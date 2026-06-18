@@ -1547,11 +1547,20 @@ async function autoSaveToSupabase() {
             })),
             updated_at: new Date().toISOString()
         };
-        await supaFetch('/gym_snapshots?on_conflict=sede,mes', {
-            method: 'POST',
-            prefer: 'resolution=merge-duplicates,return=minimal',
-            body: record
-        });
+        // Intentar actualizar primero; si no existe ningún registro, insertar
+        const existing = await supaFetch(
+            `/gym_snapshots?sede=eq.${encodeURIComponent(record.sede)}&mes=eq.${encodeURIComponent(record.mes)}&select=id`
+        );
+        if (existing && existing.length > 0) {
+            await supaFetch(
+                `/gym_snapshots?sede=eq.${encodeURIComponent(record.sede)}&mes=eq.${encodeURIComponent(record.mes)}`,
+                { method: 'PATCH', prefer: 'return=minimal', body: record }
+            );
+        } else {
+            await supaFetch('/gym_snapshots', {
+                method: 'POST', prefer: 'return=minimal', body: record
+            });
+        }
         statusEl.innerHTML += ` &nbsp;<span style="color:#1565c0;font-size:13px;">☁️ Historial actualizado (${mes})</span>`;
     } catch(e) {
         console.error('Supabase save error:', e);
