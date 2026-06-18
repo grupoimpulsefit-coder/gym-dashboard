@@ -208,12 +208,32 @@
                 <span class="role-badge" id="userRolBadge">—</span>
                 <button id="btnCambiarSede" onclick="volverAlMenu()" style="display:none;margin-left:12px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:white;border-radius:16px;padding:4px 14px;font-size:12px;font-weight:600;cursor:pointer;">← Cambiar sede</button>
             </div>
-            <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+            <div style="display:flex;gap:10px;align-items:center;">
+                <button id="btnCargarDatos" onclick="mostrarCarga()" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.35);color:white;border-radius:16px;padding:4px 14px;font-size:12px;font-weight:600;cursor:pointer;">📤 Cargar datos</button>
+                <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+            </div>
         </div>
     </div>
 
     <!-- ══════════════════ UPLOAD ══════════════════ -->
     <div class="upload-area admin-only" id="uploadSection" style="display:flex;gap:24px;flex-wrap:wrap;justify-content:center;align-items:flex-start;">
+
+        <!-- Selector de sede -->
+        <div style="width:100%;display:flex;align-items:center;gap:16px;padding:16px 24px;background:#f0f4ff;border-radius:14px;border:1.5px solid #c7d2fe;">
+            <span style="font-size:1.3em;">🏢</span>
+            <div>
+                <div style="font-size:0.8em;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Sede a cargar</div>
+                <select id="sedeSelector" onchange="onSedeSelected()" style="font-size:1em;font-weight:600;color:#302b63;border:none;background:transparent;cursor:pointer;outline:none;padding:2px 8px 2px 0;">
+                    <option value="">— Selecciona una sede —</option>
+                    <option value="Pinares">🌲 Pinares</option>
+                    <option value="Sabanilla">🏙️ Sabanilla</option>
+                    <option value="3 Ríos">🌊 3 Ríos</option>
+                    <option value="Natación">🏊 Natación</option>
+                </select>
+            </div>
+            <div id="sedeSeleccionadaBadge" style="display:none;margin-left:auto;background:#4338ca;color:white;border-radius:20px;padding:4px 16px;font-size:0.85em;font-weight:700;"></div>
+        </div>
+
         <div style="flex:1;min-width:280px;max-width:480px;">
             <div class="upload-box" id="uploadBoxU">
                 <div class="upload-icon-wrap">👥</div>
@@ -515,6 +535,26 @@ function applySedeUI() {
     document.querySelector('.header-titles p').textContent  = `${currentSedeName} · Análisis de ingresos, membresías y renovaciones`;
 }
 
+function onSedeSelected() {
+    const sel = document.getElementById('sedeSelector').value;
+    if (!sel) return;
+    currentSedeName = sel;
+    currentFileName = sel.toLowerCase().replace(/\s/g, '').replace('ríos', 'rios');
+    applySedeUI();
+    loadPricesForSede(sel);
+    const badge = document.getElementById('sedeSeleccionadaBadge');
+    badge.textContent = sel;
+    badge.style.display = 'inline-block';
+    // Limpiar estado previo
+    usuariosLoaded = false;
+    renoLoaded = false;
+    usersData = [];
+    renovacionesData = [];
+    document.getElementById('uploadStatusU').innerHTML = '';
+    document.getElementById('uploadStatusR').innerHTML = '';
+    document.getElementById('dashboard').style.display = 'none';
+}
+
 // ── SUPABASE CONSTANTS (deben ir antes de auth) ──
 const SUPA_URL = 'https://cwyqjbuhhjpefhqdcdey.supabase.co';
 const SUPA_KEY = 'sb_publishable_fCUyex-9rN7ChxV_tX8IuA_lX_6loqN';
@@ -600,11 +640,24 @@ function applyRole() {
     document.querySelectorAll('.admin-only').forEach(el => {
         el.style.display = isAdmin ? '' : 'none';
     });
-    // Forzar flex en uploadSection después del forEach (evita que CSS .admin-only lo oculte)
-    document.getElementById('uploadSection').style.display = isAdmin ? 'flex' : 'none';
-    if (!isAdmin) {
-        showSedePicker();
-    }
+    document.getElementById('uploadSection').style.display = 'none';
+    document.getElementById('btnCargarDatos').style.display = isAdmin ? 'inline-block' : 'none';
+    // Ambos roles ven el selector de sede al entrar
+    showSedePicker();
+}
+
+function mostrarCarga() {
+    document.getElementById('sedePicker').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('uploadSection').style.display = 'flex';
+    document.getElementById('btnCambiarSede').style.display = 'none';
+    // Resetear selector de sede
+    document.getElementById('sedeSelector').value = '';
+    document.getElementById('sedeSeleccionadaBadge').style.display = 'none';
+    document.getElementById('uploadStatusU').innerHTML = '';
+    document.getElementById('uploadStatusR').innerHTML = '';
+    usuariosLoaded = false;
+    renoLoaded = false;
 }
 
 const SEDE_ICONS = {
@@ -834,7 +887,10 @@ function parseCRC(val) {
 // ── FORMATO COMBINADO (pinares2.xlsx, sabanilla.xlsx, 3rios.xlsx) ──
 function processLegacyFile(wb, filename) {
     currentFileName = filename || currentFileName;
-    currentSedeName = detectSede(currentFileName);
+    // Respetar sede seleccionada manualmente en el dropdown
+    if (!document.getElementById('sedeSelector')?.value) {
+        currentSedeName = detectSede(currentFileName);
+    }
     applySedeUI();
 
     // Hoja1 → usuarios (fila 0 = encabezados, fila 1+ = datos)
@@ -916,7 +972,9 @@ function processLegacyFile(wb, filename) {
 function processUsuariosFile(data, filename) {
     try {
         currentFileName = filename || currentFileName;
-        currentSedeName = detectSede(currentFileName);
+        if (!document.getElementById('sedeSelector')?.value) {
+            currentSedeName = detectSede(currentFileName);
+        }
         applySedeUI();
         loadPricesForSede(currentSedeName);
         document.getElementById('uploadStatusU').innerHTML = '<span style="color:#667eea;font-weight:600;">⏳ Procesando usuarios...</span>';
@@ -973,8 +1031,8 @@ function processRenovacionesFile(data, filename) {
     try {
         document.getElementById('uploadStatusR').innerHTML = '<span style="color:#667eea;font-weight:600;">⏳ Procesando renovaciones...</span>';
 
-        // Detect sede from filename if usuarios not loaded yet
-        if (!usuariosLoaded && filename) {
+        // Detect sede from filename only if not selected manually and usuarios not loaded
+        if (!usuariosLoaded && filename && !document.getElementById('sedeSelector')?.value) {
             currentFileName = filename;
             currentSedeName = detectSede(filename);
             applySedeUI();
@@ -1036,9 +1094,11 @@ function rebuildDashboard() {
     renoPlans.sort().forEach(p => rps.innerHTML += `<option value="${p.replace(/"/g,'&quot;')}">${p}</option>`);
 
     document.getElementById('dashboard').style.display = 'block';
-    // Mostrar botón cambiar sede solo para colaboradores
-    if (currentRole !== 'admin') {
-        document.getElementById('btnCambiarSede').style.display = 'inline-block';
+    document.getElementById('uploadSection').style.display = 'none';
+    document.getElementById('sedePicker').style.display = 'none';
+    document.getElementById('btnCambiarSede').style.display = 'inline-block';
+    if (currentRole === 'admin') {
+        document.getElementById('btnCargarDatos').style.display = 'inline-block';
     }
 
     renderTable();
