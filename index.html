@@ -588,10 +588,11 @@ async function doLogout() {
 
 function applyRole() {
     const isAdmin = currentRole === 'admin';
-    document.getElementById('uploadSection').style.display = isAdmin ? 'flex' : 'none';
     document.querySelectorAll('.admin-only').forEach(el => {
         el.style.display = isAdmin ? '' : 'none';
     });
+    // Forzar flex en uploadSection después del forEach (evita que CSS .admin-only lo oculte)
+    document.getElementById('uploadSection').style.display = isAdmin ? 'flex' : 'none';
     if (!isAdmin) {
         loadLatestForColaborador();
     }
