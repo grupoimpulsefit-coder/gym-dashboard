@@ -1,0 +1,2533 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proyección Gym — Junio 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #1a5276;
+    --primary-light: #2e86c1;
+    --accent: #148f77;
+    --accent2: #e67e22;
+    --bg: #f0f4f8;
+    --white: #ffffff;
+    --border: #d5dce8;
+    --text: #1c2833;
+    --muted: #6c757d;
+    --warn: #c0392b;
+    --success: #27ae60;
+    --badge20: #e74c3c;
+    --badge25: #8e44ad;
+    --badgeg20: #2980b9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white; padding: 20px 32px; display: flex; align-items: center; gap: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  .header-icon { font-size: 36px; }
+  .header h1 { font-size: 22px; font-weight: 700; }
+  .header p { font-size: 13px; opacity: .85; margin-top: 2px; }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    margin: 32px auto; max-width: 560px; border: 2.5px dashed var(--primary-light);
+    border-radius: 14px; padding: 40px 24px; text-align: center; background: white;
+    cursor: pointer; transition: border-color .2s, background .2s;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: #eafaf1; }
+  .upload-zone .icon { font-size: 48px; margin-bottom: 12px; }
+  .upload-zone h2 { font-size: 18px; color: var(--primary); }
+  .upload-zone p { color: var(--muted); margin-top: 6px; font-size: 13px; }
+  #fileInput { display: none; }
+  .btn-upload {
+    margin-top: 16px; display: inline-block; padding: 10px 28px;
+    background: var(--primary); color: white; border-radius: 8px; font-size: 14px;
+    cursor: pointer; border: none; transition: background .2s;
+  }
+  .btn-upload:hover { background: var(--primary-light); }
+
+  /* ── Loading ── */
+  .loading { display: none; text-align: center; padding: 40px; }
+  .spinner { width: 40px; height: 40px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Dashboard ── */
+  #dashboard { display: none; }
+  .dash-header {
+    padding: 16px 32px; background: white; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+  .dash-title { font-size: 16px; font-weight: 700; color: var(--primary); }
+  .dash-file { font-size: 12px; color: var(--muted); }
+
+  /* ── Summary cards ── */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; padding: 24px 32px 8px; }
+  .card {
+    background: white; border-radius: 12px; padding: 18px 20px;
+    border-left: 4px solid var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,.07);
+  }
+  .card.green { border-color: var(--success); }
+  .card.orange { border-color: var(--accent2); }
+  .card.red { border-color: var(--warn); }
+  .card.purple { border-color: #8e44ad; }
+  .card-label { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+  .card-value { font-size: 28px; font-weight: 700; color: var(--primary); margin-top: 4px; }
+  .card.green .card-value { color: var(--success); }
+  .card.orange .card-value { color: var(--accent2); }
+  .card.red .card-value { color: var(--warn); }
+  .card.purple .card-value { color: #8e44ad; }
+
+  /* ── Tabs ── */
+  .tabs { padding: 0 32px; margin-top: 16px; display: flex; gap: 4px; border-bottom: 2px solid var(--border); }
+  .tab {
+    padding: 10px 20px; cursor: pointer; border-radius: 8px 8px 0 0; font-size: 13px; font-weight: 600;
+    color: var(--muted); border: 1px solid transparent; border-bottom: none; transition: all .15s;
+  }
+  .tab.active { background: white; color: var(--primary); border-color: var(--border); margin-bottom: -2px; }
+  .tab:hover:not(.active) { background: #e8edf4; color: var(--primary); }
+
+  /* ── Tab panels ── */
+  .tab-panel { display: none; padding: 24px 32px; }
+  .tab-panel.active { display: block; }
+
+  /* ── Filters bar ── */
+  .filters { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .search-box {
+    padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; width: 260px;
+    outline: none; transition: border-color .2s;
+  }
+  .search-box:focus { border-color: var(--primary-light); }
+  .filter-select {
+    padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px;
+    background: white; cursor: pointer; outline: none;
+  }
+  .btn {
+    padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    cursor: pointer; border: none; transition: all .15s;
+  }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-light); }
+  .btn-accent { background: var(--accent); color: white; }
+  .btn-accent:hover { background: #0f6b57; }
+  .btn-pdf { background: var(--warn); color: white; }
+  .btn-pdf:hover { background: #a93226; }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  table { width: 100%; border-collapse: collapse; background: white; }
+  thead th {
+    background: var(--primary); color: white; padding: 10px 12px; text-align: left;
+    font-size: 12px; font-weight: 600; white-space: nowrap; letter-spacing: .3px;
+  }
+  tbody tr { border-bottom: 1px solid #edf0f5; }
+  tbody tr:hover { background: #f0f6ff; }
+  tbody td { padding: 9px 12px; font-size: 13px; vertical-align: middle; }
+  .tag {
+    display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;
+    white-space: nowrap;
+  }
+  .tag-20 { background: #fdecea; color: var(--badge20); }
+  .tag-25 { background: #f5eef8; color: var(--badge25); }
+  .tag-g20 { background: #eaf2fb; color: var(--badgeg20); }
+  .tag-corr { background: #e8f8f5; color: var(--accent); }
+  .tag-orig { background: #fef9e7; color: #9a7d0a; }
+  .tag-noplan { background: #fdecea; color: var(--warn); }
+  .tag-hist { background: #fff3cd; color: #856404; }
+  .tag-mayo { background: #d1ecf1; color: #0c5460; }
+  .tag-full { background: #e8f8f5; color: #148f77; }
+  .corrected { color: var(--accent); font-weight: 600; }
+  .original { color: var(--muted); text-decoration: line-through; font-size: 12px; }
+  .price { font-weight: 700; color: var(--accent); }
+  .price-base { color: var(--muted); text-decoration: line-through; font-size: 12px; }
+  .no-data { text-align: center; padding: 40px; color: var(--muted); font-style: italic; }
+  .pager { display: flex; gap: 8px; margin-top: 12px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+  .pager button { padding: 5px 12px; border: 1px solid var(--border); border-radius: 6px; background: white; cursor: pointer; font-size: 12px; }
+  .pager button.active { background: var(--primary); color: white; border-color: var(--primary); }
+  .pager button:hover:not(.active) { background: var(--bg); }
+  .pager-info { font-size: 12px; color: var(--muted); }
+
+  /* ── Alert ── */
+  .alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
+  .alert-info { background: #eaf2fb; color: #1a5276; border-left: 4px solid var(--primary-light); }
+  .alert-warn { background: #fef9e7; color: #7d6608; border-left: 4px solid #f0c300; }
+
+  /* ── Proyección — estilo informe5 ── */
+  .proy-controls { padding: 20px 24px; background: #f7f8fc; border: 1px solid #eaecf5; border-radius: 12px; margin-bottom: 20px; }
+  .proy-controls-title { font-size: 11px; font-weight: 700; color: #667eea; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; }
+  .proy-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .proy-filter-item { display: flex; flex-direction: column; gap: 5px; }
+  .proy-filter-item label { font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.4px; }
+  .proy-filter-item select,
+  .proy-filter-item input[type="text"] { padding: 8px 11px; border: 1.5px solid #dde1f0; border-radius: 9px; font-size: 13px; font-family: inherit; background: white; color: #333; transition: border-color .2s; }
+  .proy-filter-item select:focus,
+  .proy-filter-item input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,.1); }
+  .proy-btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; flex-wrap: wrap; }
+  .proy-btn { border: none; padding: 9px 18px; border-radius: 9px; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; transition: all .2s; display: inline-flex; align-items: center; gap: 6px; }
+  .proy-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+  .proy-btn-orange { background: linear-gradient(135deg,#ff9800,#e65100); color: white; }
+  .proy-btn-purple { background: linear-gradient(135deg,#667eea,#764ba2); color: white; }
+  .proy-btn-red    { background: linear-gradient(135deg,#e53935,#b71c1c); color: white; }
+
+  /* Stat cards estilo informe5 */
+  .proy-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 22px; }
+  .proy-stat { background: white; padding: 20px; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.07); border: 1px solid #eef0fb; position: relative; overflow: hidden; transition: transform .2s; }
+  .proy-stat:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.1); }
+  .proy-stat::before { content:''; position:absolute; top:0; left:0; right:0; height:4px; }
+  .proy-stat.red::before    { background: linear-gradient(90deg,#e53935,#f44336); }
+  .proy-stat.orange::before { background: linear-gradient(90deg,#ff9800,#ffc107); }
+  .proy-stat.yellow::before { background: linear-gradient(90deg,#ffc107,#ffeb3b); }
+  .proy-stat.green::before  { background: linear-gradient(90deg,#43a047,#66bb6a); }
+  .proy-stat.purple::before { background: linear-gradient(90deg,#667eea,#764ba2); }
+  .proy-stat.blue::before   { background: linear-gradient(90deg,#1a5276,#2e86c1); }
+  .proy-stat h3 { color: #888; font-size: 11px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .8px; font-weight: 600; }
+  .proy-stat .sv { font-size: 1.85em; font-weight: 800; color: #1a1a3e; letter-spacing: -1px; }
+  .proy-stat .ss { font-size: 11px; color: #aaa; margin-top: 5px; }
+
+  /* Chart section */
+  .proy-chart-section { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 22px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+  .proy-chart-section canvas { max-height: 300px; }
+  .proy-section-title { font-size: 14px; font-weight: 700; color: #2d2d5e; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .proy-section-title::after { content:''; flex:1; height:2px; background: linear-gradient(90deg,#667eea22,transparent); border-radius:2px; }
+
+  /* Tabla estilo informe5 */
+  .proy-table-section { background: white; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+  .proy-table-wrap { overflow-x: auto; max-height: 520px; overflow-y: auto; border-radius: 12px; border: 1px solid #eaecf5; }
+  .proy-table-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .proy-table-wrap thead th { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); color: white; padding: 11px 13px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; white-space: nowrap; position: sticky; top: 0; }
+  .proy-table-wrap tbody tr { border-bottom: 1px solid #f0f2f8; }
+  .proy-table-wrap tbody tr:hover td { background: #f8f9ff; }
+  .proy-table-wrap tbody td { padding: 11px 13px; vertical-align: middle; }
+  .proy-table-wrap tfoot td { font-weight: 800; background: linear-gradient(135deg,#f0f2ff,#e8ebff); border-top: 2px solid #667eea; color: #2d2d5e; font-size: 13px; padding: 11px 13px; }
+
+  /* LOGIN */
+  #loginScreen { position:fixed; inset:0; background:linear-gradient(135deg,#0f0c29 0%,#1a5276 50%,#148f77 100%); display:flex; align-items:center; justify-content:center; z-index:9999; }
+  .login-card { background:white; border-radius:24px; padding:40px 44px; width:100%; max-width:420px; box-shadow:0 32px 80px rgba(0,0,0,.5); }
+  .login-logo { width:64px; height:64px; background:linear-gradient(135deg,#1a5276,#148f77); border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:30px; margin:0 auto 20px; }
+  .login-title { text-align:center; font-size:1.4em; font-weight:800; color:#1a5276; margin-bottom:4px; }
+  .login-sub { text-align:center; font-size:.85em; color:#888; margin-bottom:28px; }
+  .login-field { margin-bottom:16px; }
+  .login-field label { display:block; font-size:.75em; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+  .login-field input { width:100%; padding:12px 14px; border:1.5px solid #dde1f0; border-radius:10px; font-size:1em; font-family:inherit; outline:none; transition:border-color .2s; }
+  .login-field input:focus { border-color:#1a5276; }
+  .login-btn { width:100%; padding:13px; background:linear-gradient(135deg,#1a5276,#148f77); color:white; border:none; border-radius:12px; font-size:1em; font-weight:700; cursor:pointer; margin-top:8px; }
+  #loginError { color:#c62828; font-size:.85em; margin-top:10px; text-align:center; min-height:20px; }
+  .user-toolbar { background:rgba(0,0,0,.15); border-top:1px solid rgba(255,255,255,.15); padding:6px 32px; display:flex; align-items:center; justify-content:space-between; }
+  .role-badge { background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.3); border-radius:20px; padding:3px 12px; font-size:11px; font-weight:700; text-transform:uppercase; }
+  .logout-btn { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:white; border-radius:16px; padding:5px 16px; font-size:12px; font-weight:600; cursor:pointer; }
+  #saveStatus { font-size:12px; color:rgba(255,255,255,.85); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">🏊</div>
+    <div class="login-title">Natación — JK Sistemas</div>
+    <div class="login-sub">Proyección y análisis de ventas</div>
+    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
+    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-icon">🏊</div>
+  <div style="flex:1;">
+    <h1>Proyección de Ventas — Natación</h1>
+    <p>Análisis de planes, corrección de reposiciones y proyección con descuentos</p>
+  </div>
+</div>
+<div class="user-toolbar">
+  <div style="display:flex;align-items:center;gap:10px;color:white;">
+    <span>👤</span><span id="userNombre">—</span>
+    <span class="role-badge" id="userRolBadge">—</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="saveStatus"></span>
+    <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+  </div>
+</div>
+
+<!-- UPLOAD -->
+<div id="uploadSection">
+  <div class="upload-zone" id="dropZone">
+    <div class="icon">📂</div>
+    <h2>Cargar archivo Excel</h2>
+    <p>Arrastra y suelta el archivo <strong>nat.xlsx</strong> aquí, o haz clic para buscarlo</p>
+    <label class="btn-upload" for="fileInput">Seleccionar archivo</label>
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading" id="loadingSection">
+  <div class="spinner"></div>
+  <p>Procesando datos…</p>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="dash-header">
+    <div>
+      <div class="dash-title">Panel de Análisis</div>
+      <div class="dash-file" id="fileNameLabel"></div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="cambiarArchivo()">📂 Cambiar archivo</button>
+    </div>
+  </div>
+
+  <!-- Cards -->
+  <div class="cards">
+    <div class="card"><div class="card-label">Total Usuarios Hoja1</div><div class="card-value" id="cTotalUsuarios">—</div></div>
+    <div class="card red"><div class="card-label">Con plan incorrecto</div><div class="card-value" id="cPlanIncorrecto">—</div></div>
+    <div class="card green"><div class="card-label">Planes corregidos</div><div class="card-value" id="cCorregidos">—</div><div class="card-sub" id="cCorregidosHist" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
+    <div class="card orange"><div class="card-label">Clientes en descuento</div><div class="card-value" id="cDescuento">—</div></div>
+    <div class="card purple"><div class="card-label">Gran total junio (todos)</div><div class="card-value" id="cProyeccion">—</div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('tabUsuarios',this)">👤 Usuarios</div>
+    <div class="tab" onclick="switchTab('tabVentas',this)">🧾 Ventas Mayo</div>
+    <div class="tab" onclick="switchTab('tabProyeccion',this)">📊 Proyección Junio</div>
+    <div class="tab" onclick="switchTab('tabJunio',this)">📅 Estadísticas Junio</div>
+    <div class="tab" onclick="switchTab('tabValidacion',this)">✅ Validación Descuentos</div>
+  </div>
+
+  <!-- TAB 1: Usuarios -->
+  <div id="tabUsuarios" class="tab-panel active">
+    <div class="alert alert-info">
+      Usuarios cuyo <strong>Último Producto</strong> era "Reposicion" o "Gym incluido" fueron buscados en el historial de Hoja3 para determinar su plan principal real.
+    </div>
+    <div class="filters">
+      <input class="search-box" id="searchUsuarios" placeholder="Buscar por nombre o PIN…" oninput="filtrarTabla('usuarios')">
+      <select class="filter-select" id="filtroEstado" onchange="filtrarTabla('usuarios')">
+        <option value="">Todos los estados</option>
+        <option value="corregido">Solo corregidos</option>
+        <option value="corregido_historico">Corregidos vía histórico</option>
+        <option value="sin_correccion">Sin corrección necesaria</option>
+        <option value="sin_plan">Sin plan encontrado</option>
+      </select>
+      <select class="filter-select" id="filtroActivo" onchange="filtrarTabla('usuarios')">
+        <option value="">Todos</option>
+        <option value="Sí">Activos</option>
+        <option value="No">Inactivos</option>
+      </select>
+      <button class="btn btn-pdf" onclick="pdfUsuarios()">📄 Exportar PDF</button>
+    </div>
+    <div class="table-wrap">
+      <table id="tablaUsuarios">
+        <thead>
+          <tr>
+            <th>PIN</th><th>Nombre</th><th>Activo</th><th>Expira</th>
+            <th>Plan Original</th><th>Plan Corregido</th><th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="bodyUsuarios"></tbody>
+      </table>
+    </div>
+    <div class="pager" id="pagerUsuarios"></div>
+  </div>
+
+  <!-- TAB 2: Ventas Mayo -->
+  <div id="tabVentas" class="tab-panel">
+    <div class="alert alert-info">
+      Transacciones de Hoja3 con el <strong>plan efectivo identificado</strong>. Las entradas de "Reposicion" o "Gym incluido" muestran el plan principal de esa transacción.
+    </div>
+    <div class="filters">
+      <input class="search-box" id="searchVentas" placeholder="Buscar por cliente o plan…" oninput="filtrarTabla('ventas')">
+      <select class="filter-select" id="filtroVentaTipo" onchange="filtrarTabla('ventas')">
+        <option value="">Todos los productos</option>
+        <option value="reposicion">Solo reposiciones</option>
+        <option value="plan">Solo planes</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table id="tablaVentas">
+        <thead>
+          <tr>
+            <th>Fecha</th><th>Cliente</th><th>Producto en sistema</th><th>Plan efectivo</th><th>Total CRC</th>
+          </tr>
+        </thead>
+        <tbody id="bodyVentas"></tbody>
+      </table>
+    </div>
+    <div class="pager" id="pagerVentas"></div>
+  </div>
+
+  <!-- TAB 3: Proyección Junio -->
+  <div id="tabProyeccion" class="tab-panel">
+
+    <!-- FILTROS -->
+    <div class="proy-controls">
+      <div class="proy-controls-title">🔎 Filtros y Búsqueda</div>
+      <div class="proy-filter-grid">
+        <div class="proy-filter-item">
+          <label>Buscar por nombre</label>
+          <input type="text" id="searchProy" placeholder="Escriba el nombre…" oninput="filtrarTabla('proy')">
+        </div>
+        <div class="proy-filter-item">
+          <label>Tipo de descuento</label>
+          <select id="filtroDescuento" onchange="filtrarTabla('proy')">
+            <option value="">Todos</option>
+            <option value="20%">20% descuento</option>
+            <option value="25%">25% descuento</option>
+            <option value="G20">G20 (20%)</option>
+            <option value="Completo">Precio completo</option>
+          </select>
+        </div>
+        <div class="proy-filter-item">
+          <label>Expira en (días)</label>
+          <select id="filtroVence" onchange="filtrarTabla('proy')">
+            <option value="">Todos</option>
+            <option value="7">Próximos 7 días</option>
+            <option value="15">Próximos 15 días</option>
+            <option value="30">Próximos 30 días</option>
+            <option value="60">Próximos 60 días</option>
+            <option value="90">Próximos 90 días</option>
+            <option value="vencido">Ya vencidos</option>
+          </select>
+        </div>
+        <div class="proy-filter-item">
+          <label>Plan encontrado</label>
+          <select id="filtroPlanEncontrado" onchange="filtrarTabla('proy')">
+            <option value="">Todos</option>
+            <option value="si">Con precio definido</option>
+            <option value="pendiente">⚠ Pendientes (sin precio)</option>
+            <option value="sin_correccion">⚠ Sin plan corregido</option>
+          </select>
+        </div>
+        <div class="proy-filter-item">
+          <label>Producto / Plan</label>
+          <select id="filtroProducto" onchange="filtrarTabla('proy')">
+            <option value="">Todos los productos</option>
+          </select>
+        </div>
+      </div>
+      <div class="proy-filter-grid">
+        <div class="proy-filter-item">
+          <label>Desde (DD/MM/AAAA)</label>
+          <input type="text" id="proyFechaDesde" placeholder="dd/mm/aaaa" oninput="filtrarTabla('proy')">
+        </div>
+        <div class="proy-filter-item">
+          <label>Hasta (DD/MM/AAAA)</label>
+          <input type="text" id="proyFechaHasta" placeholder="dd/mm/aaaa" oninput="filtrarTabla('proy')">
+        </div>
+        <div class="proy-filter-item" style="justify-content:flex-end;">
+          <div class="proy-btn-row" style="margin-top:auto;">
+            <button class="proy-btn proy-btn-purple" onclick="openResumenModal()">📊 Resumen por Plan</button>
+            <button class="proy-btn proy-btn-orange" onclick="limpiarFiltrosProy()">✖ Limpiar filtros</button>
+            <button class="proy-btn proy-btn-red" onclick="pdfProyeccion()">📄 PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAT CARDS -->
+    <div class="proy-stats" id="proy-cards"></div>
+
+    <!-- GRÁFICO -->
+    <div class="proy-chart-section">
+      <div class="proy-section-title">📈 Proyección Junio por Plan (Top 10)</div>
+      <canvas id="proyChart"></canvas>
+    </div>
+
+    <!-- TABLA -->
+    <div class="proy-table-section">
+      <div class="proy-section-title">👥 Listado de Renovaciones</div>
+      <div class="proy-table-wrap">
+        <table id="tablaProyeccion">
+          <thead>
+            <tr>
+              <th>PIN</th><th>Cliente</th><th>Plan Principal</th>
+              <th>Precio Base</th><th>Descuento</th><th>Precio Junio</th>
+              <th>Pagó en Mayo</th><th>Vence</th><th>Días</th>
+            </tr>
+          </thead>
+          <tbody id="bodyProyeccion"></tbody>
+          <tfoot id="footProyeccion"></tfoot>
+        </table>
+      </div>
+      <div class="pager" id="pagerProyeccion" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- TOTALES ocultos (usados por PDF) -->
+    <div id="totalesProyeccion" style="display:none;"></div>
+  </div>
+
+  <!-- TAB 4: Estadísticas Junio -->
+  <div id="tabJunio" class="tab-panel">
+
+    <!-- Filtros -->
+    <div class="proy-controls">
+      <div class="proy-controls-title">🔎 Filtros</div>
+      <div class="proy-filter-grid">
+        <div class="proy-filter-item">
+          <label>Buscar por nombre</label>
+          <input type="text" id="searchJunio" placeholder="Escriba el nombre…" oninput="filtrarTabla('junio')">
+        </div>
+        <div class="proy-filter-item">
+          <label>Categoría</label>
+          <select id="filtroJunioTipo" onchange="filtrarTabla('junio')">
+            <option value="">Todas</option>
+            <option value="renovacion">✅ Renovación</option>
+            <option value="nuevo">🌟 Nuevo</option>
+            <option value="reingreso">🔄 Reingreso</option>
+          </select>
+        </div>
+        <div class="proy-filter-item" style="justify-content:flex-end;">
+          <div class="proy-btn-row" style="margin-top:auto;">
+            <button class="proy-btn proy-btn-red" onclick="pdfJunio()">📄 PDF</button>
+            <button class="proy-btn proy-btn-orange" onclick="limpiarFiltrosJunio()">✖ Limpiar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="proy-stats" id="junio-cards"></div>
+
+    <!-- Gráficos lado a lado -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px;">
+      <div class="proy-chart-section" style="margin-bottom:0;">
+        <div class="proy-section-title">🥧 Composición de Clientes</div>
+        <canvas id="junioDonut" style="max-height:240px;"></canvas>
+      </div>
+      <div class="proy-chart-section" style="margin-bottom:0;">
+        <div class="proy-section-title">📈 Ingresos por Plan (Top 8)</div>
+        <canvas id="junioBar" style="max-height:240px;"></canvas>
+      </div>
+    </div>
+
+    <!-- Tabla -->
+    <div class="proy-table-section">
+      <div class="proy-section-title">👥 Detalle de Clientes — Junio</div>
+      <div class="proy-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Cliente</th><th>Categoría</th><th>Plan</th>
+              <th>Pagó Junio</th><th>Fecha Pago</th><th>Última Expiración</th><th>Días Inactivo</th>
+            </tr>
+          </thead>
+          <tbody id="bodyJunio"></tbody>
+          <tfoot id="footJunio"></tfoot>
+        </table>
+      </div>
+      <div class="pager" id="pagerJunio" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <!-- TAB 5: Validación Descuentos -->
+  <div id="tabValidacion" class="tab-panel">
+    <div class="alert alert-info">
+      Clientes que pagan con <strong>descuento (20%, 25% o G20 — plan lealtad)</strong>, cruzados con los pagos registrados en la hoja <strong>Junio</strong>.
+      Se valida si ya pagaron, si se les aplicó el descuento correcto, y si están por vencer/vencidos sin haber pagado (riesgo de quedar inactivos).
+    </div>
+
+    <div class="proy-controls">
+      <div class="proy-controls-title">🔎 Filtros</div>
+      <div class="proy-filter-grid">
+        <div class="proy-filter-item">
+          <label>Buscar por nombre</label>
+          <input type="text" id="searchValidacion" placeholder="Escriba el nombre…" oninput="filtrarTabla('validacion')">
+        </div>
+        <div class="proy-filter-item">
+          <label>Estado</label>
+          <select id="filtroValidacionEstado" onchange="filtrarTabla('validacion')">
+            <option value="">Todos</option>
+            <option value="vencido_sin_pago">🔴 Vencido sin pagar</option>
+            <option value="por_vencer_sin_pago">🟠 Por vencer sin pagar</option>
+            <option value="sin_descuento">⚠ Pagó sin descuento aplicado</option>
+            <option value="monto_diferente">⚠ Monto diferente al esperado</option>
+            <option value="ok">✅ Pagó con descuento correcto</option>
+            <option value="al_dia">🟢 Al día (aún no vence)</option>
+          </select>
+        </div>
+        <div class="proy-filter-item">
+          <label>Pago</label>
+          <select id="filtroValidacionTardio" onchange="filtrarTabla('validacion')">
+            <option value="">Todos</option>
+            <option value="tardio">⏰ Solo pagos tardíos</option>
+          </select>
+        </div>
+        <div class="proy-filter-item" style="justify-content:flex-end;">
+          <div class="proy-btn-row" style="margin-top:auto;">
+            <button class="proy-btn proy-btn-orange" onclick="limpiarFiltrosValidacion()">✖ Limpiar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="proy-stats" id="validacion-cards"></div>
+
+    <div class="proy-table-section">
+      <div class="proy-section-title">👥 Detalle de Validación</div>
+      <div class="proy-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>PIN</th><th>Cliente</th><th>Plan</th><th>Descuento</th>
+              <th>Precio Junio Esperado</th><th>Pagó en Junio</th><th>Fecha Pago</th>
+              <th>Vence</th><th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="bodyValidacion"></tbody>
+        </table>
+      </div>
+      <div class="pager" id="pagerValidacion" style="margin-top:12px;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────
+// SUPABASE
+// ─────────────────────────────────────────
+const SUPA_URL = 'https://cwyqjbuhhjpefhqdcdey.supabase.co';
+const SUPA_KEY = 'sb_publishable_fCUyex-9rN7ChxV_tX8IuA_lX_6loqN';
+let currentToken = null, currentRole = null;
+
+async function supaFetch(path, opts = {}) {
+  const token = currentToken || SUPA_KEY;
+  const res = await fetch(SUPA_URL + '/rest/v1' + path, {
+    method: opts.method || 'GET',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json', 'Prefer': opts.prefer || 'return=minimal',
+      ...(opts.headers || {}) },
+    body: opts.body != null ? JSON.stringify(opts.body) : undefined
+  });
+  if (!res.ok) { const t = await res.text(); throw new Error(t); }
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pwd   = document.getElementById('loginPassword').value;
+  const btn   = document.getElementById('loginBtn');
+  const errEl = document.getElementById('loginError');
+  if (!email || !pwd) { errEl.textContent = 'Complete todos los campos.'; return; }
+  btn.textContent = 'Ingresando...'; btn.disabled = true; errEl.textContent = '';
+  try {
+    const res = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'apikey': SUPA_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pwd })
+    });
+    const data = await res.json();
+    if (!data.access_token) throw new Error(data.error_description || 'Credenciales incorrectas');
+    currentToken = data.access_token;
+    const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre`);
+    currentRole = roles?.[0]?.role || 'colaborador';
+    const nombre = roles?.[0]?.nombre || email;
+    document.getElementById('userNombre').textContent = nombre;
+    document.getElementById('userRolBadge').textContent = currentRole === 'admin' ? '⚙ Admin' : '👁 Colaborador';
+    // Ocultar sección de carga si es colaborador
+    if (currentRole !== 'admin') {
+      document.getElementById('uploadSection').style.display = 'none';
+    }
+    document.getElementById('loginScreen').style.display = 'none';
+  } catch(e) {
+    errEl.textContent = e.message;
+  } finally {
+    btn.textContent = 'Entrar'; btn.disabled = false;
+  }
+}
+
+async function doLogout() {
+  try { await fetch(`${SUPA_URL}/auth/v1/logout`, { method:'POST', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken} }); } catch(_) {}
+  currentToken = null; currentRole = null;
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+async function autoSaveNat(mes) {
+  const statusEl = document.getElementById('saveStatus');
+  statusEl.textContent = '⏳ Guardando...';
+  try {
+    const record = {
+      sede: 'Natación', mes,
+      mes_orden: mes,
+      activos: G.hoja1.filter(u => u.activo === 'Sí').length,
+      total_usuarios: G.hoja1.length,
+      proyecciones: {
+        con_descuento: G.proyeccion.length,
+        precio_completo: G.planCompleto.length,
+        total_junio: G.totalJunio || 0
+      },
+      renovaciones: {
+        nuevos: 0, renovaciones: G.ventas.length, reingresos: 0,
+        total: G.ventas.reduce((s,v) => s + v.total, 0)
+      },
+      users_data: G.hoja1.map(u => ({
+        PIN: u.pin, Nombre: u.nombre, Activo: u.activo, Expira: u.expira,
+        ÚltimoProducto: u.planCorregido || u.planOriginal,
+        PlanOriginal: u.planOriginal, EstadoCorrecion: u.estado,
+        ValorPlan: buscarPrecio(u.planCorregido || u.planOriginal) || 0
+      })),
+      renov_data: [],
+      updated_at: new Date().toISOString()
+    };
+    const existing = await supaFetch(`/gym_snapshots?sede=eq.Nataci%C3%B3n&mes=eq.${encodeURIComponent(mes)}&select=id`);
+    if (existing?.length) {
+      await supaFetch(`/gym_snapshots?sede=eq.Nataci%C3%B3n&mes=eq.${encodeURIComponent(mes)}`,
+        { method:'PATCH', prefer:'return=minimal', body: record });
+    } else {
+      await supaFetch('/gym_snapshots', { method:'POST', prefer:'return=minimal', body: record });
+    }
+    statusEl.textContent = `☁️ Guardado (${mes})`;
+  } catch(e) {
+    statusEl.textContent = '⚠️ Error: ' + e.message;
+    console.error(e);
+  }
+}
+
+// ─────────────────────────────────────────
+// CONSTANTES
+// ─────────────────────────────────────────
+const ADDONS = ['reposicion','gym incluido','matrícula anual','matricula anual','png','fondo'];
+const PAGE_SIZE = 50;
+
+// Estado global
+let proyChartInst = null;
+
+let G = {
+  planes: {},          // nombre normalizado → precio
+  planesRaw: [],       // [{nombre, precio}]
+  hoja3Map: {},        // nombre normalizado → [plan1, plan2, ...]  (planes efectivos únicos)
+  historicoMap: {},    // igual pero desde hoja histórico (enero-mayo)
+  planCompleto: [],    // usuarios activos que pagan precio completo
+  hoja1: [],           // filas procesadas
+  ventas: [],          // filas procesadas
+  proyeccion: [],      // filas procesadas
+  junio: [],           // estadísticas junio
+  validacion: [],      // validación de descuentos vs pagos junio
+  pages: { usuarios:1, ventas:1, proy:1, junio:1, validacion:1 },
+  filtered: { usuarios:[], ventas:[], proy:[], junio:[], validacion:[] }
+};
+
+// ─────────────────────────────────────────
+// UTILIDADES
+// ─────────────────────────────────────────
+const norm = s => s ? String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim() : '';
+const fmt  = n => n != null ? '₡' + Number(n).toLocaleString('es-CR') : '—';
+const isAddon = s => ADDONS.some(a => norm(s).includes(a));
+
+function parseDate(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  const parts = s.split('/');
+  if (parts.length === 3) {
+    let [d, m, y] = parts.map(Number);
+    if (y < 100) y += 2000;
+    const dt = new Date(y, m - 1, d);
+    return isNaN(dt) ? null : dt;
+  }
+  return null;
+}
+function daysUntil(date) {
+  if (!date) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.ceil((date - today) / 86400000);
+}
+function parseDateInput(str) {
+  return parseDate(str);
+}
+
+// Limpia nombre de plan: quita "(Promo: xxx)" y espacios extra
+function cleanPlan(s) {
+  if (!s) return '';
+  return s.replace(/\(Promo:[^)]+\)/gi,'').replace(/\s+/g,' ').trim();
+}
+
+// Extrae plan principal de un string con comas (multi-producto)
+function planPrincipal(productos) {
+  if (!productos) return '';
+  const partes = String(productos).split(',').map(p => cleanPlan(p)).filter(p => p && !isAddon(p));
+  return partes[0] || '';
+}
+
+// Busca precio en la tabla de planes (fuzzy: normalización)
+function buscarPrecio(planStr) {
+  const key = norm(cleanPlan(planStr));
+  if (!key) return null;
+  // Búsqueda exacta
+  if (G.planes[key] != null) return G.planes[key];
+  // Búsqueda parcial
+  for (const [k,v] of Object.entries(G.planes)) {
+    if (k.includes(key) || key.includes(k)) return v;
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────
+// FILE UPLOAD / DRAG
+// ─────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+  if (e.dataTransfer.files[0]) procesarArchivo(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) procesarArchivo(e.target.files[0]); });
+
+function cambiarArchivo() {
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('uploadSection').style.display = '';
+  fileInput.value = '';
+}
+
+function procesarArchivo(file) {
+  document.getElementById('uploadSection').style.display = 'none';
+  document.getElementById('loadingSection').style.display = 'block';
+  document.getElementById('fileNameLabel').textContent = file.name;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: false });
+      analizar(wb);
+    } catch(err) {
+      alert('Error al leer el archivo: ' + err.message);
+      cambiarArchivo();
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ─────────────────────────────────────────
+// ANÁLISIS PRINCIPAL
+// ─────────────────────────────────────────
+function sheetToArr(ws) {
+  const data = XLSX.utils.sheet_to_json(ws, { header:1, defval: null });
+  return data;
+}
+
+function analizar(wb) {
+  // ── Hoja2: tabla de precios ──
+  const arr2 = sheetToArr(wb.Sheets['Hoja2']);
+  G.planes = {};
+  G.planesRaw = [];
+  for (let i = 1; i < arr2.length; i++) {
+    const nombre = arr2[i][0], precio = arr2[i][1];
+    if (nombre != null) {
+      G.planesRaw.push({ nombre: String(nombre).trim(), precio: Number(precio) || 0 });
+      G.planes[norm(nombre)] = Number(precio) || 0;
+    }
+  }
+
+  // ── Helper: procesar filas de ventas y poblar un mapa cliente→planes ──
+  // colIdx: { fecha, cliente, producto, total } índices de columna
+  function buildClientMap(arr, colIdx) {
+    const txMap = {};
+    // priceMap: norm(cliente) → { norm(plan) → precio más reciente pagado }
+    const priceMap = {};
+
+    for (let i = 1; i < arr.length; i++) {
+      const row = arr[i];
+      const fecha   = row[colIdx.fecha];
+      const cliente = row[colIdx.cliente];
+      const producto= row[colIdx.producto];
+      const total   = row[colIdx.total];
+      if (!cliente || !producto) continue;
+      const nc = norm(String(cliente));
+      if (nc === 'invitado' || nc === 'administrativo') continue;
+
+      const fechaDia = fecha ? String(fecha).substring(0,10) : '';
+      const txKey = nc + '|' + fechaDia;
+      if (!txMap[txKey]) txMap[txKey] = { cliente: String(cliente).trim(), fecha: fechaDia, planes: [] };
+
+      const planLimpio = cleanPlan(String(producto));
+      const precio = Number(total) || 0;
+      txMap[txKey].planes.push({ plan: planLimpio, precio });
+
+      // Guardar precio real pagado por cliente+plan (se sobreescribe → queda el último cronológicamente)
+      if (!isAddon(planLimpio) && precio > 0) {
+        if (!priceMap[nc]) priceMap[nc] = {};
+        priceMap[nc][norm(planLimpio)] = precio;
+      }
+    }
+    const clientMap = {};
+    for (const tx of Object.values(txMap)) {
+      const key = norm(tx.cliente);
+      const efectivos = tx.planes.filter(p => !isAddon(p.plan) && p.precio > 0);
+      if (!clientMap[key]) clientMap[key] = [];
+      for (const pe of efectivos) {
+        if (!clientMap[key].some(x => norm(x) === norm(pe.plan)))
+          clientMap[key].push(pe.plan);
+      }
+    }
+    return { txMap, clientMap, priceMap };
+  }
+
+  // ── Hoja3: construir mapa cliente → planes efectivos (mayo) ──
+  const arr3 = sheetToArr(wb.Sheets['Hoja3']);
+  const { txMap, clientMap: h3Map, priceMap: pm3 } = buildClientMap(arr3, { fecha:0, cliente:1, producto:2, total:3 });
+  G.hoja3Map = h3Map;
+  G.pm3 = pm3;   // precios reales pagados en mayo
+  G.pmH = {};    // precios reales pagados en histórico
+  G.ventas = [];
+
+  // ── Histórico: construir mapa cliente → planes efectivos (ene-may) ──
+  G.historicoMap = {};
+  G.historicoVentas = [];
+  const histSheet = wb.Sheets['historico'] || wb.Sheets['Histórico'] || wb.Sheets['Historico'];
+  if (histSheet) {
+    const arrH = sheetToArr(histSheet);
+    // columnas: Fecha=0, Cliente=1, RegistradoPor=2, Producto=3, Total=4
+    const { clientMap: hMap, priceMap: pmH } = buildClientMap(arrH, { fecha:0, cliente:1, producto:3, total:4 });
+    G.historicoMap = hMap;
+    G.pmH = pmH;
+
+    for (let i = 1; i < arrH.length; i++) {
+      const [fecha, cliente, , producto, total] = arrH[i];
+      if (!cliente || !producto) continue;
+      if (norm(cliente) === 'invitado' || norm(cliente) === 'administrativo') continue;
+      const planLimpio = cleanPlan(String(producto));
+      G.historicoVentas.push({
+        fecha: fecha ? String(fecha).substring(0,10) : '',
+        cliente: String(cliente).trim(),
+        producto: planLimpio,
+        esAddon: isAddon(planLimpio),
+        total: Number(total) || 0
+      });
+    }
+  }
+
+  // Helper: precio real pagado por un cliente para un plan (mayo > histórico > null)
+  function precioRealPagado(clienteNorm, planNorm) {
+    if (G.pm3[clienteNorm]?.[planNorm] != null) return { precio: G.pm3[clienteNorm][planNorm], fuente: 'mayo' };
+    if (G.pmH[clienteNorm]?.[planNorm] != null) return { precio: G.pmH[clienteNorm][planNorm], fuente: 'historico' };
+    // Búsqueda fuzzy de plan
+    for (const [kc, planes] of Object.entries(G.pm3)) {
+      if (kc === clienteNorm) {
+        for (const [kp, precio] of Object.entries(planes)) {
+          if (kp.includes(planNorm) || planNorm.includes(kp)) return { precio, fuente: 'mayo' };
+        }
+      }
+    }
+    for (const [kc, planes] of Object.entries(G.pmH)) {
+      if (kc === clienteNorm) {
+        for (const [kp, precio] of Object.entries(planes)) {
+          if (kp.includes(planNorm) || planNorm.includes(kp)) return { precio, fuente: 'historico' };
+        }
+      }
+    }
+    return null;
+  }
+
+  // Reconstruir txMap para ventas de Hoja3
+  for (let i = 1; i < arr3.length; i++) {
+    const [fecha, cliente, producto, total] = arr3[i];
+    if (!cliente || !producto) continue;
+    if (norm(cliente) === 'invitado' || norm(cliente) === 'administrativo') continue;
+
+    const planLimpio = cleanPlan(String(producto));
+    const esAddon = isAddon(planLimpio);
+    let planEfectivo = planLimpio;
+
+    if (esAddon) {
+      const fechaDia = fecha ? String(fecha).substring(0,10) : '';
+      const txKey = norm(cliente) + '|' + fechaDia;
+      const tx = txMap[txKey];
+      if (tx) {
+        const pe = tx.planes.find(p => !isAddon(p.plan) && p.precio > 0);
+        if (pe) planEfectivo = pe.plan;
+      }
+    }
+
+    G.ventas.push({
+      fecha: fecha ? String(fecha).substring(0,10) : '',
+      cliente: String(cliente).trim(),
+      productoOriginal: planLimpio,
+      planEfectivo,
+      esAddon,
+      total: Number(total) || 0
+    });
+  }
+
+  // ── Hoja1: corregir planes ──
+  const arr1 = sheetToArr(wb.Sheets['Hoja1']);
+  G.hoja1 = [];
+  let corregidos = 0, sinPlan = 0, planIncorrecto = 0;
+
+  for (let i = 1; i < arr1.length; i++) {
+    const [pin, nombre, , , activo, expira, , , , ultimoProd] = arr1[i];
+    if (!nombre) continue;
+
+    const planOriginal = cleanPlan(String(ultimoProd || ''));
+    const necesitaCorreccion = isAddon(planOriginal);
+    let planCorregido = planOriginal;
+    let estado = 'ok';
+
+    let fuentePlan = null;
+
+    if (necesitaCorreccion) {
+      planIncorrecto++;
+      const key = norm(String(nombre));
+
+      function buscarEnMapa(mapa) {
+        let encontrado = mapa[key];
+        let matchedKey = key;
+        if (!encontrado || !encontrado.length) {
+          for (const [k, v] of Object.entries(mapa)) {
+            if (k.includes(key) || key.includes(k)) { encontrado = v; matchedKey = k; break; }
+          }
+        }
+        return (encontrado && encontrado.length) ? { plans: encontrado, matchedKey } : null;
+      }
+
+      // Elige el plan con mayor precio pagado (probable plan principal, no un extra/accesorio)
+      function mejorPlan(plans, matchedKey, priceMap) {
+        let mejor = plans[plans.length - 1], mejorPrecio = -1;
+        for (const p of plans) {
+          const precio = priceMap[matchedKey]?.[norm(p)];
+          if (precio != null && precio > mejorPrecio) { mejorPrecio = precio; mejor = p; }
+        }
+        return mejor;
+      }
+
+      // Primero Hoja3 (mayo, más reciente), luego histórico
+      let encontrado = buscarEnMapa(G.hoja3Map);
+      if (encontrado) {
+        fuentePlan = 'mayo';
+        planCorregido = mejorPlan(encontrado.plans, encontrado.matchedKey, G.pm3);
+        estado = 'corregido';
+        corregidos++;
+      } else {
+        encontrado = buscarEnMapa(G.historicoMap);
+        if (encontrado) {
+          fuentePlan = 'historico';
+          planCorregido = mejorPlan(encontrado.plans, encontrado.matchedKey, G.pmH);
+          estado = 'corregido';
+          corregidos++;
+        } else {
+          estado = 'sin_plan';
+          sinPlan++;
+        }
+      }
+    }
+
+    G.hoja1.push({
+      pin: pin != null ? String(pin) : '',
+      nombre: String(nombre).trim(),
+      activo: String(activo || '').trim(),
+      expira: String(expira || '').trim(),
+      planOriginal,
+      planCorregido,
+      estado,
+      fuentePlan
+    });
+  }
+
+  // ── Hojas de descuentos ──
+  G.proyeccion = [];
+  const descSheets = [
+    { nombre: '20%', pct: 0.20, label: '20%' },
+    { nombre: '25%', pct: 0.25, label: '25%' },
+    { nombre: 'g20', pct: 0.20, label: 'G20' }
+  ];
+
+  for (const ds of descSheets) {
+    if (!wb.Sheets[ds.nombre]) continue;
+    const arr = sheetToArr(wb.Sheets[ds.nombre]);
+    for (let i = 1; i < arr.length; i++) {
+      const row = arr[i];
+      const cliente = row[3], productosStr = row[4], ingresos = row[6], fecha = row[1];
+      if (!cliente || !productosStr) continue;
+
+      const planMain = planPrincipal(String(productosStr));
+      if (!planMain) continue;
+
+      // Excluir matrícula del cálculo, pero sí mostrar el plan
+      const precio = buscarPrecio(planMain);
+      let precioJunio = null;
+      if (precio != null && precio > 0) precioJunio = precio * (1 - ds.pct);
+
+      // Buscar PIN desde Hoja1
+      const clienteNorm = norm(String(cliente));
+      const hoja1Match = G.hoja1.find(u => norm(u.nombre) === clienteNorm);
+
+      G.proyeccion.push({
+        pin: hoja1Match ? hoja1Match.pin : '—',
+        cliente: String(cliente).trim(),
+        fuente: ds.label,
+        pct: ds.pct,
+        planMain,
+        productosFull: String(productosStr),
+        precioBase: precio,
+        precioJunio,
+        pagoMayo: Number(ingresos) || 0,
+        fecha: fecha ? String(fecha) : ''
+      });
+    }
+  }
+
+  // Deduplicar proyeccion por cliente+plan (puede aparecer en varias fechas)
+  const seenProy = new Set();
+  G.proyeccion = G.proyeccion.filter(r => {
+    const k = norm(r.cliente) + '|' + norm(r.planMain) + '|' + r.fuente;
+    if (seenProy.has(k)) return false;
+    seenProy.add(k); return true;
+  });
+
+  // ── Mapa nombre → fecha de vencimiento (desde Hoja1) ──
+  const expiraMap = {};
+  for (const u of G.hoja1) {
+    expiraMap[norm(u.nombre)] = { expira: u.expira, expiraDate: parseDate(u.expira) };
+  }
+  // Enriquecer proyeccion con fecha de vencimiento
+  for (const r of G.proyeccion) {
+    const info = expiraMap[norm(r.cliente)];
+    if (info) { r.expira = info.expira; r.expiraDate = info.expiraDate; }
+    else { r.expira = '—'; r.expiraDate = null; }
+  }
+
+  // ── Clientes precio completo: activos de Hoja1 NO en hojas de descuento ──
+  const nombresConDescuento = new Set(G.proyeccion.map(r => norm(r.cliente)));
+  G.planCompleto = [];
+  for (const u of G.hoja1) {
+    if (u.activo !== 'Sí') continue;
+    if (nombresConDescuento.has(norm(u.nombre))) continue;
+
+    const plan = u.planCorregido || u.planOriginal;
+    const cn = norm(u.nombre);
+
+    // CASO 1: plan es addon y no pudo corregirse → buscar de respaldo en transacciones crudas
+    if (!plan || isAddon(plan)) {
+      // Respaldo: cualquier transacción (mayo o histórico) con producto no-addon y precio > 0
+      const candidatos = [
+        ...G.ventas.filter(r => !r.esAddon && r.total > 0)
+          .map(r => ({ cliente: r.cliente, producto: r.productoOriginal, total: r.total, fuente: 'mayo' })),
+        ...(G.historicoVentas || []).filter(r => !r.esAddon && r.total > 0)
+          .map(r => ({ cliente: r.cliente, producto: r.producto, total: r.total, fuente: 'historico' }))
+      ].filter(r => {
+        const nc = norm(r.cliente);
+        return nc === cn || nc.includes(cn) || cn.includes(nc);
+      });
+
+      if (candidatos.length) {
+        // El de mayor total suele ser el plan principal (no un extra/accesorio)
+        const mejor = candidatos.reduce((a, b) => (b.total > a.total ? b : a));
+        const precioHoja2b = buscarPrecio(mejor.producto);
+        G.planCompleto.push({
+          pin: u.pin, cliente: u.nombre, fuente: 'Completo', pct: 0,
+          planMain: mejor.producto,
+          precioBase: precioHoja2b,
+          precioJunio: (precioHoja2b != null && precioHoja2b > 0) ? precioHoja2b : null,
+          precioFuente: (precioHoja2b != null && precioHoja2b > 0) ? 'hoja2' : null,
+          pendiente: (precioHoja2b != null && precioHoja2b > 0) ? null : 'sin_precio',
+          detectadoAuto: mejor.fuente,
+          pagoMayo: mejor.total,
+          expira: u.expira, expiraDate: parseDate(u.expira)
+        });
+        continue;
+      }
+
+      G.planCompleto.push({
+        pin: u.pin, cliente: u.nombre, fuente: 'Completo', pct: 0,
+        planMain: u.planOriginal || '—',
+        precioBase: null, precioJunio: null,
+        precioFuente: null, pendiente: 'sin_correccion',
+        pagoMayo: null, expira: u.expira, expiraDate: parseDate(u.expira)
+      });
+      continue;
+    }
+
+    const precioHoja2 = buscarPrecio(plan);
+
+    // CASO 2: plan reconocido pero sin precio en Hoja2 → incluir como "Pendiente"
+    if (precioHoja2 == null || precioHoja2 === 0) {
+      G.planCompleto.push({
+        pin: u.pin, cliente: u.nombre, fuente: 'Completo', pct: 0,
+        planMain: plan,
+        precioBase: null, precioJunio: null,
+        precioFuente: null, pendiente: 'sin_precio',
+        pagoMayo: null, expira: u.expira, expiraDate: parseDate(u.expira)
+      });
+      continue;
+    }
+
+    // CASO 3: plan con precio → verificar si pagó diferente en historial
+    const pn = norm(plan);
+    const real = precioRealPagado(cn, pn);
+    const usarReal = real && real.precio > 0 && real.precio !== precioHoja2;
+    const precioJunio = usarReal ? real.precio : precioHoja2;
+    const precioFuente = usarReal ? real.fuente : 'hoja2';
+
+    G.planCompleto.push({
+      pin: u.pin, cliente: u.nombre, fuente: 'Completo', pct: 0,
+      planMain: plan,
+      precioBase: precioHoja2, precioJunio,
+      precioFuente, pendiente: null,
+      pagoMayo: real ? real.precio : null,
+      expira: u.expira, expiraDate: parseDate(u.expira)
+    });
+  }
+
+  // ── Hoja Junio: estadísticas del mes ──
+  G.junio = [];
+  const junioSheet = wb.Sheets['junio'] || wb.Sheets['Junio'];
+  if (junioSheet) {
+    const arrJ = sheetToArr(junioSheet);
+    // Agrupar por cliente (ignorar addons e invitados, solo filas con precio > 0)
+    const jMap = {}; // normNombre → acumulado
+    for (let i = 1; i < arrJ.length; i++) {
+      const [fecha, cliente, , producto, total] = arrJ[i];
+      if (!cliente || !producto) continue;
+      const nc = norm(String(cliente));
+      if (nc === 'invitado' || nc === 'administrativo') continue;
+      const planLimpio = cleanPlan(String(producto));
+      if (isAddon(planLimpio)) continue;
+      const tv = Number(total) || 0;
+      if (tv <= 0) continue;
+      if (!jMap[nc]) jMap[nc] = {
+        nombre: String(cliente).trim(),
+        total: 0, planes: [], fecha: fecha ? String(fecha).substring(0,10) : ''
+      };
+      jMap[nc].total += tv;
+      if (!jMap[nc].planes.includes(planLimpio)) jMap[nc].planes.push(planLimpio);
+    }
+
+    // Mapa expira de Hoja1 para calcular días inactivo
+    const expH1 = {};
+    for (const u of G.hoja1) expH1[norm(u.nombre)] = { expira: u.expira, expiraDate: parseDate(u.expira), activo: u.activo };
+
+    for (const [nc, data] of Object.entries(jMap)) {
+      const h1info = expH1[nc];
+      const fechaPagoDate = parseDate(data.fecha);
+      let tipo = 'nuevo', diasInactivo = null;
+
+      if (h1info) {
+        if (h1info.activo === 'Sí') {
+          tipo = 'renovacion';
+        } else {
+          // Calcular días desde que expiró hasta que pagó
+          if (h1info.expiraDate && fechaPagoDate) {
+            diasInactivo = Math.round((fechaPagoDate - h1info.expiraDate) / 86400000);
+            tipo = diasInactivo > 10 ? 'reingreso' : 'renovacion';
+          } else {
+            tipo = 'renovacion';
+          }
+        }
+      }
+
+      G.junio.push({
+        nombre: data.nombre,
+        tipo,
+        planMain: data.planes[0] || '—',
+        planes: data.planes,
+        total: data.total,
+        fecha: data.fecha,
+        expira: h1info ? h1info.expira : '—',
+        diasInactivo
+      });
+    }
+    G.junio.sort((a,b) => a.nombre.localeCompare(b.nombre));
+  }
+
+  // ── Validación de descuentos (20%/25%/G20) vs pagos de Junio ──
+  G.validacion = [];
+  const TOL = 100; // tolerancia en colones para considerar montos "iguales"
+  G.proyeccion
+    .filter(r => ['20%','25%','G20'].includes(r.fuente))
+    .forEach(r => {
+      const key = norm(r.cliente);
+      const pago = G.junio.find(j => {
+        const nj = norm(j.nombre);
+        return nj === key || nj.includes(key) || key.includes(nj);
+      });
+      const dias = daysUntil(r.expiraDate);
+      let estado;
+      if (pago) {
+        const esperado = r.precioJunio;
+        const pagado = pago.total;
+        if (esperado != null && Math.abs(pagado - esperado) <= TOL) estado = 'ok';
+        else if (r.precioBase != null && Math.abs(pagado - r.precioBase) <= TOL) estado = 'sin_descuento';
+        else estado = 'monto_diferente';
+      } else if (dias !== null && dias < 0) {
+        estado = 'vencido_sin_pago';
+      } else if (dias !== null && dias <= 15) {
+        estado = 'por_vencer_sin_pago';
+      } else {
+        estado = 'al_dia';
+      }
+      // Pago tardío: pagó después de la fecha de vencimiento de su plan anterior
+      let pagoTardio = null;
+      if (pago) {
+        const fechaPagoDate = parseDate(pago.fecha);
+        if (fechaPagoDate && r.expiraDate) {
+          const diff = Math.round((fechaPagoDate - r.expiraDate) / 86400000);
+          if (diff > 0) pagoTardio = diff;
+        }
+      }
+      G.validacion.push({ ...r, pago, estado, pagoTardio });
+    });
+
+  // ── Actualizar cards ──
+  const corregidosHist = G.hoja1.filter(r => r.estado === 'corregido' && r.fuentePlan === 'historico').length;
+  document.getElementById('cTotalUsuarios').textContent = G.hoja1.length;
+  document.getElementById('cPlanIncorrecto').textContent = planIncorrecto;
+  document.getElementById('cCorregidos').textContent = corregidos;
+  document.getElementById('cCorregidosHist').textContent = corregidosHist > 0 ? `📅 ${corregidosHist} vía histórico` : '';
+  document.getElementById('cDescuento').textContent = G.proyeccion.length;
+  const totalDescuento = G.proyeccion.reduce((s,r) => s + (r.precioJunio || 0), 0);
+  const totalCompleto  = G.planCompleto.reduce((s,r) => s + (r.precioJunio || 0), 0);
+  document.getElementById('cProyeccion').textContent = '₡' + Math.round(totalDescuento + totalCompleto).toLocaleString('es-CR');
+
+  // Render tables
+  G.filtered.usuarios = [...G.hoja1];
+  G.filtered.ventas = [...G.ventas];
+  G.filtered.proy = [...G.proyeccion, ...G.planCompleto];
+  G.filtered.junio = [...G.junio];
+  G.filtered.validacion = [...G.validacion];
+  G.pages = { usuarios:1, ventas:1, proy:1, junio:1, validacion:1 };
+
+  poblarFiltroProducto();
+  renderTabla('usuarios');
+  renderTabla('ventas');
+  renderTabla('proy');
+  renderTotalesProyeccion();
+  renderProyCards([...G.proyeccion, ...G.planCompleto]);
+  renderProyChart([...G.proyeccion, ...G.planCompleto]);
+  renderTabla('junio');
+  renderTabla('validacion');
+
+  document.getElementById('loadingSection').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+
+  // Guardar en Supabase (solo admin)
+  G.totalJunio = Math.round(totalDescuento + totalCompleto);
+  if (currentRole === 'admin') {
+    // Detectar mes desde la hoja más reciente (junio sheet o Hoja3)
+    const allDates = [...G.ventas, ...G.junio]
+      .map(r => r.fecha).filter(Boolean)
+      .map(f => { const p = String(f).substring(0,10).split('/'); return p.length===3 ? new Date(p[2],p[1]-1,p[0]) : new Date(f); })
+      .filter(d => !isNaN(d));
+    const ref = allDates.length ? new Date(Math.max(...allDates.map(d=>d.getTime()))) : new Date();
+    const mesNombre = ref.toLocaleString('es-CR', { month:'long', year:'numeric' });
+    const mes = mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1) + ' de ' + ref.getFullYear();
+    autoSaveNat(mes);
+  }
+}
+
+// ─────────────────────────────────────────
+// FILTROS
+// ─────────────────────────────────────────
+function filtrarTabla(tipo) {
+  if (tipo === 'usuarios') {
+    const q = norm(document.getElementById('searchUsuarios').value);
+    const estado = document.getElementById('filtroEstado').value;
+    const activo = document.getElementById('filtroActivo').value;
+    G.filtered.usuarios = G.hoja1.filter(r => {
+      if (q && !norm(r.nombre).includes(q) && !r.pin.includes(q)) return false;
+      if (estado === 'corregido_historico') {
+        if (r.estado !== 'corregido' || r.fuentePlan !== 'historico') return false;
+      } else if (estado && r.estado !== estado) return false;
+      if (activo && r.activo !== activo) return false;
+      return true;
+    });
+    G.pages.usuarios = 1;
+  } else if (tipo === 'ventas') {
+    const q = norm(document.getElementById('searchVentas').value);
+    const tipo2 = document.getElementById('filtroVentaTipo').value;
+    G.filtered.ventas = G.ventas.filter(r => {
+      if (q && !norm(r.cliente).includes(q) && !norm(r.planEfectivo).includes(q)) return false;
+      if (tipo2 === 'reposicion' && !r.esAddon) return false;
+      if (tipo2 === 'plan' && r.esAddon) return false;
+      return true;
+    });
+    G.pages.ventas = 1;
+  } else if (tipo === 'junio') {
+    const q = norm(document.getElementById('searchJunio').value);
+    const cat = document.getElementById('filtroJunioTipo').value;
+    G.filtered.junio = G.junio.filter(r => {
+      if (q && !norm(r.nombre).includes(q) && !norm(r.planMain).includes(q)) return false;
+      if (cat && r.tipo !== cat) return false;
+      return true;
+    });
+    G.pages.junio = 1;
+  } else if (tipo === 'proy') {
+    const q = norm(document.getElementById('searchProy').value);
+    const desc = document.getElementById('filtroDescuento').value;
+    const found = document.getElementById('filtroPlanEncontrado').value;
+    const vence = document.getElementById('filtroVence').value;
+    const producto = document.getElementById('filtroProducto').value;
+    const desde = parseDateInput(document.getElementById('proyFechaDesde').value);
+    const hasta = parseDateInput(document.getElementById('proyFechaHasta').value);
+    const todosProy = [...G.proyeccion, ...G.planCompleto];
+    G.filtered.proy = todosProy.filter(r => {
+      if (q && !norm(r.cliente).includes(q) && !norm(r.planMain).includes(q)) return false;
+      if (desc && r.fuente !== desc) return false;
+      if (producto && norm(r.planMain) !== producto) return false;
+      if (found === 'si'           && (r.precioBase == null || r.pendiente)) return false;
+      if (found === 'pendiente'    && !r.pendiente) return false;
+      if (found === 'sin_correccion' && r.pendiente !== 'sin_correccion') return false;
+      if (vence) {
+        const d = daysUntil(r.expiraDate);
+        if (vence === 'vencido') { if (d === null || d >= 0) return false; }
+        else { const limit = parseInt(vence); if (d === null || d < 0 || d > limit) return false; }
+      }
+      if (desde && r.expiraDate && r.expiraDate < desde) return false;
+      if (hasta && r.expiraDate && r.expiraDate > hasta) return false;
+      return true;
+    });
+    G.pages.proy = 1;
+  } else if (tipo === 'validacion') {
+    const q = norm(document.getElementById('searchValidacion').value);
+    const estado = document.getElementById('filtroValidacionEstado').value;
+    const tardio = document.getElementById('filtroValidacionTardio').value;
+    G.filtered.validacion = G.validacion.filter(r => {
+      if (q && !norm(r.cliente).includes(q) && !norm(r.planMain).includes(q)) return false;
+      if (estado && r.estado !== estado) return false;
+      if (tardio === 'tardio' && !r.pagoTardio) return false;
+      return true;
+    });
+    G.pages.validacion = 1;
+  }
+  renderTabla(tipo);
+}
+
+function limpiarFiltrosValidacion() {
+  document.getElementById('searchValidacion').value = '';
+  document.getElementById('filtroValidacionEstado').value = '';
+  document.getElementById('filtroValidacionTardio').value = '';
+  filtrarTabla('validacion');
+}
+
+// ─────────────────────────────────────────
+// RENDER TABLAS
+// ─────────────────────────────────────────
+function pageData(arr, page) {
+  const start = (page-1)*PAGE_SIZE;
+  return arr.slice(start, start+PAGE_SIZE);
+}
+
+function renderPager(tipo, total) {
+  const pages = Math.ceil(total / PAGE_SIZE);
+  const cur = G.pages[tipo];
+  const idMap = { usuarios:'Usuarios', ventas:'Ventas', proy:'Proyeccion', junio:'Junio', validacion:'Validacion' };
+  const el = document.getElementById('pager' + (idMap[tipo]||'Proyeccion'));
+  if (pages <= 1) { el.innerHTML=''; return; }
+  let html = `<span class="pager-info">${total} registros</span>`;
+  for (let p = 1; p <= pages; p++) {
+    html += `<button class="${p===cur?'active':''}" onclick="goPage('${tipo}',${p})">${p}</button>`;
+  }
+  el.innerHTML = html;
+}
+
+function goPage(tipo, p) { G.pages[tipo] = p; renderTabla(tipo); }
+
+function renderTabla(tipo) {
+  if (tipo === 'usuarios') renderUsuarios();
+  else if (tipo === 'ventas') renderVentas();
+  else if (tipo === 'proy') renderProyeccion();
+  else if (tipo === 'junio') renderJunio();
+  else if (tipo === 'validacion') renderValidacion();
+}
+
+function renderUsuarios() {
+  const data = pageData(G.filtered.usuarios, G.pages.usuarios);
+  renderPager('usuarios', G.filtered.usuarios.length);
+  const tbody = document.getElementById('bodyUsuarios');
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="no-data">Sin resultados</td></tr>'; return; }
+  tbody.innerHTML = data.map(r => {
+    const fuenteTag = r.fuentePlan === 'historico'
+      ? ' <span class="tag tag-hist" title="Encontrado en historial enero-mayo">📅 Histórico</span>'
+      : r.fuentePlan === 'mayo'
+      ? ' <span class="tag tag-mayo" title="Encontrado en ventas mayo">Mayo</span>'
+      : '';
+    const badgeMap = {
+      ok: '',
+      corregido: `<span class="tag tag-corr">✓ Corregido</span>${fuenteTag}`,
+      sin_plan: '<span class="tag tag-noplan">Sin plan encontrado</span>'
+    };
+    const planCell = r.estado === 'corregido'
+      ? `<span class="original">${esc(r.planOriginal)}</span><br><span class="corrected">${esc(r.planCorregido)}</span>`
+      : r.estado === 'sin_plan'
+      ? `<span class="original">${esc(r.planOriginal)}</span>`
+      : `—`;
+    return `<tr>
+      <td>${esc(r.pin)}</td>
+      <td>${esc(r.nombre)}</td>
+      <td>${r.activo === 'Sí' ? '🟢 Sí' : '⚪ No'}</td>
+      <td>${esc(r.expira)}</td>
+      <td>${esc(r.planOriginal) || '—'}</td>
+      <td>${r.estado !== 'ok' ? planCell : esc(r.planOriginal)}</td>
+      <td>${badgeMap[r.estado] || ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderVentas() {
+  const data = pageData(G.filtered.ventas, G.pages.ventas);
+  renderPager('ventas', G.filtered.ventas.length);
+  const tbody = document.getElementById('bodyVentas');
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">Sin resultados</td></tr>'; return; }
+  tbody.innerHTML = data.map(r => {
+    const planCell = r.esAddon && r.planEfectivo !== r.productoOriginal
+      ? `<span class="corrected">${esc(r.planEfectivo)}</span>`
+      : esc(r.planEfectivo);
+    return `<tr>
+      <td>${esc(r.fecha)}</td>
+      <td>${esc(r.cliente)}</td>
+      <td>${r.esAddon ? `<span style="color:var(--muted)">${esc(r.productoOriginal)}</span>` : esc(r.productoOriginal)}</td>
+      <td>${planCell}</td>
+      <td class="${r.total > 0 ? 'price' : ''}">${r.total > 0 ? fmt(r.total) : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderProyeccion() {
+  const data = pageData(G.filtered.proy, G.pages.proy);
+  renderPager('proy', G.filtered.proy.length);
+  const tbody = document.getElementById('bodyProyeccion');
+  const tfoot = document.getElementById('footProyeccion');
+
+  // Footer totales (sobre filas filtradas completas, no sólo la página)
+  const allFiltered = G.filtered.proy;
+  const footJunio = allFiltered.reduce((s,r) => s+(r.precioJunio||0), 0);
+  const footMayo  = allFiltered.reduce((s,r) => s+(r.pagoMayo||0), 0);
+  tfoot.innerHTML = `<tr>
+    <td colspan="3">TOTAL (${allFiltered.length} clientes)</td>
+    <td></td><td></td>
+    <td>₡${Math.round(footJunio).toLocaleString('es-CR')}</td>
+    <td>₡${Math.round(footMayo).toLocaleString('es-CR')}</td>
+    <td colspan="2"></td>
+  </tr>`;
+
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="9" class="no-data">Sin resultados</td></tr>'; return; }
+  tbody.innerHTML = data.map(r => {
+    const tagMap = { '20%':'tag-20','25%':'tag-25','G20':'tag-g20','Completo':'tag-full' };
+    const badge = `<span class="tag ${tagMap[r.fuente]||''}">${r.fuente}</span>`;
+    const esCompleto = r.fuente === 'Completo';
+    const descBadge = esCompleto
+      ? `<span class="tag tag-full">Sin desc.</span>`
+      : `<span class="tag ${tagMap[r.fuente]||''}">${Math.round(r.pct*100)}% OFF</span>`;
+    // Pendientes: plan sin corregir o sin precio
+    const esPendiente = !!r.pendiente;
+    const pendienteTag = r.pendiente === 'sin_correccion'
+      ? `<span class="tag tag-noplan" title="Plan original es Reposicion/Gym incluido sin corrección encontrada">⚠ Sin corrección</span>`
+      : r.pendiente === 'sin_precio'
+      ? `<span class="tag tag-noplan" title="Plan identificado pero sin precio en Hoja2">⚠ Sin precio</span>`
+      : '';
+
+    const baseCell = r.precioBase != null
+      ? `<span class="price-base">${fmt(r.precioBase)}</span>`
+      : esPendiente
+      ? pendienteTag
+      : `<span style="color:var(--muted);font-style:italic">—</span>`;
+
+    // Indicador de fuente del precio junio
+    const fuenteTag = r.precioFuente === 'historico'
+      ? ` <span class="tag tag-hist" title="Precio ajustado desde historial ene-may">📅 hist.</span>`
+      : r.precioFuente === 'mayo'
+      ? ` <span class="tag tag-mayo" title="Precio ajustado desde ventas mayo">mayo</span>`
+      : '';
+    const precioModificado = r.precioFuente && r.precioFuente !== 'hoja2' && r.precioJunio !== r.precioBase;
+    const junioCell = r.precioJunio != null
+      ? `<span class="price">${fmt(Math.round(r.precioJunio))}</span>${fuenteTag}`
+      : esPendiente ? `<span style="color:var(--warn);font-style:italic">Pendiente</span>` : '—';
+    const mayoCell = r.pagoMayo != null
+      ? `<span style="color:${precioModificado ? 'var(--accent2)' : 'inherit'};font-weight:${precioModificado?'700':'400'}">${fmt(r.pagoMayo)}</span>`
+      : `<span style="color:var(--muted)">—</span>`;
+
+    // Columna vencimiento con semáforo
+    const dias = daysUntil(r.expiraDate);
+    let venceCell = '—', rowStyle = esPendiente ? 'background:#fff8f8' : precioModificado ? 'background:#fffbf0' : (esCompleto ? 'background:#f8fff9' : '');
+    if (dias !== null) {
+      let color, icon;
+      if (dias < 0)      { color = '#c0392b'; icon = '🔴'; rowStyle += (rowStyle?';':'') + 'background:#fff5f5'; }
+      else if (dias <= 7) { color = '#c0392b'; icon = '🔴'; }
+      else if (dias <= 15){ color = '#e67e22'; icon = '🟠'; }
+      else if (dias <= 30){ color = '#f0ad00'; icon = '🟡'; }
+      else                { color = 'var(--accent)'; icon = '🟢'; }
+      const label = dias < 0 ? `Vencido (${Math.abs(dias)}d)` : `${r.expira}`;
+      venceCell = `<span style="color:${color};font-weight:600;">${icon} ${label}</span>`;
+    }
+    const diasCell = dias !== null
+      ? `<span style="font-weight:700;color:${dias < 0 ? '#c0392b' : dias <= 15 ? '#e67e22' : 'var(--accent)'}">${dias < 0 ? dias : '+'+dias}</span>`
+      : '—';
+
+    const pin = r.pin || '—';
+    const clienteCell = (esPendiente || r.detectadoAuto)
+      ? `<strong style="cursor:pointer;text-decoration:underline dotted;color:var(--primary);" onclick="diagnosticoCliente('${esc(r.cliente).replace(/'/g,"\\'")}')" title="Ver historial de transacciones">${esc(r.cliente)} 🔍</strong>`
+      : `<strong>${esc(r.cliente)}</strong>`;
+    const autoTag = r.detectadoAuto
+      ? ` <span class="tag tag-hist" title="Plan detectado automáticamente desde ${r.detectadoAuto === 'mayo' ? 'ventas de mayo' : 'el histórico'} (su Último Producto en Hoja1 era un addon como Reposición/Fondo). Verifique que sea correcto.">🔍 auto</span>`
+      : '';
+    return `<tr style="${rowStyle}">
+      <td style="color:#667eea;font-weight:600;">${esc(pin)}</td>
+      <td>${clienteCell}</td>
+      <td>${esc(r.planMain)}${autoTag}</td>
+      <td>${baseCell}</td>
+      <td>${descBadge}</td>
+      <td>${junioCell}</td>
+      <td>${mayoCell}</td>
+      <td>${venceCell}</td>
+      <td>${diasCell}</td>
+    </tr>`;
+  }).join('');
+
+  // Cards y gráfico (sobre datos filtrados completos)
+  renderProyCards(G.filtered.proy);
+  renderProyChart(G.filtered.proy);
+}
+
+function renderProyCards(rows) {
+  const c7       = rows.filter(r => { const d = daysUntil(r.expiraDate); return d !== null && d >= 0 && d <= 7; });
+  const c15      = rows.filter(r => { const d = daysUntil(r.expiraDate); return d !== null && d >= 0 && d <= 15; });
+  const c30      = rows.filter(r => { const d = daysUntil(r.expiraDate); return d !== null && d >= 0 && d <= 30; });
+  const cvenc    = rows.filter(r => { const d = daysUntil(r.expiraDate); return d !== null && d < 0; });
+  const cajustados  = rows.filter(r => r.precioFuente && r.precioFuente !== 'hoja2').length;
+  const cpendientes = rows.filter(r => r.pendiente).length;
+  const totalJunio = rows.reduce((s,r) => s + (r.precioJunio||0), 0);
+  const totalMayo  = rows.reduce((s,r) => s + (r.pagoMayo||0), 0);
+
+  const mk = (cls, icon, label, val, sub) =>
+    `<div class="proy-stat ${cls}"><h3>${icon} ${label}</h3><div class="sv">${val}</div><div class="ss">${sub}</div></div>`;
+
+  document.getElementById('proy-cards').innerHTML =
+    mk('red',    '🔴', 'Vencen en 7 días',  c7.length,   '₡'+Math.round(c7.reduce((s,r)=>s+(r.precioJunio||0),0)).toLocaleString('es-CR')) +
+    mk('orange', '🟠', 'Vencen en 15 días', c15.length,  '₡'+Math.round(c15.reduce((s,r)=>s+(r.precioJunio||0),0)).toLocaleString('es-CR')) +
+    mk('yellow', '🟡', 'Vencen en 30 días', c30.length,  '₡'+Math.round(c30.reduce((s,r)=>s+(r.precioJunio||0),0)).toLocaleString('es-CR')) +
+    mk('blue',   '⚪', 'Ya vencidos',        cvenc.length,'Revisar renovación') +
+    mk('purple', '💰', 'Ingresos Junio',     '₡'+Math.round(totalJunio).toLocaleString('es-CR'), rows.length+' clientes') +
+    mk('green',  '📅', 'Pagado en Mayo',     '₡'+Math.round(totalMayo).toLocaleString('es-CR'),  'base de comparación') +
+    (cajustados  > 0 ? mk('orange', '🔄', 'Precio ajustado',  cajustados,  'desde historial real') : '') +
+    (cpendientes > 0 ? mk('red',    '⚠',  'Pendientes',       cpendientes, 'requieren revisión') : '');
+}
+
+function limpiarFiltrosProy() {
+  document.getElementById('searchProy').value = '';
+  document.getElementById('filtroDescuento').value = '';
+  document.getElementById('filtroVence').value = '';
+  document.getElementById('filtroPlanEncontrado').value = '';
+  document.getElementById('filtroProducto').value = '';
+  document.getElementById('proyFechaDesde').value = '';
+  document.getElementById('proyFechaHasta').value = '';
+  filtrarTabla('proy');
+}
+
+function poblarFiltroProducto() {
+  const sel = document.getElementById('filtroProducto');
+  const todos = [...G.proyeccion, ...G.planCompleto];
+  const planes = new Map(); // norm → nombre original
+  todos.forEach(r => {
+    if (r.planMain) planes.set(norm(r.planMain), r.planMain);
+  });
+  const sorted = [...planes.entries()].sort((a,b) => a[1].localeCompare(b[1], 'es'));
+  const valorActual = sel.value;
+  sel.innerHTML = '<option value="">Todos los productos</option>' +
+    sorted.map(([key, nombre]) => `<option value="${esc(key)}">${esc(nombre)}</option>`).join('');
+  if (sorted.some(([key]) => key === valorActual)) sel.value = valorActual;
+}
+
+function renderTotalesProyeccion() {
+  // solo mantiene datos para el PDF — la UI usa renderProyCards
+  const grupos = ['20%','25%','G20','Completo'];
+  let grandTotal = 0;
+  grupos.forEach(g => {
+    const src = g === 'Completo' ? G.planCompleto : G.proyeccion.filter(r => r.fuente === g);
+    grandTotal += src.reduce((s,r) => s+(r.precioJunio||0), 0);
+  });
+  document.getElementById('totalesProyeccion').dataset.grandTotal = Math.round(grandTotal);
+}
+
+function renderProyChart(rows) {
+  const planRev = {};
+  rows.forEach(r => {
+    if (r.precioJunio > 0) planRev[r.planMain] = (planRev[r.planMain]||0) + r.precioJunio;
+  });
+  const sorted = Object.entries(planRev).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const ctx = document.getElementById('proyChart').getContext('2d');
+  if (proyChartInst) proyChartInst.destroy();
+  if (!sorted.length) return;
+  proyChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(i => i[0]),
+      datasets: [{
+        label: 'Proyección Junio (₡)',
+        data: sorted.map(i => i[1]),
+        backgroundColor: sorted.map((_,i) => `hsla(${230+i*14},68%,${54+i*2}%,0.85)`),
+        borderRadius: 8,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: v => '₡'+v.toLocaleString('es-CR') }, grid: { color: '#f0f2f8' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────
+// DIAGNÓSTICO: por qué un cliente no tiene plan corregido
+// ─────────────────────────────────────────
+function diagnosticoCliente(nombre) {
+  const key = norm(nombre);
+
+  // Hoja1: datos del usuario
+  const u = G.hoja1.find(r => norm(r.nombre) === key);
+
+  // Transacciones de mayo (Hoja3) — match exacto y parcial
+  const ventasMayo = G.ventas.filter(r => {
+    const nc = norm(r.cliente);
+    return nc === key || nc.includes(key) || key.includes(nc);
+  });
+
+  // Transacciones del histórico — match exacto y parcial
+  const ventasHist = (G.historicoVentas || []).filter(r => {
+    const nc = norm(r.cliente);
+    return nc === key || nc.includes(key) || key.includes(nc);
+  });
+
+  let html = '';
+
+  if (u) {
+    html += `<div class="alert alert-info" style="margin-bottom:14px;">
+      <strong>Hoja1:</strong> PIN ${esc(u.pin)} · Activo: ${u.activo === 'Sí' ? 'Sí' : 'No'} · Expira: ${esc(u.expira) || '—'}
+      · Último producto: <strong>${esc(u.planOriginal) || '—'}</strong>
+      · Estado corrección: <strong>${esc(u.estado)}</strong>
+    </div>`;
+  } else {
+    html += `<div class="alert alert-warn" style="margin-bottom:14px;">No se encontró este cliente en Hoja1.</div>`;
+  }
+
+  function tablaTx(titulo, rows, getProducto) {
+    let h = `<div class="proy-section-title" style="margin-bottom:8px;">${titulo} (${rows.length})</div>`;
+    if (!rows.length) {
+      h += `<div class="alert alert-warn" style="margin-bottom:18px;">No se encontraron transacciones.</div>`;
+      return h;
+    }
+    h += `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:18px;">
+      <thead><tr style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;">
+        <th style="padding:8px 10px;text-align:left;">Fecha</th>
+        <th style="padding:8px 10px;text-align:left;">Cliente (texto original)</th>
+        <th style="padding:8px 10px;text-align:left;">Producto</th>
+        <th style="padding:8px 10px;text-align:right;">Total</th>
+      </tr></thead><tbody>`;
+    rows.forEach((r,i) => {
+      const producto = getProducto(r);
+      const addonTag = r.esAddon ? ` <span class="tag tag-noplan">addon</span>` : '';
+      h += `<tr style="border-bottom:1px solid #f0f2f8;${i%2===1?'background:#f8f9ff':''}">
+        <td style="padding:7px 10px;">${esc(r.fecha) || '—'}</td>
+        <td style="padding:7px 10px;">${esc(r.cliente)}</td>
+        <td style="padding:7px 10px;">${esc(producto)}${addonTag}</td>
+        <td style="padding:7px 10px;text-align:right;" class="${r.total>0?'price':''}">${r.total>0?fmt(r.total):'—'}</td>
+      </tr>`;
+    });
+    h += `</tbody></table>`;
+    return h;
+  }
+
+  html += tablaTx('🧾 Transacciones en Mayo (Hoja3)', ventasMayo, r => r.productoOriginal + (r.esAddon && r.planEfectivo !== r.productoOriginal ? ` → ${r.planEfectivo}` : ''));
+  html += tablaTx('📅 Transacciones en Histórico (ene–may)', ventasHist, r => r.producto);
+
+  // Conclusión
+  const todasNoAddon = [...ventasMayo.filter(r=>!r.esAddon), ...ventasHist.filter(r=>!r.esAddon)];
+  const noAddonConPrecio = todasNoAddon.filter(r => r.total > 0);
+  const noAddonEnCero = todasNoAddon.filter(r => r.total <= 0);
+  if (!ventasMayo.length && !ventasHist.length) {
+    html += `<div class="alert alert-warn">⚠ No se encontró <strong>ninguna transacción</strong> para este cliente (ni en Mayo ni en histórico). Por eso no se pudo determinar su plan principal — verifique si el nombre está escrito de forma distinta en las hojas.</div>`;
+  } else if (!todasNoAddon.length) {
+    html += `<div class="alert alert-warn">⚠ Todas las transacciones encontradas para este cliente son <strong>addons</strong> (Reposición, Gym incluido, Fondo, etc.). No hay ninguna transacción con un plan principal real, por lo que no se pudo asignar un plan.</div>`;
+  } else if (!noAddonConPrecio.length) {
+    html += `<div class="alert alert-warn">⚠ Este cliente sí tiene transacciones con un plan principal (no addon), pero <strong>todas se facturaron en ₡0</strong> (cortesía/sin cobro). El sistema solo considera planes con un total mayor a ₡0 para determinar el plan principal, por lo que no se asignó ninguno. Revise manualmente cuál de estos planes en ₡0 corresponde al plan real del cliente.</div>`;
+  } else {
+    html += `<div class="alert alert-info">ℹ Sí existen transacciones con plan principal y precio mayor a ₡0 (arriba). Si el cliente sigue marcado como "Sin corrección", probablemente el nombre en Hoja1 no coincide exactamente con el de estas transacciones — revise tildes, mayúsculas o nombres compuestos.</div>`;
+  }
+
+  let modal = document.getElementById('diagnosticoModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'diagnosticoModal';
+    modal.style.cssText = 'display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background:rgba(15,12,41,.65);backdrop-filter:blur(4px);';
+    modal.innerHTML = `<div style="background:white;margin:3% auto;padding:28px;border-radius:18px;width:92%;max-width:820px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.3);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <h3 id="diagnosticoTitulo" style="font-size:16px;font-weight:800;color:#2d2d5e;"></h3>
+        <button onclick="document.getElementById('diagnosticoModal').style.display='none'" style="border:none;background:#f0f2f8;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-family:inherit;">✖ Cerrar</button>
+      </div>
+      <div id="diagnosticoBody"></div>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display='none'; });
+  }
+  document.getElementById('diagnosticoTitulo').textContent = '🔍 Diagnóstico — ' + nombre;
+  document.getElementById('diagnosticoBody').innerHTML = html;
+  modal.style.display = 'block';
+}
+
+function openResumenModal() {
+  // Agrupa por plan todos los datos filtrados
+  const rows = G.filtered.proy;
+  const plans = {};
+  rows.forEach(r => {
+    if (!r.planMain) return;
+    if (!plans[r.planMain]) plans[r.planMain] = { plan: r.planMain, clientes: 0, totalJunio: 0, totalMayo: 0 };
+    plans[r.planMain].clientes++;
+    plans[r.planMain].totalJunio += r.precioJunio || 0;
+    plans[r.planMain].totalMayo  += r.pagoMayo || 0;
+  });
+  const sorted = Object.values(plans).sort((a,b) => b.totalJunio - a.totalJunio);
+  const grandJ = sorted.reduce((s,r)=>s+r.totalJunio,0);
+  const grandM = sorted.reduce((s,r)=>s+r.totalMayo,0);
+
+  let html = `<div style="max-height:70vh;overflow-y:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;">
+        <th style="padding:10px 12px;text-align:left;">Plan</th>
+        <th style="padding:10px 12px;">Clientes</th>
+        <th style="padding:10px 12px;">Pagado Mayo</th>
+        <th style="padding:10px 12px;">Precio Junio</th>
+      </tr></thead><tbody>`;
+  sorted.forEach((r,i) => {
+    html += `<tr style="border-bottom:1px solid #f0f2f8;${i%2===1?'background:#f8f9ff':''}">
+      <td style="padding:9px 12px;font-weight:600;">${esc(r.plan)}</td>
+      <td style="padding:9px 12px;text-align:center;">${r.clientes}</td>
+      <td style="padding:9px 12px;text-align:right;color:#888;">${r.totalMayo>0?'₡'+Math.round(r.totalMayo).toLocaleString('es-CR'):'—'}</td>
+      <td style="padding:9px 12px;text-align:right;font-weight:700;color:#2d2d5e;">₡${Math.round(r.totalJunio).toLocaleString('es-CR')}</td>
+    </tr>`;
+  });
+  html += `</tbody><tfoot><tr style="background:linear-gradient(135deg,#f0f2ff,#e8ebff);border-top:2px solid #667eea;font-weight:800;">
+    <td style="padding:10px 12px;">TOTAL GENERAL</td>
+    <td style="padding:10px 12px;text-align:center;">${rows.length}</td>
+    <td style="padding:10px 12px;text-align:right;color:#888;">₡${Math.round(grandM).toLocaleString('es-CR')}</td>
+    <td style="padding:10px 12px;text-align:right;color:#667eea;">₡${Math.round(grandJ).toLocaleString('es-CR')}</td>
+  </tr></tfoot></table></div>`;
+
+  // Modal simple
+  let modal = document.getElementById('resumenProyModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'resumenProyModal';
+    modal.style.cssText = 'display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background:rgba(15,12,41,.65);backdrop-filter:blur(4px);';
+    modal.innerHTML = `<div style="background:white;margin:4% auto;padding:28px;border-radius:18px;width:92%;max-width:780px;box-shadow:0 24px 60px rgba(0,0,0,.3);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <h3 style="font-size:16px;font-weight:800;color:#2d2d5e;">📊 Resumen por Plan — Proyección Junio</h3>
+        <div style="display:flex;gap:8px;">
+          <button onclick="pdfResumenPlanes()" style="border:none;background:linear-gradient(135deg,#e53935,#b71c1c);color:white;border-radius:8px;padding:7px 16px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;">📄 Descargar PDF</button>
+          <button onclick="document.getElementById('resumenProyModal').style.display='none'" style="border:none;background:#f0f2f8;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-family:inherit;">✖ Cerrar</button>
+        </div>
+      </div>
+      <div id="resumenProyBody"></div>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display='none'; });
+  }
+  document.getElementById('resumenProyBody').innerHTML = html;
+  modal.style.display = 'block';
+}
+
+// ─────────────────────────────────────────
+// PDF RESUMEN POR PLAN
+// ─────────────────────────────────────────
+// Formateador seguro para jsPDF: evita Unicode especial del ₡ y separadores raros
+function fmtPDF(n) {
+  if (n == null || isNaN(n)) return '—';
+  return 'CRC ' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function pdfResumenPlanes() {
+  const rows = G.filtered.proy;
+  if (!rows.length) { alert('No hay datos.'); return; }
+
+  // Reconstruir el agrupamiento igual que en el modal
+  const plans = {};
+  rows.forEach(r => {
+    if (!r.planMain) return;
+    if (!plans[r.planMain]) plans[r.planMain] = { plan: r.planMain, clientes: 0, totalJunio: 0, totalMayo: 0 };
+    plans[r.planMain].clientes++;
+    plans[r.planMain].totalJunio += r.precioJunio || 0;
+    plans[r.planMain].totalMayo  += r.pagoMayo || 0;
+  });
+  const sorted = Object.values(plans).sort((a,b) => b.totalJunio - a.totalJunio);
+  const grandJ = sorted.reduce((s,r) => s + r.totalJunio, 0);
+  const grandM = sorted.reduce((s,r) => s + r.totalMayo, 0);
+  const totalClientes = sorted.reduce((s,r) => s + r.clientes, 0);
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const fecha = new Date().toLocaleDateString('es-CR', { year:'numeric', month:'long', day:'numeric' });
+
+  // Detectar filtros activos para subtítulo
+  const filtros = [];
+  const q2    = document.getElementById('searchProy').value.trim();
+  const desc  = document.getElementById('filtroDescuento').value;
+  const vence = document.getElementById('filtroVence').value;
+  const desde = document.getElementById('proyFechaDesde').value.trim();
+  const hasta = document.getElementById('proyFechaHasta').value.trim();
+  if (q2)    filtros.push('"' + q2 + '"');
+  if (desc)  filtros.push('Descuento: ' + desc);
+  const vL = { '7':'≤7d','15':'≤15d','30':'≤30d','60':'≤60d','90':'≤90d','vencido':'Ya vencidos' };
+  if (vence) filtros.push('Vence: ' + (vL[vence]||vence));
+  if (desde) filtros.push('Desde: ' + desde);
+  if (hasta) filtros.push('Hasta: ' + hasta);
+  const subtitulo = filtros.length ? 'Filtros activos: ' + filtros.join(' · ') : 'Sin filtros — todos los clientes';
+
+  // ── Header ──
+  doc.setFillColor(102,126,234);
+  doc.rect(0, 0, pageW, 26, 'F');
+  doc.setFillColor(118,75,162);
+  doc.rect(pageW-60, 0, 60, 26, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(16); doc.setFont(undefined,'bold');
+  doc.text('Resumen Global de Planes — Proyección Junio 2026', 14, 11);
+  doc.setFontSize(8); doc.setFont(undefined,'normal');
+  doc.text(subtitulo, 14, 18);
+  doc.text('Generado: ' + fecha, pageW - 14, 18, { align: 'right' });
+  doc.setTextColor(0,0,0);
+
+  // ── Chips de totales ──
+  const resY = 30;
+  const chips = [
+    { label:'Planes distintos', val: sorted.length,                           color:[102,126,234] },
+    { label:'Total clientes',   val: totalClientes,                           color:[118,75,162]  },
+    { label:'Pagado en Mayo',   val: fmtPDF(grandM), color:[43,160,71]   },
+    { label:'Proyeccion Junio', val: fmtPDF(grandJ), color:[26,82,118]   },
+  ];
+  chips.forEach((c,i) => {
+    const x = 14 + i*72;
+    doc.setFillColor(...c.color);
+    doc.roundedRect(x, resY, 66, 14, 3, 3, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(6.5); doc.text(c.label, x+4, resY+5);
+    doc.setFontSize(typeof c.val === 'number' ? 11 : 8.5);
+    doc.setFont(undefined,'bold');
+    doc.text(String(c.val), x+4, resY+12);
+    doc.setFont(undefined,'normal');
+  });
+  doc.setTextColor(0,0,0);
+
+  // ── Tabla ──
+  const tableRows = sorted.map(r => [
+    r.plan,
+    r.clientes,
+    r.totalMayo > 0 ? fmtPDF(r.totalMayo) : '—',
+    fmtPDF(r.totalJunio)
+  ]);
+  tableRows.push([
+    'TOTAL GENERAL',
+    totalClientes,
+    fmtPDF(grandM),
+    fmtPDF(grandJ)
+  ]);
+
+  doc.autoTable({
+    startY: resY + 20,
+    head: [['Plan', 'Clientes', 'Pagado Mayo (CRC)', 'Proyeccion Junio (CRC)']],
+    body: tableRows,
+    styles: { fontSize: 9, cellPadding: 3.5, font:'helvetica' },
+    headStyles: { fillColor:[102,126,234], textColor:255, fontStyle:'bold', fontSize:9 },
+    alternateRowStyles: { fillColor:[248,249,255] },
+    didParseCell(data) {
+      const isLast = data.row.index === tableRows.length - 1;
+      if (data.section === 'body' && isLast) {
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.fillColor = [232,235,255];
+        data.cell.styles.textColor = [45,45,94];
+      }
+      if (data.section === 'body' && data.column.index === 3 && !isLast) {
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.textColor = [45,45,94];
+      }
+    },
+    columnStyles: {
+      0: { cellWidth: 'auto' },
+      1: { halign:'center', cellWidth: 28 },
+      2: { halign:'right',  cellWidth: 52 },
+      3: { halign:'right',  cellWidth: 52 }
+    },
+    margin: { left:14, right:14 }
+  });
+
+  // ── Resumen final ──
+  const finalY = doc.lastAutoTable.finalY + 10;
+  doc.setFillColor(240,242,255);
+  doc.roundedRect(14, finalY, pageW-28, 14, 4, 4, 'F');
+  doc.setFontSize(10); doc.setTextColor(102,126,234); doc.setFont(undefined,'bold');
+  doc.text(
+    'Total de Ingresos Proyectados Junio: ' + fmtPDF(grandJ),
+    pageW/2, finalY + 9, { align:'center' }
+  );
+  doc.setTextColor(0,0,0); doc.setFont(undefined,'normal');
+
+  // ── Footer páginas ──
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFontSize(7); doc.setTextColor(160,160,160);
+    doc.text(`Página ${p} de ${totalPages}`, pageW/2, doc.internal.pageSize.getHeight()-6, { align:'center' });
+  }
+
+  doc.save('resumen_planes_junio_' + new Date().toISOString().slice(0,10) + '.pdf');
+}
+
+// ─────────────────────────────────────────
+// JUNIO — RENDER
+// ─────────────────────────────────────────
+let junioDonutInst = null, junioBarInst = null;
+
+function renderJunio() {
+  const rows = G.filtered.junio;
+  const data = pageData(rows, G.pages.junio);
+  renderPager('junio', rows.length);
+
+  // Footer totales
+  const footTotal = rows.reduce((s,r) => s + r.total, 0);
+  document.getElementById('footJunio').innerHTML = `<tr>
+    <td colspan="3">TOTAL (${rows.length} clientes)</td>
+    <td>₡${Math.round(footTotal).toLocaleString('es-CR')}</td>
+    <td colspan="3"></td>
+  </tr>`;
+
+  const tbody = document.getElementById('bodyJunio');
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="no-data">Sin resultados</td></tr>'; return; }
+
+  const tipoConfig = {
+    renovacion: { label:'✅ Renovación', bg:'#e8f8f0', color:'#27ae60' },
+    nuevo:      { label:'🌟 Nuevo',      bg:'#eaf2fb', color:'#2980b9' },
+    reingreso:  { label:'🔄 Reingreso',  bg:'#fef9e7', color:'#e67e22' }
+  };
+
+  tbody.innerHTML = data.map(r => {
+    const cfg = tipoConfig[r.tipo] || tipoConfig.renovacion;
+    const badge = `<span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:${cfg.bg};color:${cfg.color};">${cfg.label}</span>`;
+    const diasCell = r.diasInactivo != null
+      ? `<span style="font-weight:700;color:${r.diasInactivo > 10 ? '#e67e22' : '#27ae60'}">${r.diasInactivo}d</span>`
+      : '—';
+    return `<tr style="${r.tipo === 'reingreso' ? 'background:#fffbf0' : r.tipo === 'nuevo' ? 'background:#f0f7ff' : ''}">
+      <td><strong>${esc(r.nombre)}</strong></td>
+      <td>${badge}</td>
+      <td>${esc(r.planMain)}${r.planes.length > 1 ? ` <span style="color:var(--muted);font-size:11px;">(+${r.planes.length-1})</span>` : ''}</td>
+      <td class="price">₡${Math.round(r.total).toLocaleString('es-CR')}</td>
+      <td>${esc(r.fecha)}</td>
+      <td style="color:var(--muted)">${esc(r.expira)}</td>
+      <td>${diasCell}</td>
+    </tr>`;
+  }).join('');
+
+  renderJunioCards(rows);
+  renderJunioCharts(G.junio); // charts usan todos los datos siempre
+}
+
+function renderJunioCards(rows) {
+  const ren  = rows.filter(r => r.tipo === 'renovacion');
+  const nue  = rows.filter(r => r.tipo === 'nuevo');
+  const rei  = rows.filter(r => r.tipo === 'reingreso');
+  const totalIngresos = rows.reduce((s,r) => s + r.total, 0);
+
+  const mk = (cls, icon, label, val, sub) =>
+    `<div class="proy-stat ${cls}"><h3>${icon} ${label}</h3><div class="sv">${val}</div><div class="ss">${sub}</div></div>`;
+
+  document.getElementById('junio-cards').innerHTML =
+    mk('purple', '👥', 'Total Clientes Junio', rows.length,  'pagos únicos registrados') +
+    mk('green',  '✅', 'Renovaciones',         ren.length,   '₡'+Math.round(ren.reduce((s,r)=>s+r.total,0)).toLocaleString('es-CR')) +
+    mk('blue',   '🌟', 'Clientes Nuevos',      nue.length,   '₡'+Math.round(nue.reduce((s,r)=>s+r.total,0)).toLocaleString('es-CR')) +
+    mk('orange', '🔄', 'Reingresos (>10d)',     rei.length,   '₡'+Math.round(rei.reduce((s,r)=>s+r.total,0)).toLocaleString('es-CR')) +
+    mk('purple', '💰', 'Ingresos Totales Junio','₡'+Math.round(totalIngresos).toLocaleString('es-CR'), rows.length+' clientes');
+}
+
+function renderJunioCharts(allRows) {
+  // Donut: composición
+  const counts = {
+    'Renovaciones': allRows.filter(r=>r.tipo==='renovacion').length,
+    'Nuevos':       allRows.filter(r=>r.tipo==='nuevo').length,
+    'Reingresos':   allRows.filter(r=>r.tipo==='reingreso').length
+  };
+  const ctxD = document.getElementById('junioDonut').getContext('2d');
+  if (junioDonutInst) junioDonutInst.destroy();
+  junioDonutInst = new Chart(ctxD, {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(counts),
+      datasets: [{ data: Object.values(counts),
+        backgroundColor: ['#27ae60','#2980b9','#e67e22'],
+        borderWidth: 3, borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 16, font: { size: 12 } } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} clientes` } }
+      },
+      cutout: '60%'
+    }
+  });
+
+  // Bar: top 8 planes por ingreso
+  const planRev = {};
+  allRows.forEach(r => { planRev[r.planMain] = (planRev[r.planMain]||0) + r.total; });
+  const sorted = Object.entries(planRev).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const ctxB = document.getElementById('junioBar').getContext('2d');
+  if (junioBarInst) junioBarInst.destroy();
+  junioBarInst = new Chart(ctxB, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(i=>i[0]),
+      datasets: [{ label:'Ingresos Junio (₡)', data: sorted.map(i=>i[1]),
+        backgroundColor: sorted.map((_,i) => `hsla(${220+i*15},65%,${50+i*3}%,0.85)`),
+        borderRadius: 7, borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: v => '₡'+v.toLocaleString('es-CR') }, grid: { color:'#f0f2f8' } },
+        x: { grid: { display: false }, ticks: { maxRotation: 30, font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function limpiarFiltrosJunio() {
+  document.getElementById('searchJunio').value = '';
+  document.getElementById('filtroJunioTipo').value = '';
+  filtrarTabla('junio');
+}
+
+// ─────────────────────────────────────────
+// VALIDACIÓN DE DESCUENTOS vs PAGOS JUNIO
+// ─────────────────────────────────────────
+const ESTADO_VALIDACION = {
+  vencido_sin_pago:    { label: '🔴 Vencido sin pagar',           bg:'#fdecea', color:'#c0392b' },
+  por_vencer_sin_pago: { label: '🟠 Por vencer sin pagar',         bg:'#fef5e7', color:'#e67e22' },
+  sin_descuento:       { label: '⚠ Pagó sin descuento',           bg:'#fef9e7', color:'#9a7d0a' },
+  monto_diferente:     { label: '⚠ Monto diferente',              bg:'#fef9e7', color:'#9a7d0a' },
+  ok:                  { label: '✅ Descuento aplicado',           bg:'#e8f8f0', color:'#27ae60' },
+  al_dia:              { label: '🟢 Al día (no vence aún)',        bg:'#eaf2fb', color:'#2980b9' }
+};
+
+function renderValidacion() {
+  const data = pageData(G.filtered.validacion, G.pages.validacion);
+  renderPager('validacion', G.filtered.validacion.length);
+  const tbody = document.getElementById('bodyValidacion');
+
+  renderValidacionCards(G.filtered.validacion);
+
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="9" class="no-data">Sin resultados</td></tr>'; return; }
+
+  tbody.innerHTML = data.map(r => {
+    const dias = daysUntil(r.expiraDate);
+    const venceCell = r.expira ? `${esc(r.expira)}${dias!=null ? ` (${dias<0?dias:'+'+dias}d)` : ''}` : '—';
+    const cfg = ESTADO_VALIDACION[r.estado] || {};
+    const badge = `<span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:${cfg.bg};color:${cfg.color};white-space:nowrap;">${cfg.label||r.estado}</span>`;
+    const pagoCell = r.pago ? `<span class="price">${fmt(r.pago.total)}</span>` : `<span style="color:var(--muted)">—</span>`;
+    const tardioTag = r.pagoTardio
+      ? ` <span class="tag tag-noplan" title="Pagó ${r.pagoTardio} día(s) después de la fecha de vencimiento del plan anterior (${esc(r.expira)})">⏰ +${r.pagoTardio}d tarde</span>`
+      : '';
+    const fechaPagoCell = r.pago ? (esc(r.pago.fecha) || '—') + tardioTag : '—';
+    const tagMap = { '20%':'tag-20','25%':'tag-25','G20':'tag-g20' };
+    const descBadge = `<span class="tag ${tagMap[r.fuente]||''}">${esc(r.fuente)} (${Math.round(r.pct*100)}%)</span>`;
+    return `<tr style="${r.estado==='vencido_sin_pago'||r.estado==='por_vencer_sin_pago'?'background:#fff8f8':''}">
+      <td style="color:#667eea;font-weight:600;">${esc(r.pin)}</td>
+      <td><strong>${esc(r.cliente)}</strong></td>
+      <td>${esc(r.planMain)}</td>
+      <td>${descBadge}</td>
+      <td>${r.precioJunio!=null?fmt(Math.round(r.precioJunio)):'—'}</td>
+      <td>${pagoCell}</td>
+      <td>${fechaPagoCell}</td>
+      <td>${venceCell}</td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderValidacionCards(rows) {
+  const counts = {};
+  Object.keys(ESTADO_VALIDACION).forEach(k => counts[k] = rows.filter(r => r.estado === k));
+  const riesgo = counts.vencido_sin_pago.concat(counts.por_vencer_sin_pago);
+  const montoRiesgo = riesgo.reduce((s,r) => s + (r.precioJunio||0), 0);
+  const pagosTardios = rows.filter(r => r.pagoTardio);
+
+  const mk = (cls, icon, label, val, sub) =>
+    `<div class="proy-stat ${cls}"><h3>${icon} ${label}</h3><div class="sv">${val}</div><div class="ss">${sub}</div></div>`;
+
+  document.getElementById('validacion-cards').innerHTML =
+    mk('red',    '🔴', 'Vencidos sin pagar',    counts.vencido_sin_pago.length,    'riesgo de quedar inactivos') +
+    mk('orange', '🟠', 'Por vencer sin pagar',  counts.por_vencer_sin_pago.length, '≤15 días') +
+    mk('purple', '💰', 'Monto en riesgo',       fmt(Math.round(montoRiesgo)),      riesgo.length+' clientes') +
+    mk('yellow', '⚠',  'Sin descuento aplicado',counts.sin_descuento.length,       'revisar cobro') +
+    mk('yellow', '⚠',  'Monto diferente',       counts.monto_diferente.length,     'revisar cobro') +
+    mk('orange', '⏰', 'Pagos tardíos',         pagosTardios.length,               'pagaron tras vencer su plan') +
+    mk('green',  '✅', 'Descuento OK',          counts.ok.length,                  'pagaron correctamente') +
+    mk('blue',   '🟢', 'Al día',                counts.al_dia.length,              'aún no vencen');
+}
+
+// ─────────────────────────────────────────
+// PDF JUNIO
+// ─────────────────────────────────────────
+function pdfJunio() {
+  const rows = G.filtered.junio;
+  if (!rows.length) { alert('No hay datos.'); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const fecha = new Date().toLocaleDateString('es-CR', { year:'numeric', month:'long', day:'numeric' });
+
+  const ren = rows.filter(r=>r.tipo==='renovacion').length;
+  const nue = rows.filter(r=>r.tipo==='nuevo').length;
+  const rei = rows.filter(r=>r.tipo==='reingreso').length;
+  const total = rows.reduce((s,r)=>s+r.total,0);
+
+  // Header
+  doc.setFillColor(102,126,234); doc.rect(0,0,pageW,24,'F');
+  doc.setFillColor(118,75,162); doc.rect(pageW-60,0,60,24,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(15); doc.setFont(undefined,'bold');
+  doc.text('Estadisticas de Junio 2026', 14, 10);
+  doc.setFontSize(8); doc.setFont(undefined,'normal');
+  const filtroTipo = document.getElementById('filtroJunioTipo').value;
+  doc.text((filtroTipo ? 'Categoria: '+filtroTipo : 'Todos los clientes') + '  |  ' + rows.length + ' registros', 14, 17);
+  doc.text('Generado: ' + fecha, pageW-14, 17, { align:'right' });
+  doc.setTextColor(0,0,0);
+
+  // Chips resumen
+  const resY = 28;
+  const chips = [
+    { label:'Total Clientes', val: rows.length, color:[102,126,234] },
+    { label:'Renovaciones',   val: ren,          color:[39,174,96] },
+    { label:'Nuevos',         val: nue,           color:[41,128,185] },
+    { label:'Reingresos',     val: rei,           color:[230,126,34] },
+    { label:'Ingresos Junio', val: fmtPDF(total), color:[26,82,118] }
+  ];
+  chips.forEach((c,i) => {
+    const x = 14 + i*57;
+    doc.setFillColor(...c.color);
+    doc.roundedRect(x, resY, 52, 14, 3, 3, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(6.5); doc.text(c.label, x+3, resY+5);
+    const isNum = typeof c.val === 'number';
+    doc.setFontSize(isNum ? 11 : 8); doc.setFont(undefined,'bold');
+    doc.text(String(c.val), x+3, resY+12);
+    doc.setFont(undefined,'normal');
+  });
+  doc.setTextColor(0,0,0);
+
+  const tipoLabel = { renovacion:'Renovacion', nuevo:'Nuevo', reingreso:'Reingreso' };
+  doc.autoTable({
+    startY: resY + 20,
+    head: [['Cliente','Categoria','Plan','Pagó Junio','Fecha Pago','Ult. Expiración','Días Inactivo']],
+    body: rows.map(r => [
+      r.nombre,
+      tipoLabel[r.tipo] || r.tipo,
+      r.planMain,
+      fmtPDF(r.total),
+      r.fecha || '—',
+      r.expira || '—',
+      r.diasInactivo != null ? r.diasInactivo+'d' : '—'
+    ]),
+    foot: [['TOTAL ('+rows.length+' clientes)','','', fmtPDF(total),'','','']],
+    styles: { fontSize: 8, cellPadding: 2.5 },
+    headStyles: { fillColor:[102,126,234], textColor:255, fontStyle:'bold' },
+    footStyles: { fillColor:[232,235,255], textColor:[45,45,94], fontStyle:'bold' },
+    alternateRowStyles: { fillColor:[248,249,255] },
+    didParseCell(data) {
+      if (data.section === 'body') {
+        const tipo = data.row.raw[1];
+        if (data.column.index === 1) {
+          data.cell.styles.textColor = tipo==='Nuevo' ? [41,128,185] : tipo==='Reingreso' ? [230,126,34] : [39,174,96];
+          data.cell.styles.fontStyle = 'bold';
+        }
+        if (data.column.index === 6 && data.cell.raw !== '—') {
+          const d = parseInt(data.cell.raw);
+          if (d > 10) data.cell.styles.textColor = [230,126,34];
+        }
+      }
+    },
+    columnStyles: { 0:{cellWidth:52}, 2:{cellWidth:50} },
+    margin: { left:14, right:14 }
+  });
+
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let p=1; p<=totalPages; p++) {
+    doc.setPage(p); doc.setFontSize(7); doc.setTextColor(160,160,160);
+    doc.text(`Pagina ${p} de ${totalPages}`, pageW/2, doc.internal.pageSize.getHeight()-6, { align:'center' });
+  }
+  doc.save('estadisticas_junio_' + new Date().toISOString().slice(0,10) + '.pdf');
+}
+
+// ─────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────
+function switchTab(id, el) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  el.classList.add('active');
+}
+
+// ─────────────────────────────────────────
+// ESCAPE HTML
+// ─────────────────────────────────────────
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─────────────────────────────────────────
+// EXPORTAR PDF
+// ─────────────────────────────────────────
+// ─────────────────────────────────────────
+// PDF USUARIOS (usa G.filtered.usuarios)
+// ─────────────────────────────────────────
+function pdfUsuarios() {
+  const rows = G.filtered.usuarios;
+  if (!rows.length) { alert('No hay usuarios con los filtros actuales.'); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const fecha = new Date().toLocaleDateString('es-CR');
+
+  // Detectar filtros activos para el subtítulo
+  const filtros = [];
+  const q = document.getElementById('searchUsuarios').value.trim();
+  const estado = document.getElementById('filtroEstado').value;
+  const activo = document.getElementById('filtroActivo').value;
+  if (q) filtros.push('Búsqueda: "' + q + '"');
+  const estadoLabels = { corregido:'Solo corregidos', corregido_historico:'Corregidos vía histórico', sin_correccion:'Sin corrección', sin_plan:'Sin plan encontrado' };
+  if (estado && estadoLabels[estado]) filtros.push(estadoLabels[estado]);
+  if (activo === 'Sí') filtros.push('Solo activos');
+  if (activo === 'No') filtros.push('Solo inactivos');
+  const subtitulo = filtros.length ? 'Filtros: ' + filtros.join(' · ') : 'Todos los usuarios';
+
+  // Header
+  doc.setFillColor(102,126,234);
+  doc.rect(0,0,pageW,24,'F');
+  doc.setFillColor(118,75,162);
+  doc.rect(pageW-60,0,60,24,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(15); doc.setFont(undefined,'bold');
+  doc.text('Listado de Usuarios', 14, 10);
+  doc.setFontSize(8); doc.setFont(undefined,'normal');
+  doc.text(subtitulo, 14, 17);
+  doc.text('Generado: ' + fecha + '  |  ' + rows.length + ' registros', pageW-14, 17, { align:'right' });
+  doc.setTextColor(0,0,0);
+
+  // Resumen rápido por estado
+  const activos   = rows.filter(r => r.activo === 'Sí').length;
+  const corregidos= rows.filter(r => r.estado === 'corregido').length;
+  const sinPlan   = rows.filter(r => r.estado === 'sin_plan').length;
+  const resY = 28;
+  const bloques = [
+    { label:'Total',      val: rows.length,  color:[102,126,234] },
+    { label:'Activos',    val: activos,       color:[43,160,71] },
+    { label:'Corregidos', val: corregidos,    color:[20,143,119] },
+    { label:'Sin plan',   val: sinPlan,       color:[192,57,43] },
+  ];
+  bloques.forEach((b,i) => {
+    const x = 14 + i*68;
+    doc.setFillColor(...b.color);
+    doc.roundedRect(x, resY, 62, 14, 3, 3, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(7); doc.text(b.label, x+4, resY+5.5);
+    doc.setFontSize(11); doc.setFont(undefined,'bold');
+    doc.text(String(b.val), x+4, resY+12);
+    doc.setFont(undefined,'normal');
+  });
+  doc.setTextColor(0,0,0);
+
+  // Tabla principal
+  doc.autoTable({
+    startY: resY + 20,
+    head: [['PIN','Nombre','Activo','Expira','Plan Original','Plan Corregido','Estado']],
+    body: rows.map(r => [
+      r.pin,
+      r.nombre,
+      r.activo === 'Sí' ? '✓ Activo' : '✗ Inactivo',
+      r.expira || '—',
+      r.planOriginal || '—',
+      r.estado !== 'ok' ? (r.planCorregido || r.planOriginal) : r.planOriginal,
+      r.estado === 'corregido' ? (r.fuentePlan === 'historico' ? 'Corregido (hist.)' : 'Corregido') :
+      r.estado === 'sin_plan'  ? 'Sin plan encontrado' : '—'
+    ]),
+    styles: { fontSize: 8, cellPadding: 2.5 },
+    headStyles: { fillColor: [102,126,234], textColor:255, fontStyle:'bold' },
+    alternateRowStyles: { fillColor: [248,249,255] },
+    didParseCell(data) {
+      if (data.section === 'body' && data.column.index === 2) {
+        data.cell.styles.textColor = data.cell.raw.includes('✓') ? [43,160,71] : [192,57,43];
+        data.cell.styles.fontStyle = 'bold';
+      }
+      if (data.section === 'body' && data.column.index === 5 && data.row.raw[6] && data.row.raw[6].includes('Corregido')) {
+        data.cell.styles.textColor = [20,143,119];
+        data.cell.styles.fontStyle = 'bold';
+      }
+      if (data.section === 'body' && data.column.index === 6 && data.cell.raw === 'Sin plan encontrado') {
+        data.cell.styles.textColor = [192,57,43];
+      }
+    },
+    columnStyles: { 1: { cellWidth: 55 }, 4: { cellWidth: 45 }, 5: { cellWidth: 45 } },
+    margin: { left:14, right:14 }
+  });
+
+  // Footer páginas
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFontSize(7); doc.setTextColor(150,150,150);
+    doc.text(`Página ${p} de ${totalPages}`, pageW/2, doc.internal.pageSize.getHeight()-6, { align:'center' });
+  }
+
+  doc.save('usuarios_' + new Date().toISOString().slice(0,10) + '.pdf');
+}
+
+// ─────────────────────────────────────────
+// PDF PROYECCIÓN (usa G.filtered.proy — respeta filtros activos)
+// ─────────────────────────────────────────
+function pdfProyeccion() {
+  const rows = G.filtered.proy;
+  if (!rows.length) { alert('No hay registros con los filtros actuales.'); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const fecha = new Date().toLocaleDateString('es-CR');
+
+  // Detectar filtros activos
+  const filtros = [];
+  const q2   = document.getElementById('searchProy').value.trim();
+  const desc = document.getElementById('filtroDescuento').value;
+  const vence= document.getElementById('filtroVence').value;
+  const desde= document.getElementById('proyFechaDesde').value.trim();
+  const hasta= document.getElementById('proyFechaHasta').value.trim();
+  if (q2)    filtros.push('Búsqueda: "' + q2 + '"');
+  if (desc)  filtros.push('Descuento: ' + desc);
+  const venceLabels = { '7':'≤7 días','15':'≤15 días','30':'≤30 días','60':'≤60 días','90':'≤90 días','vencido':'Ya vencidos' };
+  if (vence) filtros.push('Vence: ' + (venceLabels[vence]||vence));
+  if (desde) filtros.push('Desde: ' + desde);
+  if (hasta) filtros.push('Hasta: ' + hasta);
+  const subtitulo = filtros.length ? 'Filtros: ' + filtros.join(' · ') : 'Todos los clientes';
+
+  // Header
+  doc.setFillColor(102,126,234);
+  doc.rect(0,0,pageW,24,'F');
+  doc.setFillColor(118,75,162);
+  doc.rect(pageW-60,0,60,24,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(15); doc.setFont(undefined,'bold');
+  doc.text('Proyección de Renovaciones — Junio 2026', 14, 10);
+  doc.setFontSize(8); doc.setFont(undefined,'normal');
+  doc.text(subtitulo, 14, 17);
+  doc.text('Generado: ' + fecha + '  |  ' + rows.length + ' clientes', pageW-14, 17, { align:'right' });
+  doc.setTextColor(0,0,0);
+
+  // Totales por grupo (de los datos filtrados)
+  const grupos  = ['20%','25%','G20','Completo'];
+  const colores = [[231,76,60],[142,68,173],[41,128,185],[20,143,119]];
+  const etqs    = ['20% desc.','25% desc.','G20 (20%)','Precio completo'];
+  let grandTotal = 0, grandMayo = 0;
+  const resY = 28;
+  grupos.forEach((g, i) => {
+    const sub = rows.filter(r => r.fuente === g);
+    const tj = sub.reduce((s,r)=>s+(r.precioJunio||0),0);
+    grandTotal += tj;
+    grandMayo  += sub.reduce((s,r)=>s+(r.pagoMayo||0),0);
+    const x = 14 + i*68;
+    doc.setFillColor(...colores[i]);
+    doc.roundedRect(x, resY, 62, 14, 3, 3, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(6.5); doc.text(`${etqs[i]} (${sub.length})`, x+3, resY+5);
+    doc.setFontSize(8.5); doc.setFont(undefined,'bold');
+    doc.text(fmtPDF(tj), x+3, resY+12);
+    doc.setFont(undefined,'normal');
+  });
+  // Gran total
+  const gx = 14 + 4*68;
+  doc.setFillColor(26,82,118);
+  doc.roundedRect(gx, resY, 72, 14, 3, 3, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(6.5); doc.text('GRAN TOTAL JUNIO', gx+4, resY+5);
+  doc.setFontSize(10); doc.setFont(undefined,'bold');
+  doc.text(fmtPDF(grandTotal), gx+4, resY+12);
+  doc.setFont(undefined,'normal');
+  doc.setTextColor(0,0,0);
+
+  // Tabla principal
+  doc.autoTable({
+    startY: resY + 20,
+    head: [['PIN','Cliente','Plan','Precio Base','Desc.','Precio Junio','Pagó Mayo','Vence','Días']],
+    body: rows.map(r => {
+      const dias = daysUntil(r.expiraDate);
+      return [
+        r.pin || '—',
+        r.cliente,
+        r.planMain,
+        r.precioBase != null ? fmtPDF(r.precioBase) : 'N/D',
+        r.fuente === 'Completo' ? 'Sin desc.' : Math.round(r.pct*100)+'%',
+        r.precioJunio != null ? fmtPDF(r.precioJunio) : '—',
+        r.pagoMayo != null ? fmtPDF(r.pagoMayo) : '—',
+        r.expira || '—',
+        dias !== null ? (dias < 0 ? dias : '+'+dias) : '—'
+      ];
+    }),
+    foot: [[
+      '', 'TOTAL ('+rows.length+' clientes)', '', '', '',
+      fmtPDF(grandTotal),
+      fmtPDF(grandMayo),
+      '', ''
+    ]],
+    styles: { fontSize: 8, cellPadding: 2.5 },
+    headStyles: { fillColor: [102,126,234], textColor:255, fontStyle:'bold' },
+    footStyles: { fillColor: [232,235,255], textColor:[45,45,94], fontStyle:'bold' },
+    alternateRowStyles: { fillColor: [248,249,255] },
+    didParseCell(data) {
+      if (data.section === 'body') {
+        const dias = parseInt(data.row.raw[8]);
+        if (data.column.index === 8 && !isNaN(dias)) {
+          data.cell.styles.textColor = dias < 0 ? [192,57,43] : dias <= 15 ? [230,126,34] : [43,160,71];
+          data.cell.styles.fontStyle = 'bold';
+        }
+        if (data.column.index === 5) data.cell.styles.fontStyle = 'bold';
+        if (data.row.raw[1] && data.row.raw[4] === 'Sin desc.' && data.column.index === 4) {
+          data.cell.styles.textColor = [20,143,119];
+        }
+      }
+    },
+    columnStyles: { 1: { cellWidth: 48 }, 2: { cellWidth: 52 } },
+    margin: { left:14, right:14 }
+  });
+
+  // Footer páginas
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFontSize(7); doc.setTextColor(150,150,150);
+    doc.text(`Página ${p} de ${totalPages}`, pageW/2, doc.internal.pageSize.getHeight()-6, { align:'center' });
+  }
+
+  doc.save('proyeccion-junio-' + new Date().toISOString().slice(0,10) + '.pdf');
+}
+</script>
+</body>
+</html>
