@@ -774,6 +774,87 @@ function parseCRC(val) {
     return isNaN(n) ? 0 : n;
 }
 
+// ── FORMATO COMBINADO (pinares2.xlsx, sabanilla.xlsx, 3rios.xlsx) ──
+function processLegacyFile(wb, filename) {
+    currentFileName = filename || currentFileName;
+    currentSedeName = detectSede(currentFileName);
+    applySedeUI();
+
+    // Hoja1 → usuarios (fila 0 = encabezados, fila 1+ = datos)
+    const wsU = wb.Sheets['Hoja1'];
+    const rawU = XLSX.utils.sheet_to_json(wsU, { header:1, defval:'' });
+    usersData = [];
+    for (let i = 1; i < rawU.length; i++) {
+        const r = rawU[i];
+        if (!r || r.length < 5) continue;
+        const pin    = String(r[0]||'').trim();
+        const nombre = String(r[1]||'').trim();
+        if (!pin && !nombre) continue;
+        const email     = String(r[3]||'').trim();
+        let   activo    = String(r[4]||'').trim();
+        const expiraStr = String(r[5]||'').trim();
+        const prod      = String(r[9]||'').trim();
+        activo = /^s[ií]/i.test(activo) ? 'Sí' : /^no/i.test(activo) ? 'No' : activo;
+        usersData.push({
+            PIN: pin, Nombre: nombre, Email: email, Activo: activo,
+            Expira: expiraStr, ExpiraDate: parseDate(expiraStr),
+            ÚltimoProducto: prod || 'Desconocido',
+            Ingreso: '', IngresoDate: null, ValorPlan: 0
+        });
+    }
+
+    // Hoja2 → precios (fila 0 = encabezados, fila 1+ = plan/costo)
+    const wsP = wb.Sheets['Hoja2'];
+    if (wsP) {
+        const rawP = XLSX.utils.sheet_to_json(wsP, { header:1, defval:'' });
+        rawP.slice(1).forEach(r => {
+            const plan  = String(r[0]||'').trim();
+            const costo = parseFloat(String(r[1]||'0').replace(/[^\d.]/g,'')) || 0;
+            if (plan && costo) planPrices[plan] = costo;
+        });
+        savePricesToSupabase(currentSedeName);
+    }
+
+    usersData.forEach(u => u.ValorPlan = getPlanPrice(u.ÚltimoProducto, u.PIN));
+    usuariosLoaded = true;
+    document.getElementById('uploadStatusU').innerHTML =
+        `<span style="color:#2e7d32;font-weight:600;">✅ ${usersData.length} usuarios cargados — ${currentSedeName}</span>`;
+
+    // renovaciones → hoja "renovaciones" (fila 0 = encabezados, fila 1+ = datos)
+    const wsR = wb.Sheets['renovaciones'];
+    if (wsR) {
+        const rawR = XLSX.utils.sheet_to_json(wsR, { header:1, defval:'' });
+        renovacionesData = [];
+        for (let i = 1; i < rawR.length; i++) {
+            const r = rawR[i];
+            if (!r || !r[0]) continue;
+            const fechaStr = String(r[0]||'').trim();
+            const cliente  = String(r[1]||'').trim();
+            const regPor   = String(r[2]||'').trim();
+            const producto = String(r[3]||'').trim();
+            const total    = parseCRC(r[4]);
+            if (!fechaStr || !cliente) continue;
+            if (/^invitado$/i.test(cliente)) continue;
+            if (!isMembershipPlan(producto)) continue;
+            const txDate = parseRenoDateTime(fechaStr);
+            if (!txDate) continue;
+            const user = usersData.find(u => u.Nombre.trim().toLowerCase() === cliente.trim().toLowerCase());
+            const clasif = classifyTransaction(txDate, user, producto);
+            renovacionesData.push({
+                FechaStr: fechaStr, TxDate: txDate, Cliente: cliente,
+                RegistradoPor: regPor, Producto: producto, Total: total,
+                User: user, Tipo: clasif.tipo, Badge: clasif.badge, Icon: clasif.icon,
+                GapDias: clasif.gapDias
+            });
+        }
+        renoLoaded = true;
+        document.getElementById('uploadStatusR').innerHTML =
+            `<span style="color:#2e7d32;font-weight:600;">✅ ${renovacionesData.length} renovaciones cargadas (formato combinado)</span>`;
+    }
+
+    rebuildDashboard();
+}
+
 // ── USUARIOS (Informe_de_Usuarios.xlsx → "Page 1") ──
 function processUsuariosFile(data, filename) {
     try {
@@ -784,6 +865,13 @@ function processUsuariosFile(data, filename) {
         document.getElementById('uploadStatusU').innerHTML = '<span style="color:#667eea;font-weight:600;">⏳ Procesando usuarios...</span>';
 
         const wb  = XLSX.read(data, { type:'array' });
+
+        // Detectar formato combinado (Hoja1 + renovaciones + Hoja2)
+        if (wb.SheetNames.includes('Hoja1')) {
+            processLegacyFile(wb, filename);
+            return;
+        }
+
         const ws  = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
 
@@ -959,6 +1047,20 @@ function saveManualPrice() {
     }).catch(e => console.warn('No se pudo guardar precio:', e.message));
 }
 function closeModal() { document.getElementById('priceModal').style.display='none'; currentEditingUser=null; }
+
+async function savePricesToSupabase(sede) {
+    if (!sede || !Object.keys(planPrices).length) return;
+    const rows = Object.entries(planPrices).map(([plan, precio]) => ({
+        sede, plan, precio, updated_at: new Date().toISOString()
+    }));
+    try {
+        await supaFetch('/plan_prices', {
+            method: 'POST',
+            prefer: 'resolution=merge-duplicates,return=minimal',
+            body: rows
+        });
+    } catch(e) { console.warn('No se pudo guardar precios batch:', e.message); }
+}
 
 function renderTable() {
     let filtered = getFilteredUsers();
