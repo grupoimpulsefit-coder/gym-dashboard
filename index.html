@@ -1547,7 +1547,7 @@ async function autoSaveToSupabase() {
             })),
             updated_at: new Date().toISOString()
         };
-        await supaFetch('/gym_snapshots', {
+        await supaFetch('/gym_snapshots?on_conflict=sede,mes', {
             method: 'POST',
             prefer: 'resolution=merge-duplicates,return=minimal',
             body: record
