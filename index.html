@@ -1036,6 +1036,10 @@ function rebuildDashboard() {
     renoPlans.sort().forEach(p => rps.innerHTML += `<option value="${p.replace(/"/g,'&quot;')}">${p}</option>`);
 
     document.getElementById('dashboard').style.display = 'block';
+    // Mostrar botón cambiar sede solo para colaboradores
+    if (currentRole !== 'admin') {
+        document.getElementById('btnCambiarSede').style.display = 'inline-block';
+    }
 
     renderTable();
     updateRenoStats();
@@ -1551,7 +1555,7 @@ async function autoSaveToSupabase() {
         statusEl.innerHTML += ` &nbsp;<span style="color:#1565c0;font-size:13px;">☁️ Historial actualizado (${mes})</span>`;
     } catch(e) {
         console.error('Supabase save error:', e);
-        statusEl.innerHTML += ` &nbsp;<span style="color:#c62828;font-size:13px;">⚠️ Sin conexión a la nube</span>`;
+        statusEl.innerHTML += ` &nbsp;<span style="color:#c62828;font-size:13px;">⚠️ Error nube: ${e.message}</span>`;
     }
 }
 
