@@ -233,6 +233,14 @@
         </div>
     </div>
 
+    <!-- ══════════════════ SEDE PICKER (colaborador) ══════════════════ -->
+    <div id="sedePicker" style="display:none; padding:48px 32px; text-align:center;">
+        <h2 style="font-size:1.5em; font-weight:700; color:#302b63; margin-bottom:8px;">Selecciona una sede</h2>
+        <p style="color:#888; margin-bottom:36px;">Haz clic para ver los datos más recientes</p>
+        <div id="sedeCards" style="display:flex; gap:24px; justify-content:center; flex-wrap:wrap;"></div>
+        <p id="sedePickerStatus" style="margin-top:24px; color:#888; font-size:0.9em;"></p>
+    </div>
+
     <!-- ══════════════════ DASHBOARD ══════════════════ -->
     <div id="dashboard" style="display:none;">
 
@@ -594,42 +602,80 @@ function applyRole() {
     // Forzar flex en uploadSection después del forEach (evita que CSS .admin-only lo oculte)
     document.getElementById('uploadSection').style.display = isAdmin ? 'flex' : 'none';
     if (!isAdmin) {
-        loadLatestForColaborador();
+        showSedePicker();
     }
 }
 
-async function loadLatestForColaborador() {
-    const statusEl = document.getElementById('uploadStatus');
-    statusEl.innerHTML = '⏳ Cargando datos...';
+const SEDE_ICONS = {
+    'Pinares':   { emoji: '🌲', color: '#2e7d32', bg: '#e8f5e9' },
+    'Sabanilla': { emoji: '🏙️', color: '#1565c0', bg: '#e3f2fd' },
+    '3 Ríos':   { emoji: '🌊', color: '#00838f', bg: '#e0f7fa' },
+    'Natación':  { emoji: '🏊', color: '#6a1b9a', bg: '#f3e5f5' },
+};
+
+async function showSedePicker() {
+    document.getElementById('sedePicker').style.display = 'block';
+    document.getElementById('dashboard').style.display = 'none';
+    const statusEl = document.getElementById('sedePickerStatus');
+    const cardsEl  = document.getElementById('sedeCards');
+    cardsEl.innerHTML = '';
+    statusEl.textContent = '⏳ Cargando sedes disponibles...';
     try {
-        const snaps = await supaFetch('/gym_snapshots?order=updated_at.desc&limit=1&select=sede,mes,users_data,renov_data');
+        const snaps = await supaFetch('/gym_snapshots?order=updated_at.desc&select=id,sede,mes,activos,updated_at');
+        if (!snaps?.length) {
+            statusEl.textContent = 'No hay datos cargados aún. Contacte al administrador.';
+            return;
+        }
+        // Una card por sede (la más reciente de cada una)
+        const seenSedes = {};
+        snaps.forEach(s => { if (!seenSedes[s.sede]) seenSedes[s.sede] = s; });
+        statusEl.textContent = '';
+        Object.values(seenSedes).forEach(snap => {
+            const icon = SEDE_ICONS[snap.sede] || { emoji: '🏋️', color: '#555', bg: '#f5f5f5' };
+            const fecha = new Date(snap.updated_at).toLocaleDateString('es-CR', { day:'2-digit', month:'short', year:'numeric' });
+            const card = document.createElement('div');
+            card.style.cssText = `cursor:pointer;background:${icon.bg};border:2px solid ${icon.color}33;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;
+            card.innerHTML = `
+                <div style="font-size:3em;margin-bottom:12px;">${icon.emoji}</div>
+                <div style="font-size:1.2em;font-weight:700;color:${icon.color};">${snap.sede}</div>
+                <div style="font-size:0.85em;color:#666;margin-top:6px;">📅 ${snap.mes}</div>
+                <div style="font-size:0.8em;color:#999;margin-top:4px;">👥 ${snap.activos} activos</div>
+                <div style="font-size:0.75em;color:#bbb;margin-top:4px;">Actualizado: ${fecha}</div>`;
+            card.onmouseenter = () => { card.style.transform='translateY(-4px)'; card.style.boxShadow=`0 12px 32px ${icon.color}33`; };
+            card.onmouseleave = () => { card.style.transform=''; card.style.boxShadow=''; };
+            card.onclick = () => loadSedeForColaborador(snap.sede);
+            cardsEl.appendChild(card);
+        });
+    } catch(e) {
+        statusEl.textContent = '⚠️ Error al cargar sedes: ' + e.message;
+    }
+}
+
+async function loadSedeForColaborador(sede) {
+    document.getElementById('sedePickerStatus').textContent = `⏳ Cargando datos de ${sede}...`;
+    try {
+        const snaps = await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(sede)}&order=updated_at.desc&limit=1&select=sede,mes,users_data,renov_data`);
         if (!snaps?.length || !snaps[0].users_data?.length) {
-            statusEl.innerHTML = '<span style="color:#e65100">No hay datos cargados aún. Contacte al administrador.</span>';
+            document.getElementById('sedePickerStatus').textContent = 'No hay datos para esta sede.';
             return;
         }
         const snap = snaps[0];
         currentSedeName = snap.sede;
         applySedeUI();
-
         usersData = snap.users_data.map(u => ({
-            ...u,
-            ExpiraDate: parseDate(u.Expira),
-            IngresoDate: parseDate(u.Ingreso)
+            ...u, ExpiraDate: parseDate(u.Expira), IngresoDate: parseDate(u.Ingreso)
         }));
         renovacionesData = snap.renov_data.map(r => ({
-            ...r,
-            TxDate: parseRenoDateTime(r.FechaStr),
+            ...r, TxDate: parseRenoDateTime(r.FechaStr),
             User: usersData.find(u => u.Nombre === r.Cliente) || null
         }));
-
         usuariosLoaded = true;
         renoLoaded = true;
         await loadPricesForSede(currentSedeName);
+        document.getElementById('sedePicker').style.display = 'none';
         rebuildDashboard();
-        statusEl.innerHTML = `<span style="color:#2e7d32">✅ Datos de ${snap.mes} cargados desde la nube</span>`;
     } catch(e) {
-        console.error('Error loading data for colaborador:', e);
-        statusEl.innerHTML = '<span style="color:#c62828">⚠️ Error al cargar datos de la nube</span>';
+        document.getElementById('sedePickerStatus').textContent = '⚠️ Error: ' + e.message;
     }
 }
 
@@ -1443,7 +1489,7 @@ function detectMesFromData() {
 }
 
 async function autoSaveToSupabase() {
-    const statusEl = document.getElementById('uploadStatus');
+    const statusEl = document.getElementById('uploadStatusU') || document.getElementById('uploadStatusR');
     try {
         const { mes, mesOrden } = detectMesFromData();
         const today = new Date(); today.setHours(0,0,0,0);
