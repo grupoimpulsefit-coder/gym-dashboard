@@ -206,6 +206,7 @@
                 <span>👤</span>
                 <span id="userNombre">—</span>
                 <span class="role-badge" id="userRolBadge">—</span>
+                <button id="btnCambiarSede" onclick="volverAlMenu()" style="display:none;margin-left:12px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:white;border-radius:16px;padding:4px 14px;font-size:12px;font-weight:600;cursor:pointer;">← Cambiar sede</button>
             </div>
             <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
         </div>
@@ -613,9 +614,18 @@ const SEDE_ICONS = {
     'Natación':  { emoji: '🏊', color: '#6a1b9a', bg: '#f3e5f5' },
 };
 
+function volverAlMenu() {
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('btnCambiarSede').style.display = 'none';
+    usuariosLoaded = false;
+    renoLoaded = false;
+    showSedePicker();
+}
+
 async function showSedePicker() {
     document.getElementById('sedePicker').style.display = 'block';
     document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('btnCambiarSede').style.display = 'none';
     const statusEl = document.getElementById('sedePickerStatus');
     const cardsEl  = document.getElementById('sedeCards');
     cardsEl.innerHTML = '';
@@ -673,6 +683,7 @@ async function loadSedeForColaborador(sede) {
         renoLoaded = true;
         await loadPricesForSede(currentSedeName);
         document.getElementById('sedePicker').style.display = 'none';
+        document.getElementById('btnCambiarSede').style.display = 'inline-block';
         rebuildDashboard();
     } catch(e) {
         document.getElementById('sedePickerStatus').textContent = '⚠️ Error: ' + e.message;
