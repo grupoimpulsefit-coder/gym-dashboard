@@ -747,11 +747,13 @@ async function loadSedeForColaborador(sede) {
         usersData = snap.users_data.map(u => ({
             ...u, ExpiraDate: parseDate(u.Expira), IngresoDate: parseDate(u.Ingreso)
         }));
-        renovacionesData = snap.renov_data.map(r => ({
+        renovacionesData = snap.renov_data.filter(r => !r.EsClaseSuelta).map(r => ({
             ...r, TxDate: parseRenoDateTime(r.FechaStr),
             User: usersData.find(u => u.Nombre === r.Cliente) || null
         }));
-        clasesSueltasData = [];
+        clasesSueltasData = snap.renov_data.filter(r => r.EsClaseSuelta).map(c => ({
+            ...c, TxDate: parseRenoDateTime(c.FechaStr)
+        }));
         usuariosLoaded = true;
         renoLoaded = true;
         await loadPricesForSede(currentSedeName);
@@ -837,15 +839,16 @@ function normName(n) {
         .replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n')
         .replace(/\s+/g,' ').trim();
 }
-function findUserByName(clientName) {
+function findUserByName(clientName, list) {
+    list = list || usersData;
     let cn = normName(clientName);
     // Exact
-    let m = usersData.find(u => normName(u.Nombre) === cn);
+    let m = list.find(u => normName(u.Nombre) === cn);
     if (m) return m;
     // Word overlap ≥ 60%
     let words = cn.split(' ').filter(w => w.length > 2);
     let best = null, bestScore = 0;
-    usersData.forEach(u => {
+    list.forEach(u => {
         let uw = normName(u.Nombre).split(' ').filter(w => w.length > 2);
         let hits = words.filter(w => uw.some(x => x === w || x.startsWith(w) || w.startsWith(x)));
         let score = hits.length / Math.max(words.length, uw.length, 1);
@@ -1051,7 +1054,7 @@ function processUsuariosFile(data, filename) {
 }
 
 // ── RENOVACIONES (Ventas_por_Producto.xlsx → "Page 1") ──
-function processRenovacionesFile(data, filename) {
+async function processRenovacionesFile(data, filename) {
     try {
         document.getElementById('uploadStatusR').innerHTML = '<span style="color:#667eea;font-weight:600;">⏳ Procesando renovaciones...</span>';
 
@@ -1060,6 +1063,20 @@ function processRenovacionesFile(data, filename) {
             currentFileName = filename;
             currentSedeName = detectSede(filename);
             applySedeUI();
+        }
+
+        // Si no se cargó "Informe de Usuarios" en esta sesión, usar el último guardado en el
+        // historial de esta sede como referencia para clasificar Nuevo/Renovación/Reingreso
+        let refUsers = usersData;
+        if (!usuariosLoaded) {
+            try {
+                const snaps = await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(currentSedeName)}&order=updated_at.desc&limit=1&select=users_data`);
+                if (snaps?.length && snaps[0].users_data?.length) {
+                    refUsers = snaps[0].users_data.map(u => ({
+                        ...u, ExpiraDate: parseDate(u.Expira), IngresoDate: parseDate(u.Ingreso)
+                    }));
+                }
+            } catch(e) { console.warn('No se pudieron cargar usuarios de referencia:', e.message); }
         }
 
         const wb  = XLSX.read(data, { type:'array' });
@@ -1086,7 +1103,7 @@ function processRenovacionesFile(data, filename) {
                 continue;
             }
             if (!isMembershipPlan(producto)) continue;
-            const user   = findUserByName(cliente);
+            const user   = findUserByName(cliente, refUsers);
             const clasif = classifyTransaction(txDate, user, producto);
             renovacionesData.push({
                 FechaStr: fechaStr, TxDate: txDate, Cliente: cliente,
@@ -1640,13 +1657,24 @@ async function autoSaveToSupabase() {
                 nuevos:       renovacionesData.filter(r=>r.Tipo==='Nuevo').length,
                 renovaciones: renovacionesData.filter(r=>r.Tipo==='Renovación').length,
                 reingresos:   renovacionesData.filter(r=>r.Tipo==='Reingreso').length,
-                total:        renovacionesData.reduce((s,r)=>s+r.Total,0)
+                total:        renovacionesData.reduce((s,r)=>s+r.Total,0),
+                clasesSueltas: {
+                    count: clasesSueltasData.length,
+                    total: clasesSueltasData.reduce((s,c)=>s+c.Total,0)
+                }
             },
-            renov_data: renovacionesData.map(r => ({
-                FechaStr: r.FechaStr, Cliente: r.Cliente, RegistradoPor: r.RegistradoPor,
-                Producto: r.Producto, Total: r.Total, Tipo: r.Tipo,
-                Badge: r.Badge, Icon: r.Icon, GapDias: r.GapDias
-            })),
+            // clases sueltas se guardan junto a renov_data (marcadas) porque la tabla no tiene columna propia
+            renov_data: [
+                ...renovacionesData.map(r => ({
+                    FechaStr: r.FechaStr, Cliente: r.Cliente, RegistradoPor: r.RegistradoPor,
+                    Producto: r.Producto, Total: r.Total, Tipo: r.Tipo,
+                    Badge: r.Badge, Icon: r.Icon, GapDias: r.GapDias
+                })),
+                ...clasesSueltasData.map(c => ({
+                    FechaStr: c.FechaStr, Cliente: c.Cliente, RegistradoPor: c.RegistradoPor,
+                    Producto: c.Producto, Total: c.Total, EsClaseSuelta: true
+                }))
+            ],
             updated_at: new Date().toISOString()
         };
         if (usuariosLoaded) {
