@@ -412,6 +412,24 @@
                 </div>
                 <div id="clasesSueltasInfo" style="padding:12px 0; font-size:13px; color:#888;"></div>
             </div>
+
+            <!-- Tabla sin clasificar (productos que no calzan con ningún filtro, para no perder ventas) -->
+            <div class="table-section">
+                <div class="section-title">❓ Sin Clasificar (revisar — no calzan con ningún plan conocido)</div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr>
+                            <th>Fecha y Hora</th>
+                            <th>Cliente</th>
+                            <th>Producto</th>
+                            <th>Total (₡)</th>
+                            <th>Registrado por</th>
+                        </tr></thead>
+                        <tbody id="sinClasificarTableBody"></tbody>
+                    </table>
+                </div>
+                <div id="sinClasificarInfo" style="padding:12px 0; font-size:13px; color:#888;"></div>
+            </div>
         </div><!-- /tab-renovaciones -->
 
         <!-- ── TAB 3: VALIDACIÓN DESCUENTOS ── -->
@@ -522,7 +540,7 @@
 //  GLOBALS
 // ══════════════════════════════════════════════════════
 let usersData = [], planPrices = {}, manualPrices = {},
-    renovacionesData = [], clasesSueltasData = [],
+    renovacionesData = [], clasesSueltasData = [], sinClasificarData = [],
     currentSortColumn = 'Nombre', currentSortDirection = 'asc',
     revenueChart = null, renoTypePieChart = null, renoPlanBarChart = null,
     currentEditingUser = null,
@@ -569,6 +587,7 @@ function onSedeSelected() {
     usersData = [];
     renovacionesData = [];
     clasesSueltasData = [];
+    sinClasificarData = [];
     document.getElementById('uploadStatusU').innerHTML = '';
     document.getElementById('uploadStatusR').innerHTML = '';
     document.getElementById('dashboard').style.display = 'none';
@@ -747,11 +766,14 @@ async function loadSedeForColaborador(sede) {
         usersData = snap.users_data.map(u => ({
             ...u, ExpiraDate: parseDate(u.Expira), IngresoDate: parseDate(u.Ingreso)
         }));
-        renovacionesData = snap.renov_data.filter(r => !r.EsClaseSuelta).map(r => ({
+        renovacionesData = snap.renov_data.filter(r => !r.EsClaseSuelta && !r.EsSinClasificar).map(r => ({
             ...r, TxDate: parseRenoDateTime(r.FechaStr),
             User: usersData.find(u => u.Nombre === r.Cliente) || null
         }));
         clasesSueltasData = snap.renov_data.filter(r => r.EsClaseSuelta).map(c => ({
+            ...c, TxDate: parseRenoDateTime(c.FechaStr)
+        }));
+        sinClasificarData = snap.renov_data.filter(r => r.EsSinClasificar).map(c => ({
             ...c, TxDate: parseRenoDateTime(c.FechaStr)
         }));
         usuariosLoaded = true;
@@ -1087,6 +1109,7 @@ async function processRenovacionesFile(data, filename) {
         // Cols: 0=Fecha, 2=Cliente, 3=RegistradoPor, 6=Producto, 14=TotalCRC
         renovacionesData = [];
         clasesSueltasData = [];
+        sinClasificarData = [];
         for (let i = 4; i < raw.length; i++) {
             const r = raw[i];
             if (!r || !r[0]) continue;
@@ -1102,7 +1125,11 @@ async function processRenovacionesFile(data, filename) {
                 clasesSueltasData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
                 continue;
             }
-            if (!isMembershipPlan(producto)) continue;
+            if (!isMembershipPlan(producto)) {
+                // No es membresía ni clase suelta — no se descarta, queda visible como "sin clasificar"
+                sinClasificarData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
+                continue;
+            }
             const user   = findUserByName(cliente, refUsers);
             const clasif = classifyTransaction(txDate, user, producto);
             renovacionesData.push({
@@ -1321,15 +1348,17 @@ function updateRenoStats() {
     let totalCRC = all.reduce((s,r)=>s+r.Total,0);
     let dias = [...new Set(all.map(r=>r.TxDate?.toDateString()).filter(Boolean))].length;
     let clasesTotal = clasesSueltasData.reduce((s,c)=>s+c.Total,0);
-    let granTotal = totalCRC + clasesTotal;
+    let sinClasifTotal = sinClasificarData.reduce((s,c)=>s+c.Total,0);
+    let granTotal = totalCRC + clasesTotal + sinClasifTotal;
     document.getElementById('renoStatsContainer').innerHTML=`
         <div class="stat-card purple"><h3>📋 Total Membresías</h3><div class="value">${all.length}</div><div class="sub">Transacciones registradas</div></div>
         <div class="stat-card green"><h3>🆕 Nuevos</h3><div class="value" style="color:#2e7d32;">${nuevos}</div><div class="sub">${all.length?Math.round(nuevos/all.length*100):0}% del total</div></div>
         <div class="stat-card blue"><h3>✅ Renovaciones</h3><div class="value" style="color:#1565c0;">${renova}</div><div class="sub">${all.length?Math.round(renova/all.length*100):0}% del total</div></div>
         <div class="stat-card orange"><h3>🔄 Reingresos</h3><div class="value" style="color:#e65100;">${reing}</div><div class="sub">Inactivos +10 días que volvieron</div></div>
-        <div class="stat-card teal"><h3>💰 Total General</h3><div class="value" style="font-size:1.3em;">₡${granTotal.toLocaleString()}</div><div class="sub">Planes + clases sueltas · En ${dias} día(s)</div></div>
+        <div class="stat-card teal"><h3>💰 Total General</h3><div class="value" style="font-size:1.3em;">₡${granTotal.toLocaleString()}</div><div class="sub">Suma del 100% del reporte · En ${dias} día(s)</div></div>
         <div class="stat-card purple"><h3>🏋️ Planes / Membresías</h3><div class="value" style="font-size:1.1em;">₡${totalCRC.toLocaleString()}</div><div class="sub">${all.length} transacciones</div></div>
-        <div class="stat-card" style="border-left:4px solid #888;"><h3>🤸 Clases Sueltas</h3><div class="value" style="font-size:1.1em;color:#555;">₡${clasesTotal.toLocaleString()}</div><div class="sub">${clasesSueltasData.length} clases/sesiones</div></div>`;
+        <div class="stat-card" style="border-left:4px solid #888;"><h3>🤸 Clases Sueltas</h3><div class="value" style="font-size:1.1em;color:#555;">₡${clasesTotal.toLocaleString()}</div><div class="sub">${clasesSueltasData.length} clases/sesiones</div></div>
+        <div class="stat-card" style="border-left:4px solid #c62828;"><h3>❓ Sin Clasificar</h3><div class="value" style="font-size:1.1em;color:#c62828;">₡${sinClasifTotal.toLocaleString()}</div><div class="sub">${sinClasificarData.length} producto(s) no reconocido(s)</div></div>`;
 }
 
 function renderRenovaciones() {
@@ -1389,6 +1418,21 @@ function renderRenovaciones() {
     });
     document.getElementById('clasesSueltasInfo').textContent =
         `Mostrando ${clasesSueltasData.length} clases/sesiones sueltas — Total: ₡${clasesSueltasData.reduce((s,c)=>s+c.Total,0).toLocaleString()} (no se suma al total de membresías)`;
+
+    // ── Tabla sin clasificar ──
+    let scBody = document.getElementById('sinClasificarTableBody'); scBody.innerHTML = '';
+    let sinClasifSorted = [...sinClasificarData].sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0));
+    sinClasifSorted.forEach(c => {
+        let tr = scBody.insertRow();
+        tr.innerHTML = `
+            <td style="white-space:nowrap;font-size:12px;color:#666;">${c.FechaStr}</td>
+            <td>${c.Cliente}</td>
+            <td style="font-size:12.5px;">${c.Producto}</td>
+            <td style="font-weight:700;color:#c62828;">₡${c.Total.toLocaleString()}</td>
+            <td style="font-size:12px;color:#888;">${c.RegistradoPor}</td>`;
+    });
+    document.getElementById('sinClasificarInfo').textContent =
+        `Mostrando ${sinClasificarData.length} transacciones sin clasificar — Total: ₡${sinClasificarData.reduce((s,c)=>s+c.Total,0).toLocaleString()} (revisar nombres de producto, no calzan con ningún plan ni clase conocida)`;
 }
 
 function exportRenoCSV() {
@@ -1661,9 +1705,13 @@ async function autoSaveToSupabase() {
                 clasesSueltas: {
                     count: clasesSueltasData.length,
                     total: clasesSueltasData.reduce((s,c)=>s+c.Total,0)
+                },
+                sinClasificar: {
+                    count: sinClasificarData.length,
+                    total: sinClasificarData.reduce((s,c)=>s+c.Total,0)
                 }
             },
-            // clases sueltas se guardan junto a renov_data (marcadas) porque la tabla no tiene columna propia
+            // clases sueltas y sin-clasificar se guardan junto a renov_data (marcadas) porque la tabla no tiene columna propia
             renov_data: [
                 ...renovacionesData.map(r => ({
                     FechaStr: r.FechaStr, Cliente: r.Cliente, RegistradoPor: r.RegistradoPor,
@@ -1673,6 +1721,10 @@ async function autoSaveToSupabase() {
                 ...clasesSueltasData.map(c => ({
                     FechaStr: c.FechaStr, Cliente: c.Cliente, RegistradoPor: c.RegistradoPor,
                     Producto: c.Producto, Total: c.Total, EsClaseSuelta: true
+                })),
+                ...sinClasificarData.map(c => ({
+                    FechaStr: c.FechaStr, Cliente: c.Cliente, RegistradoPor: c.RegistradoPor,
+                    Producto: c.Producto, Total: c.Total, EsSinClasificar: true
                 }))
             ],
             updated_at: new Date().toISOString()
