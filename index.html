@@ -1120,8 +1120,8 @@ function rebuildDashboard() {
         document.getElementById('valTardio').addEventListener('change', renderValidacion);
     }
 
-    // Solo guardar snapshot si tenemos ambos archivos
-    if (usuariosLoaded && renoLoaded) autoSaveToSupabase();
+    // Guardar snapshot con lo que tengamos: ventas solas, usuarios solos, o ambos
+    if (usuariosLoaded || renoLoaded) autoSaveToSupabase();
 }
 
 // ══════════════════════════════════════════════════════
@@ -1564,7 +1564,9 @@ function detectMesFromData() {
 }
 
 async function autoSaveToSupabase() {
-    const statusEl = document.getElementById('uploadStatusU') || document.getElementById('uploadStatusR');
+    const statusEl = usuariosLoaded
+        ? document.getElementById('uploadStatusU')
+        : document.getElementById('uploadStatusR');
     try {
         const { mes, mesOrden } = detectMesFromData();
         const today = new Date(); today.setHours(0,0,0,0);
@@ -1586,20 +1588,12 @@ async function autoSaveToSupabase() {
             sede:          currentSedeName,
             mes,
             mes_orden:     mesOrden,
-            activos:       usersData.filter(u => u.Activo === 'Sí').length,
-            total_usuarios: usersData.length,
-            proyecciones,
             renovaciones: {
                 nuevos:       renovacionesData.filter(r=>r.Tipo==='Nuevo').length,
                 renovaciones: renovacionesData.filter(r=>r.Tipo==='Renovación').length,
                 reingresos:   renovacionesData.filter(r=>r.Tipo==='Reingreso').length,
                 total:        renovacionesData.reduce((s,r)=>s+r.Total,0)
             },
-            users_data: usersData.map(u => ({
-                PIN: u.PIN, Nombre: u.Nombre, Email: u.Email, Activo: u.Activo,
-                Expira: u.Expira, ÚltimoProducto: u.ÚltimoProducto,
-                Ingreso: u.Ingreso, ValorPlan: u.ValorPlan
-            })),
             renov_data: renovacionesData.map(r => ({
                 FechaStr: r.FechaStr, Cliente: r.Cliente, RegistradoPor: r.RegistradoPor,
                 Producto: r.Producto, Total: r.Total, Tipo: r.Tipo,
@@ -1607,16 +1601,34 @@ async function autoSaveToSupabase() {
             })),
             updated_at: new Date().toISOString()
         };
+        if (usuariosLoaded) {
+            record.activos        = usersData.filter(u => u.Activo === 'Sí').length;
+            record.total_usuarios = usersData.length;
+            record.proyecciones   = proyecciones;
+            record.users_data     = usersData.map(u => ({
+                PIN: u.PIN, Nombre: u.Nombre, Email: u.Email, Activo: u.Activo,
+                Expira: u.Expira, ÚltimoProducto: u.ÚltimoProducto,
+                Ingreso: u.Ingreso, ValorPlan: u.ValorPlan
+            }));
+        }
         // Intentar actualizar primero; si no existe ningún registro, insertar
         const existing = await supaFetch(
             `/gym_snapshots?sede=eq.${encodeURIComponent(record.sede)}&mes=eq.${encodeURIComponent(record.mes)}&select=id`
         );
         if (existing && existing.length > 0) {
+            // Si no subimos usuarios esta vez, no tocar los campos de usuarios ya guardados
             await supaFetch(
                 `/gym_snapshots?sede=eq.${encodeURIComponent(record.sede)}&mes=eq.${encodeURIComponent(record.mes)}`,
                 { method: 'PATCH', prefer: 'return=minimal', body: record }
             );
         } else {
+            // Registro nuevo sin usuarios: dejar valores por defecto razonables
+            if (!usuariosLoaded) {
+                record.activos = 0;
+                record.total_usuarios = 0;
+                record.proyecciones = [];
+                record.users_data = [];
+            }
             await supaFetch('/gym_snapshots', {
                 method: 'POST', prefer: 'return=minimal', body: record
             });
