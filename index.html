@@ -394,6 +394,24 @@
                 </div>
                 <div id="renoTableInfo" style="padding:12px 0; font-size:13px; color:#888;"></div>
             </div>
+
+            <!-- Tabla clases sueltas (independiente del total de membresías) -->
+            <div class="table-section">
+                <div class="section-title">🤸 Clases Sueltas / Sesiones (no son membresías)</div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr>
+                            <th>Fecha y Hora</th>
+                            <th>Cliente</th>
+                            <th>Producto</th>
+                            <th>Total (₡)</th>
+                            <th>Registrado por</th>
+                        </tr></thead>
+                        <tbody id="clasesSueltasTableBody"></tbody>
+                    </table>
+                </div>
+                <div id="clasesSueltasInfo" style="padding:12px 0; font-size:13px; color:#888;"></div>
+            </div>
         </div><!-- /tab-renovaciones -->
 
         <!-- ── TAB 3: VALIDACIÓN DESCUENTOS ── -->
@@ -504,7 +522,7 @@
 //  GLOBALS
 // ══════════════════════════════════════════════════════
 let usersData = [], planPrices = {}, manualPrices = {},
-    renovacionesData = [],
+    renovacionesData = [], clasesSueltasData = [],
     currentSortColumn = 'Nombre', currentSortDirection = 'asc',
     revenueChart = null, renoTypePieChart = null, renoPlanBarChart = null,
     currentEditingUser = null,
@@ -550,6 +568,7 @@ function onSedeSelected() {
     renoLoaded = false;
     usersData = [];
     renovacionesData = [];
+    clasesSueltasData = [];
     document.getElementById('uploadStatusU').innerHTML = '';
     document.getElementById('uploadStatusR').innerHTML = '';
     document.getElementById('dashboard').style.display = 'none';
@@ -732,6 +751,7 @@ async function loadSedeForColaborador(sede) {
             ...r, TxDate: parseRenoDateTime(r.FechaStr),
             User: usersData.find(u => u.Nombre === r.Cliente) || null
         }));
+        clasesSueltasData = [];
         usuariosLoaded = true;
         renoLoaded = true;
         await loadPricesForSede(currentSedeName);
@@ -852,8 +872,12 @@ function isMembershipPlan(product) {
     for (let key of Object.keys(planPrices)) {
         if (normName(key) === normName(p) || normName(p).includes(normName(key)) || normName(key).includes(normName(p))) return true;
     }
-    // Fallback: contains "plan" or "promo" or "anualidad" or "lealtad" or "bloqueado" or "verano"
-    return /plan|promo|anualidad|lealtad|bloqueado|verano|exclusivo|platium|semestral|trimestral/i.test(p);
+    // Fallback: contains "plan" or "promo" or "anualidad" or "lealtad" or "bloqueado" or "verano" or "estudiante"
+    return /plan|promo|anualidad|lealtad|bloqueado|verano|exclusivo|platium|semestral|trimestral|estudiante/i.test(p);
+}
+function isClaseSuelta(product) {
+    let pl = String(product||'').trim().toLowerCase();
+    return pl.includes('sesion') || pl.includes('sesión') || pl.includes('clase');
 }
 function classifyTransaction(txDate, user, product) {
     if (!user) return { tipo: 'Nuevo', badge: 'badge-nuevo', icon: '🆕', gapDias: null };
@@ -1045,6 +1069,7 @@ function processRenovacionesFile(data, filename) {
         // Row 0=title, Row 1=date range, Row 2=empty, Row 3=headers, Row 4+=data
         // Cols: 0=Fecha, 2=Cliente, 3=RegistradoPor, 6=Producto, 14=TotalCRC
         renovacionesData = [];
+        clasesSueltasData = [];
         for (let i = 4; i < raw.length; i++) {
             const r = raw[i];
             if (!r || !r[0]) continue;
@@ -1055,8 +1080,12 @@ function processRenovacionesFile(data, filename) {
             const total    = parseCRC(r[14]);
             if (!fechaStr || !cliente) continue;
             if (/^invitado$/i.test(cliente.trim())) continue;
-            if (!isMembershipPlan(producto)) continue;
             const txDate = parseRenoDateTime(fechaStr);
+            if (isClaseSuelta(producto)) {
+                clasesSueltasData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
+                continue;
+            }
+            if (!isMembershipPlan(producto)) continue;
             const user   = findUserByName(cliente);
             const clasif = classifyTransaction(txDate, user, producto);
             renovacionesData.push({
@@ -1274,12 +1303,16 @@ function updateRenoStats() {
     let reing  = all.filter(r=>r.Tipo==='Reingreso').length;
     let totalCRC = all.reduce((s,r)=>s+r.Total,0);
     let dias = [...new Set(all.map(r=>r.TxDate?.toDateString()).filter(Boolean))].length;
+    let clasesTotal = clasesSueltasData.reduce((s,c)=>s+c.Total,0);
+    let granTotal = totalCRC + clasesTotal;
     document.getElementById('renoStatsContainer').innerHTML=`
         <div class="stat-card purple"><h3>📋 Total Membresías</h3><div class="value">${all.length}</div><div class="sub">Transacciones registradas</div></div>
         <div class="stat-card green"><h3>🆕 Nuevos</h3><div class="value" style="color:#2e7d32;">${nuevos}</div><div class="sub">${all.length?Math.round(nuevos/all.length*100):0}% del total</div></div>
         <div class="stat-card blue"><h3>✅ Renovaciones</h3><div class="value" style="color:#1565c0;">${renova}</div><div class="sub">${all.length?Math.round(renova/all.length*100):0}% del total</div></div>
         <div class="stat-card orange"><h3>🔄 Reingresos</h3><div class="value" style="color:#e65100;">${reing}</div><div class="sub">Inactivos +10 días que volvieron</div></div>
-        <div class="stat-card teal"><h3>💰 Total Recaudado</h3><div class="value" style="font-size:1.3em;">₡${totalCRC.toLocaleString()}</div><div class="sub">En ${dias} día(s) registrado(s)</div></div>`;
+        <div class="stat-card teal"><h3>💰 Total General</h3><div class="value" style="font-size:1.3em;">₡${granTotal.toLocaleString()}</div><div class="sub">Planes + clases sueltas · En ${dias} día(s)</div></div>
+        <div class="stat-card purple"><h3>🏋️ Planes / Membresías</h3><div class="value" style="font-size:1.1em;">₡${totalCRC.toLocaleString()}</div><div class="sub">${all.length} transacciones</div></div>
+        <div class="stat-card" style="border-left:4px solid #888;"><h3>🤸 Clases Sueltas</h3><div class="value" style="font-size:1.1em;color:#555;">₡${clasesTotal.toLocaleString()}</div><div class="sub">${clasesSueltasData.length} clases/sesiones</div></div>`;
 }
 
 function renderRenovaciones() {
@@ -1324,6 +1357,21 @@ function renderRenovaciones() {
             <td style="font-size:12px;color:#888;">${r.RegistradoPor}</td>`;
     });
     document.getElementById('renoTableInfo').textContent = `Mostrando ${filtered.length} transacciones — Nuevos: ${nv} · Renovaciones: ${rv} · Reingresos: ${ri} · Total: ₡${filtered.reduce((s,r)=>s+r.Total,0).toLocaleString()}`;
+
+    // ── Tabla clases sueltas (independiente) ──
+    let csBody = document.getElementById('clasesSueltasTableBody'); csBody.innerHTML = '';
+    let clasesSorted = [...clasesSueltasData].sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0));
+    clasesSorted.forEach(c => {
+        let tr = csBody.insertRow();
+        tr.innerHTML = `
+            <td style="white-space:nowrap;font-size:12px;color:#666;">${c.FechaStr}</td>
+            <td>${c.Cliente}</td>
+            <td style="font-size:12.5px;">${c.Producto}</td>
+            <td style="font-weight:700;color:#2d2d5e;">₡${c.Total.toLocaleString()}</td>
+            <td style="font-size:12px;color:#888;">${c.RegistradoPor}</td>`;
+    });
+    document.getElementById('clasesSueltasInfo').textContent =
+        `Mostrando ${clasesSueltasData.length} clases/sesiones sueltas — Total: ₡${clasesSueltasData.reduce((s,c)=>s+c.Total,0).toLocaleString()} (no se suma al total de membresías)`;
 }
 
 function exportRenoCSV() {
