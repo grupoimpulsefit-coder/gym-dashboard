@@ -270,6 +270,7 @@
             <button class="tab-btn active" onclick="switchTab('tab-usuarios', this)">👥 Gestión de Usuarios</button>
             <button class="tab-btn" onclick="switchTab('tab-renovaciones', this)">🔄 Análisis de Renovaciones</button>
             <button class="tab-btn" onclick="switchTab('tab-validacion', this)">💳 Validación Descuentos</button>
+            <button class="tab-btn" onclick="switchTab('tab-seguimiento', this)">📋 Seguimiento Vencidos</button>
             <button class="tab-btn" onclick="switchTab('tab-historial', this)">📅 Historial</button>
         </div>
 
@@ -334,6 +335,9 @@
             <!-- Resumen chips -->
             <div class="stats" id="renoStatsContainer"></div>
 
+            <!-- Resumen del filtro activo (ej. "Hoy") para comparar contra la meta de Proyecciones -->
+            <div class="stats" id="renoFilteredStatsContainer" style="padding-top:0;"></div>
+
             <!-- Filtros renovaciones -->
             <div class="reno-controls">
                 <div class="controls-title">🔎 Filtrar Renovaciones</div>
@@ -353,7 +357,8 @@
                         <input type="text" id="renoDateFrom" placeholder="dd/mm/aaaa" oninput="renderRenovaciones()"></div>
                     <div class="filter-item"><label>Fecha hasta</label>
                         <input type="text" id="renoDateTo" placeholder="dd/mm/aaaa" oninput="renderRenovaciones()"></div>
-                    <div class="filter-item" style="justify-content:flex-end;">
+                    <div class="filter-item" style="justify-content:flex-end;flex-direction:row;gap:8px;">
+                        <button class="btn btn-purple" onclick="filterRenoHoy()" style="margin-top:auto;">📅 Hoy</button>
                         <button class="btn btn-orange" onclick="clearRenoFilters()" style="margin-top:auto;">✖ Limpiar</button></div>
                 </div>
                 <div class="btn-row" style="margin-top:14px;">
@@ -483,6 +488,54 @@
                 <div id="valTableInfo" style="padding:12px 0; font-size:13px; color:#888;"></div>
             </div>
         </div><!-- /tab-validacion -->
+
+        <!-- ── TAB SEGUIMIENTO: CLIENTES VENCIDOS SIN RENOVAR ── -->
+        <div id="tab-seguimiento" class="tab-panel">
+            <div class="controls">
+                <div class="controls-title">🔎 Filtros de Seguimiento</div>
+                <div class="filter-group">
+                    <div class="filter-item"><label>Buscar cliente</label>
+                        <input type="text" id="segSearch" placeholder="Nombre del cliente..." oninput="renderSeguimiento()"></div>
+                    <div class="filter-item"><label>Vencido hace</label>
+                        <select id="segRango" onchange="renderSeguimiento()">
+                            <option value="all">Cualquier antigüedad</option>
+                            <option value="1-15">1 a 15 días</option>
+                            <option value="16-30">16 a 30 días</option>
+                            <option value="31-60">31 a 60 días</option>
+                            <option value="61-9999">Más de 60 días</option>
+                        </select></div>
+                    <div class="filter-item"><label>Plan</label>
+                        <select id="segFilterPlan" onchange="renderSeguimiento()"><option value="all">Todos</option></select></div>
+                    <div class="filter-item" style="justify-content:flex-end;">
+                        <button class="btn btn-orange" onclick="clearSegFilters()" style="margin-top:auto;">✖ Limpiar filtros</button></div>
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-teal" onclick="exportSegCSV()">📥 Exportar CSV</button>
+                    <button class="btn btn-red"  onclick="printSeguimiento()">🖨️ Imprimir</button>
+                </div>
+            </div>
+
+            <div class="stats" id="segStatsContainer"></div>
+
+            <div class="table-section">
+                <div class="section-title">📋 Clientes Vencidos sin Renovar (no aparecen pagando en este período)</div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr>
+                            <th>PIN</th>
+                            <th>Cliente</th>
+                            <th>Email</th>
+                            <th>Plan</th>
+                            <th>Venció</th>
+                            <th>Días vencido</th>
+                            <th>Valor Plan</th>
+                        </tr></thead>
+                        <tbody id="segTableBody"></tbody>
+                    </table>
+                </div>
+                <div id="segTableInfo" style="padding:12px 0; font-size:13px; color:#888;"></div>
+            </div>
+        </div><!-- /tab-seguimiento -->
 
         <!-- ── TAB 4: HISTORIAL ── -->
         <div id="tab-historial" class="tab-panel">
@@ -810,6 +863,7 @@ function switchTab(id, btn) {
     btn.classList.add('active');
     if (id === 'tab-renovaciones' && renovacionesData.length) renderRenovaciones();
     if (id === 'tab-validacion' && allValidacion.length) renderValidacion();
+    if (id === 'tab-seguimiento' && usersData.length) renderSeguimiento();
     if (id === 'tab-historial') loadAndRenderHistorial();
 }
 
@@ -1201,6 +1255,7 @@ function rebuildDashboard() {
     updateRenoStats();
     buildValidacion();
     renderValidacion();
+    if (usersData.length) renderSeguimiento();
 
     if (!listenersAttached) {
         listenersAttached = true;
@@ -1406,12 +1461,37 @@ function getFilteredRenovaciones() {
     });
 }
 
+function getFilteredClasesSueltas() {
+    let dFrom = parseDateFromInput(document.getElementById('renoDateFrom')?.value);
+    let dTo   = parseDateFromInput(document.getElementById('renoDateTo')?.value);
+    return clasesSueltasData.filter(c => {
+        if (c.TxDate) { if (dFrom&&c.TxDate<dFrom) return false; if (dTo&&c.TxDate>dTo) return false; }
+        return true;
+    });
+}
+function getFilteredSinClasificar() {
+    let dFrom = parseDateFromInput(document.getElementById('renoDateFrom')?.value);
+    let dTo   = parseDateFromInput(document.getElementById('renoDateTo')?.value);
+    return sinClasificarData.filter(c => {
+        if (c.TxDate) { if (dFrom&&c.TxDate<dFrom) return false; if (dTo&&c.TxDate>dTo) return false; }
+        return true;
+    });
+}
+
 function clearRenoFilters() {
     document.getElementById('renoFilterTipo').value='all';
     document.getElementById('renoSearchName').value='';
     document.getElementById('renoFilterPlan').value='all';
     document.getElementById('renoDateFrom').value='';
     document.getElementById('renoDateTo').value='';
+    renderRenovaciones();
+}
+
+function filterRenoHoy() {
+    const d = new Date();
+    const ddmmyyyy = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    document.getElementById('renoDateFrom').value = ddmmyyyy;
+    document.getElementById('renoDateTo').value = ddmmyyyy;
     renderRenovaciones();
 }
 
@@ -1438,6 +1518,23 @@ function updateRenoStats() {
 
 function renderRenovaciones() {
     let filtered = getFilteredRenovaciones();
+
+    // ── Total del filtro activo (ej. "Hoy") para comparar contra la meta de Proyecciones ──
+    const dFromVal = document.getElementById('renoDateFrom')?.value || '';
+    const dToVal   = document.getElementById('renoDateTo')?.value || '';
+    const filtroActivo = dFromVal || dToVal || document.getElementById('renoSearchName')?.value
+        || (document.getElementById('renoFilterTipo')?.value !== 'all') || (document.getElementById('renoFilterPlan')?.value !== 'all');
+    const filteredClases = getFilteredClasesSueltas();
+    const filteredSinClasif = getFilteredSinClasificar();
+    const totalMembresiasFiltrado = filtered.reduce((s,r)=>s+r.Total,0);
+    const totalClasesFiltrado = filteredClases.reduce((s,c)=>s+c.Total,0);
+    const totalSinClasifFiltrado = filteredSinClasif.reduce((s,c)=>s+c.Total,0);
+    const rangoTexto = dFromVal && dToVal && dFromVal === dToVal ? `el ${dFromVal}`
+        : (dFromVal || dToVal) ? `${dFromVal||'…'} a ${dToVal||'…'}` : 'según filtros activos';
+    document.getElementById('renoFilteredStatsContainer').innerHTML = !filtroActivo ? '' : `
+        <div class="stat-card green"><h3>💰 Membresías Vendidas (${rangoTexto})</h3><div class="value" style="font-size:1.3em;">₡${totalMembresiasFiltrado.toLocaleString()}</div><div class="sub">${filtered.length} transacción(es) · compara contra la meta de Proyecciones</div></div>
+        <div class="stat-card" style="border-left:4px solid #888;"><h3>🤸 Clases Sueltas (filtrado)</h3><div class="value" style="font-size:1.1em;color:#555;">₡${totalClasesFiltrado.toLocaleString()}</div><div class="sub">${filteredClases.length} clase(s)/sesión(es)</div></div>
+        <div class="stat-card" style="border-left:4px solid #c62828;"><h3>❓ Sin Clasificar (filtrado)</h3><div class="value" style="font-size:1.1em;color:#c62828;">₡${totalSinClasifFiltrado.toLocaleString()}</div><div class="sub">${filteredSinClasif.length} producto(s)</div></div>`;
 
     // ── Charts ──
     // Pie
@@ -1479,9 +1576,9 @@ function renderRenovaciones() {
     });
     document.getElementById('renoTableInfo').textContent = `Mostrando ${filtered.length} transacciones — Nuevos: ${nv} · Renovaciones: ${rv} · Reingresos: ${ri} · Total: ₡${filtered.reduce((s,r)=>s+r.Total,0).toLocaleString()}`;
 
-    // ── Tabla clases sueltas (independiente) ──
+    // ── Tabla clases sueltas (independiente, respeta el filtro de fecha) ──
     let csBody = document.getElementById('clasesSueltasTableBody'); csBody.innerHTML = '';
-    let clasesSorted = [...clasesSueltasData].sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0));
+    let clasesSorted = [...filteredClases].sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0));
     clasesSorted.forEach(c => {
         let tr = csBody.insertRow();
         tr.innerHTML = `
@@ -1492,11 +1589,11 @@ function renderRenovaciones() {
             <td style="font-size:12px;color:#888;">${c.RegistradoPor}</td>`;
     });
     document.getElementById('clasesSueltasInfo').textContent =
-        `Mostrando ${clasesSueltasData.length} clases/sesiones sueltas — Total: ₡${clasesSueltasData.reduce((s,c)=>s+c.Total,0).toLocaleString()} (no se suma al total de membresías)`;
+        `Mostrando ${filteredClases.length} clases/sesiones sueltas — Total: ₡${totalClasesFiltrado.toLocaleString()} (no se suma al total de membresías)`;
 
-    // ── Tabla sin clasificar ──
+    // ── Tabla sin clasificar (respeta el filtro de fecha) ──
     let scBody = document.getElementById('sinClasificarTableBody'); scBody.innerHTML = '';
-    let sinClasifSorted = [...sinClasificarData].sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0));
+    let sinClasifSorted = [...filteredSinClasif].sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0));
     sinClasifSorted.forEach(c => {
         let tr = scBody.insertRow();
         tr.innerHTML = `
@@ -1507,7 +1604,7 @@ function renderRenovaciones() {
             <td style="font-size:12px;color:#888;">${c.RegistradoPor}</td>`;
     });
     document.getElementById('sinClasificarInfo').textContent =
-        `Mostrando ${sinClasificarData.length} transacciones sin clasificar — Total: ₡${sinClasificarData.reduce((s,c)=>s+c.Total,0).toLocaleString()} (revisar nombres de producto, no calzan con ningún plan ni clase conocida)`;
+        `Mostrando ${filteredSinClasif.length} transacciones sin clasificar — Total: ₡${totalSinClasifFiltrado.toLocaleString()} (revisar nombres de producto, no calzan con ningún plan ni clase conocida)`;
 }
 
 function exportRenoCSV() {
@@ -1731,6 +1828,132 @@ function renderValTable(rows) {
     });
     document.getElementById('valTableInfo').textContent =
         `Mostrando ${rows.length} de ${allValidacion.length} clientes activos con plan de lealtad/fidelidad`;
+}
+
+// ══════════════════════════════════════════════════════
+//  SEGUIMIENTO: CLIENTES VENCIDOS SIN RENOVAR
+// ══════════════════════════════════════════════════════
+function getSeguimientoVencidos() {
+    const today = new Date(); today.setHours(0,0,0,0);
+    // "Expira" en el Informe de Usuarios ya refleja si pagaron (se actualiza al renovar),
+    // así que basta con que la fecha de vencimiento haya quedado en el pasado.
+    return usersData.filter(u => u.ExpiraDate && u.ExpiraDate < today);
+}
+
+function getFilteredSeguimiento() {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const search = document.getElementById('segSearch')?.value.toLowerCase() || '';
+    const rango  = document.getElementById('segRango')?.value || 'all';
+    const plan   = document.getElementById('segFilterPlan')?.value || 'all';
+    return getSeguimientoVencidos().filter(u => {
+        if (search && !u.Nombre.toLowerCase().includes(search)) return false;
+        if (plan !== 'all' && u.ÚltimoProducto !== plan) return false;
+        const diasVencido = Math.round((today - u.ExpiraDate) / 864e5);
+        if (rango !== 'all') {
+            const [min, max] = rango.split('-').map(Number);
+            if (diasVencido < min || diasVencido > max) return false;
+        }
+        return true;
+    });
+}
+
+function clearSegFilters() {
+    document.getElementById('segSearch').value = '';
+    document.getElementById('segRango').value = 'all';
+    document.getElementById('segFilterPlan').value = 'all';
+    renderSeguimiento();
+}
+
+function renderSeguimiento() {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const todos = getSeguimientoVencidos();
+
+    // Poblar filtro de plan con los planes presentes entre los vencidos
+    const planSel = document.getElementById('segFilterPlan');
+    const currentPlan = planSel.value;
+    const planes = [...new Set(todos.map(u => u.ÚltimoProducto).filter(Boolean))].sort();
+    planSel.innerHTML = '<option value="all">Todos</option>' +
+        planes.map(p => `<option value="${p.replace(/"/g,'&quot;')}"${p===currentPlan?' selected':''}>${p}</option>`).join('');
+
+    const rows = getFilteredSeguimiento().sort((a,b) => a.ExpiraDate - b.ExpiraDate);
+
+    const valorRiesgo = rows.reduce((s,u) => s + (u.ValorPlan||0), 0);
+    const r15  = todos.filter(u => Math.round((today-u.ExpiraDate)/864e5) <= 15).length;
+    const r60  = todos.filter(u => Math.round((today-u.ExpiraDate)/864e5) > 60).length;
+    document.getElementById('segStatsContainer').innerHTML = `
+        <div class="stat-card red"><h3>📋 Total Vencidos</h3><div class="value">${todos.length}</div><div class="sub">Sin renovar a la fecha</div></div>
+        <div class="stat-card orange"><h3>🟠 Vencidos 1-15 días</h3><div class="value">${r15}</div><div class="sub">Aún recientes</div></div>
+        <div class="stat-card red"><h3>🔴 Vencidos +60 días</h3><div class="value">${r60}</div><div class="sub">Riesgo de pérdida</div></div>
+        <div class="stat-card purple"><h3>💰 Valor en Riesgo (filtro)</h3><div class="value" style="font-size:1.2em;">₡${valorRiesgo.toLocaleString()}</div><div class="sub">${rows.length} cliente(s) mostrados</div></div>`;
+
+    const tbody = document.getElementById('segTableBody'); tbody.innerHTML = '';
+    rows.forEach(u => {
+        const diasVencido = Math.round((today - u.ExpiraDate) / 864e5);
+        const tr = tbody.insertRow();
+        tr.innerHTML = `
+            <td>${u.PIN}</td>
+            <td><strong>${u.Nombre}</strong></td>
+            <td style="color:#667eea;font-size:12px;">${u.Email||'-'}</td>
+            <td style="font-size:12.5px;">${u.ÚltimoProducto||'-'}</td>
+            <td>${u.Expira||'-'}</td>
+            <td style="font-weight:700;color:${diasVencido>60?'#c62828':'#e65100'};">${diasVencido} días</td>
+            <td>${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString():'<span style="color:#aaa;">—</span>'}</td>`;
+    });
+    document.getElementById('segTableInfo').textContent =
+        `Mostrando ${rows.length} de ${todos.length} clientes vencidos sin renovar — Valor en riesgo: ₡${valorRiesgo.toLocaleString()}`;
+}
+
+function exportSegCSV() {
+    const f = getFilteredSeguimiento(); if (!f.length) { alert('No hay datos'); return; }
+    const today = new Date(); today.setHours(0,0,0,0);
+    const h = ['PIN','Nombre','Email','Plan','Vencio','Dias vencido','Valor Plan (CRC)'];
+    const rows = f.map(u => [u.PIN, u.Nombre, u.Email, u.ÚltimoProducto, u.Expira, Math.round((today-u.ExpiraDate)/864e5), u.ValorPlan]);
+    const csv = [h, ...rows].map(row => row.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+    dlBlob(csv, 'seguimiento_vencidos_'+currentSedeName+'_'+hoy()+'.csv', 'text/csv;charset=utf-8');
+}
+
+function printSeguimiento() {
+    const today = new Date(); today.setHours(0,0,0,0);
+    let f = getFilteredSeguimiento();
+    if (!f.length) { alert('No hay datos para los filtros aplicados'); return; }
+    f = f.slice().sort((a,b) => a.ExpiraDate - b.ExpiraDate);
+    const fecha = new Date().toLocaleDateString('es-CR', { year:'numeric', month:'long', day:'numeric' });
+    const rows = f.map(u => {
+        const dias = Math.round((today - u.ExpiraDate) / 864e5);
+        return `<tr>
+            <td>${u.PIN}</td>
+            <td>${u.Nombre}</td>
+            <td>${u.ÚltimoProducto||'-'}</td>
+            <td>${u.Expira||'-'}</td>
+            <td>${dias}</td>
+            <td>${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString():'—'}</td>
+            <td class="notas"></td>
+        </tr>`;
+    }).join('');
+    const win = window.open('', '_blank');
+    win.document.write(`
+    <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <title>Seguimiento Vencidos - ${currentSedeName}</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 24px; color: #222; }
+        h1 { font-size: 1.3em; margin-bottom: 2px; }
+        .sub { color: #555; font-size: 0.9em; margin-bottom: 18px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        th, td { border: 1px solid #999; padding: 7px 9px; text-align: left; }
+        th { background: #eee; }
+        td.notas { width: 160px; }
+        @media print { body { padding: 8px; } }
+    </style></head><body>
+        <h1>Seguimiento de Clientes Vencidos — ${currentSedeName}</h1>
+        <div class="sub">Generado: ${fecha} &nbsp;·&nbsp; Total: ${f.length} cliente(s)</div>
+        <table>
+            <thead><tr><th>PIN</th><th>Nombre</th><th>Plan</th><th>Venció</th><th>Días vencido</th><th>Valor</th><th>Notas / Contacto</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+    </body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 250);
 }
 
 // ══════════════════════════════════════════════════════
