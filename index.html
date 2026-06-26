@@ -524,6 +524,7 @@
                         <thead><tr>
                             <th>PIN</th>
                             <th>Cliente</th>
+                            <th>Teléfono</th>
                             <th>Email</th>
                             <th>Plan</th>
                             <th>Venció</th>
@@ -1012,11 +1013,13 @@ function processLegacyFile(wb, filename) {
         const email     = String(r[3]||'').trim();
         let   activo    = String(r[4]||'').trim();
         const expiraStr = String(r[5]||'').trim();
+        const telefono  = String(r[6]||'').trim();
         const prod      = String(r[9]||'').trim();
         activo = /^s[ií]/i.test(activo) ? 'Sí' : /^no/i.test(activo) ? 'No' : activo;
         usersData.push({
             PIN: pin, Nombre: nombre, Email: email, Activo: activo,
             Expira: expiraStr, ExpiraDate: parseDate(expiraStr),
+            Telefono: telefono,
             ÚltimoProducto: prod || 'Desconocido',
             Ingreso: '', IngresoDate: null, ValorPlan: 0
         });
@@ -1107,12 +1110,14 @@ function processUsuariosFile(data, filename) {
             const email     = String(r[3]||'').trim();
             let   activo    = String(r[4]||'').trim();
             const expiraStr = String(r[5]||'').trim();
+            const telefono  = String(r[6]||'').trim();
             const prod      = String(r[9]||'').trim();
             const ingresoStr= String(r[11]||'').trim();
             activo = /^s[ií]/i.test(activo) ? 'Sí' : /^no/i.test(activo) ? 'No' : activo;
             usersData.push({
                 PIN: pin, Nombre: nombre, Email: email, Activo: activo,
                 Expira: expiraStr, ExpiraDate: parseDate(expiraStr),
+                Telefono: telefono,
                 ÚltimoProducto: prod || 'Desconocido',
                 Ingreso: ingresoStr, IngresoDate: parseDate(ingresoStr), ValorPlan: 0
             });
@@ -1893,6 +1898,7 @@ function renderSeguimiento() {
         tr.innerHTML = `
             <td>${u.PIN}</td>
             <td><strong>${u.Nombre}</strong></td>
+            <td style="font-size:12.5px;white-space:nowrap;">${u.Telefono||'<span style="color:#aaa;">—</span>'}</td>
             <td style="color:#667eea;font-size:12px;">${u.Email||'-'}</td>
             <td style="font-size:12.5px;">${u.ÚltimoProducto||'-'}</td>
             <td>${u.Expira||'-'}</td>
@@ -1906,8 +1912,8 @@ function renderSeguimiento() {
 function exportSegCSV() {
     const f = getFilteredSeguimiento(); if (!f.length) { alert('No hay datos'); return; }
     const today = new Date(); today.setHours(0,0,0,0);
-    const h = ['PIN','Nombre','Email','Plan','Vencio','Dias vencido','Valor Plan (CRC)'];
-    const rows = f.map(u => [u.PIN, u.Nombre, u.Email, u.ÚltimoProducto, u.Expira, Math.round((today-u.ExpiraDate)/864e5), u.ValorPlan]);
+    const h = ['PIN','Nombre','Telefono','Email','Plan','Vencio','Dias vencido','Valor Plan (CRC)'];
+    const rows = f.map(u => [u.PIN, u.Nombre, u.Telefono, u.Email, u.ÚltimoProducto, u.Expira, Math.round((today-u.ExpiraDate)/864e5), u.ValorPlan]);
     const csv = [h, ...rows].map(row => row.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
     dlBlob(csv, 'seguimiento_vencidos_'+currentSedeName+'_'+hoy()+'.csv', 'text/csv;charset=utf-8');
 }
@@ -1923,6 +1929,7 @@ function printSeguimiento() {
         return `<tr>
             <td>${u.PIN}</td>
             <td>${u.Nombre}</td>
+            <td>${u.Telefono||'—'}</td>
             <td>${u.ÚltimoProducto||'-'}</td>
             <td>${u.Expira||'-'}</td>
             <td>${dias}</td>
@@ -1947,7 +1954,7 @@ function printSeguimiento() {
         <h1>Seguimiento de Clientes Vencidos — ${currentSedeName}</h1>
         <div class="sub">Generado: ${fecha} &nbsp;·&nbsp; Total: ${f.length} cliente(s)</div>
         <table>
-            <thead><tr><th>PIN</th><th>Nombre</th><th>Plan</th><th>Venció</th><th>Días vencido</th><th>Valor</th><th>Notas / Contacto</th></tr></thead>
+            <thead><tr><th>PIN</th><th>Nombre</th><th>Teléfono</th><th>Plan</th><th>Venció</th><th>Días vencido</th><th>Valor</th><th>Notas / Contacto</th></tr></thead>
             <tbody>${rows}</tbody>
         </table>
     </body></html>`);
@@ -2003,7 +2010,7 @@ async function autoSaveToSupabase() {
             record.proyecciones   = proyecciones;
             record.users_data     = usersData.map(u => ({
                 PIN: u.PIN, Nombre: u.Nombre, Email: u.Email, Activo: u.Activo,
-                Expira: u.Expira, ÚltimoProducto: u.ÚltimoProducto,
+                Expira: u.Expira, ÚltimoProducto: u.ÚltimoProducto, Telefono: u.Telefono,
                 Ingreso: u.Ingreso, ValorPlan: u.ValorPlan
             }));
         }
