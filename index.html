@@ -912,11 +912,20 @@ function classifyTransaction(txDate, user, product) {
         if (diffI <= 5) return { tipo: 'Nuevo', badge: 'badge-nuevo', icon: '🆕', gapDias: null };
     }
     // Try to compute gap = txDate - (current Expira - plan_duration)
+    // Si el cliente cambió de plan, la duración del plan NUEVO no sirve para
+    // ubicar cuándo vencía el plan ANTERIOR. Probamos las duraciones típicas
+    // (30/90/180/365 días, más la del producto actual) y usamos la que mejor
+    // explica el pago (gap más cercano a 0) antes de marcarlo como reingreso.
     if (user.ExpiraDate) {
-        let dur = getPlanDuration(product);
-        let prevExpiry = new Date(user.ExpiraDate.getTime() - dur * 864e5);
-        let gap = daysBetween(txDate, prevExpiry);
-        if (gap > 10) return { tipo: 'Reingreso', badge: 'badge-reingreso', icon: '🔄', gapDias: gap };
+        const candidatos = [...new Set([getPlanDuration(product), 30, 90, 180, 365])];
+        let bestGap = null;
+        for (const dur of candidatos) {
+            const prevExpiry = new Date(user.ExpiraDate.getTime() - dur * 864e5);
+            const gap = daysBetween(txDate, prevExpiry);
+            if (gap === null) continue;
+            if (bestGap === null || Math.abs(gap) < Math.abs(bestGap)) bestGap = gap;
+        }
+        if (bestGap !== null && bestGap > 10) return { tipo: 'Reingreso', badge: 'badge-reingreso', icon: '🔄', gapDias: bestGap };
     }
     return { tipo: 'Renovación', badge: 'badge-renova', icon: '✅', gapDias: null };
 }
