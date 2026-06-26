@@ -1640,9 +1640,9 @@ function buildValidacion() {
 
         let pagoTardio = null;
         if (pago && pago.TxDate && m.ExpiraDate) {
-            const dur = getPlanDuration(m.ÚltimoProducto);
-            const prevExpira = new Date(m.ExpiraDate.getTime() - dur * 864e5);
-            const gap = Math.round((pago.TxDate - prevExpira) / 864e5);
+            // Comparación directa contra la fecha de vencimiento (ver fix de classifyTransaction:
+            // restar la duración del plan asumía que "Expira" ya incluía este pago, lo cual no es el caso).
+            const gap = Math.round((pago.TxDate - m.ExpiraDate) / 864e5);
             if (gap > 0) pagoTardio = gap;
         }
 
