@@ -1840,9 +1840,11 @@ function renderValTable(rows) {
 // ══════════════════════════════════════════════════════
 function getSeguimientoVencidos() {
     const today = new Date(); today.setHours(0,0,0,0);
-    // "Expira" en el Informe de Usuarios ya refleja si pagaron (se actualiza al renovar),
-    // así que basta con que la fecha de vencimiento haya quedado en el pasado.
-    return usersData.filter(u => u.ExpiraDate && u.ExpiraDate < today);
+    // El Informe de Usuarios puede no estar actualizado todavía aunque el cliente ya
+    // pagó este período (aparece en el archivo de Ventas) — se excluye a quien ya
+    // tenga un pago registrado en renovacionesData, sin importar lo que diga "Expira".
+    const pagaronEstePeriodo = new Set(renovacionesData.map(r => normName(r.Cliente)));
+    return usersData.filter(u => u.ExpiraDate && u.ExpiraDate < today && !pagaronEstePeriodo.has(normName(u.Nombre)));
 }
 
 function getFilteredSeguimiento() {
