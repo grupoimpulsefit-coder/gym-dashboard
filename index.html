@@ -1105,19 +1105,39 @@ async function processRenovacionesFile(data, filename) {
         const ws  = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
 
-        // Row 0=title, Row 1=date range, Row 2=empty, Row 3=headers, Row 4+=data
-        // Cols: 0=Fecha, 2=Cliente, 3=RegistradoPor, 6=Producto, 14=TotalCRC
+        // Las exportaciones de "Ventas por Producto" varían en cuántas columnas de
+        // relleno/espaciado traen entre cada dato — por eso buscamos el encabezado
+        // por nombre en vez de asumir posiciones fijas.
+        let headerRowIdx = -1, col = {};
+        for (let i = 0; i < Math.min(raw.length, 10); i++) {
+            const r = raw[i] || [];
+            const norm = r.map(c => String(c||'').trim().toLowerCase());
+            const fechaIdx = norm.findIndex(c => c === 'fecha');
+            const productoIdx = norm.findIndex(c => c === 'producto');
+            if (fechaIdx >= 0 && productoIdx >= 0) {
+                headerRowIdx = i;
+                col.fecha      = fechaIdx;
+                col.producto   = productoIdx;
+                col.cliente    = norm.findIndex(c => c === 'cliente');
+                col.registrado = norm.findIndex(c => c.includes('registrado'));
+                col.total      = norm.findIndex(c => c.includes('total crc'));
+                if (col.total < 0) col.total = norm.findIndex(c => c.includes('total') && !c.includes('usd'));
+                break;
+            }
+        }
+        if (headerRowIdx < 0) throw new Error('No se encontró el encabezado (Fecha/Producto) en el archivo. Verifique que sea el reporte "Ventas por Producto".');
+
         renovacionesData = [];
         clasesSueltasData = [];
         sinClasificarData = [];
-        for (let i = 4; i < raw.length; i++) {
+        for (let i = headerRowIdx + 1; i < raw.length; i++) {
             const r = raw[i];
-            if (!r || !r[0]) continue;
-            const fechaStr = String(r[0]||'').trim();
-            const cliente  = String(r[2]||'').trim();
-            const regPor   = String(r[3]||'').trim();
-            const producto = String(r[6]||'').trim();
-            const total    = parseCRC(r[14]);
+            if (!r || !r[col.fecha]) continue;
+            const fechaStr = String(r[col.fecha]||'').trim();
+            const cliente  = String(r[col.cliente]||'').trim();
+            const regPor   = String(r[col.registrado]||'').trim();
+            const producto = String(r[col.producto]||'').trim();
+            const total    = parseCRC(r[col.total]);
             if (!fechaStr || !cliente) continue;
             if (/^invitado$/i.test(cliente.trim())) continue;
             const txDate = parseRenoDateTime(fechaStr);
