@@ -1697,7 +1697,21 @@ async function autoSaveToSupabase() {
             sede:          currentSedeName,
             mes,
             mes_orden:     mesOrden,
-            renovaciones: {
+            updated_at: new Date().toISOString()
+        };
+        if (usuariosLoaded) {
+            record.activos        = usersData.filter(u => u.Activo === 'Sí').length;
+            record.total_usuarios = usersData.length;
+            record.proyecciones   = proyecciones;
+            record.users_data     = usersData.map(u => ({
+                PIN: u.PIN, Nombre: u.Nombre, Email: u.Email, Activo: u.Activo,
+                Expira: u.Expira, ÚltimoProducto: u.ÚltimoProducto,
+                Ingreso: u.Ingreso, ValorPlan: u.ValorPlan
+            }));
+        }
+        if (renoLoaded) {
+            // Si no subimos Ventas esta vez, no tocar renovaciones/renov_data ya guardados (evita borrarlos)
+            record.renovaciones = {
                 nuevos:       renovacionesData.filter(r=>r.Tipo==='Nuevo').length,
                 renovaciones: renovacionesData.filter(r=>r.Tipo==='Renovación').length,
                 reingresos:   renovacionesData.filter(r=>r.Tipo==='Reingreso').length,
@@ -1710,9 +1724,9 @@ async function autoSaveToSupabase() {
                     count: sinClasificarData.length,
                     total: sinClasificarData.reduce((s,c)=>s+c.Total,0)
                 }
-            },
+            };
             // clases sueltas y sin-clasificar se guardan junto a renov_data (marcadas) porque la tabla no tiene columna propia
-            renov_data: [
+            record.renov_data = [
                 ...renovacionesData.map(r => ({
                     FechaStr: r.FechaStr, Cliente: r.Cliente, RegistradoPor: r.RegistradoPor,
                     Producto: r.Producto, Total: r.Total, Tipo: r.Tipo,
@@ -1726,36 +1740,28 @@ async function autoSaveToSupabase() {
                     FechaStr: c.FechaStr, Cliente: c.Cliente, RegistradoPor: c.RegistradoPor,
                     Producto: c.Producto, Total: c.Total, EsSinClasificar: true
                 }))
-            ],
-            updated_at: new Date().toISOString()
-        };
-        if (usuariosLoaded) {
-            record.activos        = usersData.filter(u => u.Activo === 'Sí').length;
-            record.total_usuarios = usersData.length;
-            record.proyecciones   = proyecciones;
-            record.users_data     = usersData.map(u => ({
-                PIN: u.PIN, Nombre: u.Nombre, Email: u.Email, Activo: u.Activo,
-                Expira: u.Expira, ÚltimoProducto: u.ÚltimoProducto,
-                Ingreso: u.Ingreso, ValorPlan: u.ValorPlan
-            }));
+            ];
         }
         // Intentar actualizar primero; si no existe ningún registro, insertar
         const existing = await supaFetch(
             `/gym_snapshots?sede=eq.${encodeURIComponent(record.sede)}&mes=eq.${encodeURIComponent(record.mes)}&select=id`
         );
         if (existing && existing.length > 0) {
-            // Si no subimos usuarios esta vez, no tocar los campos de usuarios ya guardados
             await supaFetch(
                 `/gym_snapshots?sede=eq.${encodeURIComponent(record.sede)}&mes=eq.${encodeURIComponent(record.mes)}`,
                 { method: 'PATCH', prefer: 'return=minimal', body: record }
             );
         } else {
-            // Registro nuevo sin usuarios: dejar valores por defecto razonables
+            // Registro nuevo: dejar valores por defecto razonables para lo que falte
             if (!usuariosLoaded) {
                 record.activos = 0;
                 record.total_usuarios = 0;
                 record.proyecciones = [];
                 record.users_data = [];
+            }
+            if (!renoLoaded) {
+                record.renovaciones = { nuevos:0, renovaciones:0, reingresos:0, total:0, clasesSueltas:{count:0,total:0}, sinClasificar:{count:0,total:0} };
+                record.renov_data = [];
             }
             await supaFetch('/gym_snapshots', {
                 method: 'POST', prefer: 'return=minimal', body: record
