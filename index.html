@@ -958,7 +958,12 @@ function isMembershipPlan(product) {
 }
 function isClaseSuelta(product) {
     let pl = String(product||'').trim().toLowerCase();
-    return pl.includes('sesion') || pl.includes('sesión') || pl.includes('clase');
+    if (!pl.includes('sesion') && !pl.includes('sesión') && !pl.includes('clase')) return false;
+    // Si está en planPrices es una membresía conocida, no clase suelta
+    for (let key of Object.keys(planPrices)) {
+        if (normName(key) === normName(product) || normName(product).includes(normName(key)) || normName(key).includes(normName(product))) return false;
+    }
+    return true;
 }
 function classifyTransaction(txDate, user, product) {
     if (!user) return { tipo: 'Nuevo', badge: 'badge-nuevo', icon: '🆕', gapDias: null };
