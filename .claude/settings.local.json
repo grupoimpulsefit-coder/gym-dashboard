@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/Jose/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/fa6ebd3e-fc82-42c9-8077-c944c2929d51/52e7b97d-f95b-4b3e-ae29-d4a6a58950c5/skills/xlsx/**)",
+      "Bash(python -c ' *)",
+      "Bash(pip install *)",
+      "PowerShell(pip install openpyxl pandas -q 2>&1)",
+      "Bash(py --version)",
+      "Bash(where python *)",
+      "Bash(python3 -c ' *)",
+      "PowerShell(Get-Command python3, py, python -ErrorAction SilentlyContinue)",
+      "Read(//c/Users/Jose/Downloads/**)",
+      "Bash(python3 -c \"import pdfplumber; print\\('ok'\\)\")",
+      "Bash(py -3 -c \"import pdfplumber; print\\('ok'\\)\")",
+      "PowerShell(py -3 \"C:\\\\Users\\\\Jose\\\\Documents\\\\claude\\\\analyze_pdfs.py\")",
+      "Read(//c/Users/Jose/**)",
+      "mcp__visualize__read_me",
+      "Bash(C:/Users/Jose/AppData/Local/Python/bin/python.exe -c ' *)",
+      "Bash(cd /tmp)",
+      "Bash(npm install *)",
+      "Bash(node -e ' *)",
+      "Bash(gh repo *)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git fetch *)",
+      "Bash(git ls-tree *)",
+      "Bash(git show *)",
+      "Bash(diff /tmp/nat_remote.html proyeccion-gym.html)",
+      "Read(//tmp/**)",
+      "Bash(git add *)",
+      "Bash(git stash *)",
+      "Bash(git checkout *)",
+      "Bash(git rm *)"
+    ]
+  }
+}

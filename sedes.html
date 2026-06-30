@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reporte de Sedes — Facturación</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --primary: #1a5276;
+  --primary-light: #2e86c1;
+  --accent: #148f77;
+  --accent2: #e67e22;
+  --bg: #f0f4f8;
+  --white: #ffffff;
+  --border: #d5dce8;
+  --text: #1c2833;
+  --muted: #6c757d;
+  --warn: #c0392b;
+  --success: #27ae60;
+
+  --c-tresrios:   #00838f;
+  --c-natacion:   #6a1b9a;
+  --c-pinares:    #2e7d32;
+  --c-sabanilla:  #1565c0;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+/* ── Login ── */
+#loginScreen { position: fixed; inset: 0; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+.login-card { background: white; border-radius: 24px; padding: 40px 44px; width: 100%; max-width: 420px; box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
+.login-logo { width: 64px; height: 64px; background: linear-gradient(135deg, #1a5276, #2e86c1); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 20px; }
+.login-card h2 { text-align: center; font-size: 1.4em; font-weight: 800; color: #2d2d5e; margin-bottom: 6px; }
+.login-card .login-sub { text-align: center; font-size: 0.85em; color: #888; margin-bottom: 28px; }
+.login-field { margin-bottom: 16px; }
+.login-field label { display: block; font-size: 0.8em; font-weight: 700; color: #444; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+.login-field input { width: 100%; padding: 11px 14px; border: 1.5px solid #dde1f0; border-radius: 10px; font-size: 14px; font-family: inherit; color: #333; }
+.login-field input:focus { outline: none; border-color: #2e86c1; box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
+.login-btn { width: 100%; padding: 13px; background: linear-gradient(135deg, #1a5276, #2e86c1); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+.login-btn:disabled { opacity: .6; cursor: not-allowed; }
+#loginError { text-align: center; color: #c62828; font-size: 13px; margin-top: 12px; min-height: 18px; }
+
+/* ── Header ── */
+.header {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: white; padding: 18px 32px; display: flex; align-items: center; gap: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25); flex-wrap: wrap;
+}
+.header-icon { font-size: 34px; }
+.header h1 { font-size: 21px; font-weight: 700; }
+.header p  { font-size: 13px; opacity: .85; margin-top: 2px; }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; color: white; font-size: 13px; }
+.logout-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35); color: white; border-radius: 16px; padding: 5px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+/* ── Loading / empty ── */
+.loading, .empty-state { display: none; text-align: center; padding: 60px 32px; color: var(--muted); }
+.spinner { width: 44px; height: 44px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Dashboard ── */
+#dashboard { display: none; }
+.dash-topbar { padding: 12px 32px; background: white; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.dash-title { font-size: 15px; font-weight: 700; color: var(--primary); }
+.dash-period { font-size: 12px; color: var(--muted); }
+.btn-back { padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 13px; cursor: pointer; color: var(--primary); font-weight: 600; }
+.btn-back:hover { background: var(--bg); }
+
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; padding: 24px 32px 8px; }
+.kpi { background: white; border-radius: 12px; padding: 16px 18px; border-left: 4px solid var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+.kpi.green  { border-color: var(--success); }
+.kpi.orange { border-color: var(--accent2); }
+.kpi.purple { border-color: #7030A0; }
+.kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+.kpi-value { font-size: 24px; font-weight: 700; color: var(--primary); margin-top: 4px; line-height: 1.1; }
+.kpi.green  .kpi-value { color: var(--success); }
+.kpi.orange .kpi-value { color: var(--accent2); }
+.kpi.purple .kpi-value { color: #7030A0; }
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.section { padding: 8px 32px; }
+.section-title { font-size: 15px; font-weight: 700; color: var(--primary); margin-bottom: 14px; border-left: 4px solid var(--primary-light); padding-left: 10px; }
+
+.sede-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; padding: 8px 32px 24px; }
+.sede-card { background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.sede-card.no-data { opacity: .55; }
+.sede-card-header { padding: 14px 18px; color: white; display: flex; align-items: center; gap: 10px; }
+.sede-card-header .s-icon { font-size: 22px; }
+.sede-card-header .s-name { font-size: 15px; font-weight: 700; }
+.sede-card-header .s-total { margin-left: auto; font-size: 18px; font-weight: 700; }
+.sede-card-body { padding: 14px 18px; }
+.sede-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f0f4f8; }
+.sede-row:last-child { border-bottom: none; }
+.sede-row-label { font-size: 12px; color: var(--muted); }
+.sede-row-val   { font-size: 13px; font-weight: 600; color: var(--text); }
+.sede-row-pct   { font-size: 11px; color: var(--muted); margin-left: 6px; }
+.progress-bar { height: 6px; border-radius: 3px; background: #e8edf4; margin-top: 10px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 3px; }
+.top-vend-label { font-size: 11px; color: var(--muted); margin-top: 12px; text-transform: uppercase; letter-spacing: .5px; }
+.top-vend-name  { font-size: 13px; font-weight: 700; margin-top: 4px; }
+.top-vend-amt   { font-size: 12px; color: var(--muted); }
+.no-vend-note { font-size: 11px; color: var(--muted); margin-top: 12px; font-style: italic; }
+
+.charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 8px 32px 24px; }
+@media (max-width: 700px) { .charts-row { grid-template-columns: 1fr; } }
+.chart-box { background: white; border-radius: 12px; padding: 18px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+.chart-box h3 { font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 14px; }
+
+.vend-section { padding: 8px 32px 32px; }
+.vend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+.vend-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+.vend-card-hdr { padding: 10px 14px; color: white; font-size: 13px; font-weight: 700; }
+.vend-table { width: 100%; border-collapse: collapse; }
+.vend-table th { background: #f8f9fb; font-size: 11px; font-weight: 600; color: var(--muted); padding: 7px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.vend-table td { padding: 8px 12px; font-size: 12px; border-bottom: 1px solid #f0f4f8; }
+.vend-table tr:last-child td { border-bottom: none; }
+.vend-rank { font-weight: 700; color: var(--muted); width: 22px; }
+.rank-1 .vend-rank { color: #C9A84C; }
+.rank-1 td { background: #fffdf0; }
+.vend-name { font-weight: 600; }
+.vend-amt  { text-align: right; font-weight: 600; white-space: nowrap; }
+.vend-pct  { text-align: right; font-size: 11px; color: var(--muted); }
+.vend-empty { padding: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+.bg-tresrios   { background: var(--c-tresrios); }
+.bg-natacion   { background: var(--c-natacion); }
+.bg-pinares    { background: var(--c-pinares); }
+.bg-sabanilla  { background: var(--c-sabanilla); }
+.text-tresrios    { color: var(--c-tresrios); }
+.text-natacion    { color: var(--c-natacion); }
+.text-pinares     { color: var(--c-pinares); }
+.text-sabanilla   { color: var(--c-sabanilla); }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">📊</div>
+    <h2>Reporte de Sedes</h2>
+    <p class="login-sub">Acceso restringido — Facturación consolidada</p>
+    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
+    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-icon">🏋️</div>
+  <div>
+    <h1>Reporte de Facturación por Sede</h1>
+    <p>Datos cargados automáticamente desde el sistema de gestión de cada sede</p>
+  </div>
+  <div class="header-right">
+    <span>👤 <span id="userNombre">—</span></span>
+    <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+  </div>
+</div>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div>Cargando datos de las sedes…</div>
+</div>
+
+<div class="empty-state" id="emptyState">
+  No hay datos cargados todavía en ninguna sede.
+</div>
+
+<div id="dashboard">
+
+  <div class="dash-topbar">
+    <div>
+      <div class="dash-title">📊 Reporte de Facturación por Sede</div>
+      <div class="dash-period" id="dashPeriod"></div>
+    </div>
+    <button class="btn-back" onclick="loadAllSedes()">↻ Actualizar</button>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Total Facturación</div>
+      <div class="kpi-value" id="kpiTotal">—</div>
+      <div class="kpi-sub">Todas las sedes</div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-label">Membresías</div>
+      <div class="kpi-value" id="kpiMemb">—</div>
+      <div class="kpi-sub" id="kpiMembPct">—</div>
+    </div>
+    <div class="kpi orange">
+      <div class="kpi-label">Minita</div>
+      <div class="kpi-value" id="kpiMinita">—</div>
+      <div class="kpi-sub" id="kpiMinitaPct">—</div>
+    </div>
+    <div class="kpi purple">
+      <div class="kpi-label">Personal Trainer</div>
+      <div class="kpi-value" id="kpiPT">—</div>
+      <div class="kpi-sub">No incluido en membresías</div>
+    </div>
+  </div>
+
+  <div class="section"><div class="section-title">Resumen por Sede</div></div>
+  <div class="sede-grid" id="sedeGrid"></div>
+
+  <div class="section"><div class="section-title">Gráficos</div></div>
+  <div class="charts-row">
+    <div class="chart-box"><h3>Facturación Total por Sede</h3><canvas id="chartBar" height="220"></canvas></div>
+    <div class="chart-box"><h3>Distribución Global Membresías vs Minita</h3><canvas id="chartPie" height="220"></canvas></div>
+  </div>
+
+  <div class="vend-section">
+    <div class="section-title">Vendedores por Sede</div>
+    <div class="vend-grid" id="vendGrid"></div>
+  </div>
+
+</div>
+
+<script>
+// ── Supabase ──────────────────────────────────────────────────────────────
+const SUPA_URL = 'https://cwyqjbuhhjpefhqdcdey.supabase.co';
+const SUPA_KEY = 'sb_publishable_fCUyex-9rN7ChxV_tX8IuA_lX_6loqN';
+let currentToken = null, currentRole = null;
+
+async function supaFetch(path, opts = {}) {
+  const token = currentToken || SUPA_KEY;
+  const res = await fetch(SUPA_URL + '/rest/v1' + path, {
+    method: opts.method || 'GET',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json', 'Prefer': opts.prefer || 'return=minimal',
+      ...(opts.headers || {}) },
+    body: opts.body != null ? JSON.stringify(opts.body) : undefined
+  });
+  if (!res.ok) { const t = await res.text(); throw new Error(t); }
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+// Único rol permitido en este reporte: 'admin_sedes' (distinto de 'admin'/'colaborador')
+const ROL_PERMITIDO = 'admin_sedes';
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pwd   = document.getElementById('loginPassword').value;
+  const btn   = document.getElementById('loginBtn');
+  const errEl = document.getElementById('loginError');
+  if (!email || !pwd) { errEl.textContent = 'Complete todos los campos.'; return; }
+  btn.textContent = 'Ingresando...'; btn.disabled = true; errEl.textContent = '';
+  try {
+    const res = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'apikey': SUPA_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pwd })
+    });
+    const data = await res.json();
+    if (!data.access_token) throw new Error(data.error_description || data.msg || 'Credenciales incorrectas');
+    currentToken = data.access_token;
+    const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre`);
+    currentRole = roles?.[0]?.role || null;
+    if (currentRole !== ROL_PERMITIDO) {
+      errEl.textContent = 'Su cuenta no tiene acceso a este reporte.';
+      await doLogout(true);
+      return;
+    }
+    document.getElementById('userNombre').textContent = roles?.[0]?.nombre || email;
+    document.getElementById('loginScreen').style.display = 'none';
+    loadAllSedes();
+  } catch(e) {
+    errEl.textContent = e.message;
+  } finally {
+    btn.textContent = 'Entrar'; btn.disabled = false;
+  }
+}
+
+document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+async function doLogout(silent) {
+  try { await fetch(`${SUPA_URL}/auth/v1/logout`, { method:'POST', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken} }); } catch(_) {}
+  currentToken = null; currentRole = null;
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+  if (!silent) {
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+  }
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+// ── Config de sedes y clasificación de productos ────────────────────────────
+const SEDE_META = {
+  '3 Ríos':   { icon: '🌊', cls: 'tresrios',  color: '#00838f' },
+  'Natación': { icon: '🏊', cls: 'natacion',  color: '#6a1b9a' },
+  'Pinares':  { icon: '🌲', cls: 'pinares',   color: '#2e7d32' },
+  'Sabanilla':{ icon: '🏙️', cls: 'sabanilla', color: '#1565c0' },
+};
+const SEDES = ['3 Ríos','Natación','Pinares','Sabanilla'];
+
+const MEMBERSHIP_KW = [
+  'plan','clases','nataci','gym','trimestre','semestre','anual',
+  'sesion','sesi','renovaci','activos','verano','black friday',
+  'estimulaci','aquafitness','fit gym','lealtad','platiu','platinum',
+  'standar','estandar','exclusivo','bloqueado','multigym','mensual',
+  'estudiante','adulto mayor','corporativo','aniversario','inactivo',
+  'promo','clase baile','clase grupal','gym incluido','nat amor',
+  'ex nat','ex 3 nat','natacion adultos','ejecutivo','png','cps'
+];
+const PT_KW = ['personal training','personal 2026'];
+
+function classify(p) {
+  const pl = (p||'').toLowerCase();
+  if (PT_KW.some(k => pl.includes(k))) return 'pt';
+  if (MEMBERSHIP_KW.some(k => pl.includes(k))) return 'memb';
+  return 'minita';
+}
+
+// ── Carga automática desde gym_snapshots ────────────────────────────────────
+let chartBar = null, chartPie = null;
+
+async function loadAllSedes() {
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('loading').style.display = 'block';
+  try {
+    const snaps = await supaFetch('/gym_snapshots?order=updated_at.desc&select=sede,mes,updated_at,activos,total_usuarios,renovaciones,renov_data');
+    document.getElementById('loading').style.display = 'none';
+    if (!snaps?.length) {
+      document.getElementById('emptyState').style.display = 'block';
+      return;
+    }
+    // snapshot más reciente por sede
+    const latest = {};
+    snaps.forEach(s => { if (!latest[s.sede]) latest[s.sede] = s; });
+    buildDashboard(latest);
+    document.getElementById('dashboard').style.display = 'block';
+  } catch(e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('emptyState').textContent = '⚠️ Error al cargar datos: ' + e.message;
+  }
+}
+
+function buildDashboard(latest) {
+  const fmt = n => '₡' + Math.round(n).toLocaleString('es-CR');
+  const pct = (a, b) => b ? (a/b*100).toFixed(1)+'%' : '0%';
+
+  // filas de venta por sede, derivadas de renov_data (RegistradoPor/Producto/Total)
+  const rowsBySede = {};
+  SEDES.forEach(s => {
+    const snap = latest[s];
+    rowsBySede[s] = (snap?.renov_data || []).map(r => ({
+      vendedor: r.RegistradoPor || 'Sin registrar',
+      producto: r.Producto || '',
+      total: Number(r.Total) || 0,
+      cat: classify(r.Producto)
+    }));
+  });
+
+  let total = 0, memb = 0, minita = 0, pt = 0;
+  const sedeSummary = {};
+  SEDES.forEach(s => {
+    const snap = latest[s];
+    if (!snap) return;
+    const rows = rowsBySede[s];
+    const tot = rows.length
+      ? rows.reduce((a,r)=>a+r.total,0)
+      : (snap.renovaciones?.total || 0); // fallback si no hay detalle (ej. Natación)
+    const mem = rows.filter(r=>r.cat==='memb').reduce((a,r)=>a+r.total,0);
+    const min = rows.filter(r=>r.cat==='minita').reduce((a,r)=>a+r.total,0);
+    const pt_ = rows.filter(r=>r.cat==='pt').reduce((a,r)=>a+r.total,0);
+
+    const vMap = {};
+    rows.forEach(r => { vMap[r.vendedor] = (vMap[r.vendedor]||0) + r.total; });
+    const vRank = Object.entries(vMap).sort((a,b)=>b[1]-a[1]);
+
+    sedeSummary[s] = { tot, mem, min, pt: pt_, vRank, hasDetalle: rows.length > 0, mes: snap.mes, updated_at: snap.updated_at };
+    total += tot; memb += mem; minita += min; pt += pt_;
+  });
+
+  document.getElementById('kpiTotal').textContent  = fmt(total);
+  document.getElementById('kpiMemb').textContent   = fmt(memb);
+  document.getElementById('kpiMembPct').textContent= pct(memb,total) + ' del total';
+  document.getElementById('kpiMinita').textContent = fmt(minita);
+  document.getElementById('kpiMinitaPct').textContent = pct(minita,total) + ' del total';
+  document.getElementById('kpiPT').textContent     = fmt(pt);
+
+  // Sede cards
+  const sedeGrid = document.getElementById('sedeGrid');
+  sedeGrid.innerHTML = '';
+  SEDES.forEach(s => {
+    const d = sedeSummary[s];
+    const m = SEDE_META[s];
+    if (!d) {
+      sedeGrid.innerHTML += `
+        <div class="sede-card no-data">
+          <div class="sede-card-header bg-${m.cls}"><span class="s-icon">${m.icon}</span><span class="s-name">${s}</span></div>
+          <div class="sede-card-body"><div class="sede-row-label">Sin datos cargados aún</div></div>
+        </div>`;
+      return;
+    }
+    const top = d.vRank[0];
+    sedeGrid.innerHTML += `
+      <div class="sede-card">
+        <div class="sede-card-header bg-${m.cls}">
+          <span class="s-icon">${m.icon}</span>
+          <span class="s-name">${s}</span>
+          <span class="s-total">${fmt(d.tot)}</span>
+        </div>
+        <div class="sede-card-body">
+          <div class="sede-row"><span class="sede-row-label">Mes</span><span class="sede-row-val">${d.mes}</span></div>
+          <div class="sede-row">
+            <span class="sede-row-label">Membresías</span>
+            <span class="sede-row-val">${fmt(d.mem)} <span class="sede-row-pct">${pct(d.mem,d.tot)}</span></span>
+          </div>
+          <div class="sede-row">
+            <span class="sede-row-label">Minita</span>
+            <span class="sede-row-val">${fmt(d.min)} <span class="sede-row-pct">${pct(d.min,d.tot)}</span></span>
+          </div>
+          ${d.pt > 0 ? `<div class="sede-row">
+            <span class="sede-row-label">Personal Trainer</span>
+            <span class="sede-row-val">${fmt(d.pt)} <span class="sede-row-pct">${pct(d.pt,d.tot)}</span></span>
+          </div>` : ''}
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct(d.mem,d.tot)};background:${m.color}"></div></div>
+          ${top ? `<div class="top-vend-label">🏆 Top Vendedor</div>
+          <div class="top-vend-name text-${m.cls}">${top[0]}</div>
+          <div class="top-vend-amt">${fmt(top[1])} · ${pct(top[1],d.tot)}</div>`
+          : `<div class="no-vend-note">Esta sede no registra vendedor por transacción.</div>`}
+        </div>
+      </div>`;
+  });
+
+  // Bar chart
+  const activeSedes = SEDES.filter(s => sedeSummary[s]);
+  const barLabels = activeSedes.map(s => s);
+  const barMemb   = activeSedes.map(s => sedeSummary[s].mem);
+  const barMinita = activeSedes.map(s => sedeSummary[s].min);
+  const barPT     = activeSedes.map(s => sedeSummary[s].pt);
+  const barColors = activeSedes.map(s => SEDE_META[s].color);
+
+  if (chartBar) chartBar.destroy();
+  chartBar = new Chart(document.getElementById('chartBar'), {
+    type: 'bar',
+    data: { labels: barLabels, datasets: [
+      { label: 'Membresías',       data: barMemb,   backgroundColor: barColors,                 borderRadius: 4 },
+      { label: 'Minita',           data: barMinita, backgroundColor: barColors.map(c=>c+'55'),  borderRadius: 4 },
+      { label: 'Personal Trainer', data: barPT,     backgroundColor: barColors.map(c=>c+'33'),  borderRadius: 4 },
+    ]},
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ' ₡' + Math.round(ctx.raw).toLocaleString('es-CR') } } },
+      scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => '₡' + (v/1000000).toFixed(1)+'M' } } }
+    }
+  });
+
+  if (chartPie) chartPie.destroy();
+  chartPie = new Chart(document.getElementById('chartPie'), {
+    type: 'doughnut',
+    data: { labels: ['Membresías', 'Minita', 'Personal Trainer'],
+      datasets: [{ data: [memb, minita, pt], backgroundColor: ['#2E5FA3','#e67e22','#7030A0'], borderWidth: 2 }] },
+    options: { responsive: true,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ' ₡' + Math.round(ctx.raw).toLocaleString('es-CR') + ' (' + pct(ctx.raw, total) + ')' } } } }
+  });
+
+  // Vendedores por sede
+  const vendGrid = document.getElementById('vendGrid');
+  vendGrid.innerHTML = '';
+  SEDES.forEach(s => {
+    const d = sedeSummary[s];
+    if (!d) return;
+    const m = SEDE_META[s];
+    const body = d.vRank.length
+      ? `<table class="vend-table">
+          <thead><tr><th>#</th><th>Vendedor</th><th style="text-align:right">CRC</th><th style="text-align:right">%</th></tr></thead>
+          <tbody>${d.vRank.slice(0,8).map((v,i) => `<tr class="${i===0?'rank-1':''}">
+            <td class="vend-rank">${i+1}</td><td class="vend-name">${v[0]}</td>
+            <td class="vend-amt">${fmt(v[1])}</td><td class="vend-pct">${pct(v[1],d.tot)}</td>
+          </tr>`).join('')}</tbody>
+        </table>`
+      : `<div class="vend-empty">Sin datos de vendedor para esta sede</div>`;
+    vendGrid.innerHTML += `
+      <div class="vend-card">
+        <div class="vend-card-hdr bg-${m.cls}">${m.icon} ${s}</div>
+        ${body}
+      </div>`;
+  });
+
+  const periodos = SEDES.filter(s=>sedeSummary[s]).map(s=>`${s}: ${sedeSummary[s].mes}`).join(' · ');
+  document.getElementById('dashPeriod').textContent = periodos;
+}
+</script>
+</body>
+</html>
