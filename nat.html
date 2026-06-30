@@ -261,6 +261,9 @@
   </div>
 </div>
 
+<!-- RESUMEN DE LO ÚLTIMO GUARDADO -->
+<div id="resumenGuardado" style="display:none;max-width:1100px;margin:24px auto 0;padding:0 24px;"></div>
+
 <!-- UPLOAD -->
 <div id="uploadSection">
   <div class="upload-zone" id="dropZone">
@@ -304,7 +307,7 @@
     <div class="tab active" onclick="switchTab('tabUsuarios',this)">👤 Usuarios</div>
     <div class="tab" onclick="switchTab('tabVentas',this)">🧾 Ventas Mayo</div>
     <div class="tab" onclick="switchTab('tabProyeccion',this)">📊 Proyección Junio</div>
-    <div class="tab" onclick="switchTab('tabJunio',this)">📅 Estadísticas Junio</div>
+    <div class="tab" onclick="switchTab('tabJunio',this)">🔄 Análisis de Renovaciones</div>
     <div class="tab" onclick="switchTab('tabValidacion',this)">✅ Validación Descuentos</div>
   </div>
 
@@ -469,7 +472,7 @@
     <div id="totalesProyeccion" style="display:none;"></div>
   </div>
 
-  <!-- TAB 4: Estadísticas Junio -->
+  <!-- TAB 4: Análisis de Renovaciones -->
   <div id="tabJunio" class="tab-panel">
 
     <!-- Filtros -->
@@ -515,7 +518,7 @@
 
     <!-- Tabla -->
     <div class="proy-table-section">
-      <div class="proy-section-title">👥 Detalle de Clientes — Junio</div>
+      <div class="proy-section-title">👥 Detalle de Renovaciones</div>
       <div class="proy-table-wrap">
         <table>
           <thead>
@@ -642,10 +645,45 @@ async function doLogin() {
       document.getElementById('uploadSection').style.display = 'none';
     }
     document.getElementById('loginScreen').style.display = 'none';
+    cargarResumenGuardado();
   } catch(e) {
     errEl.textContent = e.message;
   } finally {
     btn.textContent = 'Entrar'; btn.disabled = false;
+  }
+}
+
+// Al entrar, mostrar lo último guardado en Supabase sin obligar a resubir el Excel
+async function cargarResumenGuardado() {
+  const box = document.getElementById('resumenGuardado');
+  try {
+    const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&limit=1&select=mes,activos,total_usuarios,renovaciones,renov_data,updated_at');
+    if (!snaps?.length) { box.style.display = 'none'; return; }
+    const s = snaps[0];
+    const fmt = n => '₡' + Math.round(n||0).toLocaleString('es-CR');
+    const fecha = new Date(s.updated_at).toLocaleString('es-CR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    const vMap = {};
+    (s.renov_data||[]).forEach(r => { if (r.RegistradoPor) vMap[r.RegistradoPor] = (vMap[r.RegistradoPor]||0) + (r.Total||0); });
+    const topVend = Object.entries(vMap).sort((a,b)=>b[1]-a[1])[0];
+    box.innerHTML = `
+      <div class="dash-header" style="margin-bottom:14px;">
+        <div>
+          <div class="dash-title">📅 Último guardado — ${s.mes}</div>
+          <div class="dash-file">Actualizado: ${fecha}</div>
+        </div>
+      </div>
+      <div class="cards">
+        <div class="card"><div class="card-label">Usuarios totales</div><div class="card-value">${s.total_usuarios ?? '—'}</div></div>
+        <div class="card green"><div class="card-label">Activos</div><div class="card-value">${s.activos ?? '—'}</div></div>
+        <div class="card purple"><div class="card-label">Total cobrado (mes)</div><div class="card-value">${fmt(s.renovaciones?.total)}</div></div>
+        <div class="card orange"><div class="card-label">Nuevos / Renov. / Reingresos</div><div class="card-value" style="font-size:1.1em;">${s.renovaciones?.nuevos??0} / ${s.renovaciones?.renovaciones??0} / ${s.renovaciones?.reingresos??0}</div></div>
+        ${topVend ? `<div class="card"><div class="card-label">🏆 Top vendedor</div><div class="card-value" style="font-size:1em;">${topVend[0]}</div><div class="card-sub">${fmt(topVend[1])}</div></div>` : ''}
+      </div>
+      <div class="alert alert-info" style="margin-top:14px;">Esto es lo último guardado en el sistema. Para ver el detalle completo (usuarios, validación de descuentos, proyección) o actualizar estos datos, suba el archivo Excel abajo.</div>`;
+    box.style.display = 'block';
+  } catch(e) {
+    box.style.display = 'none';
+    console.warn('No se pudo cargar el resumen guardado:', e.message);
   }
 }
 
@@ -672,8 +710,10 @@ async function autoSaveNat(mes) {
         total_junio: G.totalJunio || 0
       },
       renovaciones: {
-        nuevos: 0, renovaciones: G.ventas.length, reingresos: 0,
-        total: G.ventas.reduce((s,v) => s + v.total, 0)
+        nuevos: G.junio.filter(j => j.tipo === 'nuevo').length,
+        renovaciones: G.junio.filter(j => j.tipo === 'renovacion').length,
+        reingresos: G.junio.filter(j => j.tipo === 'reingreso').length,
+        total: (G.junioRaw || []).reduce((s,r) => s + r.Total, 0)
       },
       users_data: G.hoja1.map(u => ({
         PIN: u.pin, Nombre: u.nombre, Activo: u.activo, Expira: u.expira,
@@ -681,7 +721,7 @@ async function autoSaveNat(mes) {
         PlanOriginal: u.planOriginal, EstadoCorrecion: u.estado,
         ValorPlan: buscarPrecio(u.planCorregido || u.planOriginal) || 0
       })),
-      renov_data: [],
+      renov_data: G.junioRaw || [],
       updated_at: new Date().toISOString()
     };
     const existing = await supaFetch(`/gym_snapshots?sede=eq.Nataci%C3%B3n&mes=eq.${encodeURIComponent(mes)}&select=id`);
@@ -794,6 +834,7 @@ fileInput.addEventListener('change', e => { if (e.target.files[0]) procesarArchi
 function cambiarArchivo() {
   document.getElementById('dashboard').style.display = 'none';
   document.getElementById('uploadSection').style.display = '';
+  document.getElementById('resumenGuardado').style.display = 'none';
   fileInput.value = '';
 }
 
@@ -1190,12 +1231,40 @@ function analizar(wb) {
   const junioSheet = wb.Sheets['junio'] || wb.Sheets['Junio'];
   if (junioSheet) {
     const arrJ = sheetToArr(junioSheet);
+    // La exportación cruda trae columnas espaciadoras variables entre cada dato,
+    // por eso ubicamos las columnas por nombre de encabezado en vez de posición fija.
+    let jHdrIdx = -1, jCol = {};
+    for (let i = 0; i < Math.min(arrJ.length, 10); i++) {
+      const r = (arrJ[i] || []).map(c => String(c||'').trim().toLowerCase());
+      const fi = r.indexOf('fecha'), pi = r.indexOf('producto');
+      if (fi >= 0 && pi >= 0) {
+        jHdrIdx = i;
+        jCol.fecha = fi; jCol.producto = pi;
+        jCol.cliente = r.indexOf('cliente');
+        jCol.registrado = r.findIndex(c => c.includes('registrado'));
+        jCol.total = r.findIndex(c => c.includes('total crc'));
+        if (jCol.total < 0) jCol.total = r.findIndex(c => c.includes('total') && !c.includes('usd'));
+        break;
+      }
+    }
     // Agrupar por cliente (ignorar addons e invitados, solo filas con precio > 0)
     const jMap = {}; // normNombre → acumulado
-    for (let i = 1; i < arrJ.length; i++) {
-      const [fecha, cliente, , producto, total] = arrJ[i];
+    G.junioRaw = []; // filas individuales (con vendedor) para guardar en renov_data
+    for (let i = jHdrIdx + 1; jHdrIdx >= 0 && i < arrJ.length; i++) {
+      const row = arrJ[i] || [];
+      const fecha = row[jCol.fecha], cliente = row[jCol.cliente], producto = row[jCol.producto], total = row[jCol.total];
+      const registradoPor = jCol.registrado >= 0 ? row[jCol.registrado] : '';
       if (!cliente || !producto) continue;
       const nc = norm(String(cliente));
+      const tvRaw = Number(total) || 0;
+      // Invitado sí cuenta aquí (Minita: agua, bebidas, snacks comprados sueltos);
+      // Administrativo se descarta por no ser una venta real.
+      if (nc !== 'administrativo' && tvRaw > 0) {
+        G.junioRaw.push({
+          FechaStr: fecha ? String(fecha) : '', Cliente: String(cliente).trim(),
+          RegistradoPor: String(registradoPor||'').trim(), Producto: String(producto).trim(), Total: tvRaw
+        });
+      }
       if (nc === 'invitado' || nc === 'administrativo') continue;
       const planLimpio = cleanPlan(String(producto));
       if (isAddon(planLimpio)) continue;
@@ -1315,6 +1384,7 @@ function analizar(wb) {
 
   document.getElementById('loadingSection').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('resumenGuardado').style.display = 'none';
 
   // Guardar en Supabase (solo admin)
   G.totalJunio = Math.round(totalDescuento + totalCompleto);
@@ -2204,7 +2274,7 @@ function pdfJunio() {
   doc.setFillColor(118,75,162); doc.rect(pageW-60,0,60,24,'F');
   doc.setTextColor(255,255,255);
   doc.setFontSize(15); doc.setFont(undefined,'bold');
-  doc.text('Estadisticas de Junio 2026', 14, 10);
+  doc.text('Analisis de Renovaciones', 14, 10);
   doc.setFontSize(8); doc.setFont(undefined,'normal');
   const filtroTipo = document.getElementById('filtroJunioTipo').value;
   doc.text((filtroTipo ? 'Categoria: '+filtroTipo : 'Todos los clientes') + '  |  ' + rows.length + ' registros', 14, 17);
