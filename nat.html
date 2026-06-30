@@ -2401,7 +2401,7 @@ function isMembershipPlan(product) {
   for (const key of Object.keys(G.planes||{})) {
     if (key === norm(p) || norm(p).includes(key) || key.includes(norm(p))) return true;
   }
-  return /plan|promo|anualidad|lealtad|bloqueado|verano|exclusivo|platium|semestral|trimestral|estudiante|renovaci[oó]n|matr[ií]cula|nataci[oó]n|gym|aquafitness|estimulaci[oó]n/i.test(p);
+  return /plan|promo|anualidad|lealtad|fidelidad|bloqueado|verano|exclusivo|platium|semestral|trimest|estudiante|renovaci[oó]n|matr[ií]cula|nataci[oó]n|gym|aquafitness|estimulaci[oó]n/i.test(p);
 }
 function isClaseSuelta(product) {
   const pl = String(product||'').trim().toLowerCase();
