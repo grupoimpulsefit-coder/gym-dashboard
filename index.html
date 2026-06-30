@@ -954,7 +954,7 @@ function isMembershipPlan(product) {
         if (normName(key) === normName(p) || normName(p).includes(normName(key)) || normName(key).includes(normName(p))) return true;
     }
     // Fallback: contains "plan" or "promo" or "anualidad" or "lealtad" or "bloqueado" or "verano" or "estudiante" or "renovacion"
-    return /plan|promo|anual|lealtad|bloqueado|verano|exclusivo|platium|semestral|trimestral|estudiante|renovaci[oó]n/i.test(p);
+    return /plan|promo|anual|lealtad|bloqueado|verano|exclusivo|platium|semestral|trimestral|estudiante|renovaci[oó]n|black/i.test(p);
 }
 function isClaseSuelta(product) {
     let pl = String(product||'').trim().toLowerCase();
