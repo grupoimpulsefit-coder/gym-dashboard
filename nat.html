@@ -314,6 +314,7 @@
     <div class="card green"><div class="card-label">Planes corregidos</div><div class="card-value" id="cCorregidos">—</div><div class="card-sub" id="cCorregidosHist" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
     <div class="card orange"><div class="card-label">Clientes en descuento</div><div class="card-value" id="cDescuento">—</div></div>
     <div class="card purple"><div class="card-label">Gran total junio (todos)</div><div class="card-value" id="cProyeccion">—</div></div>
+    <div class="card green"><div class="card-label">Total cobrado membresías</div><div class="card-value" id="cTotalMembresias">—</div><div class="card-sub" id="cTotalMembresiasCount" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
   </div>
 
   <!-- Tabs -->
@@ -1671,6 +1672,10 @@ function analizar(wb) {
   const totalDescuento = G.proyeccion.reduce((s,r) => s + (r.precioJunio || 0), 0);
   const totalCompleto  = G.planCompleto.reduce((s,r) => s + (r.precioJunio || 0), 0);
   document.getElementById('cProyeccion').textContent = '₡' + Math.round(totalDescuento + totalCompleto).toLocaleString('es-CR');
+  const ventasMembresias = G.ventas.filter(r => !r.esAddon);
+  const totalMembresias = ventasMembresias.reduce((s,r) => s + r.total, 0);
+  document.getElementById('cTotalMembresias').textContent = '₡' + Math.round(totalMembresias).toLocaleString('es-CR');
+  document.getElementById('cTotalMembresiasCount').textContent = ventasMembresias.length + ' transacciones';
 
   // Render tables
   G.filtered.usuarios = [...G.hoja1];
