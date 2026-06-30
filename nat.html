@@ -777,7 +777,7 @@ async function doLogin() {
 async function cargarResumenGuardado() {
   const box = document.getElementById('resumenGuardado');
   try {
-    const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&limit=1&select=mes,activos,total_usuarios,renovaciones,renov_data,updated_at');
+    const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&limit=1&select=mes,activos,total_usuarios,proyecciones,renovaciones,renov_data,users_data,updated_at');
     if (!snaps?.length) { box.style.display = 'none'; return; }
     const s = snaps[0];
     const fmt = n => '₡' + Math.round(n||0).toLocaleString('es-CR');
@@ -785,6 +785,9 @@ async function cargarResumenGuardado() {
     const vMap = {};
     (s.renov_data||[]).forEach(r => { if (r.RegistradoPor) vMap[r.RegistradoPor] = (vMap[r.RegistradoPor]||0) + (r.Total||0); });
     const topVend = Object.entries(vMap).sort((a,b)=>b[1]-a[1])[0];
+    const proyRows = (s.users_data||[]).filter(u => u.Descuento).sort((a,b) => (a.PrecioJunio==null) - (b.PrecioJunio==null) || (b.PrecioJunio||0)-(a.PrecioJunio||0));
+    const proyTotal = proyRows.reduce((sum,u) => sum + (u.PrecioJunio||0), 0);
+    const proyPendientes = proyRows.filter(u => u.Pendiente).length;
     box.innerHTML = `
       <div class="dash-header" style="margin-bottom:14px;">
         <div>
@@ -803,12 +806,46 @@ async function cargarResumenGuardado() {
         <div class="card orange"><div class="card-label">Nuevos / Renov. / Reingresos</div><div class="card-value" style="font-size:1.1em;">${s.renovaciones?.nuevos??0} / ${s.renovaciones?.renovaciones??0} / ${s.renovaciones?.reingresos??0}</div></div>
         ${topVend ? `<div class="card"><div class="card-label">🏆 Top vendedor</div><div class="card-value" style="font-size:1em;">${topVend[0]}</div><div class="card-sub">${fmt(topVend[1])}</div></div>` : ''}
       </div>
-      <div class="alert alert-info" style="margin-top:14px;">Esto es lo último guardado en el sistema. Para actualizar solo el Análisis de Renovaciones y Seguimiento de Vencidos, suba arriba el reporte "Ventas por Producto". Para ver el detalle completo (usuarios, validación de descuentos, proyección) o actualizar todo, suba el archivo Excel completo abajo.</div>`;
+
+      ${proyRows.length ? `
+      <div class="proy-table-section" style="margin-top:18px;">
+        <div class="proy-section-title">📊 Proyección guardada — ${proyRows.length} clientes · ${fmt(proyTotal)}${proyPendientes ? ` · <span style="color:var(--warn);">${proyPendientes} pendientes sin precio</span>` : ''}</div>
+        <input type="text" id="proyGuardadoSearch" class="filter-select" style="width:100%;margin-bottom:10px;" placeholder="Buscar por nombre…" oninput="filtrarProyGuardado()">
+        <div class="proy-table-wrap" style="max-height:420px;">
+          <table>
+            <thead><tr><th>Cliente</th><th>Plan</th><th>Descuento</th><th>Precio Junio</th><th>Expira</th></tr></thead>
+            <tbody id="proyGuardadoBody"></tbody>
+          </table>
+        </div>
+      </div>` : ''}
+
+      <div class="alert alert-info" style="margin-top:14px;">Esto es lo último guardado en el sistema. Para actualizar solo el Análisis de Renovaciones y Seguimiento de Vencidos, suba arriba el reporte "Ventas por Producto". Para ver el detalle completo (usuarios, validación de descuentos) o actualizar todo, suba el archivo Excel completo abajo.</div>`;
     box.style.display = 'block';
+    window._proyGuardadoRows = proyRows;
+    if (proyRows.length) renderProyGuardado(proyRows);
   } catch(e) {
     box.style.display = 'none';
     console.warn('No se pudo cargar el resumen guardado:', e.message);
   }
+}
+
+function renderProyGuardado(rows) {
+  const fmt = n => n!=null ? '₡'+Math.round(n).toLocaleString('es-CR') : '<span style="color:#aaa;">— pendiente</span>';
+  const tbody = document.getElementById('proyGuardadoBody');
+  if (!tbody) return;
+  tbody.innerHTML = rows.map(u => `
+    <tr>
+      <td><strong>${u.Nombre||''}</strong></td>
+      <td style="font-size:12.5px;">${u.ProyPlan||u.ÚltimoProducto||'—'}</td>
+      <td>${u.Descuento==='Completo' ? '<span style="color:#888;">Precio completo</span>' : u.Descuento}</td>
+      <td style="font-weight:700;">${fmt(u.PrecioJunio)}</td>
+      <td style="color:var(--muted);">${u.Expira||'—'}</td>
+    </tr>`).join('');
+}
+function filtrarProyGuardado() {
+  const q = norm(document.getElementById('proyGuardadoSearch').value);
+  const rows = (window._proyGuardadoRows||[]).filter(u => !q || norm(u.Nombre).includes(q));
+  renderProyGuardado(rows);
 }
 
 async function doLogout() {
@@ -857,7 +894,9 @@ async function autoSaveNat(mes, usuariosLoaded) {
         Telefono: u.telefono, Email: u.email,
         ÚltimoProducto: u.planCorregido || u.planOriginal,
         PlanOriginal: u.planOriginal, EstadoCorrecion: u.estado,
-        ValorPlan: buscarPrecio(u.planCorregido || u.planOriginal) || 0
+        ValorPlan: buscarPrecio(u.planCorregido || u.planOriginal) || 0,
+        Descuento: u.proyDescuento || null, ProyPlan: u.proyPlan || null,
+        PrecioJunio: u.proyPrecioJunio ?? null, Pendiente: u.proyPendiente || null
       }));
     }
     const existing = await supaFetch(`/gym_snapshots?sede=eq.Nataci%C3%B3n&mes=eq.${encodeURIComponent(mes)}&select=id`);
@@ -1045,7 +1084,7 @@ function procesarVentasSolo(file) {
       const fechas = rawRows.map(r => parseRenoDateTime(r.FechaStr)).filter(Boolean);
       const ref = fechas.length ? new Date(Math.max(...fechas.map(d=>d.getTime()))) : new Date();
       const mesNombre = ref.toLocaleString('es-CR', { month:'long', year:'numeric' });
-      const mes = mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1) + ' de ' + ref.getFullYear();
+      const mes = mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1);
 
       document.getElementById('resumenGuardado').style.display = 'none';
       document.getElementById('uploadSection').style.display = 'none';
@@ -1438,6 +1477,22 @@ function analizar(wb) {
       expira: u.expira, expiraDate: parseDate(u.expira)
     });
   }
+
+  // ── Anotar G.hoja1 con la info de proyección (para poder guardarla en users_data
+  //    y reconstruir la tabla de Proyección sin tener que volver a subir el Excel) ──
+  const proyPorCliente = {};
+  [...G.proyeccion, ...G.planCompleto].forEach(r => {
+    proyPorCliente[norm(r.cliente)] = r;
+  });
+  G.hoja1.forEach(u => {
+    const r = proyPorCliente[norm(u.nombre)];
+    if (r) {
+      u.proyDescuento = r.fuente;
+      u.proyPlan = r.planMain;
+      u.proyPrecioJunio = r.precioJunio;
+      u.proyPendiente = r.pendiente || null;
+    }
+  });
 
   // ── Hoja Junio: estadísticas del mes ──
   G.junio = [];
