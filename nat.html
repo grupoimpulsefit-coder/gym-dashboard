@@ -144,6 +144,18 @@
   .tag-noplan { background: #fdecea; color: var(--warn); }
   .tag-hist { background: #fff3cd; color: #856404; }
   .tag-mayo { background: #d1ecf1; color: #0c5460; }
+
+  /* ── Badges tipo renovación (Análisis de Renovaciones / Seguimiento) ── */
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .badge-nuevo     { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+  .badge-renova    { background: #e3f2fd; color: #1565c0; border: 1px solid #90caf9; }
+  .badge-reingreso { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+  .card.blue { border-color: #1565c0; }
+  .card.blue .card-value { color: #1565c0; }
+  .card.teal { border-color: #00897b; }
+  .card.teal .card-value { color: #00897b; }
+  .proy-btn-teal  { background: linear-gradient(135deg,#00897b,#004d40); color: white; }
+  .proy-btn-green { background: linear-gradient(135deg,#43a047,#2e7d32); color: white; }
   .tag-full { background: #e8f8f5; color: #148f77; }
   .corrected { color: var(--accent); font-weight: 600; }
   .original { color: var(--muted); text-decoration: line-through; font-size: 12px; }
@@ -288,7 +300,9 @@
       <div class="dash-title">Panel de Análisis</div>
       <div class="dash-file" id="fileNameLabel"></div>
     </div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+      <label class="btn btn-accent" for="ventasSoloInputDash" style="cursor:pointer;">📤 Actualizar solo Ventas</label>
+      <input type="file" id="ventasSoloInputDash" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) procesarVentasSolo(this.files[0])">
       <button class="btn btn-primary" onclick="cambiarArchivo()">📂 Cambiar archivo</button>
     </div>
   </div>
@@ -309,6 +323,7 @@
     <div class="tab" onclick="switchTab('tabProyeccion',this)">📊 Proyección Junio</div>
     <div class="tab" onclick="switchTab('tabJunio',this)">🔄 Análisis de Renovaciones</div>
     <div class="tab" onclick="switchTab('tabValidacion',this)">✅ Validación Descuentos</div>
+    <div class="tab" onclick="switchTab('tabSeguimiento',this)">📋 Seguimiento Vencidos</div>
   </div>
 
   <!-- TAB 1: Usuarios -->
@@ -475,63 +490,108 @@
   <!-- TAB 4: Análisis de Renovaciones -->
   <div id="tabJunio" class="tab-panel">
 
+    <div class="alert alert-info">
+      Transacciones de la hoja <strong>junio</strong> clasificadas como Nuevo / Renovación / Reingreso
+      según el último <strong>Informe de Usuarios</strong> conocido (de este archivo o del último guardado).
+    </div>
+
+    <!-- Resumen general -->
+    <div class="proy-stats" id="renoStatsContainer"></div>
+    <div class="proy-stats" id="renoFilteredStatsContainer" style="margin-top:-8px;"></div>
+
     <!-- Filtros -->
     <div class="proy-controls">
-      <div class="proy-controls-title">🔎 Filtros</div>
+      <div class="proy-controls-title">🔎 Filtrar Renovaciones</div>
       <div class="proy-filter-grid">
         <div class="proy-filter-item">
-          <label>Buscar por nombre</label>
-          <input type="text" id="searchJunio" placeholder="Escriba el nombre…" oninput="filtrarTabla('junio')">
+          <label>Tipo</label>
+          <select id="renoFilterTipo" onchange="renderRenovaciones()">
+            <option value="all">Todos</option>
+            <option value="Nuevo">🆕 Nuevo</option>
+            <option value="Renovación">✅ Renovación</option>
+            <option value="Reingreso">🔄 Reingreso</option>
+          </select>
         </div>
         <div class="proy-filter-item">
-          <label>Categoría</label>
-          <select id="filtroJunioTipo" onchange="filtrarTabla('junio')">
-            <option value="">Todas</option>
-            <option value="renovacion">✅ Renovación</option>
-            <option value="nuevo">🌟 Nuevo</option>
-            <option value="reingreso">🔄 Reingreso</option>
-          </select>
+          <label>Buscar cliente</label>
+          <input type="text" id="renoSearchName" placeholder="Nombre del cliente…" oninput="renderRenovaciones()">
+        </div>
+        <div class="proy-filter-item">
+          <label>Plan</label>
+          <select id="renoFilterPlan" onchange="renderRenovaciones()"><option value="all">Todos</option></select>
+        </div>
+        <div class="proy-filter-item">
+          <label>Fecha desde</label>
+          <input type="text" id="renoDateFrom" placeholder="dd/mm/aaaa" oninput="renderRenovaciones()">
+        </div>
+        <div class="proy-filter-item">
+          <label>Fecha hasta</label>
+          <input type="text" id="renoDateTo" placeholder="dd/mm/aaaa" oninput="renderRenovaciones()">
         </div>
         <div class="proy-filter-item" style="justify-content:flex-end;">
           <div class="proy-btn-row" style="margin-top:auto;">
-            <button class="proy-btn proy-btn-red" onclick="pdfJunio()">📄 PDF</button>
-            <button class="proy-btn proy-btn-orange" onclick="limpiarFiltrosJunio()">✖ Limpiar</button>
+            <button class="proy-btn proy-btn-purple" onclick="filterRenoHoy()">📅 Hoy</button>
+            <button class="proy-btn proy-btn-orange" onclick="clearRenoFilters()">✖ Limpiar</button>
           </div>
         </div>
       </div>
+      <div class="proy-btn-row">
+        <button class="proy-btn proy-btn-teal" onclick="exportRenoCSV()">📥 Exportar CSV</button>
+        <button class="proy-btn proy-btn-red" onclick="exportRenoPDF()">📄 Exportar PDF</button>
+      </div>
     </div>
-
-    <!-- Stat cards -->
-    <div class="proy-stats" id="junio-cards"></div>
 
     <!-- Gráficos lado a lado -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px;">
       <div class="proy-chart-section" style="margin-bottom:0;">
-        <div class="proy-section-title">🥧 Composición de Clientes</div>
-        <canvas id="junioDonut" style="max-height:240px;"></canvas>
+        <div class="proy-section-title">🍩 Distribución por Tipo</div>
+        <canvas id="renoTypePie" style="max-height:240px;"></canvas>
       </div>
       <div class="proy-chart-section" style="margin-bottom:0;">
-        <div class="proy-section-title">📈 Ingresos por Plan (Top 8)</div>
-        <canvas id="junioBar" style="max-height:240px;"></canvas>
+        <div class="proy-section-title">📊 Recaudado por Plan</div>
+        <canvas id="renoPlanBar" style="max-height:240px;"></canvas>
       </div>
     </div>
 
-    <!-- Tabla -->
-    <div class="proy-table-section">
-      <div class="proy-section-title">👥 Detalle de Renovaciones</div>
+    <!-- Tabla principal -->
+    <div class="proy-table-section" style="margin-bottom:22px;">
+      <div class="proy-section-title">🔄 Detalle de Transacciones de Membresía</div>
       <div class="proy-table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Cliente</th><th>Categoría</th><th>Plan</th>
-              <th>Pagó Junio</th><th>Fecha Pago</th><th>Última Expiración</th><th>Días Inactivo</th>
+              <th>Fecha y Hora</th><th>Cliente</th><th>Plan / Producto</th><th>Tipo</th>
+              <th>Total (₡)</th><th>Días sin renovar</th><th>Ingreso</th><th>Expira actual</th><th>Registrado por</th>
             </tr>
           </thead>
-          <tbody id="bodyJunio"></tbody>
-          <tfoot id="footJunio"></tfoot>
+          <tbody id="renoTableBody"></tbody>
         </table>
       </div>
-      <div class="pager" id="pagerJunio" style="margin-top:12px;"></div>
+      <div id="renoTableInfo" style="padding:10px 0;font-size:12.5px;color:#888;"></div>
+    </div>
+
+    <!-- Clases sueltas -->
+    <div class="proy-table-section" style="margin-bottom:22px;">
+      <div class="proy-section-title">🤸 Clases Sueltas / Sesiones (no son membresías)</div>
+      <div class="proy-table-wrap">
+        <table>
+          <thead><tr><th>Fecha y Hora</th><th>Cliente</th><th>Producto</th><th>Total (₡)</th><th>Registrado por</th></tr></thead>
+          <tbody id="clasesSueltasTableBody"></tbody>
+        </table>
+      </div>
+      <div id="clasesSueltasInfo" style="padding:10px 0;font-size:12.5px;color:#888;"></div>
+    </div>
+
+    <!-- Sin clasificar -->
+    <div class="proy-table-section">
+      <div class="proy-section-title">❓ Sin Clasificar (revisar — no calzan con ningún plan conocido)</div>
+      <div class="proy-table-wrap">
+        <table>
+          <thead><tr><th>Fecha y Hora</th><th>Cliente</th><th>Producto</th><th>Total (₡)</th><th>Registrado por</th></tr></thead>
+          <tbody id="sinClasificarTableBody"></tbody>
+        </table>
+      </div>
+      <div id="sinClasificarInfo" style="padding:10px 0;font-size:12.5px;color:#888;"></div>
     </div>
   </div>
 
@@ -593,6 +653,66 @@
         </table>
       </div>
       <div class="pager" id="pagerValidacion" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <!-- TAB 6: Seguimiento Vencidos -->
+  <div id="tabSeguimiento" class="tab-panel">
+    <div class="alert alert-info">
+      Clientes <strong>activos vencidos</strong> según el Informe de Usuarios que <strong>no aparecen pagando</strong> en las
+      transacciones de la hoja junio cargadas. Si un cliente ya pagó este período pero el Informe de Usuarios todavía
+      no refleja el nuevo vencimiento, no aparece aquí.
+    </div>
+
+    <div class="proy-controls">
+      <div class="proy-controls-title">🔎 Filtros de Seguimiento</div>
+      <div class="proy-filter-grid">
+        <div class="proy-filter-item">
+          <label>Buscar cliente</label>
+          <input type="text" id="segSearch" placeholder="Nombre del cliente…" oninput="renderSeguimiento()">
+        </div>
+        <div class="proy-filter-item">
+          <label>Vencido hace</label>
+          <select id="segRango" onchange="renderSeguimiento()">
+            <option value="all">Cualquier antigüedad</option>
+            <option value="1-15">1 a 15 días</option>
+            <option value="16-30">16 a 30 días</option>
+            <option value="31-60">31 a 60 días</option>
+            <option value="61-9999">Más de 60 días</option>
+          </select>
+        </div>
+        <div class="proy-filter-item">
+          <label>Plan</label>
+          <select id="segFilterPlan" onchange="renderSeguimiento()"><option value="all">Todos</option></select>
+        </div>
+        <div class="proy-filter-item" style="justify-content:flex-end;">
+          <div class="proy-btn-row" style="margin-top:auto;">
+            <button class="proy-btn proy-btn-orange" onclick="clearSegFilters()">✖ Limpiar</button>
+          </div>
+        </div>
+      </div>
+      <div class="proy-btn-row">
+        <button class="proy-btn proy-btn-teal" onclick="exportSegCSV()">📥 Exportar CSV</button>
+        <button class="proy-btn proy-btn-red" onclick="printSeguimiento()">🖨️ Imprimir</button>
+      </div>
+    </div>
+
+    <div class="proy-stats" id="segStatsContainer"></div>
+
+    <div class="proy-table-section">
+      <div class="proy-section-title">📋 Clientes Vencidos sin Renovar</div>
+      <div class="proy-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>PIN</th><th>Cliente</th><th>Teléfono</th><th>Plan</th>
+              <th>Venció</th><th>Días vencido</th><th>Valor Plan</th>
+            </tr>
+          </thead>
+          <tbody id="segTableBody"></tbody>
+        </table>
+      </div>
+      <div id="segTableInfo" style="padding:10px 0;font-size:12.5px;color:#888;"></div>
     </div>
   </div>
 </div>
@@ -671,6 +791,10 @@ async function cargarResumenGuardado() {
           <div class="dash-title">📅 Último guardado — ${s.mes}</div>
           <div class="dash-file">Actualizado: ${fecha}</div>
         </div>
+        ${currentRole === 'admin' ? `<div>
+          <label class="btn btn-accent" for="ventasSoloInput" style="cursor:pointer;">📤 Actualizar solo Ventas</label>
+          <input type="file" id="ventasSoloInput" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) procesarVentasSolo(this.files[0])">
+        </div>` : ''}
       </div>
       <div class="cards">
         <div class="card"><div class="card-label">Usuarios totales</div><div class="card-value">${s.total_usuarios ?? '—'}</div></div>
@@ -679,7 +803,7 @@ async function cargarResumenGuardado() {
         <div class="card orange"><div class="card-label">Nuevos / Renov. / Reingresos</div><div class="card-value" style="font-size:1.1em;">${s.renovaciones?.nuevos??0} / ${s.renovaciones?.renovaciones??0} / ${s.renovaciones?.reingresos??0}</div></div>
         ${topVend ? `<div class="card"><div class="card-label">🏆 Top vendedor</div><div class="card-value" style="font-size:1em;">${topVend[0]}</div><div class="card-sub">${fmt(topVend[1])}</div></div>` : ''}
       </div>
-      <div class="alert alert-info" style="margin-top:14px;">Esto es lo último guardado en el sistema. Para ver el detalle completo (usuarios, validación de descuentos, proyección) o actualizar estos datos, suba el archivo Excel abajo.</div>`;
+      <div class="alert alert-info" style="margin-top:14px;">Esto es lo último guardado en el sistema. Para actualizar solo el Análisis de Renovaciones y Seguimiento de Vencidos, suba arriba el reporte "Ventas por Producto". Para ver el detalle completo (usuarios, validación de descuentos, proyección) o actualizar todo, suba el archivo Excel completo abajo.</div>`;
     box.style.display = 'block';
   } catch(e) {
     box.style.display = 'none';
@@ -695,35 +819,47 @@ async function doLogout() {
 
 document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
-async function autoSaveNat(mes) {
+// usuariosLoaded=true cuando se subió el Excel completo (Hoja1 disponible);
+// false cuando solo se actualizó el archivo de Ventas por Producto — en ese caso
+// no se tocan activos/total_usuarios/proyecciones/users_data ya guardados.
+async function autoSaveNat(mes, usuariosLoaded) {
   const statusEl = document.getElementById('saveStatus');
   statusEl.textContent = '⏳ Guardando...';
   try {
     const record = {
       sede: 'Natación', mes,
       mes_orden: mes,
-      activos: G.hoja1.filter(u => u.activo === 'Sí').length,
-      total_usuarios: G.hoja1.length,
-      proyecciones: {
+      renovaciones: {
+        nuevos: renovacionesData.filter(r=>r.Tipo==='Nuevo').length,
+        renovaciones: renovacionesData.filter(r=>r.Tipo==='Renovación').length,
+        reingresos: renovacionesData.filter(r=>r.Tipo==='Reingreso').length,
+        total: renovacionesData.reduce((s,r)=>s+r.Total,0),
+        clasesSueltas: { count: clasesSueltasData.length, total: clasesSueltasData.reduce((s,c)=>s+c.Total,0) },
+        sinClasificar: { count: sinClasificarData.length, total: sinClasificarData.reduce((s,c)=>s+c.Total,0) }
+      },
+      renov_data: [
+        ...renovacionesData.map(r => ({ FechaStr:r.FechaStr, Cliente:r.Cliente, RegistradoPor:r.RegistradoPor, Producto:r.Producto, Total:r.Total, Tipo:r.Tipo, Badge:r.Badge, Icon:r.Icon, GapDias:r.GapDias })),
+        ...clasesSueltasData.map(c => ({ FechaStr:c.FechaStr, Cliente:c.Cliente, RegistradoPor:c.RegistradoPor, Producto:c.Producto, Total:c.Total, EsClaseSuelta:true })),
+        ...sinClasificarData.map(c => ({ FechaStr:c.FechaStr, Cliente:c.Cliente, RegistradoPor:c.RegistradoPor, Producto:c.Producto, Total:c.Total, EsSinClasificar:true }))
+      ],
+      updated_at: new Date().toISOString()
+    };
+    if (usuariosLoaded) {
+      record.activos = G.hoja1.filter(u => u.activo === 'Sí').length;
+      record.total_usuarios = G.hoja1.length;
+      record.proyecciones = {
         con_descuento: G.proyeccion.length,
         precio_completo: G.planCompleto.length,
         total_junio: G.totalJunio || 0
-      },
-      renovaciones: {
-        nuevos: G.junio.filter(j => j.tipo === 'nuevo').length,
-        renovaciones: G.junio.filter(j => j.tipo === 'renovacion').length,
-        reingresos: G.junio.filter(j => j.tipo === 'reingreso').length,
-        total: (G.junioRaw || []).reduce((s,r) => s + r.Total, 0)
-      },
-      users_data: G.hoja1.map(u => ({
+      };
+      record.users_data = G.hoja1.map(u => ({
         PIN: u.pin, Nombre: u.nombre, Activo: u.activo, Expira: u.expira,
+        Telefono: u.telefono, Email: u.email,
         ÚltimoProducto: u.planCorregido || u.planOriginal,
         PlanOriginal: u.planOriginal, EstadoCorrecion: u.estado,
         ValorPlan: buscarPrecio(u.planCorregido || u.planOriginal) || 0
-      })),
-      renov_data: G.junioRaw || [],
-      updated_at: new Date().toISOString()
-    };
+      }));
+    }
     const existing = await supaFetch(`/gym_snapshots?sede=eq.Nataci%C3%B3n&mes=eq.${encodeURIComponent(mes)}&select=id`);
     if (existing?.length) {
       await supaFetch(`/gym_snapshots?sede=eq.Nataci%C3%B3n&mes=eq.${encodeURIComponent(mes)}`,
@@ -758,8 +894,8 @@ let G = {
   proyeccion: [],      // filas procesadas
   junio: [],           // estadísticas junio
   validacion: [],      // validación de descuentos vs pagos junio
-  pages: { usuarios:1, ventas:1, proy:1, junio:1, validacion:1 },
-  filtered: { usuarios:[], ventas:[], proy:[], junio:[], validacion:[] }
+  pages: { usuarios:1, ventas:1, proy:1, validacion:1 },
+  filtered: { usuarios:[], ventas:[], proy:[], validacion:[] }
 };
 
 // ─────────────────────────────────────────
@@ -851,6 +987,81 @@ function procesarArchivo(file) {
     } catch(err) {
       alert('Error al leer el archivo: ' + err.message);
       cambiarArchivo();
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ─────────────────────────────────────────
+// ACTUALIZAR SOLO "VENTAS POR PRODUCTO"
+// (sin tener que volver a subir el Excel completo de nat.xlsx)
+// ─────────────────────────────────────────
+function procesarVentasSolo(file) {
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type:'array', cellDates:false });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+
+      let hdrIdx = -1, col = {};
+      for (let i = 0; i < Math.min(raw.length, 10); i++) {
+        const r = (raw[i]||[]).map(c => String(c||'').trim().toLowerCase());
+        const fi = r.indexOf('fecha'), pi = r.indexOf('producto');
+        if (fi >= 0 && pi >= 0) {
+          hdrIdx = i;
+          col.fecha = fi; col.producto = pi;
+          col.cliente = r.indexOf('cliente');
+          col.registrado = r.findIndex(c => c.includes('registrado'));
+          col.total = r.findIndex(c => c.includes('total crc'));
+          if (col.total < 0) col.total = r.findIndex(c => c.includes('total') && !c.includes('usd'));
+          break;
+        }
+      }
+      if (hdrIdx < 0) throw new Error('No se encontró el encabezado (Fecha/Producto). Verifique que sea el reporte "Ventas por Producto".');
+
+      const rawRows = [];
+      for (let i = hdrIdx+1; i < raw.length; i++) {
+        const row = raw[i] || [];
+        const fecha = row[col.fecha], cliente = row[col.cliente], producto = row[col.producto], total = row[col.total];
+        const registrado = col.registrado >= 0 ? row[col.registrado] : '';
+        if (!fecha || !cliente || !producto) continue;
+        if (norm(String(cliente)) === 'administrativo') continue;
+        const tv = Number(total) || 0;
+        if (tv <= 0) continue;
+        rawRows.push({ FechaStr: String(fecha), Cliente: String(cliente).trim(), RegistradoPor: String(registrado||'').trim(), Producto: String(producto).trim(), Total: tv });
+      }
+      if (!rawRows.length) throw new Error('No se encontraron transacciones válidas en el archivo.');
+
+      // Si ya hay un Informe de Usuarios cargado en esta sesión, se usa ese;
+      // si no, se trae el último guardado en Supabase para poder clasificar
+      // Nuevo/Renovación/Reingreso y calcular Seguimiento de Vencidos.
+      if (G.hoja1.length) buildUsersDataFromHoja1();
+      else await fetchUsersDataFromSnapshot();
+
+      buildRenovacionesState(rawRows);
+
+      // Detectar mes a partir de las fechas del archivo
+      const fechas = rawRows.map(r => parseRenoDateTime(r.FechaStr)).filter(Boolean);
+      const ref = fechas.length ? new Date(Math.max(...fechas.map(d=>d.getTime()))) : new Date();
+      const mesNombre = ref.toLocaleString('es-CR', { month:'long', year:'numeric' });
+      const mes = mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1) + ' de ' + ref.getFullYear();
+
+      document.getElementById('resumenGuardado').style.display = 'none';
+      document.getElementById('uploadSection').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('tabJunio').classList.add('active');
+      document.querySelector(`.tab[onclick*="tabJunio"]`).classList.add('active');
+      renderRenovaciones();
+
+      if (currentRole === 'admin') await autoSaveNat(mes, false);
+    } catch(err) {
+      alert('Error al leer el archivo: ' + err.message);
+    } finally {
+      const i1 = document.getElementById('ventasSoloInput'); if (i1) i1.value = '';
+      const i2 = document.getElementById('ventasSoloInputDash'); if (i2) i2.value = '';
     }
   };
   reader.readAsArrayBuffer(file);
@@ -1013,7 +1224,7 @@ function analizar(wb) {
   let corregidos = 0, sinPlan = 0, planIncorrecto = 0;
 
   for (let i = 1; i < arr1.length; i++) {
-    const [pin, nombre, , , activo, expira, , , , ultimoProd] = arr1[i];
+    const [pin, nombre, , email, activo, expira, telefono, , , ultimoProd] = arr1[i];
     if (!nombre) continue;
 
     const planOriginal = cleanPlan(String(ultimoProd || ''));
@@ -1074,6 +1285,8 @@ function analizar(wb) {
       nombre: String(nombre).trim(),
       activo: String(activo || '').trim(),
       expira: String(expira || '').trim(),
+      telefono: telefono && telefono !== 'Sin Definir' ? String(telefono).trim() : '',
+      email: email ? String(email).trim() : '',
       planOriginal,
       planCorregido,
       estado,
@@ -1368,9 +1581,8 @@ function analizar(wb) {
   G.filtered.usuarios = [...G.hoja1];
   G.filtered.ventas = [...G.ventas];
   G.filtered.proy = [...G.proyeccion, ...G.planCompleto];
-  G.filtered.junio = [...G.junio];
   G.filtered.validacion = [...G.validacion];
-  G.pages = { usuarios:1, ventas:1, proy:1, junio:1, validacion:1 };
+  G.pages = { usuarios:1, ventas:1, proy:1, validacion:1 };
 
   poblarFiltroProducto();
   renderTabla('usuarios');
@@ -1379,8 +1591,12 @@ function analizar(wb) {
   renderTotalesProyeccion();
   renderProyCards([...G.proyeccion, ...G.planCompleto]);
   renderProyChart([...G.proyeccion, ...G.planCompleto]);
-  renderTabla('junio');
   renderTabla('validacion');
+
+  // Análisis de Renovaciones / Seguimiento de Vencidos (a partir de la hoja "junio")
+  // Los gráficos se renderizan al abrir esas pestañas (ver switchTab), no aquí.
+  buildUsersDataFromHoja1();
+  buildRenovacionesState(G.junioRaw || []);
 
   document.getElementById('loadingSection').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
@@ -1397,7 +1613,7 @@ function analizar(wb) {
     const ref = allDates.length ? new Date(Math.max(...allDates.map(d=>d.getTime()))) : new Date();
     const mesNombre = ref.toLocaleString('es-CR', { month:'long', year:'numeric' });
     const mes = mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1) + ' de ' + ref.getFullYear();
-    autoSaveNat(mes);
+    autoSaveNat(mes, true);
   }
 }
 
@@ -1428,15 +1644,6 @@ function filtrarTabla(tipo) {
       return true;
     });
     G.pages.ventas = 1;
-  } else if (tipo === 'junio') {
-    const q = norm(document.getElementById('searchJunio').value);
-    const cat = document.getElementById('filtroJunioTipo').value;
-    G.filtered.junio = G.junio.filter(r => {
-      if (q && !norm(r.nombre).includes(q) && !norm(r.planMain).includes(q)) return false;
-      if (cat && r.tipo !== cat) return false;
-      return true;
-    });
-    G.pages.junio = 1;
   } else if (tipo === 'proy') {
     const q = norm(document.getElementById('searchProy').value);
     const desc = document.getElementById('filtroDescuento').value;
@@ -1496,7 +1703,7 @@ function pageData(arr, page) {
 function renderPager(tipo, total) {
   const pages = Math.ceil(total / PAGE_SIZE);
   const cur = G.pages[tipo];
-  const idMap = { usuarios:'Usuarios', ventas:'Ventas', proy:'Proyeccion', junio:'Junio', validacion:'Validacion' };
+  const idMap = { usuarios:'Usuarios', ventas:'Ventas', proy:'Proyeccion', validacion:'Validacion' };
   const el = document.getElementById('pager' + (idMap[tipo]||'Proyeccion'));
   if (pages <= 1) { el.innerHTML=''; return; }
   let html = `<span class="pager-info">${total} registros</span>`;
@@ -1512,7 +1719,6 @@ function renderTabla(tipo) {
   if (tipo === 'usuarios') renderUsuarios();
   else if (tipo === 'ventas') renderVentas();
   else if (tipo === 'proy') renderProyeccion();
-  else if (tipo === 'junio') renderJunio();
   else if (tipo === 'validacion') renderValidacion();
 }
 
@@ -2059,129 +2265,456 @@ function pdfResumenPlanes() {
   doc.save('resumen_planes_junio_' + new Date().toISOString().slice(0,10) + '.pdf');
 }
 
-// ─────────────────────────────────────────
-// JUNIO — RENDER
-// ─────────────────────────────────────────
-let junioDonutInst = null, junioBarInst = null;
+// ═══════════════════════════════════════════════════════
+// ANÁLISIS DE RENOVACIONES / SEGUIMIENTO DE VENCIDOS
+// (misma lógica que index.html, adaptada a la hoja "junio" de nat.xlsx
+//  y reutilizable cuando solo se sube el archivo de Ventas por Producto)
+// ═══════════════════════════════════════════════════════
+let usersData = [];           // construido desde G.hoja1, o desde el último snapshot guardado
+let renovacionesData = [];
+let clasesSueltasData = [];
+let sinClasificarData = [];
+let renoTypePieChart = null, renoPlanBarChart = null;
 
-function renderJunio() {
-  const rows = G.filtered.junio;
-  const data = pageData(rows, G.pages.junio);
-  renderPager('junio', rows.length);
+function daysBetween(d1, d2) {
+  if (!d1 || !d2) return null;
+  return Math.round((d1 - d2) / 864e5);
+}
 
-  // Footer totales
-  const footTotal = rows.reduce((s,r) => s + r.total, 0);
-  document.getElementById('footJunio').innerHTML = `<tr>
-    <td colspan="3">TOTAL (${rows.length} clientes)</td>
-    <td>₡${Math.round(footTotal).toLocaleString('es-CR')}</td>
-    <td colspan="3"></td>
-  </tr>`;
+function parseRenoDateTime(str) {
+  if (!str) return null;
+  const datepart = String(str).trim().split(/\s+/)[0];
+  return parseDate(datepart);
+}
 
-  const tbody = document.getElementById('bodyJunio');
-  if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="no-data">Sin resultados</td></tr>'; return; }
+function isMembershipPlan(product) {
+  const p = String(product||'').trim();
+  if (/\(\d+\)/.test(p)) return false; // "Agua (1)" etc. — venta suelta con cantidad
+  const pl = p.toLowerCase();
+  if (pl.includes('sesion') || pl.includes('sesión') || pl.includes('clase')) return false;
+  for (const key of Object.keys(G.planes||{})) {
+    if (key === norm(p) || norm(p).includes(key) || key.includes(norm(p))) return true;
+  }
+  return /plan|promo|anualidad|lealtad|bloqueado|verano|exclusivo|platium|semestral|trimestral|estudiante|renovaci[oó]n|matr[ií]cula|nataci[oó]n|gym|aquafitness|estimulaci[oó]n/i.test(p);
+}
+function isClaseSuelta(product) {
+  const pl = String(product||'').trim().toLowerCase();
+  return pl.includes('sesion') || pl.includes('sesión') || pl.includes('clase');
+}
+function classifyTransaction(txDate, user, product) {
+  if (!user) return { tipo: 'Nuevo', badge: 'badge-nuevo', icon: '🆕', gapDias: null };
+  if (user.IngresoDate) {
+    const diffI = Math.abs(daysBetween(txDate, user.IngresoDate));
+    if (diffI !== null && diffI <= 5) return { tipo: 'Nuevo', badge: 'badge-nuevo', icon: '🆕', gapDias: null };
+  }
+  if (user.ExpiraDate) {
+    const gap = daysBetween(txDate, user.ExpiraDate);
+    if (gap !== null && gap > 10) return { tipo: 'Reingreso', badge: 'badge-reingreso', icon: '🔄', gapDias: gap };
+  }
+  return { tipo: 'Renovación', badge: 'badge-renova', icon: '✅', gapDias: null };
+}
+function findUserByName(clientName, list) {
+  list = list || usersData;
+  const cn = norm(clientName);
+  let m = list.find(u => norm(u.Nombre) === cn);
+  if (m) return m;
+  const words = cn.split(' ').filter(w => w.length > 2);
+  let best = null, bestScore = 0;
+  list.forEach(u => {
+    const uw = norm(u.Nombre).split(' ').filter(w => w.length > 2);
+    const hits = words.filter(w => uw.some(x => x === w || x.startsWith(w) || w.startsWith(x)));
+    const score = hits.length / Math.max(words.length, uw.length, 1);
+    if (score > bestScore && score >= 0.55) { bestScore = score; best = u; }
+  });
+  return best;
+}
 
-  const tipoConfig = {
-    renovacion: { label:'✅ Renovación', bg:'#e8f8f0', color:'#27ae60' },
-    nuevo:      { label:'🌟 Nuevo',      bg:'#eaf2fb', color:'#2980b9' },
-    reingreso:  { label:'🔄 Reingreso',  bg:'#fef9e7', color:'#e67e22' }
-  };
+// Construye `usersData` (formato compatible con classifyTransaction/getSeguimientoVencidos)
+// a partir de G.hoja1, que ya viene con los planes corregidos del archivo completo.
+function buildUsersDataFromHoja1() {
+  usersData = G.hoja1.map(u => ({
+    PIN: u.pin, Nombre: u.nombre, Activo: u.activo, Expira: u.expira,
+    ExpiraDate: parseDate(u.expira), IngresoDate: null,
+    ÚltimoProducto: u.planCorregido || u.planOriginal,
+    Telefono: u.telefono || '', Email: u.email || '',
+    ValorPlan: buscarPrecio(u.planCorregido || u.planOriginal) || 0
+  }));
+}
 
-  tbody.innerHTML = data.map(r => {
-    const cfg = tipoConfig[r.tipo] || tipoConfig.renovacion;
-    const badge = `<span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:${cfg.bg};color:${cfg.color};">${cfg.label}</span>`;
-    const diasCell = r.diasInactivo != null
-      ? `<span style="font-weight:700;color:${r.diasInactivo > 10 ? '#e67e22' : '#27ae60'}">${r.diasInactivo}d</span>`
-      : '—';
-    return `<tr style="${r.tipo === 'reingreso' ? 'background:#fffbf0' : r.tipo === 'nuevo' ? 'background:#f0f7ff' : ''}">
-      <td><strong>${esc(r.nombre)}</strong></td>
-      <td>${badge}</td>
-      <td>${esc(r.planMain)}${r.planes.length > 1 ? ` <span style="color:var(--muted);font-size:11px;">(+${r.planes.length-1})</span>` : ''}</td>
-      <td class="price">₡${Math.round(r.total).toLocaleString('es-CR')}</td>
-      <td>${esc(r.fecha)}</td>
-      <td style="color:var(--muted)">${esc(r.expira)}</td>
-      <td>${diasCell}</td>
+// Trae usersData desde el último snapshot guardado en Supabase (cuando solo se sube
+// el archivo de Ventas y no se tiene el Informe de Usuarios cargado en esta sesión).
+async function fetchUsersDataFromSnapshot() {
+  try {
+    const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&limit=1&select=users_data');
+    const saved = snaps?.[0]?.users_data || [];
+    usersData = saved.map(u => ({
+      PIN: u.PIN, Nombre: u.Nombre, Activo: u.Activo, Expira: u.Expira,
+      ExpiraDate: parseDate(u.Expira), IngresoDate: null,
+      ÚltimoProducto: u.ÚltimoProducto, Telefono: u.Telefono || '', Email: u.Email || '',
+      ValorPlan: u.ValorPlan || 0
+    }));
+  } catch(e) {
+    console.warn('No se pudo cargar usersData del último snapshot:', e.message);
+    usersData = [];
+  }
+}
+
+// Clasifica filas crudas {FechaStr,Cliente,RegistradoPor,Producto,Total} en
+// renovacionesData / clasesSueltasData / sinClasificarData, igual que index.html.
+function buildRenovacionesState(rawRows) {
+  renovacionesData = []; clasesSueltasData = []; sinClasificarData = [];
+  rawRows.forEach(row => {
+    const fechaStr = row.FechaStr, cliente = row.Cliente, regPor = row.RegistradoPor || '';
+    const producto = row.Producto, total = Number(row.Total) || 0;
+    if (!fechaStr || !cliente) return;
+    const txDate = parseRenoDateTime(fechaStr);
+    if (/^invitado$/i.test(cliente.trim())) {
+      // Invitado nunca es renovación de socio, pero sí cuenta como Minita/sin clasificar
+      if (isClaseSuelta(producto)) clasesSueltasData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
+      else sinClasificarData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
+      return;
+    }
+    if (isClaseSuelta(producto)) {
+      clasesSueltasData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
+      return;
+    }
+    if (!isMembershipPlan(producto)) {
+      sinClasificarData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
+      return;
+    }
+    const user = findUserByName(cliente);
+    const clasif = classifyTransaction(txDate, user, producto);
+    renovacionesData.push({
+      FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor,
+      Producto: producto, Total: total, User: user,
+      Tipo: clasif.tipo, Badge: clasif.badge, Icon: clasif.icon, GapDias: clasif.gapDias
+    });
+  });
+}
+
+// ── Filtros ──
+function getFilteredRenovaciones() {
+  const tipo = document.getElementById('renoFilterTipo')?.value || 'all';
+  const search = document.getElementById('renoSearchName')?.value.toLowerCase() || '';
+  const plan = document.getElementById('renoFilterPlan')?.value || 'all';
+  const dFrom = parseDateInput(document.getElementById('renoDateFrom')?.value);
+  const dTo = parseDateInput(document.getElementById('renoDateTo')?.value);
+  return renovacionesData.filter(r => {
+    if (tipo !== 'all' && r.Tipo !== tipo) return false;
+    if (search && !r.Cliente.toLowerCase().includes(search)) return false;
+    if (plan !== 'all' && r.Producto.trim() !== plan) return false;
+    if (r.TxDate) { if (dFrom && r.TxDate < dFrom) return false; if (dTo && r.TxDate > dTo) return false; }
+    return true;
+  });
+}
+function getFilteredClasesSueltas() {
+  const dFrom = parseDateInput(document.getElementById('renoDateFrom')?.value);
+  const dTo = parseDateInput(document.getElementById('renoDateTo')?.value);
+  return clasesSueltasData.filter(c => { if (c.TxDate) { if (dFrom && c.TxDate < dFrom) return false; if (dTo && c.TxDate > dTo) return false; } return true; });
+}
+function getFilteredSinClasificar() {
+  const dFrom = parseDateInput(document.getElementById('renoDateFrom')?.value);
+  const dTo = parseDateInput(document.getElementById('renoDateTo')?.value);
+  return sinClasificarData.filter(c => { if (c.TxDate) { if (dFrom && c.TxDate < dFrom) return false; if (dTo && c.TxDate > dTo) return false; } return true; });
+}
+function clearRenoFilters() {
+  document.getElementById('renoFilterTipo').value = 'all';
+  document.getElementById('renoSearchName').value = '';
+  document.getElementById('renoFilterPlan').value = 'all';
+  document.getElementById('renoDateFrom').value = '';
+  document.getElementById('renoDateTo').value = '';
+  renderRenovaciones();
+}
+function filterRenoHoy() {
+  const d = new Date();
+  const ddmmyyyy = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  document.getElementById('renoDateFrom').value = ddmmyyyy;
+  document.getElementById('renoDateTo').value = ddmmyyyy;
+  renderRenovaciones();
+}
+
+function updateRenoStats() {
+  const all = renovacionesData;
+  const nuevos = all.filter(r=>r.Tipo==='Nuevo').length;
+  const renova = all.filter(r=>r.Tipo==='Renovación').length;
+  const reing  = all.filter(r=>r.Tipo==='Reingreso').length;
+  const totalCRC = all.reduce((s,r)=>s+r.Total,0);
+  const dias = [...new Set(all.map(r=>r.TxDate?.toDateString()).filter(Boolean))].length;
+  const clasesTotal = clasesSueltasData.reduce((s,c)=>s+c.Total,0);
+  const sinClasifTotal = sinClasificarData.reduce((s,c)=>s+c.Total,0);
+  const granTotal = totalCRC + clasesTotal + sinClasifTotal;
+  document.getElementById('renoStatsContainer').innerHTML = `
+    <div class="card purple"><div class="card-label">📋 Total Membresías</div><div class="card-value">${all.length}</div></div>
+    <div class="card green"><div class="card-label">🆕 Nuevos</div><div class="card-value">${nuevos}</div><div class="card-sub">${all.length?Math.round(nuevos/all.length*100):0}% del total</div></div>
+    <div class="card blue"><div class="card-label">✅ Renovaciones</div><div class="card-value">${renova}</div><div class="card-sub">${all.length?Math.round(renova/all.length*100):0}% del total</div></div>
+    <div class="card orange"><div class="card-label">🔄 Reingresos</div><div class="card-value">${reing}</div><div class="card-sub">Inactivos +10 días que volvieron</div></div>
+    <div class="card teal"><div class="card-label">💰 Total General</div><div class="card-value">₡${granTotal.toLocaleString('es-CR')}</div><div class="card-sub">En ${dias} día(s)</div></div>
+    <div class="card" style="border-color:#888;"><div class="card-label">🤸 Clases Sueltas</div><div class="card-value" style="color:#555;">₡${clasesTotal.toLocaleString('es-CR')}</div><div class="card-sub">${clasesSueltasData.length} clases/sesiones</div></div>
+    <div class="card red"><div class="card-label">❓ Sin Clasificar</div><div class="card-value">₡${sinClasifTotal.toLocaleString('es-CR')}</div><div class="card-sub">${sinClasificarData.length} producto(s) no reconocido(s)</div></div>`;
+}
+
+function renderRenovaciones() {
+  const filtered = getFilteredRenovaciones();
+  const dFromVal = document.getElementById('renoDateFrom')?.value || '';
+  const dToVal = document.getElementById('renoDateTo')?.value || '';
+  const filtroActivo = dFromVal || dToVal || document.getElementById('renoSearchName')?.value
+    || (document.getElementById('renoFilterTipo')?.value !== 'all') || (document.getElementById('renoFilterPlan')?.value !== 'all');
+  const filteredClases = getFilteredClasesSueltas();
+  const filteredSinClasif = getFilteredSinClasificar();
+  const totalMembFiltrado = filtered.reduce((s,r)=>s+r.Total,0);
+  const totalClasesFiltrado = filteredClases.reduce((s,c)=>s+c.Total,0);
+  const totalSinClasifFiltrado = filteredSinClasif.reduce((s,c)=>s+c.Total,0);
+  document.getElementById('renoFilteredStatsContainer').innerHTML = !filtroActivo ? '' : `
+    <div class="card green"><div class="card-label">💰 Membresías (filtro)</div><div class="card-value">₡${totalMembFiltrado.toLocaleString('es-CR')}</div><div class="card-sub">${filtered.length} transacción(es)</div></div>
+    <div class="card" style="border-color:#888;"><div class="card-label">🤸 Clases Sueltas (filtro)</div><div class="card-value" style="color:#555;">₡${totalClasesFiltrado.toLocaleString('es-CR')}</div><div class="card-sub">${filteredClases.length} clase(s)</div></div>
+    <div class="card red"><div class="card-label">❓ Sin Clasificar (filtro)</div><div class="card-value">₡${totalSinClasifFiltrado.toLocaleString('es-CR')}</div><div class="card-sub">${filteredSinClasif.length} producto(s)</div></div>`;
+  updateRenoStats();
+
+  // Poblar filtro de plan
+  const planSel = document.getElementById('renoFilterPlan');
+  const curPlan = planSel.value;
+  const planes = [...new Set(renovacionesData.map(r=>r.Producto.trim()))].sort();
+  planSel.innerHTML = '<option value="all">Todos</option>' + planes.map(p => `<option value="${esc(p)}"${p===curPlan?' selected':''}>${esc(p)}</option>`).join('');
+
+  // Charts
+  const nv = filtered.filter(r=>r.Tipo==='Nuevo').length;
+  const rv = filtered.filter(r=>r.Tipo==='Renovación').length;
+  const ri = filtered.filter(r=>r.Tipo==='Reingreso').length;
+  const ctxPie = document.getElementById('renoTypePie').getContext('2d');
+  if (renoTypePieChart) renoTypePieChart.destroy();
+  renoTypePieChart = new Chart(ctxPie, { type:'doughnut', data:{ labels:['Nuevo','Renovación','Reingreso'], datasets:[{ data:[nv,rv,ri], backgroundColor:['#43a047','#1e88e5','#ff9800'], borderWidth:2, borderColor:'#fff' }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom' } } } });
+
+  const planTot = {};
+  filtered.forEach(r => { const p = r.Producto.trim(); planTot[p] = (planTot[p]||0) + r.Total; });
+  const barSorted = Object.entries(planTot).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const ctxBar = document.getElementById('renoPlanBar').getContext('2d');
+  if (renoPlanBarChart) renoPlanBarChart.destroy();
+  if (barSorted.length) renoPlanBarChart = new Chart(ctxBar, { type:'bar', data:{ labels:barSorted.map(i=>i[0]), datasets:[{ label:'CRC Recaudado', data:barSorted.map(i=>i[1]), backgroundColor: barSorted.map((_,i)=>`hsla(${200+i*18},65%,50%,0.82)`), borderRadius:6, borderSkipped:false }] }, options:{ responsive:true, plugins:{ legend:{display:false} }, scales:{ y:{ ticks:{ callback:v=>'₡'+v.toLocaleString('es-CR') } }, x:{} } } });
+
+  // Tabla principal
+  const tbody = document.getElementById('renoTableBody'); tbody.innerHTML = '';
+  filtered.sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0));
+  filtered.forEach(r => {
+    const tr = tbody.insertRow();
+    const gap = r.GapDias!=null ? `<span style="color:#e65100;font-weight:700;">${r.GapDias} días</span>` : '<span style="color:#aaa;">—</span>';
+    const ingreso = '<span style="color:#aaa;">—</span>';
+    const expira = r.User?.Expira || '<span style="color:#aaa;">—</span>';
+    const clienteDisplay = r.User ? `<strong>${esc(r.Cliente)}</strong>` :
+      `<strong>${esc(r.Cliente)}</strong> <span style="background:#fff3e0;color:#e65100;font-size:11px;padding:2px 6px;border-radius:10px;">¿nuevo?</span>`;
+    tr.innerHTML = `
+      <td style="white-space:nowrap;font-size:12px;color:#666;">${esc(r.FechaStr)}</td>
+      <td>${clienteDisplay}</td>
+      <td style="font-size:12.5px;">${esc(r.Producto)}</td>
+      <td><span class="badge ${r.Badge}">${r.Icon} ${r.Tipo}</span></td>
+      <td style="font-weight:700;color:#2d2d5e;">₡${r.Total.toLocaleString('es-CR')}</td>
+      <td>${gap}</td>
+      <td style="font-size:12px;">${ingreso}</td>
+      <td style="font-size:12px;">${expira}</td>
+      <td style="font-size:12px;color:#888;">${esc(r.RegistradoPor)}</td>`;
+  });
+  document.getElementById('renoTableInfo').textContent = `Mostrando ${filtered.length} transacciones — Nuevos: ${nv} · Renovaciones: ${rv} · Reingresos: ${ri} · Total: ₡${filtered.reduce((s,r)=>s+r.Total,0).toLocaleString('es-CR')}`;
+
+  // Clases sueltas
+  const csBody = document.getElementById('clasesSueltasTableBody'); csBody.innerHTML = '';
+  [...filteredClases].sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0)).forEach(c => {
+    const tr = csBody.insertRow();
+    tr.innerHTML = `
+      <td style="white-space:nowrap;font-size:12px;color:#666;">${esc(c.FechaStr)}</td>
+      <td>${esc(c.Cliente)}</td>
+      <td style="font-size:12.5px;">${esc(c.Producto)}</td>
+      <td style="font-weight:700;color:#2d2d5e;">₡${c.Total.toLocaleString('es-CR')}</td>
+      <td style="font-size:12px;color:#888;">${esc(c.RegistradoPor)}</td>`;
+  });
+  document.getElementById('clasesSueltasInfo').textContent = `Mostrando ${filteredClases.length} clases/sesiones sueltas — Total: ₡${totalClasesFiltrado.toLocaleString('es-CR')} (no se suma al total de membresías)`;
+
+  // Sin clasificar
+  const scBody = document.getElementById('sinClasificarTableBody'); scBody.innerHTML = '';
+  [...filteredSinClasif].sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0)).forEach(c => {
+    const tr = scBody.insertRow();
+    tr.innerHTML = `
+      <td style="white-space:nowrap;font-size:12px;color:#666;">${esc(c.FechaStr)}</td>
+      <td>${esc(c.Cliente)}</td>
+      <td style="font-size:12.5px;">${esc(c.Producto)}</td>
+      <td style="font-weight:700;color:#c62828;">₡${c.Total.toLocaleString('es-CR')}</td>
+      <td style="font-size:12px;color:#888;">${esc(c.RegistradoPor)}</td>`;
+  });
+  document.getElementById('sinClasificarInfo').textContent = `Mostrando ${filteredSinClasif.length} transacciones sin clasificar — Total: ₡${totalSinClasifFiltrado.toLocaleString('es-CR')} (revisar nombres de producto)`;
+}
+
+function exportRenoCSV() {
+  const f = getFilteredRenovaciones(); if (!f.length) { alert('No hay datos'); return; }
+  const h = ['Fecha','Cliente','Plan','Tipo','Total CRC','Dias sin renovar','Expira actual','Registrado por'];
+  const rows = f.map(r => [r.FechaStr, r.Cliente, r.Producto, r.Tipo, r.Total, r.GapDias??'', r.User?.Expira||'', r.RegistradoPor]);
+  const csv = [h, ...rows].map(row => row.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  dlBlob(csv, 'renovaciones_natacion_' + hoy() + '.csv', 'text/csv;charset=utf-8');
+}
+
+function exportRenoPDF() {
+  const f = getFilteredRenovaciones(); if (!f.length) { alert('No hay datos'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'landscape', unit:'pt', format:'a4' });
+  const pW = doc.internal.pageSize.getWidth();
+  const fecha = new Date().toLocaleDateString('es-CR', { year:'numeric', month:'long', day:'numeric' });
+  doc.setFillColor(102,126,234); doc.rect(0,0,pW,78,'F');
+  doc.setFillColor(118,75,162); doc.rect(pW-180,0,180,78,'F');
+  doc.setFontSize(17); doc.setTextColor(255,255,255); doc.setFont(undefined,'bold');
+  doc.text('Analisis de Renovaciones - Natacion',36,30);
+  doc.setFontSize(10); doc.setFont(undefined,'normal');
+  doc.text('Clasificacion de membresias: Nuevos, Renovaciones y Reingresos',36,48);
+  doc.text('Generado: '+fecha,36,64);
+  doc.setFontSize(9); doc.text('JK Sistemas',pW-90,46,{align:'center'});
+  const nv=f.filter(r=>r.Tipo==='Nuevo').length, rv=f.filter(r=>r.Tipo==='Renovación').length, ri=f.filter(r=>r.Tipo==='Reingreso').length;
+  const tot=f.reduce((s,r)=>s+r.Total,0);
+  doc.setFillColor(240,242,255); doc.roundedRect(36,86,pW-72,28,4,4,'F');
+  doc.setFontSize(9); doc.setTextColor(45,45,94); doc.setFont(undefined,'bold');
+  doc.text(`Total: ${f.length}  |  Nuevos: ${nv}  |  Renovaciones: ${rv}  |  Reingresos: ${ri}  |  Recaudado: CRC ${tot.toLocaleString('es-CR')}`, pW/2, 104, {align:'center'});
+  const tableRows = f.sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0)).map(r=>[
+    r.FechaStr.split(' ')[0], r.Cliente, r.Producto, r.Tipo,
+    'CRC '+r.Total.toLocaleString('es-CR'),
+    r.GapDias!=null?r.GapDias+' dias':'-',
+    r.RegistradoPor
+  ]);
+  doc.autoTable({
+    startY:122,
+    head:[['Fecha','Cliente','Plan','Tipo','Total (CRC)','Días gap','Registrado por']],
+    body:tableRows,
+    headStyles:{ fillColor:[102,126,234], textColor:255, fontStyle:'bold', fontSize:8.5 },
+    didParseCell(data) {
+      if (data.section==='body'&&data.column.index===3) {
+        const v=String(data.cell.raw);
+        if (v.includes('Nuevo')) data.cell.styles.textColor=[46,125,50];
+        if (v.includes('Renovaci')) data.cell.styles.textColor=[21,101,192];
+        if (v.includes('Reingreso')) data.cell.styles.textColor=[230,81,0];
+        data.cell.styles.fontStyle='bold';
+      }
+    },
+    alternateRowStyles:{ fillColor:[248,249,255] },
+    styles:{ fontSize:8.5, cellPadding:6 },
+    columnStyles:{ 1:{cellWidth:130}, 2:{cellWidth:140}, 4:{halign:'right'} },
+    margin:{ left:36, right:36 }
+  });
+  const fy=doc.lastAutoTable.finalY+14;
+  doc.setFontSize(8); doc.setTextColor(160,160,160); doc.setFont(undefined,'normal');
+  doc.text('Sistema creado por JK Sistemas  |  '+fecha, pW/2, Math.min(fy+12, doc.internal.pageSize.getHeight()-16), {align:'center'});
+  doc.save('renovaciones_natacion_'+hoy()+'.pdf');
+}
+
+// ── Seguimiento de vencidos ──
+function getSeguimientoVencidos() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const pagaronEstePeriodo = new Set(renovacionesData.map(r => norm(r.Cliente)));
+  return usersData.filter(u => u.ExpiraDate && u.ExpiraDate < today && !pagaronEstePeriodo.has(norm(u.Nombre)));
+}
+function getFilteredSeguimiento() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const search = document.getElementById('segSearch')?.value.toLowerCase() || '';
+  const rango = document.getElementById('segRango')?.value || 'all';
+  const plan = document.getElementById('segFilterPlan')?.value || 'all';
+  return getSeguimientoVencidos().filter(u => {
+    if (search && !u.Nombre.toLowerCase().includes(search)) return false;
+    if (plan !== 'all' && u.ÚltimoProducto !== plan) return false;
+    const diasVencido = Math.round((today - u.ExpiraDate) / 864e5);
+    if (rango !== 'all') {
+      const [min, max] = rango.split('-').map(Number);
+      if (diasVencido < min || diasVencido > max) return false;
+    }
+    return true;
+  });
+}
+function clearSegFilters() {
+  document.getElementById('segSearch').value = '';
+  document.getElementById('segRango').value = 'all';
+  document.getElementById('segFilterPlan').value = 'all';
+  renderSeguimiento();
+}
+
+function renderSeguimiento() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todos = getSeguimientoVencidos();
+  const planSel = document.getElementById('segFilterPlan');
+  const curPlan = planSel.value;
+  const planes = [...new Set(todos.map(u => u.ÚltimoProducto).filter(Boolean))].sort();
+  planSel.innerHTML = '<option value="all">Todos</option>' + planes.map(p => `<option value="${esc(p)}"${p===curPlan?' selected':''}>${esc(p)}</option>`).join('');
+
+  const rows = getFilteredSeguimiento().sort((a,b) => a.ExpiraDate - b.ExpiraDate);
+  const valorRiesgo = rows.reduce((s,u) => s + (u.ValorPlan||0), 0);
+  const r15 = todos.filter(u => Math.round((today-u.ExpiraDate)/864e5) <= 15).length;
+  const r60 = todos.filter(u => Math.round((today-u.ExpiraDate)/864e5) > 60).length;
+  document.getElementById('segStatsContainer').innerHTML = `
+    <div class="card red"><div class="card-label">📋 Total Vencidos</div><div class="card-value">${todos.length}</div><div class="card-sub">Sin renovar a la fecha</div></div>
+    <div class="card orange"><div class="card-label">🟠 Vencidos 1-15 días</div><div class="card-value">${r15}</div><div class="card-sub">Aún recientes</div></div>
+    <div class="card red"><div class="card-label">🔴 Vencidos +60 días</div><div class="card-value">${r60}</div><div class="card-sub">Riesgo de pérdida</div></div>
+    <div class="card purple"><div class="card-label">💰 Valor en Riesgo (filtro)</div><div class="card-value">₡${valorRiesgo.toLocaleString('es-CR')}</div><div class="card-sub">${rows.length} cliente(s) mostrados</div></div>`;
+
+  const tbody = document.getElementById('segTableBody'); tbody.innerHTML = '';
+  rows.forEach(u => {
+    const diasVencido = Math.round((today - u.ExpiraDate) / 864e5);
+    const tr = tbody.insertRow();
+    tr.innerHTML = `
+      <td>${esc(u.PIN)}</td>
+      <td><strong>${esc(u.Nombre)}</strong></td>
+      <td style="font-size:12.5px;white-space:nowrap;">${esc(u.Telefono)||'<span style="color:#aaa;">—</span>'}</td>
+      <td style="font-size:12.5px;">${esc(u.ÚltimoProducto)||'-'}</td>
+      <td>${esc(u.Expira)||'-'}</td>
+      <td style="font-weight:700;color:${diasVencido>60?'#c62828':'#e65100'};">${diasVencido} días</td>
+      <td>${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString('es-CR'):'<span style="color:#aaa;">—</span>'}</td>`;
+  });
+  document.getElementById('segTableInfo').textContent = `Mostrando ${rows.length} de ${todos.length} clientes vencidos sin renovar — Valor en riesgo: ₡${valorRiesgo.toLocaleString('es-CR')}`;
+}
+
+function exportSegCSV() {
+  const f = getFilteredSeguimiento(); if (!f.length) { alert('No hay datos'); return; }
+  const today = new Date(); today.setHours(0,0,0,0);
+  const h = ['PIN','Nombre','Telefono','Plan','Vencio','Dias vencido','Valor Plan (CRC)'];
+  const rows = f.map(u => [u.PIN, u.Nombre, u.Telefono, u.ÚltimoProducto, u.Expira, Math.round((today-u.ExpiraDate)/864e5), u.ValorPlan]);
+  const csv = [h, ...rows].map(row => row.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  dlBlob(csv, 'seguimiento_vencidos_natacion_'+hoy()+'.csv', 'text/csv;charset=utf-8');
+}
+
+function printSeguimiento() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  let f = getFilteredSeguimiento();
+  if (!f.length) { alert('No hay datos para los filtros aplicados'); return; }
+  f = f.slice().sort((a,b) => a.ExpiraDate - b.ExpiraDate);
+  const fecha = new Date().toLocaleDateString('es-CR', { year:'numeric', month:'long', day:'numeric' });
+  const rows = f.map(u => {
+    const dias = Math.round((today - u.ExpiraDate) / 864e5);
+    return `<tr>
+      <td>${esc(u.PIN)}</td><td>${esc(u.Nombre)}</td><td>${esc(u.Telefono)||'—'}</td>
+      <td>${esc(u.ÚltimoProducto)||'-'}</td><td>${esc(u.Expira)||'-'}</td><td>${dias}</td>
+      <td>${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString('es-CR'):'—'}</td><td class="notas"></td>
     </tr>`;
   }).join('');
-
-  renderJunioCards(rows);
-  renderJunioCharts(G.junio); // charts usan todos los datos siempre
+  const win = window.open('', '_blank');
+  win.document.write(`
+  <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <title>Seguimiento Vencidos - Natación</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; color: #222; }
+    h1 { font-size: 1.3em; margin-bottom: 2px; }
+    .sub { color: #555; font-size: 0.9em; margin-bottom: 18px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    th, td { border: 1px solid #999; padding: 7px 9px; text-align: left; }
+    th { background: #eee; }
+    td.notas { width: 160px; }
+    @media print { body { padding: 8px; } }
+  </style></head><body>
+    <h1>Seguimiento de Clientes Vencidos — Natación</h1>
+    <div class="sub">Generado: ${fecha} &nbsp;·&nbsp; Total: ${f.length} cliente(s)</div>
+    <table>
+      <thead><tr><th>PIN</th><th>Nombre</th><th>Teléfono</th><th>Plan</th><th>Venció</th><th>Días vencido</th><th>Valor</th><th>Notas / Contacto</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 250);
 }
 
-function renderJunioCards(rows) {
-  const ren  = rows.filter(r => r.tipo === 'renovacion');
-  const nue  = rows.filter(r => r.tipo === 'nuevo');
-  const rei  = rows.filter(r => r.tipo === 'reingreso');
-  const totalIngresos = rows.reduce((s,r) => s + r.total, 0);
-
-  const mk = (cls, icon, label, val, sub) =>
-    `<div class="proy-stat ${cls}"><h3>${icon} ${label}</h3><div class="sv">${val}</div><div class="ss">${sub}</div></div>`;
-
-  document.getElementById('junio-cards').innerHTML =
-    mk('purple', '👥', 'Total Clientes Junio', rows.length,  'pagos únicos registrados') +
-    mk('green',  '✅', 'Renovaciones',         ren.length,   '₡'+Math.round(ren.reduce((s,r)=>s+r.total,0)).toLocaleString('es-CR')) +
-    mk('blue',   '🌟', 'Clientes Nuevos',      nue.length,   '₡'+Math.round(nue.reduce((s,r)=>s+r.total,0)).toLocaleString('es-CR')) +
-    mk('orange', '🔄', 'Reingresos (>10d)',     rei.length,   '₡'+Math.round(rei.reduce((s,r)=>s+r.total,0)).toLocaleString('es-CR')) +
-    mk('purple', '💰', 'Ingresos Totales Junio','₡'+Math.round(totalIngresos).toLocaleString('es-CR'), rows.length+' clientes');
-}
-
-function renderJunioCharts(allRows) {
-  // Donut: composición
-  const counts = {
-    'Renovaciones': allRows.filter(r=>r.tipo==='renovacion').length,
-    'Nuevos':       allRows.filter(r=>r.tipo==='nuevo').length,
-    'Reingresos':   allRows.filter(r=>r.tipo==='reingreso').length
-  };
-  const ctxD = document.getElementById('junioDonut').getContext('2d');
-  if (junioDonutInst) junioDonutInst.destroy();
-  junioDonutInst = new Chart(ctxD, {
-    type: 'doughnut',
-    data: {
-      labels: Object.keys(counts),
-      datasets: [{ data: Object.values(counts),
-        backgroundColor: ['#27ae60','#2980b9','#e67e22'],
-        borderWidth: 3, borderColor: '#fff'
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { position: 'bottom', labels: { padding: 16, font: { size: 12 } } },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} clientes` } }
-      },
-      cutout: '60%'
-    }
-  });
-
-  // Bar: top 8 planes por ingreso
-  const planRev = {};
-  allRows.forEach(r => { planRev[r.planMain] = (planRev[r.planMain]||0) + r.total; });
-  const sorted = Object.entries(planRev).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const ctxB = document.getElementById('junioBar').getContext('2d');
-  if (junioBarInst) junioBarInst.destroy();
-  junioBarInst = new Chart(ctxB, {
-    type: 'bar',
-    data: {
-      labels: sorted.map(i=>i[0]),
-      datasets: [{ label:'Ingresos Junio (₡)', data: sorted.map(i=>i[1]),
-        backgroundColor: sorted.map((_,i) => `hsla(${220+i*15},65%,${50+i*3}%,0.85)`),
-        borderRadius: 7, borderSkipped: false
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { ticks: { callback: v => '₡'+v.toLocaleString('es-CR') }, grid: { color:'#f0f2f8' } },
-        x: { grid: { display: false }, ticks: { maxRotation: 30, font: { size: 10 } } }
-      }
-    }
-  });
-}
-
-function limpiarFiltrosJunio() {
-  document.getElementById('searchJunio').value = '';
-  document.getElementById('filtroJunioTipo').value = '';
-  filtrarTabla('junio');
+function hoy() { return new Date().toISOString().slice(0,10); }
+function dlBlob(content, filename, type) {
+  const blob = new Blob(['﻿'+content], { type });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href);
 }
 
 // ─────────────────────────────────────────
@@ -2255,97 +2788,6 @@ function renderValidacionCards(rows) {
 // ─────────────────────────────────────────
 // PDF JUNIO
 // ─────────────────────────────────────────
-function pdfJunio() {
-  const rows = G.filtered.junio;
-  if (!rows.length) { alert('No hay datos.'); return; }
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  const pageW = doc.internal.pageSize.getWidth();
-  const fecha = new Date().toLocaleDateString('es-CR', { year:'numeric', month:'long', day:'numeric' });
-
-  const ren = rows.filter(r=>r.tipo==='renovacion').length;
-  const nue = rows.filter(r=>r.tipo==='nuevo').length;
-  const rei = rows.filter(r=>r.tipo==='reingreso').length;
-  const total = rows.reduce((s,r)=>s+r.total,0);
-
-  // Header
-  doc.setFillColor(102,126,234); doc.rect(0,0,pageW,24,'F');
-  doc.setFillColor(118,75,162); doc.rect(pageW-60,0,60,24,'F');
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(15); doc.setFont(undefined,'bold');
-  doc.text('Analisis de Renovaciones', 14, 10);
-  doc.setFontSize(8); doc.setFont(undefined,'normal');
-  const filtroTipo = document.getElementById('filtroJunioTipo').value;
-  doc.text((filtroTipo ? 'Categoria: '+filtroTipo : 'Todos los clientes') + '  |  ' + rows.length + ' registros', 14, 17);
-  doc.text('Generado: ' + fecha, pageW-14, 17, { align:'right' });
-  doc.setTextColor(0,0,0);
-
-  // Chips resumen
-  const resY = 28;
-  const chips = [
-    { label:'Total Clientes', val: rows.length, color:[102,126,234] },
-    { label:'Renovaciones',   val: ren,          color:[39,174,96] },
-    { label:'Nuevos',         val: nue,           color:[41,128,185] },
-    { label:'Reingresos',     val: rei,           color:[230,126,34] },
-    { label:'Ingresos Junio', val: fmtPDF(total), color:[26,82,118] }
-  ];
-  chips.forEach((c,i) => {
-    const x = 14 + i*57;
-    doc.setFillColor(...c.color);
-    doc.roundedRect(x, resY, 52, 14, 3, 3, 'F');
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(6.5); doc.text(c.label, x+3, resY+5);
-    const isNum = typeof c.val === 'number';
-    doc.setFontSize(isNum ? 11 : 8); doc.setFont(undefined,'bold');
-    doc.text(String(c.val), x+3, resY+12);
-    doc.setFont(undefined,'normal');
-  });
-  doc.setTextColor(0,0,0);
-
-  const tipoLabel = { renovacion:'Renovacion', nuevo:'Nuevo', reingreso:'Reingreso' };
-  doc.autoTable({
-    startY: resY + 20,
-    head: [['Cliente','Categoria','Plan','Pagó Junio','Fecha Pago','Ult. Expiración','Días Inactivo']],
-    body: rows.map(r => [
-      r.nombre,
-      tipoLabel[r.tipo] || r.tipo,
-      r.planMain,
-      fmtPDF(r.total),
-      r.fecha || '—',
-      r.expira || '—',
-      r.diasInactivo != null ? r.diasInactivo+'d' : '—'
-    ]),
-    foot: [['TOTAL ('+rows.length+' clientes)','','', fmtPDF(total),'','','']],
-    styles: { fontSize: 8, cellPadding: 2.5 },
-    headStyles: { fillColor:[102,126,234], textColor:255, fontStyle:'bold' },
-    footStyles: { fillColor:[232,235,255], textColor:[45,45,94], fontStyle:'bold' },
-    alternateRowStyles: { fillColor:[248,249,255] },
-    didParseCell(data) {
-      if (data.section === 'body') {
-        const tipo = data.row.raw[1];
-        if (data.column.index === 1) {
-          data.cell.styles.textColor = tipo==='Nuevo' ? [41,128,185] : tipo==='Reingreso' ? [230,126,34] : [39,174,96];
-          data.cell.styles.fontStyle = 'bold';
-        }
-        if (data.column.index === 6 && data.cell.raw !== '—') {
-          const d = parseInt(data.cell.raw);
-          if (d > 10) data.cell.styles.textColor = [230,126,34];
-        }
-      }
-    },
-    columnStyles: { 0:{cellWidth:52}, 2:{cellWidth:50} },
-    margin: { left:14, right:14 }
-  });
-
-  const totalPages = doc.internal.getNumberOfPages();
-  for (let p=1; p<=totalPages; p++) {
-    doc.setPage(p); doc.setFontSize(7); doc.setTextColor(160,160,160);
-    doc.text(`Pagina ${p} de ${totalPages}`, pageW/2, doc.internal.pageSize.getHeight()-6, { align:'center' });
-  }
-  doc.save('estadisticas_junio_' + new Date().toISOString().slice(0,10) + '.pdf');
-}
-
 // ─────────────────────────────────────────
 // TABS
 // ─────────────────────────────────────────
@@ -2354,6 +2796,10 @@ function switchTab(id, el) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   el.classList.add('active');
+  // Los gráficos de Chart.js necesitan que el canvas ya esté visible para medir
+  // su tamaño, por eso estas pestañas se renderizan al activarlas, no antes.
+  if (id === 'tabJunio') renderRenovaciones();
+  if (id === 'tabSeguimiento') renderSeguimiento();
 }
 
 // ─────────────────────────────────────────
