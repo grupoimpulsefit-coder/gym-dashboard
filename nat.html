@@ -2386,10 +2386,17 @@ function parseRenoDateTime(str) {
   return parseDate(datepart);
 }
 
+// "Clases de Natación ... - X vez/veces por semana" son planes mensuales (membresía),
+// no ventas sueltas, aunque el nombre contenga la palabra "clase(s)".
+function esPlanDeNatacionRecurrente(pl) {
+  return (pl.includes('natacion') || pl.includes('natación') || pl.includes('aquafitness') || pl.includes('estimulaci'))
+    && (pl.includes('vez por semana') || pl.includes('veces por semana') || pl.includes('x semana'));
+}
 function isMembershipPlan(product) {
   const p = String(product||'').trim();
   if (/\(\d+\)/.test(p)) return false; // "Agua (1)" etc. — venta suelta con cantidad
   const pl = p.toLowerCase();
+  if (esPlanDeNatacionRecurrente(pl)) return true;
   if (pl.includes('sesion') || pl.includes('sesión') || pl.includes('clase')) return false;
   for (const key of Object.keys(G.planes||{})) {
     if (key === norm(p) || norm(p).includes(key) || key.includes(norm(p))) return true;
@@ -2398,6 +2405,7 @@ function isMembershipPlan(product) {
 }
 function isClaseSuelta(product) {
   const pl = String(product||'').trim().toLowerCase();
+  if (esPlanDeNatacionRecurrente(pl)) return false;
   return pl.includes('sesion') || pl.includes('sesión') || pl.includes('clase');
 }
 function classifyTransaction(txDate, user, product) {
