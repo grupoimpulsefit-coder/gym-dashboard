@@ -773,79 +773,95 @@ async function doLogin() {
   }
 }
 
-// Al entrar, mostrar lo último guardado en Supabase sin obligar a resubir el Excel
+// Al entrar, reconstruir el dashboard completo (Usuarios, Proyección, Validación,
+// Renovaciones, Seguimiento) a partir de lo último guardado en Supabase, sin
+// obligar a resubir el Excel. "Ventas Mayo" no se reconstruye porque depende de
+// las transacciones crudas de Hoja3, que no se guardan en el snapshot.
 async function cargarResumenGuardado() {
-  const box = document.getElementById('resumenGuardado');
   try {
     const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&limit=1&select=mes,activos,total_usuarios,proyecciones,renovaciones,renov_data,users_data,updated_at');
-    if (!snaps?.length) { box.style.display = 'none'; return; }
-    const s = snaps[0];
-    const fmt = n => '₡' + Math.round(n||0).toLocaleString('es-CR');
-    const fecha = new Date(s.updated_at).toLocaleString('es-CR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
-    const vMap = {};
-    (s.renov_data||[]).forEach(r => { if (r.RegistradoPor) vMap[r.RegistradoPor] = (vMap[r.RegistradoPor]||0) + (r.Total||0); });
-    const topVend = Object.entries(vMap).sort((a,b)=>b[1]-a[1])[0];
-    const proyRows = (s.users_data||[]).filter(u => u.Descuento).sort((a,b) => (a.PrecioJunio==null) - (b.PrecioJunio==null) || (b.PrecioJunio||0)-(a.PrecioJunio||0));
-    const proyTotal = proyRows.reduce((sum,u) => sum + (u.PrecioJunio||0), 0);
-    const proyPendientes = proyRows.filter(u => u.Pendiente).length;
-    box.innerHTML = `
-      <div class="dash-header" style="margin-bottom:14px;">
-        <div>
-          <div class="dash-title">📅 Último guardado — ${s.mes}</div>
-          <div class="dash-file">Actualizado: ${fecha}</div>
-        </div>
-        ${currentRole === 'admin' ? `<div>
-          <label class="btn btn-accent" for="ventasSoloInput" style="cursor:pointer;">📤 Actualizar solo Ventas</label>
-          <input type="file" id="ventasSoloInput" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) procesarVentasSolo(this.files[0])">
-        </div>` : ''}
-      </div>
-      <div class="cards">
-        <div class="card"><div class="card-label">Usuarios totales</div><div class="card-value">${s.total_usuarios ?? '—'}</div></div>
-        <div class="card green"><div class="card-label">Activos</div><div class="card-value">${s.activos ?? '—'}</div></div>
-        <div class="card purple"><div class="card-label">Total cobrado (mes)</div><div class="card-value">${fmt(s.renovaciones?.total)}</div></div>
-        <div class="card orange"><div class="card-label">Nuevos / Renov. / Reingresos</div><div class="card-value" style="font-size:1.1em;">${s.renovaciones?.nuevos??0} / ${s.renovaciones?.renovaciones??0} / ${s.renovaciones?.reingresos??0}</div></div>
-        ${topVend ? `<div class="card"><div class="card-label">🏆 Top vendedor</div><div class="card-value" style="font-size:1em;">${topVend[0]}</div><div class="card-sub">${fmt(topVend[1])}</div></div>` : ''}
-      </div>
-
-      ${proyRows.length ? `
-      <div class="proy-table-section" style="margin-top:18px;">
-        <div class="proy-section-title">📊 Proyección guardada — ${proyRows.length} clientes · ${fmt(proyTotal)}${proyPendientes ? ` · <span style="color:var(--warn);">${proyPendientes} pendientes sin precio</span>` : ''}</div>
-        <input type="text" id="proyGuardadoSearch" class="filter-select" style="width:100%;margin-bottom:10px;" placeholder="Buscar por nombre…" oninput="filtrarProyGuardado()">
-        <div class="proy-table-wrap" style="max-height:420px;">
-          <table>
-            <thead><tr><th>Cliente</th><th>Plan</th><th>Descuento</th><th>Precio Junio</th><th>Expira</th></tr></thead>
-            <tbody id="proyGuardadoBody"></tbody>
-          </table>
-        </div>
-      </div>` : ''}
-
-      <div class="alert alert-info" style="margin-top:14px;">Esto es lo último guardado en el sistema. Para actualizar solo el Análisis de Renovaciones y Seguimiento de Vencidos, suba arriba el reporte "Ventas por Producto". Para ver el detalle completo (usuarios, validación de descuentos) o actualizar todo, suba el archivo Excel completo abajo.</div>`;
-    box.style.display = 'block';
-    window._proyGuardadoRows = proyRows;
-    if (proyRows.length) renderProyGuardado(proyRows);
+    if (!snaps?.length) { document.getElementById('resumenGuardado').style.display = 'none'; return; }
+    mostrarDashboardDesdeSnapshot(snaps[0]);
   } catch(e) {
-    box.style.display = 'none';
+    document.getElementById('resumenGuardado').style.display = 'none';
     console.warn('No se pudo cargar el resumen guardado:', e.message);
   }
 }
 
-function renderProyGuardado(rows) {
-  const fmt = n => n!=null ? '₡'+Math.round(n).toLocaleString('es-CR') : '<span style="color:#aaa;">— pendiente</span>';
-  const tbody = document.getElementById('proyGuardadoBody');
-  if (!tbody) return;
-  tbody.innerHTML = rows.map(u => `
-    <tr>
-      <td><strong>${u.Nombre||''}</strong></td>
-      <td style="font-size:12.5px;">${u.ProyPlan||u.ÚltimoProducto||'—'}</td>
-      <td>${u.Descuento==='Completo' ? '<span style="color:#888;">Precio completo</span>' : u.Descuento}</td>
-      <td style="font-weight:700;">${fmt(u.PrecioJunio)}</td>
-      <td style="color:var(--muted);">${u.Expira||'—'}</td>
-    </tr>`).join('');
-}
-function filtrarProyGuardado() {
-  const q = norm(document.getElementById('proyGuardadoSearch').value);
-  const rows = (window._proyGuardadoRows||[]).filter(u => !q || norm(u.Nombre).includes(q));
-  renderProyGuardado(rows);
+const PCT_DESCUENTO = { '20%': 0.2, '25%': 0.25, 'G20': 0.2, 'Completo': 0 };
+
+function mostrarDashboardDesdeSnapshot(s) {
+  const ud = s.users_data || [];
+
+  // ── Reconstruir G.hoja1 (tab Usuarios) ──
+  G.hoja1 = ud.map(u => ({
+    pin: u.PIN || '', nombre: u.Nombre || '', activo: u.Activo || '', expira: u.Expira || '',
+    telefono: u.Telefono || '', email: u.Email || '',
+    planOriginal: u.PlanOriginal || u.ÚltimoProducto || '',
+    planCorregido: u.ÚltimoProducto || '',
+    estado: u.EstadoCorrecion || 'ok', fuentePlan: u.FuentePlan || null,
+    valorPlanGuardado: u.ValorPlan ?? null
+  }));
+
+  // ── Reconstruir Proyección / Plan Completo (tab Proyección) ──
+  G.proyeccion = []; G.planCompleto = [];
+  ud.forEach(u => {
+    if (!u.Descuento) return;
+    const row = {
+      pin: u.PIN, cliente: u.Nombre, fuente: u.Descuento, pct: PCT_DESCUENTO[u.Descuento] ?? 0,
+      planMain: u.ProyPlan || u.ÚltimoProducto, precioBase: null,
+      precioJunio: u.PrecioJunio, precioFuente: null, pendiente: u.Pendiente || null,
+      pagoMayo: null, expira: u.Expira, expiraDate: parseDate(u.Expira)
+    };
+    if (u.Descuento === 'Completo') G.planCompleto.push(row);
+    else G.proyeccion.push(row);
+  });
+  G.totalJunio = s.proyecciones?.total_junio || [...G.proyeccion, ...G.planCompleto].reduce((sum,r)=>sum+(r.precioJunio||0),0);
+
+  // ── Reconstruir Validación de Descuentos (tab Validación) ──
+  G.validacion = ud.filter(u => u.EstadoValidacion).map(u => ({
+    pin: u.PIN, cliente: u.Nombre, fuente: u.Descuento, pct: PCT_DESCUENTO[u.Descuento] ?? 0,
+    planMain: u.ProyPlan || u.ÚltimoProducto, precioJunio: u.PrecioJunio,
+    expira: u.Expira, expiraDate: parseDate(u.Expira),
+    estado: u.EstadoValidacion, pagoTardio: u.PagoTardio || null,
+    pago: u.PagoMonto != null ? { total: u.PagoMonto, fecha: u.PagoFecha } : null
+  }));
+
+  // ── Renovaciones / Seguimiento ──
+  buildUsersDataFromHoja1();
+  buildRenovacionesState(s.renov_data || []);
+
+  // ── Render ──
+  G.filtered.usuarios = [...G.hoja1];
+  G.filtered.proy = [...G.proyeccion, ...G.planCompleto];
+  G.filtered.validacion = [...G.validacion];
+  G.pages = { usuarios:1, ventas:1, proy:1, validacion:1 };
+
+  document.getElementById('cTotalUsuarios').textContent = G.hoja1.length;
+  document.getElementById('cPlanIncorrecto').textContent = G.hoja1.filter(u=>u.estado!=='ok').length;
+  document.getElementById('cCorregidos').textContent = G.hoja1.filter(u=>u.estado==='corregido').length;
+  const corregidosHist = G.hoja1.filter(u => u.estado === 'corregido' && u.fuentePlan === 'historico').length;
+  document.getElementById('cCorregidosHist').textContent = corregidosHist > 0 ? `📅 ${corregidosHist} vía histórico` : '';
+  document.getElementById('cDescuento').textContent = G.proyeccion.length;
+  document.getElementById('cProyeccion').textContent = '₡' + Math.round(G.totalJunio).toLocaleString('es-CR');
+
+  poblarFiltroProducto();
+  renderTabla('usuarios');
+  renderTabla('proy');
+  renderTotalesProyeccion();
+  renderTabla('validacion');
+
+  // "Ventas Mayo" depende de transacciones crudas que no se guardan — se oculta en esta vista
+  const tabVentasBtn = document.querySelector(`.tab[onclick*="tabVentas"]`);
+  if (tabVentasBtn) tabVentasBtn.style.display = 'none';
+  document.getElementById('tabVentas').classList.remove('active');
+
+  document.getElementById('fileNameLabel').innerHTML =
+    `📅 Datos guardados — ${s.mes} <span style="color:var(--muted);font-weight:400;">(actualizado ${new Date(s.updated_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})})</span>`;
+
+  document.getElementById('resumenGuardado').style.display = 'none';
+  document.getElementById('uploadSection').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
 }
 
 async function doLogout() {
@@ -893,10 +909,12 @@ async function autoSaveNat(mes, usuariosLoaded) {
         PIN: u.pin, Nombre: u.nombre, Activo: u.activo, Expira: u.expira,
         Telefono: u.telefono, Email: u.email,
         ÚltimoProducto: u.planCorregido || u.planOriginal,
-        PlanOriginal: u.planOriginal, EstadoCorrecion: u.estado,
+        PlanOriginal: u.planOriginal, EstadoCorrecion: u.estado, FuentePlan: u.fuentePlan || null,
         ValorPlan: buscarPrecio(u.planCorregido || u.planOriginal) || 0,
         Descuento: u.proyDescuento || null, ProyPlan: u.proyPlan || null,
-        PrecioJunio: u.proyPrecioJunio ?? null, Pendiente: u.proyPendiente || null
+        PrecioJunio: u.proyPrecioJunio ?? null, Pendiente: u.proyPendiente || null,
+        EstadoValidacion: u.validEstado || null, PagoTardio: u.validPagoTardio || null,
+        PagoMonto: u.validPagoMonto ?? null, PagoFecha: u.validPagoFecha || null
       }));
     }
     const existing = await supaFetch(`/gym_snapshots?sede=eq.Nataci%C3%B3n&mes=eq.${encodeURIComponent(mes)}&select=id`);
@@ -925,7 +943,7 @@ let proyChartInst = null;
 let G = {
   planes: {},          // nombre normalizado → precio
   planesRaw: [],       // [{nombre, precio}]
-  hoja3Map: {},        // nombre normalizado → [plan1, plan2, ...]  (planes efectivos únicos)
+  hoja3Map: {},        // nombre normalizado → [{plan, fecha, fechaDate, precio}, ...] por transacción
   historicoMap: {},    // igual pero desde hoja histórico (enero-mayo)
   planCompleto: [],    // usuarios activos que pagan precio completo
   hoja1: [],           // filas procesadas
@@ -1158,14 +1176,15 @@ function analizar(wb) {
         priceMap[nc][norm(planLimpio)] = precio;
       }
     }
+    // clientMap: normCliente → [{plan, fecha, fechaDate, precio}, ...] (una entrada por transacción,
+    // no deduplicada por plan) para poder elegir la compra más reciente, no solo la de mayor precio.
     const clientMap = {};
     for (const tx of Object.values(txMap)) {
       const key = norm(tx.cliente);
       const efectivos = tx.planes.filter(p => !isAddon(p.plan) && p.precio > 0);
       if (!clientMap[key]) clientMap[key] = [];
       for (const pe of efectivos) {
-        if (!clientMap[key].some(x => norm(x) === norm(pe.plan)))
-          clientMap[key].push(pe.plan);
+        clientMap[key].push({ plan: pe.plan, fecha: tx.fecha, fechaDate: parseDate(tx.fecha), precio: pe.precio });
       }
     }
     return { txMap, clientMap, priceMap };
@@ -1288,28 +1307,35 @@ function analizar(wb) {
         return (encontrado && encontrado.length) ? { plans: encontrado, matchedKey } : null;
       }
 
-      // Elige el plan con mayor precio pagado (probable plan principal, no un extra/accesorio)
-      function mejorPlan(plans, matchedKey, priceMap) {
-        let mejor = plans[plans.length - 1], mejorPrecio = -1;
-        for (const p of plans) {
-          const precio = priceMap[matchedKey]?.[norm(p)];
-          if (precio != null && precio > mejorPrecio) { mejorPrecio = precio; mejor = p; }
+      // Elige el plan de la compra más reciente respecto a hoy (no la de mayor precio),
+      // ya que ese es el plan que el cliente realmente tiene vigente. Si hay varias
+      // compras el mismo día, se usa el precio más alto como desempate.
+      const today = new Date(); today.setHours(0,0,0,0);
+      function mejorPlan(entries) {
+        const candidatos = entries.filter(e => e.fechaDate && e.fechaDate <= today);
+        const pool = candidatos.length ? candidatos : entries;
+        let mejor = pool[0];
+        for (const e of pool) {
+          if (!mejor.fechaDate || (e.fechaDate && e.fechaDate > mejor.fechaDate) ||
+              (e.fechaDate && mejor.fechaDate && e.fechaDate.getTime() === mejor.fechaDate.getTime() && e.precio > mejor.precio)) {
+            mejor = e;
+          }
         }
-        return mejor;
+        return mejor.plan;
       }
 
       // Primero Hoja3 (mayo, más reciente), luego histórico
       let encontrado = buscarEnMapa(G.hoja3Map);
       if (encontrado) {
         fuentePlan = 'mayo';
-        planCorregido = mejorPlan(encontrado.plans, encontrado.matchedKey, G.pm3);
+        planCorregido = mejorPlan(encontrado.plans);
         estado = 'corregido';
         corregidos++;
       } else {
         encontrado = buscarEnMapa(G.historicoMap);
         if (encontrado) {
           fuentePlan = 'historico';
-          planCorregido = mejorPlan(encontrado.plans, encontrado.matchedKey, G.pmH);
+          planCorregido = mejorPlan(encontrado.plans);
           estado = 'corregido';
           corregidos++;
         } else {
@@ -1621,6 +1647,20 @@ function analizar(wb) {
       G.validacion.push({ ...r, pago, estado, pagoTardio });
     });
 
+  // ── Anotar G.hoja1 con el resultado de Validación (para guardarlo y poder
+  //    verlo sin re-subir el Excel) ──
+  const validPorCliente = {};
+  G.validacion.forEach(r => { validPorCliente[norm(r.cliente)] = r; });
+  G.hoja1.forEach(u => {
+    const r = validPorCliente[norm(u.nombre)];
+    if (r) {
+      u.validEstado = r.estado;
+      u.validPagoTardio = r.pagoTardio || null;
+      u.validPagoMonto = r.pago ? r.pago.total : null;
+      u.validPagoFecha = r.pago ? r.pago.fecha : null;
+    }
+  });
+
   // ── Actualizar cards ──
   const corregidosHist = G.hoja1.filter(r => r.estado === 'corregido' && r.fuentePlan === 'historico').length;
   document.getElementById('cTotalUsuarios').textContent = G.hoja1.length;
@@ -1656,6 +1696,10 @@ function analizar(wb) {
   document.getElementById('loadingSection').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
   document.getElementById('resumenGuardado').style.display = 'none';
+  // Con el Excel completo cargado, "Ventas Mayo" vuelve a estar disponible
+  // (puede haber quedado oculta si antes se vio el dashboard desde un snapshot)
+  const tabVentasBtn = document.querySelector(`.tab[onclick*="tabVentas"]`);
+  if (tabVentasBtn) tabVentasBtn.style.display = '';
 
   // Guardar en Supabase (solo admin)
   G.totalJunio = Math.round(totalDescuento + totalCompleto);
@@ -2392,7 +2436,8 @@ function buildUsersDataFromHoja1() {
     ExpiraDate: parseDate(u.expira), IngresoDate: null,
     ÚltimoProducto: u.planCorregido || u.planOriginal,
     Telefono: u.telefono || '', Email: u.email || '',
-    ValorPlan: buscarPrecio(u.planCorregido || u.planOriginal) || 0
+    // Si viene de un snapshot (sin Hoja2 cargada), usar el valor ya guardado
+    ValorPlan: u.valorPlanGuardado ?? (buscarPrecio(u.planCorregido || u.planOriginal) || 0)
   }));
 }
 
