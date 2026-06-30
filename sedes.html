@@ -71,6 +71,8 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 .kpi.green  { border-color: var(--success); }
 .kpi.orange { border-color: var(--accent2); }
 .kpi.purple { border-color: #7030A0; }
+.kpi.accesorios { border-color: #8d6e63; }
+.kpi.accesorios .kpi-value { color: #8d6e63; }
 .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
 .kpi-value { font-size: 24px; font-weight: 700; color: var(--primary); margin-top: 4px; line-height: 1.1; }
 .kpi.green  .kpi-value { color: var(--success); }
@@ -199,6 +201,11 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
       <div class="kpi-value" id="kpiPT">—</div>
       <div class="kpi-sub">No incluido en membresías</div>
     </div>
+    <div class="kpi accesorios">
+      <div class="kpi-label">Accesorios</div>
+      <div class="kpi-value" id="kpiAcc">—</div>
+      <div class="kpi-sub" id="kpiAccPct">—</div>
+    </div>
   </div>
 
   <div class="section"><div class="section-title">Resumen por Sede</div></div>
@@ -296,22 +303,29 @@ const SEDE_META = {
 };
 const SEDES = ['3 Ríos','Natación','Pinares','Sabanilla'];
 
-const MEMBERSHIP_KW = [
-  'plan','clases','nataci','gym','trimestre','semestre','anual',
-  'sesion','sesi','renovaci','activos','verano','black friday',
-  'estimulaci','aquafitness','fit gym','lealtad','platiu','platinum',
-  'standar','estandar','exclusivo','bloqueado','multigym','mensual',
-  'estudiante','adulto mayor','corporativo','aniversario','inactivo',
-  'promo','clase baile','clase grupal','gym incluido','nat amor',
-  'ex nat','ex 3 nat','natacion adultos','ejecutivo','png','cps'
-];
 const PT_KW = ['personal training','personal 2026'];
 
+// Bebidas, snacks y suplementos vendidos sueltos en recepción
+const MINITA_KW = [
+  'agua','gatorade','gatorage','powerade','rooster','be come strong',
+  'aminos','creatina','pre-entreno','pre entreno','bucked up','glu',
+  'gricket','gym bite','scoop de prote','snack','bebida'
+];
+
+// Mercadería de natación (no es bebida/suplemento ni membresía)
+const ACCESORIOS_KW = [
+  'gorra','lente','goggle','tapon de nariz','tapon de oido',
+  'tapón de nariz','tapón de oido','bolso','paños','panos'
+];
+
+// Todo lo que no caiga en PT/Minita/Accesorios se asume Membresía
+// (planes, clases, mensualidades, matrículas, etc. — son la mayoría de los productos reales)
 function classify(p) {
   const pl = (p||'').toLowerCase();
   if (PT_KW.some(k => pl.includes(k))) return 'pt';
-  if (MEMBERSHIP_KW.some(k => pl.includes(k))) return 'memb';
-  return 'minita';
+  if (MINITA_KW.some(k => pl.includes(k))) return 'minita';
+  if (ACCESORIOS_KW.some(k => pl.includes(k))) return 'accesorios';
+  return 'memb';
 }
 
 // ── Carga automática desde gym_snapshots ────────────────────────────────────
@@ -356,7 +370,7 @@ function buildDashboard(latest) {
     }));
   });
 
-  let total = 0, memb = 0, minita = 0, pt = 0;
+  let total = 0, memb = 0, minita = 0, pt = 0, accesorios = 0;
   const sedeSummary = {};
   SEDES.forEach(s => {
     const snap = latest[s];
@@ -365,16 +379,17 @@ function buildDashboard(latest) {
     const tot = rows.length
       ? rows.reduce((a,r)=>a+r.total,0)
       : (snap.renovaciones?.total || 0); // fallback si no hay detalle (ej. Natación)
-    const mem = rows.filter(r=>r.cat==='memb').reduce((a,r)=>a+r.total,0);
-    const min = rows.filter(r=>r.cat==='minita').reduce((a,r)=>a+r.total,0);
-    const pt_ = rows.filter(r=>r.cat==='pt').reduce((a,r)=>a+r.total,0);
+    const mem  = rows.filter(r=>r.cat==='memb').reduce((a,r)=>a+r.total,0);
+    const min  = rows.filter(r=>r.cat==='minita').reduce((a,r)=>a+r.total,0);
+    const pt_  = rows.filter(r=>r.cat==='pt').reduce((a,r)=>a+r.total,0);
+    const acc  = rows.filter(r=>r.cat==='accesorios').reduce((a,r)=>a+r.total,0);
 
     const vMap = {};
     rows.forEach(r => { vMap[r.vendedor] = (vMap[r.vendedor]||0) + r.total; });
     const vRank = Object.entries(vMap).sort((a,b)=>b[1]-a[1]);
 
-    sedeSummary[s] = { tot, mem, min, pt: pt_, vRank, hasDetalle: rows.length > 0, mes: snap.mes, updated_at: snap.updated_at };
-    total += tot; memb += mem; minita += min; pt += pt_;
+    sedeSummary[s] = { tot, mem, min, pt: pt_, acc, vRank, hasDetalle: rows.length > 0, mes: snap.mes, updated_at: snap.updated_at };
+    total += tot; memb += mem; minita += min; pt += pt_; accesorios += acc;
   });
 
   document.getElementById('kpiTotal').textContent  = fmt(total);
@@ -383,6 +398,8 @@ function buildDashboard(latest) {
   document.getElementById('kpiMinita').textContent = fmt(minita);
   document.getElementById('kpiMinitaPct').textContent = pct(minita,total) + ' del total';
   document.getElementById('kpiPT').textContent     = fmt(pt);
+  document.getElementById('kpiAcc').textContent    = fmt(accesorios);
+  document.getElementById('kpiAccPct').textContent = pct(accesorios,total) + ' del total';
 
   // Sede cards
   const sedeGrid = document.getElementById('sedeGrid');
@@ -420,6 +437,10 @@ function buildDashboard(latest) {
             <span class="sede-row-label">Personal Trainer</span>
             <span class="sede-row-val">${fmt(d.pt)} <span class="sede-row-pct">${pct(d.pt,d.tot)}</span></span>
           </div>` : ''}
+          ${d.acc > 0 ? `<div class="sede-row">
+            <span class="sede-row-label">Accesorios</span>
+            <span class="sede-row-val">${fmt(d.acc)} <span class="sede-row-pct">${pct(d.acc,d.tot)}</span></span>
+          </div>` : ''}
           <div class="progress-bar"><div class="progress-fill" style="width:${pct(d.mem,d.tot)};background:${m.color}"></div></div>
           ${top ? `<div class="top-vend-label">🏆 Top Vendedor</div>
           <div class="top-vend-name text-${m.cls}">${top[0]}</div>
@@ -435,6 +456,7 @@ function buildDashboard(latest) {
   const barMemb   = activeSedes.map(s => sedeSummary[s].mem);
   const barMinita = activeSedes.map(s => sedeSummary[s].min);
   const barPT     = activeSedes.map(s => sedeSummary[s].pt);
+  const barAcc    = activeSedes.map(s => sedeSummary[s].acc);
   const barColors = activeSedes.map(s => SEDE_META[s].color);
 
   if (chartBar) chartBar.destroy();
@@ -444,6 +466,7 @@ function buildDashboard(latest) {
       { label: 'Membresías',       data: barMemb,   backgroundColor: barColors,                 borderRadius: 4 },
       { label: 'Minita',           data: barMinita, backgroundColor: barColors.map(c=>c+'55'),  borderRadius: 4 },
       { label: 'Personal Trainer', data: barPT,     backgroundColor: barColors.map(c=>c+'33'),  borderRadius: 4 },
+      { label: 'Accesorios',       data: barAcc,    backgroundColor: barColors.map(c=>c+'1a'),  borderRadius: 4 },
     ]},
     options: {
       responsive: true,
@@ -456,8 +479,8 @@ function buildDashboard(latest) {
   if (chartPie) chartPie.destroy();
   chartPie = new Chart(document.getElementById('chartPie'), {
     type: 'doughnut',
-    data: { labels: ['Membresías', 'Minita', 'Personal Trainer'],
-      datasets: [{ data: [memb, minita, pt], backgroundColor: ['#2E5FA3','#e67e22','#7030A0'], borderWidth: 2 }] },
+    data: { labels: ['Membresías', 'Minita', 'Personal Trainer', 'Accesorios'],
+      datasets: [{ data: [memb, minita, pt, accesorios], backgroundColor: ['#2E5FA3','#e67e22','#7030A0','#8d6e63'], borderWidth: 2 }] },
     options: { responsive: true,
       plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } },
         tooltip: { callbacks: { label: ctx => ' ₡' + Math.round(ctx.raw).toLocaleString('es-CR') + ' (' + pct(ctx.raw, total) + ')' } } } }
