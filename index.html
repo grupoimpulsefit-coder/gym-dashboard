@@ -954,14 +954,17 @@ function isMembershipPlan(product) {
         if (normName(key) === normName(p) || normName(p).includes(normName(key)) || normName(key).includes(normName(p))) return true;
     }
     // Fallback: contains "plan" or "promo" or "anualidad" or "lealtad" or "bloqueado" or "verano" or "estudiante" or "renovacion"
-    return /plan|promo|anual|lealtad|bloqueado|verano|exclusivo|platium|semestral|trimestral|estudiante|renovaci[oó]n|black|ejecutivo/i.test(p);
+    return /plan|promo|anual|lealtad|bloqueado|verano|exclusivo|platium|semestral|trimest|estudiante|renovaci[oó]n|black|ejecutivo/i.test(p);
 }
 function isClaseSuelta(product) {
     let pl = String(product||'').trim().toLowerCase();
     if (!pl.includes('sesion') && !pl.includes('sesión') && !pl.includes('clase')) return false;
-    // Si está en planPrices es una membresía conocida, no clase suelta
+    // Planes recurrentes de natación ("x vez/veces por semana") son membresías, no clases sueltas
+    if (/\d*\s*(vez|veces)\s*por\s*semana|x\s*semana/i.test(pl)) return false;
+    // Quitar "(Promo: ...)" antes de buscar en planPrices
+    const productClean = product.replace(/\(Promo:[^)]*\)/gi, '').trim();
     for (let key of Object.keys(planPrices)) {
-        if (normName(key) === normName(product) || normName(product).includes(normName(key)) || normName(key).includes(normName(product))) return false;
+        if (normName(key) === normName(productClean) || normName(productClean).includes(normName(key)) || normName(key).includes(normName(productClean))) return false;
     }
     return true;
 }
