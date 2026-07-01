@@ -315,6 +315,7 @@
     <div class="card orange"><div class="card-label">Clientes en descuento</div><div class="card-value" id="cDescuento">—</div></div>
     <div class="card purple"><div class="card-label">Proyección junio (todos)</div><div class="card-value" id="cProyeccion">—</div></div>
     <div class="card green"><div class="card-label">💰 Total membresías cobrado</div><div class="card-value" id="cTotalMembresias">—</div><div class="card-sub" id="cTotalMembresiasCount" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
+    <div class="card" style="border-left-color:#00bcd4;"><div class="card-label">📅 Membresías hoy</div><div class="card-value" id="cMembresiasHoy" style="color:#00bcd4;">—</div><div class="card-sub" id="cMembresiasHoyCount" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
   </div>
 
   <!-- Tabs -->
@@ -1676,6 +1677,11 @@ function analizar(wb) {
   const totalMembresias = ventasMembresias.reduce((s,r) => s + r.total, 0);
   document.getElementById('cTotalMembresias').textContent = '₡' + Math.round(totalMembresias).toLocaleString('es-CR');
   document.getElementById('cTotalMembresiasCount').textContent = ventasMembresias.length + ' transacciones';
+  const hoy = new Date().toISOString().substring(0,10);
+  const ventasHoy = ventasMembresias.filter(r => (r.fecha||'').substring(0,10) === hoy);
+  const totalHoy = ventasHoy.reduce((s,r) => s + r.total, 0);
+  document.getElementById('cMembresiasHoy').textContent = '₡' + Math.round(totalHoy).toLocaleString('es-CR');
+  document.getElementById('cMembresiasHoyCount').textContent = ventasHoy.length + ' membresía(s) hoy';
 
   // Render tables
   G.filtered.usuarios = [...G.hoja1];
