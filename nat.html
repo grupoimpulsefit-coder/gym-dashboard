@@ -1206,13 +1206,32 @@ async function processUsuariosNat(file) {
   }
 }
 
-// Construye mapa cliente → [{plan, fecha, fechaDate, precio}] desde renov_data de snapshots guardados
+// Construye mapa cliente → [{plan, fecha, fechaDate, precio}] para corregir planes addon.
+// Fuente primaria: users_data de snapshots anteriores (ya tienen planes corregidos con Hoja3).
+// Fuente secundaria: renov_data (pagos reales del mes).
 async function buildRenovMapFromSnapshots() {
   const map = {};
   try {
-    const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&limit=6&select=renov_data');
-    const seen = new Set(); // evitar duplicados entre snapshots
-    snaps?.forEach(snap => {
+    const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&limit=6&select=mes,users_data,renov_data,updated_at');
+    if (!snaps?.length) return map;
+
+    // 1. users_data: plan corregido ya procesado por analizar() en meses anteriores
+    snaps.forEach(snap => {
+      const snapDate = new Date(snap.updated_at || 0);
+      (snap.users_data || []).forEach(u => {
+        if (!u.Nombre) return;
+        const plan = u.ÚltimoProducto;
+        if (!plan || isAddon(plan)) return;
+        const key = norm(u.Nombre);
+        if (!map[key]) map[key] = [];
+        // Fecha del snapshot como referencia temporal
+        map[key].push({ plan, fecha: snap.mes || '', fechaDate: snapDate, precio: u.ValorPlan || 0 });
+      });
+    });
+
+    // 2. renov_data: pagos reales (complementa casos no cubiertos por users_data)
+    const seen = new Set();
+    snaps.forEach(snap => {
       (snap.renov_data || []).forEach(r => {
         if (!r.Cliente || !r.Producto) return;
         if (r.EsClaseSuelta || r.EsSinClasificar) return;
