@@ -301,9 +301,22 @@
       <div class="dash-file" id="fileNameLabel"></div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+      <label class="btn btn-accent" for="usuariosNatInput" style="cursor:pointer;">👤 Subir Informe Usuarios</label>
+      <input type="file" id="usuariosNatInput" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) processUsuariosNat(this.files[0])">
       <label class="btn btn-accent" for="ventasSoloInputDash" style="cursor:pointer;">📤 Actualizar solo Ventas</label>
       <input type="file" id="ventasSoloInputDash" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) procesarVentasSolo(this.files[0])">
       <button class="btn btn-primary" onclick="cambiarArchivo()">📂 Cambiar archivo</button>
+    </div>
+  </div>
+
+  <!-- Cards proyección usuarios (visibles al subir Informe Usuarios) -->
+  <div id="cardsProyeccion" style="display:none;">
+    <div style="padding:6px 0 2px;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.04em;">PROYECCIÓN MENSUAL</div>
+    <div class="cards">
+      <div class="card blue"><div class="card-label">👥 Usuarios activos</div><div class="card-value" id="pActivos">—</div><div class="card-sub" id="pActivosSub" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
+      <div class="card orange"><div class="card-label">⚠️ Expiran en 30 días</div><div class="card-value" id="pExpiran" style="color:#e65100;">—</div><div class="card-sub" id="pExpiranSub" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
+      <div class="card green"><div class="card-label">💰 Ingresos mensuales</div><div class="card-value" id="pIngresos">—</div><div class="card-sub" style="font-size:11px;color:var(--muted);margin-top:2px">Activos con precio</div></div>
+      <div class="card red"><div class="card-label">⚠️ Sin precio definido</div><div class="card-value" id="pSinPrecio" style="color:#c62828;">—</div><div class="card-sub" style="font-size:11px;color:var(--muted);margin-top:2px">Activos sin precio</div></div>
     </div>
   </div>
 
@@ -781,13 +794,46 @@ async function doLogin() {
 // las transacciones crudas de Hoja3, que no se guardan en el snapshot.
 async function cargarResumenGuardado() {
   try {
-    const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&limit=1&select=mes,activos,total_usuarios,proyecciones,renovaciones,renov_data,users_data,updated_at');
+    const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&select=mes,activos,total_usuarios,proyecciones,renovaciones,renov_data,users_data,updated_at');
     if (!snaps?.length) { document.getElementById('resumenGuardado').style.display = 'none'; return; }
-    mostrarDashboardDesdeSnapshot(snaps[0]);
+    if (snaps.length > 1) {
+      mostrarDashboardDesdeSnapshot(snaps[0]);
+      renderMesSelector(snaps);
+    } else {
+      mostrarDashboardDesdeSnapshot(snaps[0]);
+    }
   } catch(e) {
     document.getElementById('resumenGuardado').style.display = 'none';
     console.warn('No se pudo cargar el resumen guardado:', e.message);
   }
+}
+
+function renderMesSelector(snaps) {
+  const el = document.getElementById('resumenGuardado');
+  const selector = document.createElement('div');
+  selector.id = 'mesSelectorNat';
+  selector.style.cssText = 'background:#f5f5f5;border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+  selector.innerHTML = `<span style="font-size:13px;font-weight:600;color:#555;">📅 Ver mes:</span>` +
+    snaps.map((s,i) => `<button onclick="cargarMesNat(${i})" id="mesBtnNat${i}"
+      style="padding:5px 14px;border-radius:20px;border:1.5px solid ${i===0?'#5c6bc0':'#ccc'};
+      background:${i===0?'#5c6bc0':'#fff'};color:${i===0?'#fff':'#333'};font-size:13px;cursor:pointer;font-weight:${i===0?'700':'400'};">
+      ${s.mes||'Sin nombre'}</button>`).join('');
+  window._natSnaps = snaps;
+  window._natSnapIdx = 0;
+  el.insertAdjacentElement('afterbegin', selector);
+}
+
+function cargarMesNat(idx) {
+  if (!window._natSnaps) return;
+  window._natSnapIdx = idx;
+  document.querySelectorAll('[id^="mesBtnNat"]').forEach((btn, i) => {
+    const active = i === idx;
+    btn.style.background = active ? '#5c6bc0' : '#fff';
+    btn.style.color = active ? '#fff' : '#333';
+    btn.style.borderColor = active ? '#5c6bc0' : '#ccc';
+    btn.style.fontWeight = active ? '700' : '400';
+  });
+  mostrarDashboardDesdeSnapshot(window._natSnaps[idx]);
 }
 
 const PCT_DESCUENTO = { '20%': 0.2, '25%': 0.25, 'G20': 0.2, 'Completo': 0 };
@@ -860,6 +906,9 @@ function mostrarDashboardDesdeSnapshot(s) {
 
   document.getElementById('fileNameLabel').innerHTML =
     `📅 Datos guardados — ${s.mes} <span style="color:var(--muted);font-weight:400;">(actualizado ${new Date(s.updated_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})})</span>`;
+
+  // Mostrar cards de proyección si el snapshot tiene users_data con ValorPlan
+  if (G.hoja1.length && G.hoja1.some(u => u.valorPlanGuardado > 0)) updateProjectionCards();
 
   document.getElementById('resumenGuardado').style.display = 'none';
   document.getElementById('uploadSection').style.display = 'none';
@@ -989,6 +1038,150 @@ function parseDateInput(str) {
 function cleanPlan(s) {
   if (!s) return '';
   return s.replace(/\(Promo:[^)]+\)/gi,'').replace(/\s+/g,' ').trim();
+}
+
+// ─────────────────────────────────────────
+// PRECIOS DESDE SUPABASE (para Informe Usuarios)
+// ─────────────────────────────────────────
+let planPrices = {};
+
+async function loadPricesForSede(sede) {
+  try {
+    const rows = await supaFetch(`/plan_prices?sede=eq.${encodeURIComponent(sede)}&select=plan,precio`);
+    if (rows && rows.length) { rows.forEach(r => { planPrices[r.plan] = r.precio; }); return; }
+    // Fallback: reconstruir desde último snapshot
+    const snaps = await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(sede)}&order=updated_at.desc&limit=1&select=users_data`);
+    if (snaps?.length && snaps[0].users_data?.length) {
+      snaps[0].users_data.forEach(u => {
+        if (u.ÚltimoProducto && u.ValorPlan > 0) planPrices[u.ÚltimoProducto] = u.ValorPlan;
+      });
+    }
+  } catch(e) { console.warn('Precios Supabase nat:', e.message); }
+}
+
+function getPlanPriceNat(plan) {
+  if (!plan) return 0;
+  if (planPrices[plan]) return planPrices[plan];
+  // Búsqueda fuzzy igual que buscarPrecio
+  const key = norm(cleanPlan(plan));
+  for (const [k, v] of Object.entries(planPrices)) {
+    const nk = norm(cleanPlan(k));
+    if (nk === key || nk.includes(key) || key.includes(nk)) return v;
+  }
+  // También buscar en G.planes (cargado desde Hoja2 del archivo combinado)
+  return buscarPrecio(plan) || 0;
+}
+
+async function processUsuariosNat(file) {
+  try {
+    document.getElementById('saveStatus').textContent = '⏳ Cargando usuarios...';
+    await loadPricesForSede('Natación');
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(new Uint8Array(data), { type:'array', cellDates:false });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+
+    // Detectar fila de encabezados (busca "PIN" en primeras 5 filas)
+    let startRow = 2;
+    for (let i = 0; i < Math.min(raw.length, 5); i++) {
+      const r = raw[i].map(c => String(c||'').trim().toLowerCase());
+      if (r.includes('pin') || r.includes('nombre')) { startRow = i + 1; break; }
+    }
+
+    const newHoja1 = [];
+    for (let i = startRow; i < raw.length; i++) {
+      const r = raw[i] || [];
+      const pin    = String(r[0]||'').trim();
+      const nombre = String(r[1]||'').trim();
+      if (!pin && !nombre) continue;
+      const email    = String(r[3]||'').trim();
+      let   activo   = String(r[4]||'').trim();
+      const expira   = String(r[5]||'').trim();
+      const telefono = String(r[6]||'').trim();
+      const plan     = String(r[9]||'').trim() || 'Desconocido';
+      activo = /^s[ií]/i.test(activo) ? 'Sí' : /^no/i.test(activo) ? 'No' : activo;
+      const precio = getPlanPriceNat(plan);
+      newHoja1.push({
+        pin, nombre, activo, expira, telefono, email,
+        planOriginal: plan, planCorregido: plan,
+        estado: 'ok', fuentePlan: null, valorPlanGuardado: precio
+      });
+    }
+
+    if (!newHoja1.length) { alert('No se encontraron usuarios en el archivo.'); return; }
+
+    // Merge con G.hoja1 existente (preservar correcciones de planes si ya estaba cargado el archivo combinado)
+    if (G.hoja1.length) {
+      const byPin = {};
+      G.hoja1.forEach(u => { if (u.pin) byPin[u.pin] = u; });
+      newHoja1.forEach(u => {
+        const prev = byPin[u.pin];
+        if (prev && prev.planCorregido && prev.planCorregido !== prev.planOriginal) {
+          u.planCorregido = prev.planCorregido;
+          u.fuentePlan = prev.fuentePlan;
+          u.estado = prev.estado;
+        }
+        u.valorPlanGuardado = getPlanPriceNat(u.planCorregido);
+      });
+    }
+    G.hoja1 = newHoja1;
+
+    buildUsersDataFromHoja1();
+    updateProjectionCards();
+
+    // Detectar mes del archivo por fecha de expiración más frecuente
+    const mes = detectarMesNat();
+    await autoSaveNat(mes, true);
+    document.getElementById('saveStatus').textContent = `✅ ${newHoja1.length} usuarios cargados (${mes})`;
+
+    // Recargar selector de meses
+    const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&select=mes,activos,total_usuarios,proyecciones,renovaciones,renov_data,users_data,updated_at');
+    const selectorEl = document.getElementById('mesSelectorNat');
+    if (selectorEl) selectorEl.remove();
+    if (snaps && snaps.length > 1) renderMesSelector(snaps);
+  } catch(e) {
+    console.error(e);
+    document.getElementById('saveStatus').textContent = '⚠️ Error: ' + e.message;
+  }
+}
+
+function detectarMesNat() {
+  // Intentar detectar mes desde las fechas de expiración de usuarios activos
+  const activos = G.hoja1.filter(u => u.activo === 'Sí' && u.expira);
+  if (activos.length) {
+    const counts = {};
+    activos.forEach(u => {
+      const d = parseDate(u.expira);
+      if (d) {
+        const key = d.toLocaleString('es-CR', { month:'long', year:'numeric' });
+        counts[key] = (counts[key]||0) + 1;
+      }
+    });
+    const top = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+    if (top) { const k = top[0]; return k.charAt(0).toUpperCase() + k.slice(1); }
+  }
+  return new Date().toLocaleString('es-CR', { month:'long', year:'numeric' }).replace(/^\w/, c=>c.toUpperCase());
+}
+
+function updateProjectionCards() {
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const en30 = new Date(hoy); en30.setDate(en30.getDate() + 30);
+  const activos = G.hoja1.filter(u => u.activo === 'Sí');
+  const expiran = activos.filter(u => {
+    const d = parseDate(u.expira);
+    return d && d >= hoy && d <= en30;
+  });
+  const conPrecio = activos.filter(u => (u.valorPlanGuardado||0) > 0);
+  const sinPrecio = activos.filter(u => !(u.valorPlanGuardado > 0));
+  const ingresos  = conPrecio.reduce((s,u) => s + (u.valorPlanGuardado||0), 0);
+
+  document.getElementById('pActivos').textContent = activos.length;
+  document.getElementById('pActivosSub').textContent = `${G.hoja1.length} total`;
+  document.getElementById('pExpiran').textContent = expiran.length;
+  document.getElementById('pExpiranSub').textContent = `próximos 30 días`;
+  document.getElementById('pIngresos').textContent = '₡' + Math.round(ingresos).toLocaleString('es-CR');
+  document.getElementById('pSinPrecio').textContent = sinPrecio.length;
+  document.getElementById('cardsProyeccion').style.display = '';
 }
 
 // Extrae plan principal de un string con comas (multi-producto)
