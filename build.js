@@ -1,7 +1,7 @@
 const fs = require('fs');
 
-const SUPA_URL = process.env.SUPA_URL;
-const SUPA_KEY = process.env.SUPA_KEY;
+const SUPA_URL = (process.env.SUPA_URL || '').trim();
+const SUPA_KEY = (process.env.SUPA_KEY || '').trim();
 
 if (!SUPA_URL || !SUPA_KEY) {
   console.error('ERROR: SUPA_URL y SUPA_KEY deben estar definidas como variables de entorno');
