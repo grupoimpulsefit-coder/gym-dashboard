@@ -1453,6 +1453,7 @@ function printRenewalList() {
         <tr>
             <td>${u.PIN}</td>
             <td>${u.Nombre}</td>
+            <td>${u.Telefono||'—'}</td>
             <td>${u.ÚltimoProducto||'-'}</td>
             <td style="text-align:right;">${u.ValorPlan>0 ? '₡'+u.ValorPlan.toLocaleString() : '—'}</td>
             <td>${u.Expira||'-'}</td>
@@ -1481,10 +1482,10 @@ function printRenewalList() {
         <div class="sub">Filtro: ${expLabel} &nbsp;·&nbsp; Generado: ${fecha} &nbsp;·&nbsp; Total: ${f.length} usuario(s)</div>
         <table>
             <thead><tr>
-                <th>PIN</th><th>Nombre</th><th>Plan</th><th>Valor</th><th>Vence</th><th>¿Pagó?</th><th>Notas</th>
+                <th>PIN</th><th>Nombre</th><th>Teléfono</th><th>Plan</th><th>Valor</th><th>Vence</th><th>¿Pagó?</th><th>Notas</th>
             </tr></thead>
             <tbody>${rows}</tbody>
-            <tfoot><tr><td colspan="7">Marcar con ✓ cuando el cliente haya pagado su renovación.</td></tr></tfoot>
+            <tfoot><tr><td colspan="8">Marcar con ✓ cuando el cliente haya pagado su renovación.</td></tr></tfoot>
         </table>
     </body></html>`);
     win.document.close();
