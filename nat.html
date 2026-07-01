@@ -1334,7 +1334,7 @@ function renderDesgloseByPlan(activos) {
   const foot = document.getElementById('footDesglose');
   if (!body) return;
 
-  body.innerHTML = rows.map(r => `<tr>
+  body.innerHTML = rows.map(r => `<tr style="cursor:pointer;" onclick="verUsuariosPorPlan(${JSON.stringify(r.plan)})" title="Ver usuarios con este plan">
     <td><strong>${r.plan}</strong></td>
     <td style="text-align:center;">${r.total}</td>
     <td style="text-align:center;">${r.conPrecio}</td>
@@ -1356,6 +1356,15 @@ function renderDesgloseByPlan(activos) {
   </tr>`;
 
   document.getElementById('desgloseByPlan').style.display = '';
+}
+
+function verUsuariosPorPlan(plan) {
+  // Llenar el buscador del tab Usuarios con el nombre del plan y activar ese tab
+  const searchEl = document.getElementById('searchUsuarios');
+  if (searchEl) { searchEl.value = plan; filtrarTabla('usuarios'); }
+  // Cambiar al tab Usuarios
+  const tabBtn = document.querySelector('.tab[onclick*="tabUsuarios"]');
+  if (tabBtn) tabBtn.click();
 }
 
 async function editarPrecioNat(plan) {
@@ -2136,7 +2145,7 @@ function filtrarTabla(tipo) {
     const estado = document.getElementById('filtroEstado').value;
     const activo = document.getElementById('filtroActivo').value;
     G.filtered.usuarios = G.hoja1.filter(r => {
-      if (q && !norm(r.nombre).includes(q) && !r.pin.includes(q)) return false;
+      if (q && !norm(r.nombre).includes(q) && !r.pin.includes(q) && !norm(r.planCorregido||r.planOriginal||'').includes(q)) return false;
       if (estado === 'corregido_historico') {
         if (r.estado !== 'corregido' || r.fuentePlan !== 'historico') return false;
       } else if (estado && r.estado !== estado) return false;
