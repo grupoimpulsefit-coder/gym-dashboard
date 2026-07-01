@@ -2370,7 +2370,14 @@ setupUploadBox('uploadBoxR', 'fileInputR', processRenovacionesFile);
 async function loadPricesForSede(sede) {
     try {
         const rows = await supaFetch(`/plan_prices?sede=eq.${encodeURIComponent(sede)}&select=plan,precio`);
-        if (rows && rows.length) rows.forEach(r => { planPrices[r.plan] = r.precio; });
+        if (rows && rows.length) { rows.forEach(r => { planPrices[r.plan] = r.precio; }); return; }
+        // Fallback: reconstruir precios desde el último snapshot guardado (útil en dev o cuando plan_prices está vacío)
+        const snaps = await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(sede)}&order=updated_at.desc&limit=1&select=users_data`);
+        if (snaps?.length && snaps[0].users_data?.length) {
+            snaps[0].users_data.forEach(u => {
+                if (u.ÚltimoProducto && u.ValorPlan > 0) planPrices[u.ÚltimoProducto] = u.ValorPlan;
+            });
+        }
     } catch(e) { console.warn('Precios Supabase:', e.message); }
 }
 
