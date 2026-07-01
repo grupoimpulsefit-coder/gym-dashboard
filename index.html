@@ -800,7 +800,7 @@ async function showSedePicker() {
                 <div style="font-size:0.75em;color:#bbb;margin-top:4px;">Actualizado: ${fecha}</div>`;
             card.onmouseenter = () => { card.style.transform='translateY(-4px)'; card.style.boxShadow=`0 12px 32px ${icon.color}33`; };
             card.onmouseleave = () => { card.style.transform=''; card.style.boxShadow=''; };
-            card.onclick = () => loadSedeForColaborador(snap.sede);
+            card.onclick = () => selectMesForSede(snap.sede, snaps);
             cardsEl.appendChild(card);
         });
     } catch(e) {
@@ -808,10 +808,41 @@ async function showSedePicker() {
     }
 }
 
-async function loadSedeForColaborador(sede) {
-    document.getElementById('sedePickerStatus').textContent = `⏳ Cargando datos de ${sede}...`;
+function selectMesForSede(sede, allSnaps) {
+    const meses = allSnaps.filter(s => s.sede === sede).sort((a,b) => b.mes_orden - a.mes_orden || new Date(b.updated_at) - new Date(a.updated_at));
+    if (meses.length <= 1) { loadSedeForColaborador(sede, meses[0]?.mes); return; }
+
+    const cardsEl = document.getElementById('sedeCards');
+    const statusEl = document.getElementById('sedePickerStatus');
+    statusEl.textContent = '';
+    cardsEl.innerHTML = `
+        <div style="width:100%;text-align:center;margin-bottom:16px;">
+            <div style="font-size:1.1em;font-weight:700;color:#667eea;margin-bottom:4px;">📅 Seleccioná el mes a visualizar — ${sede}</div>
+            <div style="font-size:0.85em;color:#888;">Se guardan los últimos ${meses.length} períodos disponibles</div>
+        </div>
+        ${meses.map(s => {
+            const fecha = new Date(s.updated_at).toLocaleString('es-CR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+            const esMasReciente = s === meses[0];
+            return `<div onclick="loadSedeForColaborador('${sede.replace(/'/g,"\\'")}','${s.mes.replace(/'/g,"\\'")}')
+                " style="cursor:pointer;background:${esMasReciente?'#eef2ff':'#fff'};border:2px solid ${esMasReciente?'#667eea':'#d0d7e8'};border-radius:14px;padding:20px 32px;min-width:160px;text-align:center;transition:transform .15s,box-shadow .15s;"
+                onmouseenter="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px #667eea33'"
+                onmouseleave="this.style.transform='';this.style.boxShadow=''">
+                <div style="font-size:1.3em;font-weight:700;color:#667eea;">${s.mes}</div>
+                <div style="font-size:0.8em;color:#888;margin-top:4px;">👥 ${s.activos} activos</div>
+                <div style="font-size:0.75em;color:#bbb;margin-top:2px;">Actualizado: ${fecha}</div>
+                ${esMasReciente ? '<div style="font-size:0.7em;color:#667eea;font-weight:600;margin-top:4px;">● Más reciente</div>' : ''}
+            </div>`;
+        }).join('')}
+        <div style="width:100%;text-align:center;margin-top:8px;">
+            <button onclick="showSedePicker()" style="background:none;border:none;color:#888;cursor:pointer;font-size:0.9em;">← Volver a sedes</button>
+        </div>`;
+}
+
+async function loadSedeForColaborador(sede, mesEspecifico) {
+    document.getElementById('sedePickerStatus').textContent = `⏳ Cargando datos de ${sede}${mesEspecifico ? ' — ' + mesEspecifico : ''}...`;
     try {
-        const snaps = await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(sede)}&order=updated_at.desc&limit=1&select=sede,mes,users_data,renov_data`);
+        const mesFilter = mesEspecifico ? `&mes=eq.${encodeURIComponent(mesEspecifico)}` : '';
+        const snaps = await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(sede)}${mesFilter}&order=updated_at.desc&limit=1&select=sede,mes,users_data,renov_data`);
         if (!snaps?.length || !snaps[0].users_data?.length) {
             document.getElementById('sedePickerStatus').textContent = 'No hay datos para esta sede.';
             return;
