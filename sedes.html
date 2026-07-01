@@ -177,7 +177,11 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
       <div class="dash-title">📊 Reporte de Facturación por Sede</div>
       <div class="dash-period" id="dashPeriod"></div>
     </div>
-    <button class="btn-back" onclick="loadAllSedes()">↻ Actualizar</button>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <label style="font-size:13px;font-weight:600;color:#555;">📅 Mes:</label>
+      <select id="mesSelectorSedes" onchange="loadAllSedes(this.value)" style="border:1.5px solid #d0d7e8;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;color:#333;cursor:pointer;background:white;"></select>
+      <button class="btn-back" onclick="loadAllSedes(document.getElementById('mesSelectorSedes').value)">↻ Actualizar</button>
+    </div>
   </div>
 
   <div class="kpi-row">
@@ -331,20 +335,33 @@ function classify(p) {
 // ── Carga automática desde gym_snapshots ────────────────────────────────────
 let chartBar = null, chartPie = null;
 
-async function loadAllSedes() {
+async function loadAllSedes(mesElegido) {
   document.getElementById('dashboard').style.display = 'none';
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('loading').style.display = 'block';
   try {
-    const snaps = await supaFetch('/gym_snapshots?order=updated_at.desc&select=sede,mes,updated_at,activos,total_usuarios,renovaciones,renov_data');
+    // Traer todos los snapshots para poblar el selector de meses
+    const allSnaps = await supaFetch('/gym_snapshots?order=mes_orden.desc&select=sede,mes,mes_orden,updated_at,activos,total_usuarios,renovaciones,renov_data');
     document.getElementById('loading').style.display = 'none';
-    if (!snaps?.length) {
+    if (!allSnaps?.length) {
       document.getElementById('emptyState').style.display = 'block';
       return;
     }
-    // snapshot más reciente por sede
+
+    // Poblar selector con meses únicos disponibles
+    const mesesUnicos = [...new Map(allSnaps.map(s => [s.mes_orden || s.mes, s.mes])).entries()]
+      .sort((a,b) => (b[0]||'').localeCompare(a[0]||''));
+    const sel = document.getElementById('mesSelectorSedes');
+    const mesActual = mesElegido || mesesUnicos[0]?.[1];
+    sel.innerHTML = mesesUnicos.map(([orden, mes]) =>
+      `<option value="${mes}" ${mes === mesActual ? 'selected' : ''}>${mes}</option>`
+    ).join('');
+
+    // Filtrar snaps al mes elegido y tomar el más reciente por sede
+    const snapsDelMes = allSnaps.filter(s => s.mes === mesActual);
     const latest = {};
-    snaps.forEach(s => { if (!latest[s.sede]) latest[s.sede] = s; });
+    snapsDelMes.forEach(s => { if (!latest[s.sede]) latest[s.sede] = s; });
+
     buildDashboard(latest);
     document.getElementById('dashboard').style.display = 'block';
   } catch(e) {
