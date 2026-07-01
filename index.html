@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de GestiÃ³n de Usuarios - Pinares</title>
+    <title>Sistema de Gestión de Usuarios - Pinares</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -162,19 +162,19 @@
 </head>
 <body>
 
-<!-- â•â•â•â•â•â•â•â•â•â• LOGIN â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══════════ LOGIN ══════════ -->
 <div id="loginScreen">
     <div class="login-card">
-        <div class="login-logo">ðŸ‹ï¸</div>
-        <h2>Sistema de GestiÃ³n</h2>
-        <p class="login-sub">Pinares Â· Sabanilla Â· 3 RÃ­os</p>
+        <div class="login-logo">🏋️</div>
+        <h2>Sistema de Gestión</h2>
+        <p class="login-sub">Pinares · Sabanilla · 3 Ríos</p>
         <div class="login-field">
-            <label>Correo electrÃ³nico</label>
+            <label>Correo electrónico</label>
             <input type="email" id="loginEmail" placeholder="usuario@correo.com" autocomplete="username">
         </div>
         <div class="login-field">
-            <label>ContraseÃ±a</label>
-            <input type="password" id="loginPassword" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" autocomplete="current-password">
+            <label>Contraseña</label>
+            <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
         </div>
         <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
         <div id="loginError"></div>
@@ -183,52 +183,52 @@
 
 <div class="container">
 
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• HEADER â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ══════════════════ HEADER ══════════════════ -->
     <div class="header">
         <div class="header-inner">
             <div class="header-top">
                 <div class="header-brand">
-                    <div class="header-icon">ðŸ“Š</div>
+                    <div class="header-icon">📊</div>
                     <div class="header-titles">
-                        <h1>Sistema de GestiÃ³n de Usuarios</h1>
-                        <p>Pinares Â· AnÃ¡lisis de ingresos, membresÃ­as y renovaciones</p>
+                        <h1>Sistema de Gestión de Usuarios</h1>
+                        <p>Pinares · Análisis de ingresos, membresías y renovaciones</p>
                     </div>
                 </div>
-                <div class="header-badge">âš¡ Panel Administrativo</div>
+                <div class="header-badge">⚡ Panel Administrativo</div>
             </div>
             <div class="header-footer">
-                <span class="tagline">AnÃ¡lisis de ingresos proyectados en tiempo real</span>
-                <span class="jk">ðŸ¢ Sistema creado por JK Sistemas</span>
+                <span class="tagline">Análisis de ingresos proyectados en tiempo real</span>
+                <span class="jk">🏢 Sistema creado por JK Sistemas</span>
             </div>
         </div>
         <div class="user-toolbar">
             <div class="user-info">
-                <span>ðŸ‘¤</span>
-                <span id="userNombre">â€”</span>
-                <span class="role-badge" id="userRolBadge">â€”</span>
-                <button id="btnCambiarSede" onclick="volverAlMenu()" style="display:none;margin-left:12px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:white;border-radius:16px;padding:4px 14px;font-size:12px;font-weight:600;cursor:pointer;">â† Cambiar sede</button>
+                <span>👤</span>
+                <span id="userNombre">—</span>
+                <span class="role-badge" id="userRolBadge">—</span>
+                <button id="btnCambiarSede" onclick="volverAlMenu()" style="display:none;margin-left:12px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:white;border-radius:16px;padding:4px 14px;font-size:12px;font-weight:600;cursor:pointer;">← Cambiar sede</button>
             </div>
             <div style="display:flex;gap:10px;align-items:center;">
-                <button id="btnCargarDatos" onclick="mostrarCarga()" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.35);color:white;border-radius:16px;padding:4px 14px;font-size:12px;font-weight:600;cursor:pointer;">ðŸ“¤ Cargar datos</button>
-                <button class="logout-btn" onclick="doLogout()">Cerrar sesiÃ³n</button>
+                <button id="btnCargarDatos" onclick="mostrarCarga()" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.35);color:white;border-radius:16px;padding:4px 14px;font-size:12px;font-weight:600;cursor:pointer;">📤 Cargar datos</button>
+                <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
             </div>
         </div>
     </div>
 
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• UPLOAD â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ══════════════════ UPLOAD ══════════════════ -->
     <div class="upload-area admin-only" id="uploadSection" style="display:flex;gap:24px;flex-wrap:wrap;justify-content:center;align-items:flex-start;">
 
         <!-- Selector de sede -->
         <div style="width:100%;display:flex;align-items:center;gap:16px;padding:16px 24px;background:#f0f4ff;border-radius:14px;border:1.5px solid #c7d2fe;">
-            <span style="font-size:1.3em;">ðŸ¢</span>
+            <span style="font-size:1.3em;">🏢</span>
             <div>
                 <div style="font-size:0.8em;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Sede a cargar</div>
                 <select id="sedeSelector" onchange="onSedeSelected()" style="font-size:1em;font-weight:600;color:#302b63;border:none;background:transparent;cursor:pointer;outline:none;padding:2px 8px 2px 0;">
-                    <option value="">â€” Selecciona una sede â€”</option>
-                    <option value="Pinares">ðŸŒ² Pinares</option>
-                    <option value="Sabanilla">ðŸ™ï¸ Sabanilla</option>
-                    <option value="3 RÃ­os">ðŸŒŠ 3 RÃ­os</option>
-                    <option value="NataciÃ³n">ðŸŠ NataciÃ³n</option>
+                    <option value="">— Selecciona una sede —</option>
+                    <option value="Pinares">🌲 Pinares</option>
+                    <option value="Sabanilla">🏙️ Sabanilla</option>
+                    <option value="3 Ríos">🌊 3 Ríos</option>
+                    <option value="Natación">🏊 Natación</option>
                 </select>
             </div>
             <div id="sedeSeleccionadaBadge" style="display:none;margin-left:auto;background:#4338ca;color:white;border-radius:20px;padding:4px 16px;font-size:0.85em;font-weight:700;"></div>
@@ -236,80 +236,80 @@
 
         <div style="flex:1;min-width:280px;max-width:480px;">
             <div class="upload-box" id="uploadBoxU">
-                <div class="upload-icon-wrap">ðŸ‘¥</div>
+                <div class="upload-icon-wrap">👥</div>
                 <h3>Informe de Usuarios</h3>
-                <p class="upload-hint">Exportar desde el sistema â†’ "Informe de Usuarios"</p>
+                <p class="upload-hint">Exportar desde el sistema → "Informe de Usuarios"</p>
                 <input type="file" id="fileInputU" accept=".xlsx,.xls">
             </div>
             <div id="uploadStatusU" style="margin-top:10px;font-size:0.9em;font-weight:500;text-align:center;"></div>
         </div>
         <div style="flex:1;min-width:280px;max-width:480px;">
             <div class="upload-box" id="uploadBoxR">
-                <div class="upload-icon-wrap">ðŸ”„</div>
+                <div class="upload-icon-wrap">🔄</div>
                 <h3>Ventas por Producto</h3>
-                <p class="upload-hint">Exportar desde el sistema â†’ "Ventas por Producto"</p>
+                <p class="upload-hint">Exportar desde el sistema → "Ventas por Producto"</p>
                 <input type="file" id="fileInputR" accept=".xlsx,.xls">
             </div>
             <div id="uploadStatusR" style="margin-top:10px;font-size:0.9em;font-weight:500;text-align:center;"></div>
         </div>
     </div>
 
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SEDE PICKER (colaborador) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ══════════════════ SEDE PICKER (colaborador) ══════════════════ -->
     <div id="sedePicker" style="display:none; padding:48px 32px; text-align:center;">
         <h2 style="font-size:1.5em; font-weight:700; color:#302b63; margin-bottom:8px;">Selecciona una sede</h2>
-        <p style="color:#888; margin-bottom:36px;">Haz clic para ver los datos mÃ¡s recientes</p>
+        <p style="color:#888; margin-bottom:36px;">Haz clic para ver los datos más recientes</p>
         <div id="sedeCards" style="display:flex; gap:24px; justify-content:center; flex-wrap:wrap;"></div>
         <p id="sedePickerStatus" style="margin-top:24px; color:#888; font-size:0.9em;"></p>
     </div>
 
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• DASHBOARD â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ══════════════════ DASHBOARD ══════════════════ -->
     <div id="dashboard" style="display:none;">
 
         <!-- TABS -->
         <div class="tab-nav">
-            <button class="tab-btn active" onclick="switchTab('tab-usuarios', this)">ðŸ‘¥ GestiÃ³n de Usuarios</button>
-            <button class="tab-btn" onclick="switchTab('tab-renovaciones', this)">ðŸ”„ AnÃ¡lisis de Renovaciones</button>
-            <button class="tab-btn" onclick="switchTab('tab-validacion', this)">ðŸ’³ ValidaciÃ³n Descuentos</button>
-            <button class="tab-btn" onclick="switchTab('tab-seguimiento', this)">ðŸ“‹ Seguimiento Vencidos</button>
-            <button class="tab-btn" onclick="switchTab('tab-historial', this)">ðŸ“… Historial</button>
+            <button class="tab-btn active" onclick="switchTab('tab-usuarios', this)">👥 Gestión de Usuarios</button>
+            <button class="tab-btn" onclick="switchTab('tab-renovaciones', this)">🔄 Análisis de Renovaciones</button>
+            <button class="tab-btn" onclick="switchTab('tab-validacion', this)">💳 Validación Descuentos</button>
+            <button class="tab-btn" onclick="switchTab('tab-seguimiento', this)">📋 Seguimiento Vencidos</button>
+            <button class="tab-btn" onclick="switchTab('tab-historial', this)">📅 Historial</button>
         </div>
 
-        <!-- â”€â”€ TAB 1: USUARIOS â”€â”€ -->
+        <!-- ── TAB 1: USUARIOS ── -->
         <div id="tab-usuarios" class="tab-panel active">
             <div class="controls">
-                <div class="controls-title">ðŸ”Ž Filtros y BÃºsqueda</div>
+                <div class="controls-title">🔎 Filtros y Búsqueda</div>
                 <div class="filter-group">
                     <div class="filter-item"><label>Buscar por nombre</label><input type="text" id="searchName" placeholder="Escriba el nombre..."></div>
                     <div class="filter-item"><label>Estado</label>
                         <select id="filterStatus"><option value="all">Todos</option><option value="activo">Activos</option><option value="inactivo">Inactivos</option></select></div>
-                    <div class="filter-item"><label>Ãšltimo Producto</label>
+                    <div class="filter-item"><label>Último Producto</label>
                         <select id="filterProduct"><option value="all">Todos</option></select></div>
-                    <div class="filter-item"><label>Expira en (dÃ­as)</label>
-                        <select id="filterExpiry"><option value="all">Todos</option><option value="7">PrÃ³ximos 7 dÃ­as</option><option value="15">PrÃ³ximos 15 dÃ­as</option><option value="30">PrÃ³ximos 30 dÃ­as</option><option value="60">PrÃ³ximos 60 dÃ­as</option><option value="90">PrÃ³ximos 90 dÃ­as</option></select></div>
+                    <div class="filter-item"><label>Expira en (días)</label>
+                        <select id="filterExpiry"><option value="all">Todos</option><option value="7">Próximos 7 días</option><option value="15">Próximos 15 días</option><option value="30">Próximos 30 días</option><option value="60">Próximos 60 días</option><option value="90">Próximos 90 días</option></select></div>
                 </div>
                 <div class="filter-group">
                     <div class="filter-item"><label>Tipo de fecha</label>
-                        <select id="dateTypeFilter"><option value="ingreso">Fecha de Ingreso</option><option value="expira">Fecha de ExpiraciÃ³n</option></select></div>
+                        <select id="dateTypeFilter"><option value="ingreso">Fecha de Ingreso</option><option value="expira">Fecha de Expiración</option></select></div>
                     <div class="filter-item"><label>Desde (DD/MM/AAAA)</label><input type="text" id="dateFrom" placeholder="dd/mm/aaaa"></div>
                     <div class="filter-item"><label>Hasta (DD/MM/AAAA)</label><input type="text" id="dateTo" placeholder="dd/mm/aaaa"></div>
-                    <div class="filter-item" style="justify-content:flex-end;"><button class="btn btn-orange" onclick="clearDateFilters()" style="margin-top:auto;">âœ– Limpiar filtros</button></div>
+                    <div class="filter-item" style="justify-content:flex-end;"><button class="btn btn-orange" onclick="clearDateFilters()" style="margin-top:auto;">✖ Limpiar filtros</button></div>
                 </div>
                 <div class="btn-row">
-                    <button class="btn btn-purple admin-only" onclick="openSummaryModal()">ðŸ“Š Resumen por Plan</button>
-                    <button class="btn btn-green"  onclick="exportToCSV()">ðŸ“¥ Exportar CSV</button>
-                    <button class="btn btn-red"    onclick="printRenewalList()">ðŸ–¨ï¸ Imprimir Lista para RecepciÃ³n</button>
+                    <button class="btn btn-purple admin-only" onclick="openSummaryModal()">📊 Resumen por Plan</button>
+                    <button class="btn btn-green"  onclick="exportToCSV()">📥 Exportar CSV</button>
+                    <button class="btn btn-red"    onclick="printRenewalList()">🖨️ Imprimir Lista para Recepción</button>
                 </div>
             </div>
 
             <div class="stats" id="statsContainer"></div>
 
             <div class="chart-section">
-                <div class="section-title">ðŸ“ˆ Ingresos Mensuales por Plan (Top 10)</div>
+                <div class="section-title">📈 Ingresos Mensuales por Plan (Top 10)</div>
                 <canvas id="revenueChart"></canvas>
             </div>
 
             <div class="table-section">
-                <div class="section-title">ðŸ‘¥ Listado de Usuarios</div>
+                <div class="section-title">👥 Listado de Usuarios</div>
                 <div class="table-container">
                     <table id="usersTable">
                         <thead><tr>
@@ -317,10 +317,10 @@
                             <th onclick="sortTable('Nombre')">Nombre</th>
                             <th onclick="sortTable('Email')">Email</th>
                             <th onclick="sortTable('Activo')">Estado</th>
-                            <th onclick="sortTable('Expira')">Fecha ExpiraciÃ³n</th>
-                            <th onclick="sortTable('Ãšltimo Producto')">Plan</th>
+                            <th onclick="sortTable('Expira')">Fecha Expiración</th>
+                            <th onclick="sortTable('Último Producto')">Plan</th>
                             <th onclick="sortTable('Ingreso')">Fecha Ingreso</th>
-                            <th class="admin-only">Valor Plan (â‚¡)</th>
+                            <th class="admin-only">Valor Plan (₡)</th>
                             <th class="admin-only">Acciones</th>
                         </tr></thead>
                         <tbody id="tableBody"></tbody>
@@ -329,7 +329,7 @@
             </div>
         </div><!-- /tab-usuarios -->
 
-        <!-- â”€â”€ TAB 2: RENOVACIONES â”€â”€ -->
+        <!-- ── TAB 2: RENOVACIONES ── -->
         <div id="tab-renovaciones" class="tab-panel">
 
             <!-- Resumen chips -->
@@ -340,14 +340,14 @@
 
             <!-- Filtros renovaciones -->
             <div class="reno-controls">
-                <div class="controls-title">ðŸ”Ž Filtrar Renovaciones</div>
+                <div class="controls-title">🔎 Filtrar Renovaciones</div>
                 <div class="reno-filter-row">
                     <div class="filter-item"><label>Tipo</label>
                         <select id="renoFilterTipo" onchange="renderRenovaciones()">
                             <option value="all">Todos</option>
-                            <option value="Nuevo">ðŸ†• Nuevo</option>
-                            <option value="RenovaciÃ³n">âœ… RenovaciÃ³n</option>
-                            <option value="Reingreso">ðŸ”„ Reingreso</option>
+                            <option value="Nuevo">🆕 Nuevo</option>
+                            <option value="Renovación">✅ Renovación</option>
+                            <option value="Reingreso">🔄 Reingreso</option>
                         </select></div>
                     <div class="filter-item"><label>Buscar cliente</label>
                         <input type="text" id="renoSearchName" placeholder="Nombre del cliente..." oninput="renderRenovaciones()"></div>
@@ -358,30 +358,30 @@
                     <div class="filter-item"><label>Fecha hasta</label>
                         <input type="text" id="renoDateTo" placeholder="dd/mm/aaaa" oninput="renderRenovaciones()"></div>
                     <div class="filter-item" style="justify-content:flex-end;flex-direction:row;gap:8px;">
-                        <button class="btn btn-purple" onclick="filterRenoHoy()" style="margin-top:auto;">ðŸ“… Hoy</button>
-                        <button class="btn btn-orange" onclick="clearRenoFilters()" style="margin-top:auto;">âœ– Limpiar</button></div>
+                        <button class="btn btn-purple" onclick="filterRenoHoy()" style="margin-top:auto;">📅 Hoy</button>
+                        <button class="btn btn-orange" onclick="clearRenoFilters()" style="margin-top:auto;">✖ Limpiar</button></div>
                 </div>
                 <div class="btn-row" style="margin-top:14px;">
-                    <button class="btn btn-teal"   onclick="exportRenoCSV()">ðŸ“¥ Exportar CSV</button>
-                    <button class="btn btn-red"     onclick="exportRenoPDF()">ðŸ“„ Exportar PDF</button>
+                    <button class="btn btn-teal"   onclick="exportRenoCSV()">📥 Exportar CSV</button>
+                    <button class="btn btn-red"     onclick="exportRenoPDF()">📄 Exportar PDF</button>
                 </div>
             </div>
 
-            <!-- GrÃ¡ficas -->
+            <!-- Gráficas -->
             <div class="charts-grid">
                 <div class="chart-box">
-                    <div class="section-title" style="margin-bottom:14px;">ðŸ© DistribuciÃ³n por Tipo</div>
+                    <div class="section-title" style="margin-bottom:14px;">🍩 Distribución por Tipo</div>
                     <canvas id="renoTypePie"></canvas>
                 </div>
                 <div class="chart-box">
-                    <div class="section-title" style="margin-bottom:14px;">ðŸ“Š Recaudado por Plan</div>
+                    <div class="section-title" style="margin-bottom:14px;">📊 Recaudado por Plan</div>
                     <canvas id="renoPlanBar"></canvas>
                 </div>
             </div>
 
             <!-- Tabla renovaciones -->
             <div class="table-section">
-                <div class="section-title">ðŸ”„ Detalle de Transacciones de MembresÃ­a</div>
+                <div class="section-title">🔄 Detalle de Transacciones de Membresía</div>
                 <div class="table-container">
                     <table>
                         <thead><tr>
@@ -389,8 +389,8 @@
                             <th>Cliente</th>
                             <th>Plan / Producto</th>
                             <th>Tipo</th>
-                            <th>Total (â‚¡)</th>
-                            <th>DÃ­as sin renovar</th>
+                            <th>Total (₡)</th>
+                            <th>Días sin renovar</th>
                             <th>Ingreso Pinares</th>
                             <th>Expira actual</th>
                             <th>Registrado por</th>
@@ -401,16 +401,16 @@
                 <div id="renoTableInfo" style="padding:12px 0; font-size:13px; color:#888;"></div>
             </div>
 
-            <!-- Tabla clases sueltas (independiente del total de membresÃ­as) -->
+            <!-- Tabla clases sueltas (independiente del total de membresías) -->
             <div class="table-section">
-                <div class="section-title">ðŸ¤¸ Clases Sueltas / Sesiones (no son membresÃ­as)</div>
+                <div class="section-title">🤸 Clases Sueltas / Sesiones (no son membresías)</div>
                 <div class="table-container">
                     <table>
                         <thead><tr>
                             <th>Fecha y Hora</th>
                             <th>Cliente</th>
                             <th>Producto</th>
-                            <th>Total (â‚¡)</th>
+                            <th>Total (₡)</th>
                             <th>Registrado por</th>
                         </tr></thead>
                         <tbody id="clasesSueltasTableBody"></tbody>
@@ -419,16 +419,16 @@
                 <div id="clasesSueltasInfo" style="padding:12px 0; font-size:13px; color:#888;"></div>
             </div>
 
-            <!-- Tabla sin clasificar (productos que no calzan con ningÃºn filtro, para no perder ventas) -->
+            <!-- Tabla sin clasificar (productos que no calzan con ningún filtro, para no perder ventas) -->
             <div class="table-section">
-                <div class="section-title">â“ Sin Clasificar (revisar â€” no calzan con ningÃºn plan conocido)</div>
+                <div class="section-title">❓ Sin Clasificar (revisar — no calzan con ningún plan conocido)</div>
                 <div class="table-container">
                     <table>
                         <thead><tr>
                             <th>Fecha y Hora</th>
                             <th>Cliente</th>
                             <th>Producto</th>
-                            <th>Total (â‚¡)</th>
+                            <th>Total (₡)</th>
                             <th>Registrado por</th>
                         </tr></thead>
                         <tbody id="sinClasificarTableBody"></tbody>
@@ -438,38 +438,38 @@
             </div>
         </div><!-- /tab-renovaciones -->
 
-        <!-- â”€â”€ TAB 3: VALIDACIÃ“N DESCUENTOS â”€â”€ -->
+        <!-- ── TAB 3: VALIDACIÓN DESCUENTOS ── -->
         <div id="tab-validacion" class="tab-panel">
             <div class="controls">
-                <div class="controls-title">ðŸ”Ž Filtros de ValidaciÃ³n</div>
+                <div class="controls-title">🔎 Filtros de Validación</div>
                 <div class="filter-group">
                     <div class="filter-item"><label>Buscar cliente</label>
                         <input type="text" id="valSearch" placeholder="Nombre del cliente..."></div>
                     <div class="filter-item"><label>Estado</label>
                         <select id="valEstado">
                             <option value="all">Todos</option>
-                            <option value="vencido_sin_pago">ðŸ”´ Vencido sin pago</option>
-                            <option value="por_vencer_sin_pago">ðŸŸ  Por vencer sin pago</option>
-                            <option value="sin_descuento">âš  Sin descuento aplicado</option>
-                            <option value="monto_diferente">âš  Monto diferente</option>
-                            <option value="ok">âœ… Descuento OK</option>
-                            <option value="al_dia">ðŸŸ¢ Al dÃ­a</option>
+                            <option value="vencido_sin_pago">🔴 Vencido sin pago</option>
+                            <option value="por_vencer_sin_pago">🟠 Por vencer sin pago</option>
+                            <option value="sin_descuento">⚠ Sin descuento aplicado</option>
+                            <option value="monto_diferente">⚠ Monto diferente</option>
+                            <option value="ok">✅ Descuento OK</option>
+                            <option value="al_dia">🟢 Al día</option>
                         </select></div>
                     <div class="filter-item"><label>Pago</label>
                         <select id="valTardio">
                             <option value="all">Todos</option>
-                            <option value="tardio">â° Pagos tardÃ­os</option>
+                            <option value="tardio">⏰ Pagos tardíos</option>
                             <option value="atiempo">A tiempo</option>
                         </select></div>
                     <div class="filter-item" style="justify-content:flex-end;">
-                        <button class="btn btn-orange" onclick="clearValFilters()" style="margin-top:auto;">âœ– Limpiar filtros</button></div>
+                        <button class="btn btn-orange" onclick="clearValFilters()" style="margin-top:auto;">✖ Limpiar filtros</button></div>
                 </div>
             </div>
 
             <div class="stats" id="valStatsContainer"></div>
 
             <div class="table-section">
-                <div class="section-title">ðŸ’³ Detalle de ValidaciÃ³n â€” Planes de Lealtad / Fidelidad</div>
+                <div class="section-title">💳 Detalle de Validación — Planes de Lealtad / Fidelidad</div>
                 <div class="table-container">
                     <table>
                         <thead><tr>
@@ -477,7 +477,7 @@
                             <th>Cliente</th>
                             <th>Plan</th>
                             <th>Precio Esperado</th>
-                            <th>PagÃ³</th>
+                            <th>Pagó</th>
                             <th>Fecha Pago</th>
                             <th>Expira</th>
                             <th>Estado</th>
@@ -489,46 +489,46 @@
             </div>
         </div><!-- /tab-validacion -->
 
-        <!-- â”€â”€ TAB SEGUIMIENTO: CLIENTES VENCIDOS SIN RENOVAR â”€â”€ -->
+        <!-- ── TAB SEGUIMIENTO: CLIENTES VENCIDOS SIN RENOVAR ── -->
         <div id="tab-seguimiento" class="tab-panel">
             <div class="controls">
-                <div class="controls-title">ðŸ”Ž Filtros de Seguimiento</div>
+                <div class="controls-title">🔎 Filtros de Seguimiento</div>
                 <div class="filter-group">
                     <div class="filter-item"><label>Buscar cliente</label>
                         <input type="text" id="segSearch" placeholder="Nombre del cliente..." oninput="renderSeguimiento()"></div>
                     <div class="filter-item"><label>Vencido hace</label>
                         <select id="segRango" onchange="renderSeguimiento()">
-                            <option value="all">Cualquier antigÃ¼edad</option>
-                            <option value="1-15">1 a 15 dÃ­as</option>
-                            <option value="16-30">16 a 30 dÃ­as</option>
-                            <option value="31-60">31 a 60 dÃ­as</option>
-                            <option value="61-9999">MÃ¡s de 60 dÃ­as</option>
+                            <option value="all">Cualquier antigüedad</option>
+                            <option value="1-15">1 a 15 días</option>
+                            <option value="16-30">16 a 30 días</option>
+                            <option value="31-60">31 a 60 días</option>
+                            <option value="61-9999">Más de 60 días</option>
                         </select></div>
                     <div class="filter-item"><label>Plan</label>
                         <select id="segFilterPlan" onchange="renderSeguimiento()"><option value="all">Todos</option></select></div>
                     <div class="filter-item" style="justify-content:flex-end;">
-                        <button class="btn btn-orange" onclick="clearSegFilters()" style="margin-top:auto;">âœ– Limpiar filtros</button></div>
+                        <button class="btn btn-orange" onclick="clearSegFilters()" style="margin-top:auto;">✖ Limpiar filtros</button></div>
                 </div>
                 <div class="btn-row">
-                    <button class="btn btn-teal" onclick="exportSegCSV()">ðŸ“¥ Exportar CSV</button>
-                    <button class="btn btn-red"  onclick="printSeguimiento()">ðŸ–¨ï¸ Imprimir</button>
+                    <button class="btn btn-teal" onclick="exportSegCSV()">📥 Exportar CSV</button>
+                    <button class="btn btn-red"  onclick="printSeguimiento()">🖨️ Imprimir</button>
                 </div>
             </div>
 
             <div class="stats" id="segStatsContainer"></div>
 
             <div class="table-section">
-                <div class="section-title">ðŸ“‹ Clientes Vencidos sin Renovar (no aparecen pagando en este perÃ­odo)</div>
+                <div class="section-title">📋 Clientes Vencidos sin Renovar (no aparecen pagando en este período)</div>
                 <div class="table-container">
                     <table>
                         <thead><tr>
                             <th>PIN</th>
                             <th>Cliente</th>
-                            <th>TelÃ©fono</th>
+                            <th>Teléfono</th>
                             <th>Email</th>
                             <th>Plan</th>
-                            <th>VenciÃ³</th>
-                            <th>DÃ­as vencido</th>
+                            <th>Venció</th>
+                            <th>Días vencido</th>
                             <th>Valor Plan</th>
                         </tr></thead>
                         <tbody id="segTableBody"></tbody>
@@ -538,17 +538,17 @@
             </div>
         </div><!-- /tab-seguimiento -->
 
-        <!-- â”€â”€ TAB 4: HISTORIAL â”€â”€ -->
+        <!-- ── TAB 4: HISTORIAL ── -->
         <div id="tab-historial" class="tab-panel">
             <div class="controls">
-                <div class="controls-title">ðŸ“… Historial de Snapshots por Sede</div>
+                <div class="controls-title">📅 Historial de Snapshots por Sede</div>
                 <div class="filter-group">
                     <div class="filter-item"><label>Filtrar por sede</label>
                         <select id="histSedeFilter" onchange="renderHistorial()">
                             <option value="all">Todas las sedes</option>
                         </select></div>
                     <div class="filter-item" style="justify-content:flex-end;">
-                        <button class="btn btn-red" onclick="clearAllSnapshots()" style="margin-top:auto;">ðŸ—‘ Limpiar todo</button></div>
+                        <button class="btn btn-red" onclick="clearAllSnapshots()" style="margin-top:auto;">🗑 Limpiar todo</button></div>
                 </div>
             </div>
             <div id="historialContent" style="padding:24px 32px;"></div>
@@ -558,31 +558,31 @@
 
     <!-- FOOTER -->
     <div class="page-footer">
-        <strong>JK Sistemas</strong> Â· Sistema de GestiÃ³n de Usuarios Pinares Â· Todos los derechos reservados
+        <strong>JK Sistemas</strong> · Sistema de Gestión de Usuarios Pinares · Todos los derechos reservados
     </div>
 </div><!-- /container -->
 
-<!-- â•â•â•â•â•â•â•â•â•â• SUMMARY MODAL â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══════════ SUMMARY MODAL ══════════ -->
 <div id="summaryModal" class="modal">
     <div class="summary-modal-content">
-        <h3>ðŸ“Š Resumen Global de Planes â€” Ingresos Mensuales</h3>
-        <p style="color:#888;margin-top:6px;font-size:13px;">Basado en usuarios activos con precio definido (segÃºn filtros activos)</p>
+        <h3>📊 Resumen Global de Planes — Ingresos Mensuales</h3>
+        <p style="color:#888;margin-top:6px;font-size:13px;">Basado en usuarios activos con precio definido (según filtros activos)</p>
         <div id="summaryTableContainer" style="margin-top:16px;"></div>
         <div class="modal-buttons" style="margin-top:20px;">
-            <button class="btn btn-green"  onclick="exportSummaryCSV()">ðŸ“¥ CSV</button>
-            <button class="btn btn-red"    onclick="exportSummaryPDF()">ðŸ“„ PDF</button>
+            <button class="btn btn-green"  onclick="exportSummaryCSV()">📥 CSV</button>
+            <button class="btn btn-red"    onclick="exportSummaryPDF()">📄 PDF</button>
             <button class="btn btn-orange" onclick="document.getElementById('summaryModal').style.display='none'">Cerrar</button>
         </div>
     </div>
 </div>
 
-<!-- â•â•â•â•â•â•â•â•â•â• PRICE MODAL â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══════════ PRICE MODAL ══════════ -->
 <div id="priceModal" class="modal">
     <div class="modal-content">
-        <h3>âœï¸ Editar Valor del Plan</h3>
+        <h3>✏️ Editar Valor del Plan</h3>
         <p><strong>Plan:</strong> <span id="modalPlanName"></span></p>
         <p><strong>Usuario:</strong> <span id="modalUserName"></span></p>
-        <input type="number" id="modalPriceValue" placeholder="Ingrese el monto en colones (â‚¡)" step="1000">
+        <input type="number" id="modalPriceValue" placeholder="Ingrese el monto en colones (₡)" step="1000">
         <div class="modal-buttons">
             <button class="btn btn-green" onclick="saveManualPrice()">Guardar</button>
             <button class="btn btn-red"   onclick="closeModal()">Cancelar</button>
@@ -591,9 +591,9 @@
 </div>
 
 <script>
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 //  GLOBALS
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 let usersData = [], planPrices = {}, manualPrices = {},
     renovacionesData = [], clasesSueltasData = [], sinClasificarData = [],
     currentSortColumn = 'Nombre', currentSortDirection = 'asc',
@@ -605,10 +605,10 @@ let usersData = [], planPrices = {}, manualPrices = {},
 const SEDE_ALIASES = {
     pinares:   'Pinares',
     sabanilla: 'Sabanilla',
-    '3rios':   '3 RÃ­os',
-    tresrios:  '3 RÃ­os',
-    natacion:  'NataciÃ³n',
-    nataciÃ³n:  'NataciÃ³n',
+    '3rios':   '3 Ríos',
+    tresrios:  '3 Ríos',
+    natacion:  'Natación',
+    natación:  'Natación',
 };
 
 function detectSede(filename) {
@@ -622,15 +622,15 @@ function detectSede(filename) {
 }
 
 function applySedeUI() {
-    document.querySelector('.header-titles h1').textContent = `Sistema de GestiÃ³n â€” ${currentSedeName}`;
-    document.querySelector('.header-titles p').textContent  = `${currentSedeName} Â· AnÃ¡lisis de ingresos, membresÃ­as y renovaciones`;
+    document.querySelector('.header-titles h1').textContent = `Sistema de Gestión — ${currentSedeName}`;
+    document.querySelector('.header-titles p').textContent  = `${currentSedeName} · Análisis de ingresos, membresías y renovaciones`;
 }
 
 function onSedeSelected() {
     const sel = document.getElementById('sedeSelector').value;
     if (!sel) return;
     currentSedeName = sel;
-    currentFileName = sel.toLowerCase().replace(/\s/g, '').replace('rÃ­os', 'rios');
+    currentFileName = sel.toLowerCase().replace(/\s/g, '').replace('ríos', 'rios');
     applySedeUI();
     loadPricesForSede(sel);
     const badge = document.getElementById('sedeSeleccionadaBadge');
@@ -648,7 +648,7 @@ function onSedeSelected() {
     document.getElementById('dashboard').style.display = 'none';
 }
 
-// â”€â”€ SUPABASE CONSTANTS (deben ir antes de auth) â”€â”€
+// ── SUPABASE CONSTANTS (deben ir antes de auth) ──
 const SUPA_URL = '__SUPA_URL__';
 const SUPA_KEY = '__SUPA_KEY__';
 
@@ -670,9 +670,9 @@ async function supaFetch(path, opts = {}) {
     return txt ? JSON.parse(txt) : null;
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 //  AUTH
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 let currentToken = null, currentRole = null, currentUserEmail = '';
 
 async function doLogin() {
@@ -700,7 +700,7 @@ async function doLogin() {
         const nombre = roles?.[0]?.nombre || currentUserEmail;
 
         document.getElementById('userNombre').textContent = nombre;
-        document.getElementById('userRolBadge').textContent = currentRole === 'admin' ? 'âš™ Admin' : 'ðŸ‘ Colaborador';
+        document.getElementById('userRolBadge').textContent = currentRole === 'admin' ? '⚙ Admin' : '👁 Colaborador';
         applyRole();
         document.getElementById('loginScreen').style.display = 'none';
     } catch(e) {
@@ -754,10 +754,10 @@ function mostrarCarga() {
 }
 
 const SEDE_ICONS = {
-    'Pinares':   { emoji: 'ðŸŒ²', color: '#2e7d32', bg: '#e8f5e9' },
-    'Sabanilla': { emoji: 'ðŸ™ï¸', color: '#1565c0', bg: '#e3f2fd' },
-    '3 RÃ­os':   { emoji: 'ðŸŒŠ', color: '#00838f', bg: '#e0f7fa' },
-    'NataciÃ³n':  { emoji: 'ðŸŠ', color: '#6a1b9a', bg: '#f3e5f5' },
+    'Pinares':   { emoji: '🌲', color: '#2e7d32', bg: '#e8f5e9' },
+    'Sabanilla': { emoji: '🏙️', color: '#1565c0', bg: '#e3f2fd' },
+    '3 Ríos':   { emoji: '🌊', color: '#00838f', bg: '#e0f7fa' },
+    'Natación':  { emoji: '🏊', color: '#6a1b9a', bg: '#f3e5f5' },
 };
 
 function volverAlMenu() {
@@ -775,27 +775,27 @@ async function showSedePicker() {
     const statusEl = document.getElementById('sedePickerStatus');
     const cardsEl  = document.getElementById('sedeCards');
     cardsEl.innerHTML = '';
-    statusEl.textContent = 'â³ Cargando sedes disponibles...';
+    statusEl.textContent = '⏳ Cargando sedes disponibles...';
     try {
         const snaps = await supaFetch('/gym_snapshots?order=updated_at.desc&select=id,sede,mes,activos,updated_at');
         if (!snaps?.length) {
-            statusEl.textContent = 'No hay datos cargados aÃºn. Contacte al administrador.';
+            statusEl.textContent = 'No hay datos cargados aún. Contacte al administrador.';
             return;
         }
-        // Una card por sede (la mÃ¡s reciente de cada una)
+        // Una card por sede (la más reciente de cada una)
         const seenSedes = {};
         snaps.forEach(s => { if (!seenSedes[s.sede]) seenSedes[s.sede] = s; });
         statusEl.textContent = '';
         Object.values(seenSedes).forEach(snap => {
-            const icon = SEDE_ICONS[snap.sede] || { emoji: 'ðŸ‹ï¸', color: '#555', bg: '#f5f5f5' };
+            const icon = SEDE_ICONS[snap.sede] || { emoji: '🏋️', color: '#555', bg: '#f5f5f5' };
             const fecha = new Date(snap.updated_at).toLocaleString('es-CR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
             const card = document.createElement('div');
             card.style.cssText = `cursor:pointer;background:${icon.bg};border:2px solid ${icon.color}33;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;
             card.innerHTML = `
                 <div style="font-size:3em;margin-bottom:12px;">${icon.emoji}</div>
                 <div style="font-size:1.2em;font-weight:700;color:${icon.color};">${snap.sede}</div>
-                <div style="font-size:0.85em;color:#666;margin-top:6px;">ðŸ“… ${snap.mes}</div>
-                <div style="font-size:0.8em;color:#999;margin-top:4px;">ðŸ‘¥ ${snap.activos} activos</div>
+                <div style="font-size:0.85em;color:#666;margin-top:6px;">📅 ${snap.mes}</div>
+                <div style="font-size:0.8em;color:#999;margin-top:4px;">👥 ${snap.activos} activos</div>
                 <div style="font-size:0.75em;color:#bbb;margin-top:4px;">Actualizado: ${fecha}</div>`;
             card.onmouseenter = () => { card.style.transform='translateY(-4px)'; card.style.boxShadow=`0 12px 32px ${icon.color}33`; };
             card.onmouseleave = () => { card.style.transform=''; card.style.boxShadow=''; };
@@ -803,12 +803,12 @@ async function showSedePicker() {
             cardsEl.appendChild(card);
         });
     } catch(e) {
-        statusEl.textContent = 'âš ï¸ Error al cargar sedes: ' + e.message;
+        statusEl.textContent = '⚠️ Error al cargar sedes: ' + e.message;
     }
 }
 
 async function loadSedeForColaborador(sede) {
-    document.getElementById('sedePickerStatus').textContent = `â³ Cargando datos de ${sede}...`;
+    document.getElementById('sedePickerStatus').textContent = `⏳ Cargando datos de ${sede}...`;
     try {
         const snaps = await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(sede)}&order=updated_at.desc&limit=1&select=sede,mes,users_data,renov_data`);
         if (!snaps?.length || !snaps[0].users_data?.length) {
@@ -838,25 +838,25 @@ async function loadSedeForColaborador(sede) {
         document.getElementById('btnCambiarSede').style.display = 'inline-block';
         rebuildDashboard();
     } catch(e) {
-        document.getElementById('sedePickerStatus').textContent = 'âš ï¸ Error: ' + e.message;
+        document.getElementById('sedePickerStatus').textContent = '⚠️ Error: ' + e.message;
     }
 }
 
-// â”€â”€ VALIDACIÃ“N DESCUENTOS â”€â”€
+// ── VALIDACIÓN DESCUENTOS ──
 const LEALTAD_RE = /lealtad|fidelidad/i;
 const ESTADO_VALIDACION = {
-    vencido_sin_pago:    { label: 'ðŸ”´ Vencido sin pago',        color: '#e53935' },
-    por_vencer_sin_pago: { label: 'ðŸŸ  Por vencer sin pago',     color: '#e65100' },
-    sin_descuento:       { label: 'âš ï¸ Sin descuento aplicado',  color: '#f9a825' },
-    monto_diferente:     { label: 'âš ï¸ Monto diferente',         color: '#f9a825' },
-    ok:                  { label: 'âœ… Descuento OK',             color: '#2e7d32' },
-    al_dia:              { label: 'ðŸŸ¢ Al dÃ­a',                   color: '#1565c0' },
+    vencido_sin_pago:    { label: '🔴 Vencido sin pago',        color: '#e53935' },
+    por_vencer_sin_pago: { label: '🟠 Por vencer sin pago',     color: '#e65100' },
+    sin_descuento:       { label: '⚠️ Sin descuento aplicado',  color: '#f9a825' },
+    monto_diferente:     { label: '⚠️ Monto diferente',         color: '#f9a825' },
+    ok:                  { label: '✅ Descuento OK',             color: '#2e7d32' },
+    al_dia:              { label: '🟢 Al día',                   color: '#1565c0' },
 };
 let allValidacion = [];
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 //  UTILITY
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 function switchTab(id, btn) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -913,8 +913,8 @@ function getPlanPrice(planName, userId) {
 }
 function normName(n) {
     return String(n||'').toLowerCase()
-        .replace(/[Ã¡Ã Ã¤]/g,'a').replace(/[Ã©Ã¨Ã«]/g,'e').replace(/[Ã­Ã¬Ã¯]/g,'i')
-        .replace(/[Ã³Ã²Ã¶]/g,'o').replace(/[ÃºÃ¹Ã¼]/g,'u').replace(/Ã±/g,'n')
+        .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i')
+        .replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n')
         .replace(/\s+/g,' ').trim();
 }
 function findUserByName(clientName, list) {
@@ -923,7 +923,7 @@ function findUserByName(clientName, list) {
     // Exact
     let m = list.find(u => normName(u.Nombre) === cn);
     if (m) return m;
-    // Word overlap â‰¥ 60%
+    // Word overlap ≥ 60%
     let words = cn.split(' ').filter(w => w.length > 2);
     let best = null, bestScore = 0;
     list.forEach(u => {
@@ -948,18 +948,18 @@ function isMembershipPlan(product) {
     if (/\(\d+\)/.test(p)) return false;
     // Skip session/class
     let pl = p.toLowerCase();
-    if (pl.includes('sesion') || pl.includes('sesiÃ³n') || pl.includes('clase')) return false;
+    if (pl.includes('sesion') || pl.includes('sesión') || pl.includes('clase')) return false;
     // Check if appears in planPrices (case-insensitive)
     for (let key of Object.keys(planPrices)) {
         if (normName(key) === normName(p) || normName(p).includes(normName(key)) || normName(key).includes(normName(p))) return true;
     }
     // Fallback: contains "plan" or "promo" or "anualidad" or "lealtad" or "bloqueado" or "verano" or "estudiante" or "renovacion"
-    return /plan|promo|anual|lealtad|bloqueado|verano|exclusivo|platium|semestral|trimest|estudiante|renovaci[oÃ³]n|black|ejecutivo/i.test(p);
+    return /plan|promo|anual|lealtad|bloqueado|verano|exclusivo|platium|semestral|trimest|estudiante|renovaci[oó]n|black|ejecutivo/i.test(p);
 }
 function isClaseSuelta(product) {
     let pl = String(product||'').trim().toLowerCase();
-    if (!pl.includes('sesion') && !pl.includes('sesiÃ³n') && !pl.includes('clase')) return false;
-    // Planes recurrentes de nataciÃ³n ("x vez/veces por semana") son membresÃ­as, no clases sueltas
+    if (!pl.includes('sesion') && !pl.includes('sesión') && !pl.includes('clase')) return false;
+    // Planes recurrentes de natación ("x vez/veces por semana") son membresías, no clases sueltas
     if (/\d*\s*(vez|veces)\s*por\s*semana|x\s*semana/i.test(pl)) return false;
     // Quitar "(Promo: ...)" antes de buscar en planPrices
     const productClean = product.replace(/\(Promo:[^)]*\)/gi, '').trim();
@@ -969,37 +969,37 @@ function isClaseSuelta(product) {
     return true;
 }
 function classifyTransaction(txDate, user, product) {
-    if (!user) return { tipo: 'Nuevo', badge: 'badge-nuevo', icon: 'ðŸ†•', gapDias: null };
-    // Check if Ingreso date is very close to transaction date â†’ brand new member
+    if (!user) return { tipo: 'Nuevo', badge: 'badge-nuevo', icon: '🆕', gapDias: null };
+    // Check if Ingreso date is very close to transaction date → brand new member
     if (user.IngresoDate) {
         let diffI = Math.abs(daysBetween(txDate, user.IngresoDate));
-        if (diffI <= 5) return { tipo: 'Nuevo', badge: 'badge-nuevo', icon: 'ðŸ†•', gapDias: null };
+        if (diffI <= 5) return { tipo: 'Nuevo', badge: 'badge-nuevo', icon: '🆕', gapDias: null };
     }
-    // DÃ­as de diferencia entre cuÃ¡ndo pagÃ³ y la fecha de vencimiento registrada
+    // Días de diferencia entre cuándo pagó y la fecha de vencimiento registrada
     // en el Informe de Usuarios. No se intenta "adivinar" el vencimiento anterior
-    // restando la duraciÃ³n del plan: eso fallaba si el cliente cambiÃ³ de plan, y
-    // tambiÃ©n si "Expira actual" ya refleja el vencimiento vigente al momento del
+    // restando la duración del plan: eso fallaba si el cliente cambió de plan, y
+    // también si "Expira actual" ya refleja el vencimiento vigente al momento del
     // pago (como ocurre normalmente), comparar directo es lo correcto.
     if (user.ExpiraDate) {
         const gap = daysBetween(txDate, user.ExpiraDate);
-        if (gap !== null && gap > 10) return { tipo: 'Reingreso', badge: 'badge-reingreso', icon: 'ðŸ”„', gapDias: gap };
+        if (gap !== null && gap > 10) return { tipo: 'Reingreso', badge: 'badge-reingreso', icon: '🔄', gapDias: gap };
     }
-    return { tipo: 'RenovaciÃ³n', badge: 'badge-renova', icon: 'âœ…', gapDias: null };
+    return { tipo: 'Renovación', badge: 'badge-renova', icon: '✅', gapDias: null };
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-//  EXCEL PROCESSING â€” dos archivos separados
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
+//  EXCEL PROCESSING — dos archivos separados
+// ══════════════════════════════════════════════════════
 let usuariosLoaded = false, renoLoaded = false;
 let listenersAttached = false;
 
 function parseCRC(val) {
-    let s = String(val||'').replace(/[â‚¡â‚¬\s]/g,'').replace(/\./g,'').replace(',','.');
+    let s = String(val||'').replace(/[₡€\s]/g,'').replace(/\./g,'').replace(',','.');
     let n = parseFloat(s);
     return isNaN(n) ? 0 : n;
 }
 
-// â”€â”€ FORMATO COMBINADO (pinares2.xlsx, sabanilla.xlsx, 3rios.xlsx) â”€â”€
+// ── FORMATO COMBINADO (pinares2.xlsx, sabanilla.xlsx, 3rios.xlsx) ──
 function processLegacyFile(wb, filename) {
     currentFileName = filename || currentFileName;
     // Respetar sede seleccionada manualmente en el dropdown
@@ -1008,7 +1008,7 @@ function processLegacyFile(wb, filename) {
     }
     applySedeUI();
 
-    // Hoja1 â†’ usuarios (fila 0 = encabezados, fila 1+ = datos)
+    // Hoja1 → usuarios (fila 0 = encabezados, fila 1+ = datos)
     const wsU = wb.Sheets['Hoja1'];
     const rawU = XLSX.utils.sheet_to_json(wsU, { header:1, defval:'' });
     usersData = [];
@@ -1023,17 +1023,17 @@ function processLegacyFile(wb, filename) {
         const expiraStr = String(r[5]||'').trim();
         const telefono  = String(r[6]||'').trim();
         const prod      = String(r[9]||'').trim();
-        activo = /^s[iÃ­]/i.test(activo) ? 'SÃ­' : /^no/i.test(activo) ? 'No' : activo;
+        activo = /^s[ií]/i.test(activo) ? 'Sí' : /^no/i.test(activo) ? 'No' : activo;
         usersData.push({
             PIN: pin, Nombre: nombre, Email: email, Activo: activo,
             Expira: expiraStr, ExpiraDate: parseDate(expiraStr),
             Telefono: telefono,
-            ÃšltimoProducto: prod || 'Desconocido',
+            ÚltimoProducto: prod || 'Desconocido',
             Ingreso: '', IngresoDate: null, ValorPlan: 0
         });
     }
 
-    // Hoja2 â†’ precios (fila 0 = encabezados, fila 1+ = plan/costo)
+    // Hoja2 → precios (fila 0 = encabezados, fila 1+ = plan/costo)
     const wsP = wb.Sheets['Hoja2'];
     if (wsP) {
         const rawP = XLSX.utils.sheet_to_json(wsP, { header:1, defval:'' });
@@ -1045,12 +1045,12 @@ function processLegacyFile(wb, filename) {
         savePricesToSupabase(currentSedeName);
     }
 
-    usersData.forEach(u => u.ValorPlan = getPlanPrice(u.ÃšltimoProducto, u.PIN));
+    usersData.forEach(u => u.ValorPlan = getPlanPrice(u.ÚltimoProducto, u.PIN));
     usuariosLoaded = true;
     document.getElementById('uploadStatusU').innerHTML =
-        `<span style="color:#2e7d32;font-weight:600;">âœ… ${usersData.length} usuarios cargados â€” ${currentSedeName}</span>`;
+        `<span style="color:#2e7d32;font-weight:600;">✅ ${usersData.length} usuarios cargados — ${currentSedeName}</span>`;
 
-    // renovaciones â†’ hoja "renovaciones" (fila 0 = encabezados, fila 1+ = datos)
+    // renovaciones → hoja "renovaciones" (fila 0 = encabezados, fila 1+ = datos)
     const wsR = wb.Sheets['renovaciones'];
     if (wsR) {
         const rawR = XLSX.utils.sheet_to_json(wsR, { header:1, defval:'' });
@@ -1079,13 +1079,13 @@ function processLegacyFile(wb, filename) {
         }
         renoLoaded = true;
         document.getElementById('uploadStatusR').innerHTML =
-            `<span style="color:#2e7d32;font-weight:600;">âœ… ${renovacionesData.length} renovaciones cargadas (formato combinado)</span>`;
+            `<span style="color:#2e7d32;font-weight:600;">✅ ${renovacionesData.length} renovaciones cargadas (formato combinado)</span>`;
     }
 
     rebuildDashboard();
 }
 
-// â”€â”€ USUARIOS (Informe_de_Usuarios.xlsx â†’ "Page 1") â”€â”€
+// ── USUARIOS (Informe_de_Usuarios.xlsx → "Page 1") ──
 function processUsuariosFile(data, filename) {
     try {
         currentFileName = filename || currentFileName;
@@ -1094,7 +1094,7 @@ function processUsuariosFile(data, filename) {
         }
         applySedeUI();
         loadPricesForSede(currentSedeName);
-        document.getElementById('uploadStatusU').innerHTML = '<span style="color:#667eea;font-weight:600;">â³ Procesando usuarios...</span>';
+        document.getElementById('uploadStatusU').innerHTML = '<span style="color:#667eea;font-weight:600;">⏳ Procesando usuarios...</span>';
 
         const wb  = XLSX.read(data, { type:'array' });
 
@@ -1121,34 +1121,34 @@ function processUsuariosFile(data, filename) {
             const telefono  = String(r[6]||'').trim();
             const prod      = String(r[9]||'').trim();
             const ingresoStr= String(r[11]||'').trim();
-            activo = /^s[iÃ­]/i.test(activo) ? 'SÃ­' : /^no/i.test(activo) ? 'No' : activo;
+            activo = /^s[ií]/i.test(activo) ? 'Sí' : /^no/i.test(activo) ? 'No' : activo;
             usersData.push({
                 PIN: pin, Nombre: nombre, Email: email, Activo: activo,
                 Expira: expiraStr, ExpiraDate: parseDate(expiraStr),
                 Telefono: telefono,
-                ÃšltimoProducto: prod || 'Desconocido',
+                ÚltimoProducto: prod || 'Desconocido',
                 Ingreso: ingresoStr, IngresoDate: parseDate(ingresoStr), ValorPlan: 0
             });
         }
 
         // Apply prices (from Supabase cache or manual overrides)
-        usersData.forEach(u => u.ValorPlan = getPlanPrice(u.ÃšltimoProducto, u.PIN));
+        usersData.forEach(u => u.ValorPlan = getPlanPrice(u.ÚltimoProducto, u.PIN));
 
         usuariosLoaded = true;
         document.getElementById('uploadStatusU').innerHTML =
-            `<span style="color:#2e7d32;font-weight:600;">âœ… ${usersData.length} usuarios cargados â€” ${currentSedeName}</span>`;
+            `<span style="color:#2e7d32;font-weight:600;">✅ ${usersData.length} usuarios cargados — ${currentSedeName}</span>`;
 
         rebuildDashboard();
     } catch(e) {
         console.error(e);
-        document.getElementById('uploadStatusU').innerHTML = `<span style="color:#c62828;">âŒ Error: ${e.message}</span>`;
+        document.getElementById('uploadStatusU').innerHTML = `<span style="color:#c62828;">❌ Error: ${e.message}</span>`;
     }
 }
 
-// â”€â”€ RENOVACIONES (Ventas_por_Producto.xlsx â†’ "Page 1") â”€â”€
+// ── RENOVACIONES (Ventas_por_Producto.xlsx → "Page 1") ──
 async function processRenovacionesFile(data, filename) {
     try {
-        document.getElementById('uploadStatusR').innerHTML = '<span style="color:#667eea;font-weight:600;">â³ Procesando renovaciones...</span>';
+        document.getElementById('uploadStatusR').innerHTML = '<span style="color:#667eea;font-weight:600;">⏳ Procesando renovaciones...</span>';
 
         // Detect sede from filename only if not selected manually and usuarios not loaded
         if (!usuariosLoaded && filename && !document.getElementById('sedeSelector')?.value) {
@@ -1157,8 +1157,8 @@ async function processRenovacionesFile(data, filename) {
             applySedeUI();
         }
 
-        // Si no se cargÃ³ "Informe de Usuarios" en esta sesiÃ³n, usar el Ãºltimo guardado en el
-        // historial de esta sede como referencia para clasificar Nuevo/RenovaciÃ³n/Reingreso
+        // Si no se cargó "Informe de Usuarios" en esta sesión, usar el último guardado en el
+        // historial de esta sede como referencia para clasificar Nuevo/Renovación/Reingreso
         let refUsers = usersData;
         if (!usuariosLoaded) {
             try {
@@ -1175,8 +1175,8 @@ async function processRenovacionesFile(data, filename) {
         const ws  = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
 
-        // Las exportaciones de "Ventas por Producto" varÃ­an en cuÃ¡ntas columnas de
-        // relleno/espaciado traen entre cada dato â€” por eso buscamos el encabezado
+        // Las exportaciones de "Ventas por Producto" varían en cuántas columnas de
+        // relleno/espaciado traen entre cada dato — por eso buscamos el encabezado
         // por nombre en vez de asumir posiciones fijas.
         let headerRowIdx = -1, col = {};
         for (let i = 0; i < Math.min(raw.length, 10); i++) {
@@ -1195,7 +1195,7 @@ async function processRenovacionesFile(data, filename) {
                 break;
             }
         }
-        if (headerRowIdx < 0) throw new Error('No se encontrÃ³ el encabezado (Fecha/Producto) en el archivo. Verifique que sea el reporte "Ventas por Producto".');
+        if (headerRowIdx < 0) throw new Error('No se encontró el encabezado (Fecha/Producto) en el archivo. Verifique que sea el reporte "Ventas por Producto".');
 
         renovacionesData = [];
         clasesSueltasData = [];
@@ -1211,8 +1211,8 @@ async function processRenovacionesFile(data, filename) {
             if (!fechaStr || !cliente) continue;
             const txDate = parseRenoDateTime(fechaStr);
             if (/^invitado$/i.test(cliente.trim())) {
-                // Invitado nunca es renovaciÃ³n de un socio (no tiene membresÃ­a que renovar),
-                // pero sÃ­ debe contar en Minita / sin clasificar (agua, bebidas, snacks, etc.)
+                // Invitado nunca es renovación de un socio (no tiene membresía que renovar),
+                // pero sí debe contar en Minita / sin clasificar (agua, bebidas, snacks, etc.)
                 if (isClaseSuelta(producto)) {
                     clasesSueltasData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
                 } else {
@@ -1225,7 +1225,7 @@ async function processRenovacionesFile(data, filename) {
                 continue;
             }
             if (!isMembershipPlan(producto)) {
-                // No es membresÃ­a ni clase suelta â€” no se descarta, queda visible como "sin clasificar"
+                // No es membresía ni clase suelta — no se descarta, queda visible como "sin clasificar"
                 sinClasificarData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
                 continue;
             }
@@ -1241,21 +1241,21 @@ async function processRenovacionesFile(data, filename) {
 
         renoLoaded = true;
         document.getElementById('uploadStatusR').innerHTML =
-            `<span style="color:#2e7d32;font-weight:600;">âœ… ${renovacionesData.length} transacciones de membresÃ­a cargadas</span>`;
+            `<span style="color:#2e7d32;font-weight:600;">✅ ${renovacionesData.length} transacciones de membresía cargadas</span>`;
 
         rebuildDashboard();
     } catch(e) {
         console.error(e);
-        document.getElementById('uploadStatusR').innerHTML = `<span style="color:#c62828;">âŒ Error: ${e.message}</span>`;
+        document.getElementById('uploadStatusR').innerHTML = `<span style="color:#c62828;">❌ Error: ${e.message}</span>`;
     }
 }
 
-// â”€â”€ REBUILD DASHBOARD (llamado despuÃ©s de cargar cualquier archivo) â”€â”€
+// ── REBUILD DASHBOARD (llamado después de cargar cualquier archivo) ──
 function rebuildDashboard() {
     if (!usuariosLoaded && !renoLoaded) return;
 
     // Populate filters
-    const products = [...new Set(usersData.map(u=>u.ÃšltimoProducto).filter(p=>p&&p!=='Desconocido'))];
+    const products = [...new Set(usersData.map(u=>u.ÚltimoProducto).filter(p=>p&&p!=='Desconocido'))];
     const ps = document.getElementById('filterProduct');
     ps.innerHTML = '<option value="all">Todos</option>';
     products.sort().forEach(p => ps.innerHTML += `<option value="${p.replace(/"/g,'&quot;')}">${p}</option>`);
@@ -1297,9 +1297,9 @@ function rebuildDashboard() {
     if (usuariosLoaded || renoLoaded) autoSaveToSupabase();
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 //  USUARIOS TAB
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 function getFilteredUsers() {
     let search = document.getElementById('searchName')?.value.toLowerCase()||'';
     let status = document.getElementById('filterStatus')?.value||'all';
@@ -1310,26 +1310,26 @@ function getFilteredUsers() {
     let dTo    = parseDateFromInput(document.getElementById('dateTo')?.value);
     return usersData.filter(u => {
         if (search && !u.Nombre.toLowerCase().includes(search)) return false;
-        if (status!=='all') { if (status==='activo'&&u.Activo!=='SÃ­') return false; if (status==='inactivo'&&u.Activo!=='No') return false; }
+        if (status!=='all') { if (status==='activo'&&u.Activo!=='Sí') return false; if (status==='inactivo'&&u.Activo!=='No') return false; }
         if (expDays&&expDays!=='all') { let d=daysUntilExpiry(u.ExpiraDate); if (d<0||d>parseInt(expDays)) return false; }
-        if (prod!=='all'&&u.ÃšltimoProducto!==prod) return false;
+        if (prod!=='all'&&u.ÚltimoProducto!==prod) return false;
         if (dFrom||dTo) { let cd=dtype==='ingreso'?u.IngresoDate:u.ExpiraDate; if (cd) { if (dFrom&&cd<dFrom) return false; if (dTo&&cd>dTo) return false; } else return false; }
         return true;
     });
 }
 function clearDateFilters() { document.getElementById('dateFrom').value=''; document.getElementById('dateTo').value=''; renderTable(); }
 function sortTable(col) { if (currentSortColumn===col) currentSortDirection=currentSortDirection==='asc'?'desc':'asc'; else { currentSortColumn=col; currentSortDirection='asc'; } renderTable(); }
-function openPriceModal(user) { currentEditingUser=user; document.getElementById('modalPlanName').textContent=user.ÃšltimoProducto; document.getElementById('modalUserName').textContent=user.Nombre; document.getElementById('modalPriceValue').value=user.ValorPlan||''; document.getElementById('priceModal').style.display='block'; }
+function openPriceModal(user) { currentEditingUser=user; document.getElementById('modalPlanName').textContent=user.ÚltimoProducto; document.getElementById('modalUserName').textContent=user.Nombre; document.getElementById('modalPriceValue').value=user.ValorPlan||''; document.getElementById('priceModal').style.display='block'; }
 function saveManualPrice() {
     if (!currentEditingUser) return;
     const p = parseFloat(document.getElementById('modalPriceValue').value);
-    if (isNaN(p) || p < 0) { alert('Monto invÃ¡lido'); return; }
-    const plan = currentEditingUser.ÃšltimoProducto;
+    if (isNaN(p) || p < 0) { alert('Monto inválido'); return; }
+    const plan = currentEditingUser.ÚltimoProducto;
     manualPrices[`${plan}|${currentEditingUser.PIN}`] = p;
     planPrices[plan] = p;
     currentEditingUser.ValorPlan = p;
     // Actualizar todos los usuarios con el mismo plan
-    usersData.filter(u => u.ÃšltimoProducto === plan && !manualPrices[`${plan}|${u.PIN}`])
+    usersData.filter(u => u.ÚltimoProducto === plan && !manualPrices[`${plan}|${u.PIN}`])
              .forEach(u => u.ValorPlan = p);
     closeModal();
     renderTable();
@@ -1371,44 +1371,44 @@ function renderTable() {
         let r = tbody.insertRow();
         const isAdmin = currentRole === 'admin';
         const priceCols = isAdmin ? `
-        <td style="font-weight:600;">${u.ValorPlan>0?'â‚¡'+u.ValorPlan.toLocaleString():'<span style="color:#aaa;">Sin definir</span>'}
-          ${manualPrices[`${u.ÃšltimoProducto}|${u.PIN}`]?'<span style="color:#ff9800;font-size:11px;"> âœï¸</span>':''}</td>
-        <td><button class="price-edit-btn" onclick='openPriceModal({PIN:"${u.PIN}",Nombre:"${u.Nombre.replace(/"/g,'&quot;')}",ÃšltimoProducto:"${u.ÃšltimoProducto.replace(/"/g,'&quot;')}",ValorPlan:${u.ValorPlan}})'>Editar precio</button></td>` : '';
+        <td style="font-weight:600;">${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString():'<span style="color:#aaa;">Sin definir</span>'}
+          ${manualPrices[`${u.ÚltimoProducto}|${u.PIN}`]?'<span style="color:#ff9800;font-size:11px;"> ✏️</span>':''}</td>
+        <td><button class="price-edit-btn" onclick='openPriceModal({PIN:"${u.PIN}",Nombre:"${u.Nombre.replace(/"/g,'&quot;')}",ÚltimoProducto:"${u.ÚltimoProducto.replace(/"/g,'&quot;')}",ValorPlan:${u.ValorPlan}})'>Editar precio</button></td>` : '';
         r.innerHTML=`<td>${u.PIN}</td><td><strong>${u.Nombre}</strong></td><td style="color:#667eea;">${u.Email||'-'}</td>
-        <td class="${u.Activo==='SÃ­'?'status-active':'status-inactive'}">${u.Activo==='SÃ­'?'âœ“ Activo':'âœ— Inactivo'}</td>
-        <td>${u.Expira||'-'}</td><td>${u.ÃšltimoProducto||'-'}</td><td>${u.Ingreso||'-'}</td>${priceCols}`;
+        <td class="${u.Activo==='Sí'?'status-active':'status-inactive'}">${u.Activo==='Sí'?'✓ Activo':'✗ Inactivo'}</td>
+        <td>${u.Expira||'-'}</td><td>${u.ÚltimoProducto||'-'}</td><td>${u.Ingreso||'-'}</td>${priceCols}`;
     });
     updateStats(filtered);
 }
 
 function updateStats(filtered) {
-    let active = filtered.filter(u=>u.Activo==='SÃ­');
-    let expSoon = filtered.filter(u=>{ let d=daysUntilExpiry(u.ExpiraDate); return u.Activo==='SÃ­'&&d>=0&&d<=30; });
-    let projected = filtered.reduce((s,u)=>{ if(u.Activo==='SÃ­'){ let d=daysUntilExpiry(u.ExpiraDate); if(d>=0&&d<=30) return s+u.ValorPlan; } return s; },0);
+    let active = filtered.filter(u=>u.Activo==='Sí');
+    let expSoon = filtered.filter(u=>{ let d=daysUntilExpiry(u.ExpiraDate); return u.Activo==='Sí'&&d>=0&&d<=30; });
+    let projected = filtered.reduce((s,u)=>{ if(u.Activo==='Sí'){ let d=daysUntilExpiry(u.ExpiraDate); if(d>=0&&d<=30) return s+u.ValorPlan; } return s; },0);
     let monthly = active.reduce((s,u)=>s+u.ValorPlan,0);
-    let undef = active.filter(u=>u.ValorPlan===0&&u.ÃšltimoProducto!=='Desconocido');
+    let undef = active.filter(u=>u.ValorPlan===0&&u.ÚltimoProducto!=='Desconocido');
     document.getElementById('statsContainer').innerHTML=`
-        <div class="stat-card purple"><h3>ðŸ‘¥ Total Usuarios</h3><div class="value">${filtered.length.toLocaleString()}</div><div class="sub">Mostrados segÃºn filtros</div></div>
-        <div class="stat-card green"><h3>âœ… Usuarios Activos</h3><div class="value">${active.length.toLocaleString()}</div><div class="sub">${filtered.length?Math.round(active.length/filtered.length*100):0}% del total</div></div>
-        <div class="stat-card orange"><h3>âš ï¸ Expiran en 30 dÃ­as</h3><div class="value">${expSoon.length.toLocaleString()}</div><div class="sub">Posibles renovaciones</div></div>
-        <div class="stat-card blue"><h3>ðŸ’° Ingresos Mensuales</h3><div class="value" style="font-size:1.35em;">â‚¡${monthly.toLocaleString()}</div><div class="sub">Usuarios activos con precio</div></div>
-        <div class="stat-card teal"><h3>ðŸ“ˆ ProyecciÃ³n 30 dÃ­as</h3><div class="value" style="font-size:1.35em;">â‚¡${projected.toLocaleString()}</div><div class="sub">Renovaciones esperadas</div></div>
-        ${undef.length>0?`<div class="stat-card red"><h3>âš ï¸ Sin precio definido</h3><div class="value" style="color:#c62828;">${undef.length}</div><div class="sub">Activos sin precio asignado</div></div>`:''}`;
+        <div class="stat-card purple"><h3>👥 Total Usuarios</h3><div class="value">${filtered.length.toLocaleString()}</div><div class="sub">Mostrados según filtros</div></div>
+        <div class="stat-card green"><h3>✅ Usuarios Activos</h3><div class="value">${active.length.toLocaleString()}</div><div class="sub">${filtered.length?Math.round(active.length/filtered.length*100):0}% del total</div></div>
+        <div class="stat-card orange"><h3>⚠️ Expiran en 30 días</h3><div class="value">${expSoon.length.toLocaleString()}</div><div class="sub">Posibles renovaciones</div></div>
+        <div class="stat-card blue"><h3>💰 Ingresos Mensuales</h3><div class="value" style="font-size:1.35em;">₡${monthly.toLocaleString()}</div><div class="sub">Usuarios activos con precio</div></div>
+        <div class="stat-card teal"><h3>📈 Proyección 30 días</h3><div class="value" style="font-size:1.35em;">₡${projected.toLocaleString()}</div><div class="sub">Renovaciones esperadas</div></div>
+        ${undef.length>0?`<div class="stat-card red"><h3>⚠️ Sin precio definido</h3><div class="value" style="color:#c62828;">${undef.length}</div><div class="sub">Activos sin precio asignado</div></div>`:''}`;
     updateChart(active);
 }
 
 function updateChart(active) {
-    let pr={}; active.forEach(u=>{ if(u.ValorPlan>0) pr[u.ÃšltimoProducto]=(pr[u.ÃšltimoProducto]||0)+u.ValorPlan; });
+    let pr={}; active.forEach(u=>{ if(u.ValorPlan>0) pr[u.ÚltimoProducto]=(pr[u.ÚltimoProducto]||0)+u.ValorPlan; });
     let sorted=Object.entries(pr).sort((a,b)=>b[1]-a[1]).slice(0,10);
     let ctx=document.getElementById('revenueChart').getContext('2d');
     if (revenueChart) revenueChart.destroy();
-    if (sorted.length) revenueChart=new Chart(ctx,{ type:'bar', data:{ labels:sorted.map(i=>i[0]), datasets:[{ label:'Ingresos (â‚¡)', data:sorted.map(i=>i[1]), backgroundColor:sorted.map((_,i)=>`hsla(${230+i*12},70%,${55+i*2}%,0.85)`), borderRadius:8, borderSkipped:false }]}, options:{ responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ ticks:{ callback:v=>'â‚¡'+v.toLocaleString() }, grid:{ color:'#f0f2f8' } }, x:{ grid:{ display:false } } } } });
+    if (sorted.length) revenueChart=new Chart(ctx,{ type:'bar', data:{ labels:sorted.map(i=>i[0]), datasets:[{ label:'Ingresos (₡)', data:sorted.map(i=>i[1]), backgroundColor:sorted.map((_,i)=>`hsla(${230+i*12},70%,${55+i*2}%,0.85)`), borderRadius:8, borderSkipped:false }]}, options:{ responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ ticks:{ callback:v=>'₡'+v.toLocaleString() }, grid:{ color:'#f0f2f8' } }, x:{ grid:{ display:false } } } } });
 }
 
 function exportToCSV() {
     let f=getFilteredUsers(); if(!f.length){alert('No hay datos');return;}
     let h=['PIN','Nombre','Email','Activo','Expira','Ultimo Producto','Ingreso','Valor Plan (CRC)'];
-    let r=f.map(u=>[u.PIN,u.Nombre,u.Email,u.Activo==='SÃ­'?'Activo':'Inactivo',u.Expira,u.ÃšltimoProducto,u.Ingreso,u.ValorPlan]);
+    let r=f.map(u=>[u.PIN,u.Nombre,u.Email,u.Activo==='Sí'?'Activo':'Inactivo',u.Expira,u.ÚltimoProducto,u.Ingreso,u.ValorPlan]);
     let csv=[h,...r].map(row=>row.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
     dlBlob(csv,'usuarios_'+hoy()+'.csv','text/csv;charset=utf-8');
 }
@@ -1419,15 +1419,15 @@ function printRenewalList() {
     f = f.slice().sort((a,b) => (a.ExpiraDate?.getTime()??Infinity) - (b.ExpiraDate?.getTime()??Infinity));
 
     const expDays = document.getElementById('filterExpiry')?.value;
-    const expLabel = expDays && expDays !== 'all' ? `PrÃ³ximos ${expDays} dÃ­as` : 'Todos los usuarios filtrados';
+    const expLabel = expDays && expDays !== 'all' ? `Próximos ${expDays} días` : 'Todos los usuarios filtrados';
     const fecha = new Date().toLocaleDateString('es-CR', { year:'numeric', month:'long', day:'numeric' });
 
     const rows = f.map(u => `
         <tr>
             <td>${u.PIN}</td>
             <td>${u.Nombre}</td>
-            <td>${u.ÃšltimoProducto||'-'}</td>
-            <td style="text-align:right;">${u.ValorPlan>0 ? 'â‚¡'+u.ValorPlan.toLocaleString() : 'â€”'}</td>
+            <td>${u.ÚltimoProducto||'-'}</td>
+            <td style="text-align:right;">${u.ValorPlan>0 ? '₡'+u.ValorPlan.toLocaleString() : '—'}</td>
             <td>${u.Expira||'-'}</td>
             <td class="chk"></td>
             <td class="notas"></td>
@@ -1445,19 +1445,19 @@ function printRenewalList() {
         th, td { border: 1px solid #999; padding: 7px 9px; text-align: left; }
         th { background: #eee; }
         td.chk { width: 60px; text-align: center; }
-        td.chk::before { content: "â˜"; font-size: 18px; }
+        td.chk::before { content: "☐"; font-size: 18px; }
         td.notas { width: 140px; }
         tfoot td { font-size: 11px; color: #777; border: none; padding-top: 10px; }
         @media print { body { padding: 8px; } }
     </style></head><body>
-        <h1>Lista de Renovaciones â€” ${currentSedeName}</h1>
-        <div class="sub">Filtro: ${expLabel} &nbsp;Â·&nbsp; Generado: ${fecha} &nbsp;Â·&nbsp; Total: ${f.length} usuario(s)</div>
+        <h1>Lista de Renovaciones — ${currentSedeName}</h1>
+        <div class="sub">Filtro: ${expLabel} &nbsp;·&nbsp; Generado: ${fecha} &nbsp;·&nbsp; Total: ${f.length} usuario(s)</div>
         <table>
             <thead><tr>
-                <th>PIN</th><th>Nombre</th><th>Plan</th><th>Valor</th><th>Vence</th><th>Â¿PagÃ³?</th><th>Notas</th>
+                <th>PIN</th><th>Nombre</th><th>Plan</th><th>Valor</th><th>Vence</th><th>¿Pagó?</th><th>Notas</th>
             </tr></thead>
             <tbody>${rows}</tbody>
-            <tfoot><tr><td colspan="7">Marcar con âœ“ cuando el cliente haya pagado su renovaciÃ³n.</td></tr></tfoot>
+            <tfoot><tr><td colspan="7">Marcar con ✓ cuando el cliente haya pagado su renovación.</td></tr></tfoot>
         </table>
     </body></html>`);
     win.document.close();
@@ -1465,9 +1465,9 @@ function printRenewalList() {
     setTimeout(() => win.print(), 250);
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 //  RENOVACIONES TAB
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 function getFilteredRenovaciones() {
     let tipo  = document.getElementById('renoFilterTipo')?.value||'all';
     let search= document.getElementById('renoSearchName')?.value.toLowerCase()||'';
@@ -1520,7 +1520,7 @@ function filterRenoHoy() {
 function updateRenoStats() {
     let all = renovacionesData;
     let nuevos = all.filter(r=>r.Tipo==='Nuevo').length;
-    let renova = all.filter(r=>r.Tipo==='RenovaciÃ³n').length;
+    let renova = all.filter(r=>r.Tipo==='Renovación').length;
     let reing  = all.filter(r=>r.Tipo==='Reingreso').length;
     let totalCRC = all.reduce((s,r)=>s+r.Total,0);
     let dias = [...new Set(all.map(r=>r.TxDate?.toDateString()).filter(Boolean))].length;
@@ -1528,20 +1528,20 @@ function updateRenoStats() {
     let sinClasifTotal = sinClasificarData.reduce((s,c)=>s+c.Total,0);
     let granTotal = totalCRC + clasesTotal + sinClasifTotal;
     document.getElementById('renoStatsContainer').innerHTML=`
-        <div class="stat-card purple"><h3>ðŸ“‹ Total MembresÃ­as</h3><div class="value">${all.length}</div><div class="sub">Transacciones registradas</div></div>
-        <div class="stat-card green"><h3>ðŸ†• Nuevos</h3><div class="value" style="color:#2e7d32;">${nuevos}</div><div class="sub">${all.length?Math.round(nuevos/all.length*100):0}% del total</div></div>
-        <div class="stat-card blue"><h3>âœ… Renovaciones</h3><div class="value" style="color:#1565c0;">${renova}</div><div class="sub">${all.length?Math.round(renova/all.length*100):0}% del total</div></div>
-        <div class="stat-card orange"><h3>ðŸ”„ Reingresos</h3><div class="value" style="color:#e65100;">${reing}</div><div class="sub">Inactivos +10 dÃ­as que volvieron</div></div>
-        <div class="stat-card teal"><h3>ðŸ’° Total General</h3><div class="value" style="font-size:1.3em;">â‚¡${granTotal.toLocaleString()}</div><div class="sub">Suma del 100% del reporte Â· En ${dias} dÃ­a(s)</div></div>
-        <div class="stat-card purple"><h3>ðŸ‹ï¸ Planes / MembresÃ­as</h3><div class="value" style="font-size:1.1em;">â‚¡${totalCRC.toLocaleString()}</div><div class="sub">${all.length} transacciones</div></div>
-        <div class="stat-card" style="border-left:4px solid #888;"><h3>ðŸ¤¸ Clases Sueltas</h3><div class="value" style="font-size:1.1em;color:#555;">â‚¡${clasesTotal.toLocaleString()}</div><div class="sub">${clasesSueltasData.length} clases/sesiones</div></div>
-        <div class="stat-card" style="border-left:4px solid #c62828;"><h3>â“ Sin Clasificar</h3><div class="value" style="font-size:1.1em;color:#c62828;">â‚¡${sinClasifTotal.toLocaleString()}</div><div class="sub">${sinClasificarData.length} producto(s) no reconocido(s)</div></div>`;
+        <div class="stat-card purple"><h3>📋 Total Membresías</h3><div class="value">${all.length}</div><div class="sub">Transacciones registradas</div></div>
+        <div class="stat-card green"><h3>🆕 Nuevos</h3><div class="value" style="color:#2e7d32;">${nuevos}</div><div class="sub">${all.length?Math.round(nuevos/all.length*100):0}% del total</div></div>
+        <div class="stat-card blue"><h3>✅ Renovaciones</h3><div class="value" style="color:#1565c0;">${renova}</div><div class="sub">${all.length?Math.round(renova/all.length*100):0}% del total</div></div>
+        <div class="stat-card orange"><h3>🔄 Reingresos</h3><div class="value" style="color:#e65100;">${reing}</div><div class="sub">Inactivos +10 días que volvieron</div></div>
+        <div class="stat-card teal"><h3>💰 Total General</h3><div class="value" style="font-size:1.3em;">₡${granTotal.toLocaleString()}</div><div class="sub">Suma del 100% del reporte · En ${dias} día(s)</div></div>
+        <div class="stat-card purple"><h3>🏋️ Planes / Membresías</h3><div class="value" style="font-size:1.1em;">₡${totalCRC.toLocaleString()}</div><div class="sub">${all.length} transacciones</div></div>
+        <div class="stat-card" style="border-left:4px solid #888;"><h3>🤸 Clases Sueltas</h3><div class="value" style="font-size:1.1em;color:#555;">₡${clasesTotal.toLocaleString()}</div><div class="sub">${clasesSueltasData.length} clases/sesiones</div></div>
+        <div class="stat-card" style="border-left:4px solid #c62828;"><h3>❓ Sin Clasificar</h3><div class="value" style="font-size:1.1em;color:#c62828;">₡${sinClasifTotal.toLocaleString()}</div><div class="sub">${sinClasificarData.length} producto(s) no reconocido(s)</div></div>`;
 }
 
 function renderRenovaciones() {
     let filtered = getFilteredRenovaciones();
 
-    // â”€â”€ Total del filtro activo (ej. "Hoy") para comparar contra la meta de Proyecciones â”€â”€
+    // ── Total del filtro activo (ej. "Hoy") para comparar contra la meta de Proyecciones ──
     const dFromVal = document.getElementById('renoDateFrom')?.value || '';
     const dToVal   = document.getElementById('renoDateTo')?.value || '';
     const filtroActivo = dFromVal || dToVal || document.getElementById('renoSearchName')?.value
@@ -1552,20 +1552,20 @@ function renderRenovaciones() {
     const totalClasesFiltrado = filteredClases.reduce((s,c)=>s+c.Total,0);
     const totalSinClasifFiltrado = filteredSinClasif.reduce((s,c)=>s+c.Total,0);
     const rangoTexto = dFromVal && dToVal && dFromVal === dToVal ? `el ${dFromVal}`
-        : (dFromVal || dToVal) ? `${dFromVal||'â€¦'} a ${dToVal||'â€¦'}` : 'segÃºn filtros activos';
+        : (dFromVal || dToVal) ? `${dFromVal||'…'} a ${dToVal||'…'}` : 'según filtros activos';
     document.getElementById('renoFilteredStatsContainer').innerHTML = !filtroActivo ? '' : `
-        <div class="stat-card green"><h3>ðŸ’° MembresÃ­as Vendidas (${rangoTexto})</h3><div class="value" style="font-size:1.3em;">â‚¡${totalMembresiasFiltrado.toLocaleString()}</div><div class="sub">${filtered.length} transacciÃ³n(es) Â· compara contra la meta de Proyecciones</div></div>
-        <div class="stat-card" style="border-left:4px solid #888;"><h3>ðŸ¤¸ Clases Sueltas (filtrado)</h3><div class="value" style="font-size:1.1em;color:#555;">â‚¡${totalClasesFiltrado.toLocaleString()}</div><div class="sub">${filteredClases.length} clase(s)/sesiÃ³n(es)</div></div>
-        <div class="stat-card" style="border-left:4px solid #c62828;"><h3>â“ Sin Clasificar (filtrado)</h3><div class="value" style="font-size:1.1em;color:#c62828;">â‚¡${totalSinClasifFiltrado.toLocaleString()}</div><div class="sub">${filteredSinClasif.length} producto(s)</div></div>`;
+        <div class="stat-card green"><h3>💰 Membresías Vendidas (${rangoTexto})</h3><div class="value" style="font-size:1.3em;">₡${totalMembresiasFiltrado.toLocaleString()}</div><div class="sub">${filtered.length} transacción(es) · compara contra la meta de Proyecciones</div></div>
+        <div class="stat-card" style="border-left:4px solid #888;"><h3>🤸 Clases Sueltas (filtrado)</h3><div class="value" style="font-size:1.1em;color:#555;">₡${totalClasesFiltrado.toLocaleString()}</div><div class="sub">${filteredClases.length} clase(s)/sesión(es)</div></div>
+        <div class="stat-card" style="border-left:4px solid #c62828;"><h3>❓ Sin Clasificar (filtrado)</h3><div class="value" style="font-size:1.1em;color:#c62828;">₡${totalSinClasifFiltrado.toLocaleString()}</div><div class="sub">${filteredSinClasif.length} producto(s)</div></div>`;
 
-    // â”€â”€ Charts â”€â”€
+    // ── Charts ──
     // Pie
     let nv=filtered.filter(r=>r.Tipo==='Nuevo').length;
-    let rv=filtered.filter(r=>r.Tipo==='RenovaciÃ³n').length;
+    let rv=filtered.filter(r=>r.Tipo==='Renovación').length;
     let ri=filtered.filter(r=>r.Tipo==='Reingreso').length;
     let ctxPie=document.getElementById('renoTypePie').getContext('2d');
     if (renoTypePieChart) renoTypePieChart.destroy();
-    renoTypePieChart=new Chart(ctxPie,{ type:'doughnut', data:{ labels:['Nuevo','RenovaciÃ³n','Reingreso'], datasets:[{ data:[nv,rv,ri], backgroundColor:['#43a047','#1e88e5','#ff9800'], borderWidth:2, borderColor:'#f8f9ff' }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom' } } } });
+    renoTypePieChart=new Chart(ctxPie,{ type:'doughnut', data:{ labels:['Nuevo','Renovación','Reingreso'], datasets:[{ data:[nv,rv,ri], backgroundColor:['#43a047','#1e88e5','#ff9800'], borderWidth:2, borderColor:'#f8f9ff' }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom' } } } });
 
     // Bar by plan
     let planTot={};
@@ -1573,32 +1573,32 @@ function renderRenovaciones() {
     let barSorted=Object.entries(planTot).sort((a,b)=>b[1]-a[1]).slice(0,8);
     let ctxBar=document.getElementById('renoPlanBar').getContext('2d');
     if (renoPlanBarChart) renoPlanBarChart.destroy();
-    if (barSorted.length) renoPlanBarChart=new Chart(ctxBar,{ type:'bar', data:{ labels:barSorted.map(i=>i[0]), datasets:[{ label:'CRC Recaudado', data:barSorted.map(i=>i[1]), backgroundColor:barSorted.map((_,i)=>`hsla(${200+i*18},65%,50%,0.82)`), borderRadius:6, borderSkipped:false }] }, options:{ responsive:true, plugins:{ legend:{display:false} }, scales:{ y:{ ticks:{ callback:v=>'â‚¡'+v.toLocaleString() }, grid:{color:'#f0f2f8'} }, x:{grid:{display:false}} } } });
+    if (barSorted.length) renoPlanBarChart=new Chart(ctxBar,{ type:'bar', data:{ labels:barSorted.map(i=>i[0]), datasets:[{ label:'CRC Recaudado', data:barSorted.map(i=>i[1]), backgroundColor:barSorted.map((_,i)=>`hsla(${200+i*18},65%,50%,0.82)`), borderRadius:6, borderSkipped:false }] }, options:{ responsive:true, plugins:{ legend:{display:false} }, scales:{ y:{ ticks:{ callback:v=>'₡'+v.toLocaleString() }, grid:{color:'#f0f2f8'} }, x:{grid:{display:false}} } } });
 
-    // â”€â”€ Table â”€â”€
+    // ── Table ──
     let tbody=document.getElementById('renoTableBody'); tbody.innerHTML='';
     filtered.sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0));
     filtered.forEach(r => {
         let tr=tbody.insertRow();
-        let gap=r.GapDias!==null&&r.GapDias!==undefined?`<span style="color:#e65100;font-weight:700;">${r.GapDias} dÃ­as</span>`:'<span style="color:#aaa;">â€”</span>';
+        let gap=r.GapDias!==null&&r.GapDias!==undefined?`<span style="color:#e65100;font-weight:700;">${r.GapDias} días</span>`:'<span style="color:#aaa;">—</span>';
         let ingreso=r.User?.Ingreso||'<span style="color:#aaa;">No encontrado</span>';
-        let expira =r.User?.Expira||'<span style="color:#aaa;">â€”</span>';
+        let expira =r.User?.Expira||'<span style="color:#aaa;">—</span>';
         let clienteDisplay=r.User?`<strong>${r.Cliente}</strong>`:
-            `<strong>${r.Cliente}</strong> <span style="background:#fff3e0;color:#e65100;font-size:11px;padding:2px 6px;border-radius:10px;">Â¿nuevo?</span>`;
+            `<strong>${r.Cliente}</strong> <span style="background:#fff3e0;color:#e65100;font-size:11px;padding:2px 6px;border-radius:10px;">¿nuevo?</span>`;
         tr.innerHTML=`
             <td style="white-space:nowrap;font-size:12px;color:#666;">${r.FechaStr}</td>
             <td>${clienteDisplay}</td>
             <td style="font-size:12.5px;">${r.Producto}</td>
             <td><span class="badge ${r.Badge}">${r.Icon} ${r.Tipo}</span></td>
-            <td style="font-weight:700;color:#2d2d5e;">â‚¡${r.Total.toLocaleString()}</td>
+            <td style="font-weight:700;color:#2d2d5e;">₡${r.Total.toLocaleString()}</td>
             <td>${gap}</td>
             <td style="font-size:12px;">${ingreso}</td>
             <td style="font-size:12px;">${expira}</td>
             <td style="font-size:12px;color:#888;">${r.RegistradoPor}</td>`;
     });
-    document.getElementById('renoTableInfo').textContent = `Mostrando ${filtered.length} transacciones â€” Nuevos: ${nv} Â· Renovaciones: ${rv} Â· Reingresos: ${ri} Â· Total: â‚¡${filtered.reduce((s,r)=>s+r.Total,0).toLocaleString()}`;
+    document.getElementById('renoTableInfo').textContent = `Mostrando ${filtered.length} transacciones — Nuevos: ${nv} · Renovaciones: ${rv} · Reingresos: ${ri} · Total: ₡${filtered.reduce((s,r)=>s+r.Total,0).toLocaleString()}`;
 
-    // â”€â”€ Tabla clases sueltas (independiente, respeta el filtro de fecha) â”€â”€
+    // ── Tabla clases sueltas (independiente, respeta el filtro de fecha) ──
     let csBody = document.getElementById('clasesSueltasTableBody'); csBody.innerHTML = '';
     let clasesSorted = [...filteredClases].sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0));
     clasesSorted.forEach(c => {
@@ -1607,13 +1607,13 @@ function renderRenovaciones() {
             <td style="white-space:nowrap;font-size:12px;color:#666;">${c.FechaStr}</td>
             <td>${c.Cliente}</td>
             <td style="font-size:12.5px;">${c.Producto}</td>
-            <td style="font-weight:700;color:#2d2d5e;">â‚¡${c.Total.toLocaleString()}</td>
+            <td style="font-weight:700;color:#2d2d5e;">₡${c.Total.toLocaleString()}</td>
             <td style="font-size:12px;color:#888;">${c.RegistradoPor}</td>`;
     });
     document.getElementById('clasesSueltasInfo').textContent =
-        `Mostrando ${filteredClases.length} clases/sesiones sueltas â€” Total: â‚¡${totalClasesFiltrado.toLocaleString()} (no se suma al total de membresÃ­as)`;
+        `Mostrando ${filteredClases.length} clases/sesiones sueltas — Total: ₡${totalClasesFiltrado.toLocaleString()} (no se suma al total de membresías)`;
 
-    // â”€â”€ Tabla sin clasificar (respeta el filtro de fecha) â”€â”€
+    // ── Tabla sin clasificar (respeta el filtro de fecha) ──
     let scBody = document.getElementById('sinClasificarTableBody'); scBody.innerHTML = '';
     let sinClasifSorted = [...filteredSinClasif].sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0));
     sinClasifSorted.forEach(c => {
@@ -1622,11 +1622,11 @@ function renderRenovaciones() {
             <td style="white-space:nowrap;font-size:12px;color:#666;">${c.FechaStr}</td>
             <td>${c.Cliente}</td>
             <td style="font-size:12.5px;">${c.Producto}</td>
-            <td style="font-weight:700;color:#c62828;">â‚¡${c.Total.toLocaleString()}</td>
+            <td style="font-weight:700;color:#c62828;">₡${c.Total.toLocaleString()}</td>
             <td style="font-size:12px;color:#888;">${c.RegistradoPor}</td>`;
     });
     document.getElementById('sinClasificarInfo').textContent =
-        `Mostrando ${filteredSinClasif.length} transacciones sin clasificar â€” Total: â‚¡${totalSinClasifFiltrado.toLocaleString()} (revisar nombres de producto, no calzan con ningÃºn plan ni clase conocida)`;
+        `Mostrando ${filteredSinClasif.length} transacciones sin clasificar — Total: ₡${totalSinClasifFiltrado.toLocaleString()} (revisar nombres de producto, no calzan con ningún plan ni clase conocida)`;
 }
 
 function exportRenoCSV() {
@@ -1649,12 +1649,12 @@ function exportRenoPDF() {
     doc.setFontSize(17); doc.setTextColor(255,255,255); doc.setFont(undefined,'bold');
     doc.text('Analisis de Renovaciones - '+currentSedeName,36,30);
     doc.setFontSize(10); doc.setFont(undefined,'normal');
-    doc.text('Clasificacion de membresÃ­as: Nuevos, Renovaciones y Reingresos',36,48);
+    doc.text('Clasificacion de membresías: Nuevos, Renovaciones y Reingresos',36,48);
     doc.text('Generado: '+fecha,36,64);
     doc.setFontSize(9); doc.text('JK Sistemas',pW-90,46,{align:'center'});
 
     // Summary row
-    let nv=f.filter(r=>r.Tipo==='Nuevo').length, rv=f.filter(r=>r.Tipo==='RenovaciÃ³n').length, ri=f.filter(r=>r.Tipo==='Reingreso').length;
+    let nv=f.filter(r=>r.Tipo==='Nuevo').length, rv=f.filter(r=>r.Tipo==='Renovación').length, ri=f.filter(r=>r.Tipo==='Reingreso').length;
     let tot=f.reduce((s,r)=>s+r.Total,0);
     doc.setFillColor(240,242,255); doc.roundedRect(36,86,pW-72,28,4,4,'F');
     doc.setFontSize(9); doc.setTextColor(45,45,94); doc.setFont(undefined,'bold');
@@ -1668,7 +1668,7 @@ function exportRenoPDF() {
     ]);
     doc.autoTable({
         startY:122,
-        head:[['Fecha','Cliente','Plan','Tipo','Total (CRC)','DÃ­as gap','Ingreso Pinares','Registrado por']],
+        head:[['Fecha','Cliente','Plan','Tipo','Total (CRC)','Días gap','Ingreso Pinares','Registrado por']],
         body:tableRows,
         headStyles:{ fillColor:[102,126,234], textColor:255, fontStyle:'bold', fontSize:8.5 },
         didParseCell(data) {
@@ -1691,21 +1691,21 @@ function exportRenoPDF() {
     doc.save('renovaciones_'+hoy()+'.pdf');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 //  SUMMARY MODAL (plan summary)
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 function buildPlanSummary() {
-    let active=getFilteredUsers().filter(u=>u.Activo==='SÃ­');
+    let active=getFilteredUsers().filter(u=>u.Activo==='Sí');
     let plans={};
-    active.forEach(u=>{ let p=u.ÃšltimoProducto||'Desconocido'; if (!plans[p]) plans[p]={plan:p,usuarios:0,conPrecio:0,sinPrecio:0,total:0,precio:0}; plans[p].usuarios++; if (u.ValorPlan>0){plans[p].conPrecio++;plans[p].total+=u.ValorPlan;plans[p].precio=u.ValorPlan;}else plans[p].sinPrecio++; });
+    active.forEach(u=>{ let p=u.ÚltimoProducto||'Desconocido'; if (!plans[p]) plans[p]={plan:p,usuarios:0,conPrecio:0,sinPrecio:0,total:0,precio:0}; plans[p].usuarios++; if (u.ValorPlan>0){plans[p].conPrecio++;plans[p].total+=u.ValorPlan;plans[p].precio=u.ValorPlan;}else plans[p].sinPrecio++; });
     return Object.values(plans).sort((a,b)=>b.total-a.total);
 }
 function openSummaryModal() {
     let rows=buildPlanSummary();
     let tU=rows.reduce((s,r)=>s+r.usuarios,0), tC=rows.reduce((s,r)=>s+r.conPrecio,0), tS=rows.reduce((s,r)=>s+r.sinPrecio,0), tI=rows.reduce((s,r)=>s+r.total,0);
     let html=`<table class="summary-table"><thead><tr><th>Plan</th><th>Usuarios Activos</th><th>Con Precio</th><th>Sin Precio</th><th>Precio Unitario</th><th>Total Mensual</th></tr></thead><tbody>`;
-    rows.forEach(r=>{ html+=`<tr><td><strong>${r.plan}</strong></td><td>${r.usuarios}</td><td>${r.conPrecio}</td><td>${r.sinPrecio>0?'<span style="color:#c62828;font-weight:700;">'+r.sinPrecio+'</span>':'0'}</td><td>${r.precio>0?'â‚¡'+r.precio.toLocaleString():'<span style="color:#aaa;">â€”</span>'}</td><td style="font-weight:700;">${r.total>0?'â‚¡'+r.total.toLocaleString():'<span style="color:#aaa;">â€”</span>'}</td></tr>`; });
-    html+=`</tbody><tfoot><tr><td>TOTAL GENERAL</td><td>${tU}</td><td>${tC}</td><td>${tS>0?'<span style="color:#c62828;">'+tS+'</span>':'0'}</td><td>â€”</td><td style="color:#667eea;">â‚¡${tI.toLocaleString()}</td></tr></tfoot></table>`;
+    rows.forEach(r=>{ html+=`<tr><td><strong>${r.plan}</strong></td><td>${r.usuarios}</td><td>${r.conPrecio}</td><td>${r.sinPrecio>0?'<span style="color:#c62828;font-weight:700;">'+r.sinPrecio+'</span>':'0'}</td><td>${r.precio>0?'₡'+r.precio.toLocaleString():'<span style="color:#aaa;">—</span>'}</td><td style="font-weight:700;">${r.total>0?'₡'+r.total.toLocaleString():'<span style="color:#aaa;">—</span>'}</td></tr>`; });
+    html+=`</tbody><tfoot><tr><td>TOTAL GENERAL</td><td>${tU}</td><td>${tC}</td><td>${tS>0?'<span style="color:#c62828;">'+tS+'</span>':'0'}</td><td>—</td><td style="color:#667eea;">₡${tI.toLocaleString()}</td></tr></tfoot></table>`;
     document.getElementById('summaryTableContainer').innerHTML=html;
     document.getElementById('summaryModal').style.display='block';
 }
@@ -1725,7 +1725,7 @@ function exportSummaryPDF() {
     let fecha=new Date().toLocaleDateString('es-CR',{year:'numeric',month:'long',day:'numeric'});
     doc.setFillColor(102,126,234); doc.rect(0,0,pW,80,'F');
     doc.setFillColor(118,75,162); doc.rect(pW-200,0,200,80,'F');
-    doc.setFontSize(18);doc.setTextColor(255,255,255);doc.setFont(undefined,'bold');doc.text('Resumen Global de Planes â€” '+currentSedeName,36,32);
+    doc.setFontSize(18);doc.setTextColor(255,255,255);doc.setFont(undefined,'bold');doc.text('Resumen Global de Planes — '+currentSedeName,36,32);
     doc.setFontSize(11);doc.setFont(undefined,'normal');doc.text('Ingresos Mensuales - Sistema de Gestion de Usuarios '+currentSedeName,36,50);
     doc.setFontSize(9);doc.text('Generado el: '+fecha,36,66);doc.text('JK Sistemas',pW-80,45,{align:'center'});
     let tRows=rows.map(r=>[r.plan,r.usuarios,r.conPrecio,r.sinPrecio,r.precio>0?'CRC '+r.precio.toLocaleString('es-CR'):'-',r.total>0?'CRC '+r.total.toLocaleString('es-CR'):'-']);
@@ -1742,15 +1742,15 @@ function exportSummaryPDF() {
     doc.save('resumen_planes_'+hoy()+'.pdf');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-//  VALIDACIÃ“N DESCUENTOS TAB
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
+//  VALIDACIÓN DESCUENTOS TAB
+// ══════════════════════════════════════════════════════
 function buildValidacion() {
     allValidacion = [];
     const TOL = 100;
     const today = new Date(); today.setHours(0,0,0,0);
-    usersData.filter(m => m.Activo === 'SÃ­' && LEALTAD_RE.test(m.ÃšltimoProducto || '')).forEach(m => {
-        const precioEsperado = (planPrices[m.ÃšltimoProducto] || m.ValorPlan || 0) || null;
+    usersData.filter(m => m.Activo === 'Sí' && LEALTAD_RE.test(m.ÚltimoProducto || '')).forEach(m => {
+        const precioEsperado = (planPrices[m.ÚltimoProducto] || m.ValorPlan || 0) || null;
         const pagos = renovacionesData
             .filter(r => r.User === m && LEALTAD_RE.test(r.Producto))
             .sort((a, b) => (b.TxDate?.getTime() || 0) - (a.TxDate?.getTime() || 0));
@@ -1759,8 +1759,8 @@ function buildValidacion() {
 
         let pagoTardio = null;
         if (pago && pago.TxDate && m.ExpiraDate) {
-            // ComparaciÃ³n directa contra la fecha de vencimiento (ver fix de classifyTransaction:
-            // restar la duraciÃ³n del plan asumÃ­a que "Expira" ya incluÃ­a este pago, lo cual no es el caso).
+            // Comparación directa contra la fecha de vencimiento (ver fix de classifyTransaction:
+            // restar la duración del plan asumía que "Expira" ya incluía este pago, lo cual no es el caso).
             const gap = Math.round((pago.TxDate - m.ExpiraDate) / 864e5);
             if (gap > 0) pagoTardio = gap;
         }
@@ -1778,7 +1778,7 @@ function buildValidacion() {
             estado = 'ok';
         }
 
-        allValidacion.push({ pin: m.PIN, cliente: m.Nombre, plan: m.ÃšltimoProducto, precioEsperado, pago, expira: m.ExpiraDate, expiraStr: m.Expira, dias, estado, pagoTardio });
+        allValidacion.push({ pin: m.PIN, cliente: m.Nombre, plan: m.ÚltimoProducto, precioEsperado, pago, expira: m.ExpiraDate, expiraStr: m.Expira, dias, estado, pagoTardio });
     });
 }
 
@@ -1815,14 +1815,14 @@ function renderValStats() {
         .filter(r => r.estado === 'vencido_sin_pago' || r.estado === 'por_vencer_sin_pago')
         .reduce((s, r) => s + (r.precioEsperado || 0), 0);
     document.getElementById('valStatsContainer').innerHTML = `
-        <div class="stat-card red"><h3>ðŸ”´ Vencidos sin pagar</h3><div class="value">${count('vencido_sin_pago')}</div><div class="sub">riesgo de inactivarse</div></div>
-        <div class="stat-card orange"><h3>ðŸŸ  Por vencer sin pagar</h3><div class="value">${count('por_vencer_sin_pago')}</div><div class="sub">â‰¤15 dÃ­as</div></div>
-        <div class="stat-card purple"><h3>ðŸ’° Monto en riesgo</h3><div class="value" style="font-size:1.35em;">â‚¡${montoRiesgo.toLocaleString()}</div><div class="sub">vencidos / por vencer sin pago</div></div>
-        <div class="stat-card teal"><h3>âš ï¸ Sin descuento</h3><div class="value">${count('sin_descuento')}</div><div class="sub">revisar cobro</div></div>
-        <div class="stat-card orange"><h3>âš ï¸ Monto diferente</h3><div class="value">${count('monto_diferente')}</div><div class="sub">revisar cobro</div></div>
-        <div class="stat-card orange"><h3>â° Pagos tardÃ­os</h3><div class="value">${tardios}</div><div class="sub">pagaron tras vencer</div></div>
-        <div class="stat-card green"><h3>âœ… Descuento OK</h3><div class="value">${count('ok')}</div><div class="sub">pagaron correctamente</div></div>
-        <div class="stat-card blue"><h3>ðŸŸ¢ Al dÃ­a</h3><div class="value">${count('al_dia')}</div><div class="sub">aÃºn no vencen</div></div>`;
+        <div class="stat-card red"><h3>🔴 Vencidos sin pagar</h3><div class="value">${count('vencido_sin_pago')}</div><div class="sub">riesgo de inactivarse</div></div>
+        <div class="stat-card orange"><h3>🟠 Por vencer sin pagar</h3><div class="value">${count('por_vencer_sin_pago')}</div><div class="sub">≤15 días</div></div>
+        <div class="stat-card purple"><h3>💰 Monto en riesgo</h3><div class="value" style="font-size:1.35em;">₡${montoRiesgo.toLocaleString()}</div><div class="sub">vencidos / por vencer sin pago</div></div>
+        <div class="stat-card teal"><h3>⚠️ Sin descuento</h3><div class="value">${count('sin_descuento')}</div><div class="sub">revisar cobro</div></div>
+        <div class="stat-card orange"><h3>⚠️ Monto diferente</h3><div class="value">${count('monto_diferente')}</div><div class="sub">revisar cobro</div></div>
+        <div class="stat-card orange"><h3>⏰ Pagos tardíos</h3><div class="value">${tardios}</div><div class="sub">pagaron tras vencer</div></div>
+        <div class="stat-card green"><h3>✅ Descuento OK</h3><div class="value">${count('ok')}</div><div class="sub">pagaron correctamente</div></div>
+        <div class="stat-card blue"><h3>🟢 Al día</h3><div class="value">${count('al_dia')}</div><div class="sub">aún no vencen</div></div>`;
 }
 
 function renderValTable(rows) {
@@ -1832,17 +1832,17 @@ function renderValTable(rows) {
         const cfg = ESTADO_VALIDACION[r.estado];
         const tr = tbody.insertRow();
         if (r.estado === 'vencido_sin_pago' || r.estado === 'por_vencer_sin_pago') tr.style.background = 'rgba(229,57,53,0.06)';
-        const pagoCell = r.pago ? `<strong>â‚¡${r.pago.Total.toLocaleString()}</strong>` : `<span style="color:#aaa;">â€”</span>`;
-        let fechaCell = r.pago ? r.pago.FechaStr.split(/\s+/)[0] : 'â€”';
-        if (r.pagoTardio) fechaCell += ` <span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:4px;">â° +${r.pagoTardio}d</span>`;
+        const pagoCell = r.pago ? `<strong>₡${r.pago.Total.toLocaleString()}</strong>` : `<span style="color:#aaa;">—</span>`;
+        let fechaCell = r.pago ? r.pago.FechaStr.split(/\s+/)[0] : '—';
+        if (r.pagoTardio) fechaCell += ` <span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:4px;">⏰ +${r.pagoTardio}d</span>`;
         const venceCell = r.expira
             ? `${r.expiraStr}${r.dias != null ? ` <span style="color:#aaa;font-size:11px;">(${r.dias < 0 ? r.dias : '+' + r.dias}d)</span>` : ''}`
-            : 'â€”';
+            : '—';
         tr.innerHTML = `
             <td>${r.pin}</td>
             <td><strong>${r.cliente}</strong></td>
             <td style="font-size:12.5px;">${r.plan}</td>
-            <td>${r.precioEsperado != null ? 'â‚¡' + r.precioEsperado.toLocaleString() : '<span style="color:#aaa;">â€”</span>'}</td>
+            <td>${r.precioEsperado != null ? '₡' + r.precioEsperado.toLocaleString() : '<span style="color:#aaa;">—</span>'}</td>
             <td>${pagoCell}</td>
             <td style="font-size:12px;">${fechaCell}</td>
             <td style="font-size:12px;">${venceCell}</td>
@@ -1852,13 +1852,13 @@ function renderValTable(rows) {
         `Mostrando ${rows.length} de ${allValidacion.length} clientes activos con plan de lealtad/fidelidad`;
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 //  SEGUIMIENTO: CLIENTES VENCIDOS SIN RENOVAR
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 function getSeguimientoVencidos() {
     const today = new Date(); today.setHours(0,0,0,0);
-    // El Informe de Usuarios puede no estar actualizado todavÃ­a aunque el cliente ya
-    // pagÃ³ este perÃ­odo (aparece en el archivo de Ventas) â€” se excluye a quien ya
+    // El Informe de Usuarios puede no estar actualizado todavía aunque el cliente ya
+    // pagó este período (aparece en el archivo de Ventas) — se excluye a quien ya
     // tenga un pago registrado en renovacionesData, sin importar lo que diga "Expira".
     const pagaronEstePeriodo = new Set(renovacionesData.map(r => normName(r.Cliente)));
     return usersData.filter(u => u.ExpiraDate && u.ExpiraDate < today && !pagaronEstePeriodo.has(normName(u.Nombre)));
@@ -1871,7 +1871,7 @@ function getFilteredSeguimiento() {
     const plan   = document.getElementById('segFilterPlan')?.value || 'all';
     return getSeguimientoVencidos().filter(u => {
         if (search && !u.Nombre.toLowerCase().includes(search)) return false;
-        if (plan !== 'all' && u.ÃšltimoProducto !== plan) return false;
+        if (plan !== 'all' && u.ÚltimoProducto !== plan) return false;
         const diasVencido = Math.round((today - u.ExpiraDate) / 864e5);
         if (rango !== 'all') {
             const [min, max] = rango.split('-').map(Number);
@@ -1895,7 +1895,7 @@ function renderSeguimiento() {
     // Poblar filtro de plan con los planes presentes entre los vencidos
     const planSel = document.getElementById('segFilterPlan');
     const currentPlan = planSel.value;
-    const planes = [...new Set(todos.map(u => u.ÃšltimoProducto).filter(Boolean))].sort();
+    const planes = [...new Set(todos.map(u => u.ÚltimoProducto).filter(Boolean))].sort();
     planSel.innerHTML = '<option value="all">Todos</option>' +
         planes.map(p => `<option value="${p.replace(/"/g,'&quot;')}"${p===currentPlan?' selected':''}>${p}</option>`).join('');
 
@@ -1905,10 +1905,10 @@ function renderSeguimiento() {
     const r15  = todos.filter(u => Math.round((today-u.ExpiraDate)/864e5) <= 15).length;
     const r60  = todos.filter(u => Math.round((today-u.ExpiraDate)/864e5) > 60).length;
     document.getElementById('segStatsContainer').innerHTML = `
-        <div class="stat-card red"><h3>ðŸ“‹ Total Vencidos</h3><div class="value">${todos.length}</div><div class="sub">Sin renovar a la fecha</div></div>
-        <div class="stat-card orange"><h3>ðŸŸ  Vencidos 1-15 dÃ­as</h3><div class="value">${r15}</div><div class="sub">AÃºn recientes</div></div>
-        <div class="stat-card red"><h3>ðŸ”´ Vencidos +60 dÃ­as</h3><div class="value">${r60}</div><div class="sub">Riesgo de pÃ©rdida</div></div>
-        <div class="stat-card purple"><h3>ðŸ’° Valor en Riesgo (filtro)</h3><div class="value" style="font-size:1.2em;">â‚¡${valorRiesgo.toLocaleString()}</div><div class="sub">${rows.length} cliente(s) mostrados</div></div>`;
+        <div class="stat-card red"><h3>📋 Total Vencidos</h3><div class="value">${todos.length}</div><div class="sub">Sin renovar a la fecha</div></div>
+        <div class="stat-card orange"><h3>🟠 Vencidos 1-15 días</h3><div class="value">${r15}</div><div class="sub">Aún recientes</div></div>
+        <div class="stat-card red"><h3>🔴 Vencidos +60 días</h3><div class="value">${r60}</div><div class="sub">Riesgo de pérdida</div></div>
+        <div class="stat-card purple"><h3>💰 Valor en Riesgo (filtro)</h3><div class="value" style="font-size:1.2em;">₡${valorRiesgo.toLocaleString()}</div><div class="sub">${rows.length} cliente(s) mostrados</div></div>`;
 
     const tbody = document.getElementById('segTableBody'); tbody.innerHTML = '';
     rows.forEach(u => {
@@ -1917,22 +1917,22 @@ function renderSeguimiento() {
         tr.innerHTML = `
             <td>${u.PIN}</td>
             <td><strong>${u.Nombre}</strong></td>
-            <td style="font-size:12.5px;white-space:nowrap;">${u.Telefono||'<span style="color:#aaa;">â€”</span>'}</td>
+            <td style="font-size:12.5px;white-space:nowrap;">${u.Telefono||'<span style="color:#aaa;">—</span>'}</td>
             <td style="color:#667eea;font-size:12px;">${u.Email||'-'}</td>
-            <td style="font-size:12.5px;">${u.ÃšltimoProducto||'-'}</td>
+            <td style="font-size:12.5px;">${u.ÚltimoProducto||'-'}</td>
             <td>${u.Expira||'-'}</td>
-            <td style="font-weight:700;color:${diasVencido>60?'#c62828':'#e65100'};">${diasVencido} dÃ­as</td>
-            <td>${u.ValorPlan>0?'â‚¡'+u.ValorPlan.toLocaleString():'<span style="color:#aaa;">â€”</span>'}</td>`;
+            <td style="font-weight:700;color:${diasVencido>60?'#c62828':'#e65100'};">${diasVencido} días</td>
+            <td>${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString():'<span style="color:#aaa;">—</span>'}</td>`;
     });
     document.getElementById('segTableInfo').textContent =
-        `Mostrando ${rows.length} de ${todos.length} clientes vencidos sin renovar â€” Valor en riesgo: â‚¡${valorRiesgo.toLocaleString()}`;
+        `Mostrando ${rows.length} de ${todos.length} clientes vencidos sin renovar — Valor en riesgo: ₡${valorRiesgo.toLocaleString()}`;
 }
 
 function exportSegCSV() {
     const f = getFilteredSeguimiento(); if (!f.length) { alert('No hay datos'); return; }
     const today = new Date(); today.setHours(0,0,0,0);
     const h = ['PIN','Nombre','Telefono','Email','Plan','Vencio','Dias vencido','Valor Plan (CRC)'];
-    const rows = f.map(u => [u.PIN, u.Nombre, u.Telefono, u.Email, u.ÃšltimoProducto, u.Expira, Math.round((today-u.ExpiraDate)/864e5), u.ValorPlan]);
+    const rows = f.map(u => [u.PIN, u.Nombre, u.Telefono, u.Email, u.ÚltimoProducto, u.Expira, Math.round((today-u.ExpiraDate)/864e5), u.ValorPlan]);
     const csv = [h, ...rows].map(row => row.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
     dlBlob(csv, 'seguimiento_vencidos_'+currentSedeName+'_'+hoy()+'.csv', 'text/csv;charset=utf-8');
 }
@@ -1948,11 +1948,11 @@ function printSeguimiento() {
         return `<tr>
             <td>${u.PIN}</td>
             <td>${u.Nombre}</td>
-            <td>${u.Telefono||'â€”'}</td>
-            <td>${u.ÃšltimoProducto||'-'}</td>
+            <td>${u.Telefono||'—'}</td>
+            <td>${u.ÚltimoProducto||'-'}</td>
             <td>${u.Expira||'-'}</td>
             <td>${dias}</td>
-            <td>${u.ValorPlan>0?'â‚¡'+u.ValorPlan.toLocaleString():'â€”'}</td>
+            <td>${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString():'—'}</td>
             <td class="notas"></td>
         </tr>`;
     }).join('');
@@ -1970,10 +1970,10 @@ function printSeguimiento() {
         td.notas { width: 160px; }
         @media print { body { padding: 8px; } }
     </style></head><body>
-        <h1>Seguimiento de Clientes Vencidos â€” ${currentSedeName}</h1>
-        <div class="sub">Generado: ${fecha} &nbsp;Â·&nbsp; Total: ${f.length} cliente(s)</div>
+        <h1>Seguimiento de Clientes Vencidos — ${currentSedeName}</h1>
+        <div class="sub">Generado: ${fecha} &nbsp;·&nbsp; Total: ${f.length} cliente(s)</div>
         <table>
-            <thead><tr><th>PIN</th><th>Nombre</th><th>TelÃ©fono</th><th>Plan</th><th>VenciÃ³</th><th>DÃ­as vencido</th><th>Valor</th><th>Notas / Contacto</th></tr></thead>
+            <thead><tr><th>PIN</th><th>Nombre</th><th>Teléfono</th><th>Plan</th><th>Venció</th><th>Días vencido</th><th>Valor</th><th>Notas / Contacto</th></tr></thead>
             <tbody>${rows}</tbody>
         </table>
     </body></html>`);
@@ -1982,9 +1982,9 @@ function printSeguimiento() {
     setTimeout(() => win.print(), 250);
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 //  HISTORIAL (Supabase)
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 let histSnapshots = [];   // in-memory cache after fetch
 
 function detectMesFromData() {
@@ -2004,13 +2004,13 @@ async function autoSaveToSupabase() {
         const { mes, mesOrden } = detectMesFromData();
         const today = new Date(); today.setHours(0,0,0,0);
         const ranges = [
-            { label:'Vencen en 7 dÃ­as',  days:7  },
-            { label:'Vencen en 15 dÃ­as', days:15 },
-            { label:'Vencen en 30 dÃ­as', days:30 },
-            { label:'Vencen en 60 dÃ­as', days:60 },
+            { label:'Vencen en 7 días',  days:7  },
+            { label:'Vencen en 15 días', days:15 },
+            { label:'Vencen en 30 días', days:30 },
+            { label:'Vencen en 60 días', days:60 },
             { label:'Ya vencidos (activos)', days:-1 },
         ];
-        const active = usersData.filter(u => u.Activo === 'SÃ­' && u.ExpiraDate);
+        const active = usersData.filter(u => u.Activo === 'Sí' && u.ExpiraDate);
         const proyecciones = ranges.map(rng => {
             let g = rng.days === -1
                 ? active.filter(u => u.ExpiraDate < today)
@@ -2024,12 +2024,12 @@ async function autoSaveToSupabase() {
             updated_at: new Date().toISOString()
         };
         if (usuariosLoaded) {
-            record.activos        = usersData.filter(u => u.Activo === 'SÃ­').length;
+            record.activos        = usersData.filter(u => u.Activo === 'Sí').length;
             record.total_usuarios = usersData.length;
             record.proyecciones   = proyecciones;
             record.users_data     = usersData.map(u => ({
                 PIN: u.PIN, Nombre: u.Nombre, Email: u.Email, Activo: u.Activo,
-                Expira: u.Expira, ÃšltimoProducto: u.ÃšltimoProducto, Telefono: u.Telefono,
+                Expira: u.Expira, ÚltimoProducto: u.ÚltimoProducto, Telefono: u.Telefono,
                 Ingreso: u.Ingreso, ValorPlan: u.ValorPlan
             }));
         }
@@ -2037,7 +2037,7 @@ async function autoSaveToSupabase() {
             // Si no subimos Ventas esta vez, no tocar renovaciones/renov_data ya guardados (evita borrarlos)
             record.renovaciones = {
                 nuevos:       renovacionesData.filter(r=>r.Tipo==='Nuevo').length,
-                renovaciones: renovacionesData.filter(r=>r.Tipo==='RenovaciÃ³n').length,
+                renovaciones: renovacionesData.filter(r=>r.Tipo==='Renovación').length,
                 reingresos:   renovacionesData.filter(r=>r.Tipo==='Reingreso').length,
                 total:        renovacionesData.reduce((s,r)=>s+r.Total,0),
                 clasesSueltas: {
@@ -2066,7 +2066,7 @@ async function autoSaveToSupabase() {
                 }))
             ];
         }
-        // Intentar actualizar primero; si no existe ningÃºn registro, insertar
+        // Intentar actualizar primero; si no existe ningún registro, insertar
         const existing = await supaFetch(
             `/gym_snapshots?sede=eq.${encodeURIComponent(record.sede)}&mes=eq.${encodeURIComponent(record.mes)}&select=id`
         );
@@ -2091,15 +2091,15 @@ async function autoSaveToSupabase() {
                 method: 'POST', prefer: 'return=minimal', body: record
             });
         }
-        statusEl.innerHTML += ` &nbsp;<span style="color:#1565c0;font-size:13px;">â˜ï¸ Historial actualizado (${mes})</span>`;
+        statusEl.innerHTML += ` &nbsp;<span style="color:#1565c0;font-size:13px;">☁️ Historial actualizado (${mes})</span>`;
     } catch(e) {
         console.error('Supabase save error:', e);
-        statusEl.innerHTML += ` &nbsp;<span style="color:#c62828;font-size:13px;">âš ï¸ Error nube: ${e.message}</span>`;
+        statusEl.innerHTML += ` &nbsp;<span style="color:#c62828;font-size:13px;">⚠️ Error nube: ${e.message}</span>`;
     }
 }
 
 async function deleteSnapshot(id) {
-    if (!confirm('Â¿Eliminar este registro del historial?')) return;
+    if (!confirm('¿Eliminar este registro del historial?')) return;
     try {
         await supaFetch(`/gym_snapshots?id=eq.${id}`, { method: 'DELETE' });
         await loadAndRenderHistorial();
@@ -2107,7 +2107,7 @@ async function deleteSnapshot(id) {
 }
 
 async function clearAllSnapshots() {
-    if (!confirm('Â¿Eliminar TODO el historial de esta sede?\n\nEsta acciÃ³n no se puede deshacer.')) return;
+    if (!confirm('¿Eliminar TODO el historial de esta sede?\n\nEsta acción no se puede deshacer.')) return;
     const sedeFilter = document.getElementById('histSedeFilter')?.value || 'all';
     try {
         const path = sedeFilter === 'all'
@@ -2120,11 +2120,11 @@ async function clearAllSnapshots() {
 
 async function loadAndRenderHistorial() {
     const container = document.getElementById('historialContent');
-    container.innerHTML = `<div style="text-align:center;padding:40px;color:#aaa;">â³ Cargando historial...</div>`;
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:#aaa;">⏳ Cargando historial...</div>`;
     try {
         histSnapshots = await supaFetch('/gym_snapshots?order=mes_orden.desc,sede.asc&select=*') || [];
     } catch(e) {
-        container.innerHTML = `<div style="text-align:center;padding:40px;color:#c62828;">âŒ No se pudo conectar a la base de datos.<br><small>${e.message}</small></div>`;
+        container.innerHTML = `<div style="text-align:center;padding:40px;color:#c62828;">❌ No se pudo conectar a la base de datos.<br><small>${e.message}</small></div>`;
         return;
     }
     updateHistSedeFilter();
@@ -2147,9 +2147,9 @@ function renderHistorial() {
 
     if (!snaps.length) {
         container.innerHTML = `<div style="text-align:center;padding:60px 20px;color:#aaa;">
-            <div style="font-size:48px;margin-bottom:16px;">ðŸ“­</div>
-            <div style="font-size:1.1em;font-weight:600;color:#666;">No hay datos en el historial aÃºn</div>
-            <div style="font-size:13px;margin-top:8px;">Cada vez que cargues un Excel se guardarÃ¡ automÃ¡ticamente aquÃ­.</div>
+            <div style="font-size:48px;margin-bottom:16px;">📭</div>
+            <div style="font-size:1.1em;font-weight:600;color:#666;">No hay datos en el historial aún</div>
+            <div style="font-size:13px;margin-top:8px;">Cada vez que cargues un Excel se guardará automáticamente aquí.</div>
         </div>`;
         return;
     }
@@ -2166,9 +2166,9 @@ function renderHistorial() {
             return `<tr>
                 <td><strong>${s.mes}</strong><br><span style="color:#aaa;font-size:11px;">Actualizado: ${upd}</span></td>
                 <td style="text-align:center;">${(s.activos||0).toLocaleString()} <span style="color:#aaa;font-size:11px;">/ ${(s.total_usuarios||0).toLocaleString()}</span></td>
-                <td style="text-align:right;color:#2e7d32;font-weight:700;">â‚¡${(proj30?.revenue||0).toLocaleString()}<br><span style="color:#aaa;font-size:11px;">${proj30?.count||0} miembros</span></td>
-                <td style="text-align:right;color:#1565c0;font-weight:700;">â‚¡${(proj60?.revenue||0).toLocaleString()}<br><span style="color:#aaa;font-size:11px;">${proj60?.count||0} miembros</span></td>
-                <td style="text-align:right;font-weight:700;">â‚¡${(reno.total||0).toLocaleString()}</td>
+                <td style="text-align:right;color:#2e7d32;font-weight:700;">₡${(proj30?.revenue||0).toLocaleString()}<br><span style="color:#aaa;font-size:11px;">${proj30?.count||0} miembros</span></td>
+                <td style="text-align:right;color:#1565c0;font-weight:700;">₡${(proj60?.revenue||0).toLocaleString()}<br><span style="color:#aaa;font-size:11px;">${proj60?.count||0} miembros</span></td>
+                <td style="text-align:right;font-weight:700;">₡${(reno.total||0).toLocaleString()}</td>
                 <td style="text-align:center;">
                     <span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${reno.nuevos||0} N</span>
                     <span style="background:#e3f2fd;color:#1565c0;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${reno.renovaciones||0} R</span>
@@ -2176,18 +2176,18 @@ function renderHistorial() {
                 </td>
                 <td>
                     <button onclick="showSnapshotDetail(${s.id})" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;padding:5px 11px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;">Ver detalle</button>
-                    <button onclick="deleteSnapshot(${s.id})" style="background:linear-gradient(135deg,#e53935,#b71c1c);color:white;border:none;padding:5px 9px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;margin-left:4px;">ðŸ—‘</button>
+                    <button onclick="deleteSnapshot(${s.id})" style="background:linear-gradient(135deg,#e53935,#b71c1c);color:white;border:none;padding:5px 9px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;margin-left:4px;">🗑</button>
                 </td>
             </tr>`;
         }).join('');
         return `<div style="margin-bottom:32px;">
-            <div class="section-title">ðŸ¢ ${sede} <span style="font-size:13px;font-weight:400;color:#888;">(${items.length} mes${items.length>1?'es':''})</span></div>
+            <div class="section-title">🏢 ${sede} <span style="font-size:13px;font-weight:400;color:#888;">(${items.length} mes${items.length>1?'es':''})</span></div>
             <div class="table-container"><table>
                 <thead><tr>
                     <th>Mes</th>
                     <th style="text-align:center;">Activos</th>
-                    <th style="text-align:right;">ProyecciÃ³n 30d</th>
-                    <th style="text-align:right;">ProyecciÃ³n 60d</th>
+                    <th style="text-align:right;">Proyección 30d</th>
+                    <th style="text-align:right;">Proyección 60d</th>
                     <th style="text-align:right;">Recaudado</th>
                     <th style="text-align:center;">N / R / Re</th>
                     <th>Acciones</th>
@@ -2203,47 +2203,47 @@ function showSnapshotDetail(id) {
     if (!snap) return;
     const reno = snap.renovaciones || {};
     const projRows = (snap.proyecciones||[]).map(p =>
-        `<tr><td>${p.label}</td><td style="text-align:center;">${p.count}</td><td style="text-align:right;font-weight:700;">â‚¡${(p.revenue||0).toLocaleString()}</td></tr>`
+        `<tr><td>${p.label}</td><td style="text-align:center;">${p.count}</td><td style="text-align:right;font-weight:700;">₡${(p.revenue||0).toLocaleString()}</td></tr>`
     ).join('');
     document.getElementById('summaryTableContainer').innerHTML = `
         <div style="font-size:14px;color:#555;margin-bottom:18px;">
-            <strong>${snap.sede}</strong> Â· ${snap.mes} Â· ${snap.activos} activos de ${snap.total_usuarios} totales
+            <strong>${snap.sede}</strong> · ${snap.mes} · ${snap.activos} activos de ${snap.total_usuarios} totales
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
             <div>
-                <div class="section-title" style="margin-bottom:10px;">ðŸ“ˆ Proyecciones</div>
+                <div class="section-title" style="margin-bottom:10px;">📈 Proyecciones</div>
                 <table class="summary-table">
                     <thead><tr><th>Rango</th><th style="text-align:center;">Miembros</th><th style="text-align:right;">Ingreso Est.</th></tr></thead>
                     <tbody>${projRows}</tbody>
                 </table>
             </div>
             <div>
-                <div class="section-title" style="margin-bottom:10px;">ðŸ”„ Renovaciones</div>
+                <div class="section-title" style="margin-bottom:10px;">🔄 Renovaciones</div>
                 <div class="stats" style="padding:0;grid-template-columns:1fr 1fr;">
-                    <div class="stat-card green"  style="padding:16px;"><h3>ðŸ†• Nuevos</h3><div class="value">${reno.nuevos||0}</div></div>
-                    <div class="stat-card blue"   style="padding:16px;"><h3>âœ… Renovaciones</h3><div class="value">${reno.renovaciones||0}</div></div>
-                    <div class="stat-card orange" style="padding:16px;"><h3>ðŸ”„ Reingresos</h3><div class="value">${reno.reingresos||0}</div></div>
-                    <div class="stat-card teal"   style="padding:16px;"><h3>ðŸ’° Recaudado</h3><div class="value" style="font-size:1.2em;">â‚¡${(reno.total||0).toLocaleString()}</div></div>
+                    <div class="stat-card green"  style="padding:16px;"><h3>🆕 Nuevos</h3><div class="value">${reno.nuevos||0}</div></div>
+                    <div class="stat-card blue"   style="padding:16px;"><h3>✅ Renovaciones</h3><div class="value">${reno.renovaciones||0}</div></div>
+                    <div class="stat-card orange" style="padding:16px;"><h3>🔄 Reingresos</h3><div class="value">${reno.reingresos||0}</div></div>
+                    <div class="stat-card teal"   style="padding:16px;"><h3>💰 Recaudado</h3><div class="value" style="font-size:1.2em;">₡${(reno.total||0).toLocaleString()}</div></div>
                 </div>
             </div>
         </div>`;
     document.getElementById('summaryModal').style.display = 'block';
-    document.querySelector('.summary-modal-content h3').textContent = `ðŸ“… ${snap.mes} â€” ${snap.sede}`;
+    document.querySelector('.summary-modal-content h3').textContent = `📅 ${snap.mes} — ${snap.sede}`;
     document.querySelector('.summary-modal-content p').textContent = '';
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 //  HELPERS
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 function hoy() { return new Date().toISOString().slice(0,10); }
 function dlBlob(content, filename, type) {
-    let blob=new Blob(['ï»¿'+content],{type});
+    let blob=new Blob(['﻿'+content],{type});
     let a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); URL.revokeObjectURL(a.href);
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 //  EVENTS
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════
 function readAndProcess(file, processFn) {
     if (!file) return;
     if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {

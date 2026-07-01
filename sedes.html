@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reporte de Sedes â€” FacturaciÃ³n</title>
+<title>Reporte de Sedes — Facturación</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root {
@@ -27,7 +27,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
 
-/* â”€â”€ Login â”€â”€ */
+/* ── Login ── */
 #loginScreen { position: fixed; inset: 0; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); display: flex; align-items: center; justify-content: center; z-index: 9999; }
 .login-card { background: white; border-radius: 24px; padding: 40px 44px; width: 100%; max-width: 420px; box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
 .login-logo { width: 64px; height: 64px; background: linear-gradient(135deg, #1a5276, #2e86c1); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 20px; }
@@ -41,7 +41,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 .login-btn:disabled { opacity: .6; cursor: not-allowed; }
 #loginError { text-align: center; color: #c62828; font-size: 13px; margin-top: 12px; min-height: 18px; }
 
-/* â”€â”€ Header â”€â”€ */
+/* ── Header ── */
 .header {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
   color: white; padding: 18px 32px; display: flex; align-items: center; gap: 16px;
@@ -53,12 +53,12 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 .header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; color: white; font-size: 13px; }
 .logout-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35); color: white; border-radius: 16px; padding: 5px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
 
-/* â”€â”€ Loading / empty â”€â”€ */
+/* ── Loading / empty ── */
 .loading, .empty-state { display: none; text-align: center; padding: 60px 32px; color: var(--muted); }
 .spinner { width: 44px; height: 44px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* â”€â”€ Dashboard â”€â”€ */
+/* ── Dashboard ── */
 #dashboard { display: none; }
 .dash-topbar { padding: 12px 32px; background: white; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 .dash-title { font-size: 15px; font-weight: 700; color: var(--primary); }
@@ -136,85 +136,85 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 </head>
 <body>
 
-<!-- â”€â”€ LOGIN â”€â”€ -->
+<!-- ── LOGIN ── -->
 <div id="loginScreen">
   <div class="login-card">
-    <div class="login-logo">ðŸ“Š</div>
+    <div class="login-logo">📊</div>
     <h2>Reporte de Sedes</h2>
-    <p class="login-sub">Acceso restringido â€” FacturaciÃ³n consolidada</p>
-    <div class="login-field"><label>Correo electrÃ³nico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
-    <div class="login-field"><label>ContraseÃ±a</label><input type="password" id="loginPassword" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" autocomplete="current-password"></div>
+    <p class="login-sub">Acceso restringido — Facturación consolidada</p>
+    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
+    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
     <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
     <div id="loginError"></div>
   </div>
 </div>
 
 <div class="header">
-  <div class="header-icon">ðŸ‹ï¸</div>
+  <div class="header-icon">🏋️</div>
   <div>
-    <h1>Reporte de FacturaciÃ³n por Sede</h1>
-    <p>Datos cargados automÃ¡ticamente desde el sistema de gestiÃ³n de cada sede</p>
+    <h1>Reporte de Facturación por Sede</h1>
+    <p>Datos cargados automáticamente desde el sistema de gestión de cada sede</p>
   </div>
   <div class="header-right">
-    <span>ðŸ‘¤ <span id="userNombre">â€”</span></span>
-    <button class="logout-btn" onclick="doLogout()">Cerrar sesiÃ³n</button>
+    <span>👤 <span id="userNombre">—</span></span>
+    <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
   </div>
 </div>
 
 <div class="loading" id="loading">
   <div class="spinner"></div>
-  <div>Cargando datos de las sedesâ€¦</div>
+  <div>Cargando datos de las sedes…</div>
 </div>
 
 <div class="empty-state" id="emptyState">
-  No hay datos cargados todavÃ­a en ninguna sede.
+  No hay datos cargados todavía en ninguna sede.
 </div>
 
 <div id="dashboard">
 
   <div class="dash-topbar">
     <div>
-      <div class="dash-title">ðŸ“Š Reporte de FacturaciÃ³n por Sede</div>
+      <div class="dash-title">📊 Reporte de Facturación por Sede</div>
       <div class="dash-period" id="dashPeriod"></div>
     </div>
-    <button class="btn-back" onclick="loadAllSedes()">â†» Actualizar</button>
+    <button class="btn-back" onclick="loadAllSedes()">↻ Actualizar</button>
   </div>
 
   <div class="kpi-row">
     <div class="kpi">
-      <div class="kpi-label">Total FacturaciÃ³n</div>
-      <div class="kpi-value" id="kpiTotal">â€”</div>
+      <div class="kpi-label">Total Facturación</div>
+      <div class="kpi-value" id="kpiTotal">—</div>
       <div class="kpi-sub">Todas las sedes</div>
     </div>
     <div class="kpi green">
-      <div class="kpi-label">MembresÃ­as</div>
-      <div class="kpi-value" id="kpiMemb">â€”</div>
-      <div class="kpi-sub" id="kpiMembPct">â€”</div>
+      <div class="kpi-label">Membresías</div>
+      <div class="kpi-value" id="kpiMemb">—</div>
+      <div class="kpi-sub" id="kpiMembPct">—</div>
     </div>
     <div class="kpi orange">
       <div class="kpi-label">Minita</div>
-      <div class="kpi-value" id="kpiMinita">â€”</div>
-      <div class="kpi-sub" id="kpiMinitaPct">â€”</div>
+      <div class="kpi-value" id="kpiMinita">—</div>
+      <div class="kpi-sub" id="kpiMinitaPct">—</div>
     </div>
     <div class="kpi purple">
       <div class="kpi-label">Personal Trainer</div>
-      <div class="kpi-value" id="kpiPT">â€”</div>
-      <div class="kpi-sub">No incluido en membresÃ­as</div>
+      <div class="kpi-value" id="kpiPT">—</div>
+      <div class="kpi-sub">No incluido en membresías</div>
     </div>
     <div class="kpi accesorios">
       <div class="kpi-label">Accesorios</div>
-      <div class="kpi-value" id="kpiAcc">â€”</div>
-      <div class="kpi-sub" id="kpiAccPct">â€”</div>
+      <div class="kpi-value" id="kpiAcc">—</div>
+      <div class="kpi-sub" id="kpiAccPct">—</div>
     </div>
   </div>
 
   <div class="section"><div class="section-title">Resumen por Sede</div></div>
   <div class="sede-grid" id="sedeGrid"></div>
 
-  <div class="section"><div class="section-title">GrÃ¡ficos</div></div>
+  <div class="section"><div class="section-title">Gráficos</div></div>
   <div class="charts-row">
-    <div class="chart-box"><h3>FacturaciÃ³n Total por Sede</h3><canvas id="chartBar" height="220"></canvas></div>
-    <div class="chart-box"><h3>DistribuciÃ³n Global MembresÃ­as vs Minita</h3><canvas id="chartPie" height="220"></canvas></div>
+    <div class="chart-box"><h3>Facturación Total por Sede</h3><canvas id="chartBar" height="220"></canvas></div>
+    <div class="chart-box"><h3>Distribución Global Membresías vs Minita</h3><canvas id="chartPie" height="220"></canvas></div>
   </div>
 
   <div class="vend-section">
@@ -225,7 +225,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 </div>
 
 <script>
-// â”€â”€ Supabase â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Supabase ──────────────────────────────────────────────────────────────
 const SUPA_URL = '__SUPA_URL__';
 const SUPA_KEY = '__SUPA_KEY__';
 let currentToken = null, currentRole = null;
@@ -244,7 +244,7 @@ async function supaFetch(path, opts = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
-// Ãšnico rol permitido en este reporte: 'admin_sedes' (distinto de 'admin'/'colaborador')
+// Único rol permitido en este reporte: 'admin_sedes' (distinto de 'admin'/'colaborador')
 const ROL_PERMITIDO = 'admin_sedes';
 
 async function doLogin() {
@@ -294,32 +294,32 @@ async function doLogout(silent) {
   document.getElementById('loginScreen').style.display = 'flex';
 }
 
-// â”€â”€ Config de sedes y clasificaciÃ³n de productos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Config de sedes y clasificación de productos ────────────────────────────
 const SEDE_META = {
-  '3 RÃ­os':   { icon: 'ðŸŒŠ', cls: 'tresrios',  color: '#00838f' },
-  'NataciÃ³n': { icon: 'ðŸŠ', cls: 'natacion',  color: '#6a1b9a' },
-  'Pinares':  { icon: 'ðŸŒ²', cls: 'pinares',   color: '#2e7d32' },
-  'Sabanilla':{ icon: 'ðŸ™ï¸', cls: 'sabanilla', color: '#1565c0' },
+  '3 Ríos':   { icon: '🌊', cls: 'tresrios',  color: '#00838f' },
+  'Natación': { icon: '🏊', cls: 'natacion',  color: '#6a1b9a' },
+  'Pinares':  { icon: '🌲', cls: 'pinares',   color: '#2e7d32' },
+  'Sabanilla':{ icon: '🏙️', cls: 'sabanilla', color: '#1565c0' },
 };
-const SEDES = ['3 RÃ­os','NataciÃ³n','Pinares','Sabanilla'];
+const SEDES = ['3 Ríos','Natación','Pinares','Sabanilla'];
 
 const PT_KW = ['personal training','personal 2026'];
 
-// Bebidas, snacks y suplementos vendidos sueltos en recepciÃ³n
+// Bebidas, snacks y suplementos vendidos sueltos en recepción
 const MINITA_KW = [
   'agua','gatorade','gatorage','powerade','rooster','be come strong',
   'aminos','creatina','pre-entreno','pre entreno','bucked up','glu',
-  'gricket','gym bite','scoop de prote','snack','bebida','paÃ±o','pano'
+  'gricket','gym bite','scoop de prote','snack','bebida','paño','pano'
 ];
 
-// MercaderÃ­a de nataciÃ³n (no es bebida/suplemento ni membresÃ­a)
+// Mercadería de natación (no es bebida/suplemento ni membresía)
 const ACCESORIOS_KW = [
   'gorra','lente','goggle','tapon de nariz','tapon de oido',
-  'tapÃ³n de nariz','tapÃ³n de oido','bolso'
+  'tapón de nariz','tapón de oido','bolso'
 ];
 
-// Todo lo que no caiga en PT/Minita/Accesorios se asume MembresÃ­a
-// (planes, clases, mensualidades, matrÃ­culas, etc. â€” son la mayorÃ­a de los productos reales)
+// Todo lo que no caiga en PT/Minita/Accesorios se asume Membresía
+// (planes, clases, mensualidades, matrículas, etc. — son la mayoría de los productos reales)
 function classify(p) {
   const pl = (p||'').toLowerCase();
   if (PT_KW.some(k => pl.includes(k))) return 'pt';
@@ -328,7 +328,7 @@ function classify(p) {
   return 'memb';
 }
 
-// â”€â”€ Carga automÃ¡tica desde gym_snapshots â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Carga automática desde gym_snapshots ────────────────────────────────────
 let chartBar = null, chartPie = null;
 
 async function loadAllSedes() {
@@ -342,7 +342,7 @@ async function loadAllSedes() {
       document.getElementById('emptyState').style.display = 'block';
       return;
     }
-    // snapshot mÃ¡s reciente por sede
+    // snapshot más reciente por sede
     const latest = {};
     snaps.forEach(s => { if (!latest[s.sede]) latest[s.sede] = s; });
     buildDashboard(latest);
@@ -350,12 +350,12 @@ async function loadAllSedes() {
   } catch(e) {
     document.getElementById('loading').style.display = 'none';
     document.getElementById('emptyState').style.display = 'block';
-    document.getElementById('emptyState').textContent = 'âš ï¸ Error al cargar datos: ' + e.message;
+    document.getElementById('emptyState').textContent = '⚠️ Error al cargar datos: ' + e.message;
   }
 }
 
 function buildDashboard(latest) {
-  const fmt = n => 'â‚¡' + Math.round(n).toLocaleString('es-CR');
+  const fmt = n => '₡' + Math.round(n).toLocaleString('es-CR');
   const pct = (a, b) => b ? (a/b*100).toFixed(1)+'%' : '0%';
 
   // filas de venta por sede, derivadas de renov_data (RegistradoPor/Producto/Total)
@@ -378,7 +378,7 @@ function buildDashboard(latest) {
     const rows = rowsBySede[s];
     const tot = rows.length
       ? rows.reduce((a,r)=>a+r.total,0)
-      : (snap.renovaciones?.total || 0); // fallback si no hay detalle (ej. NataciÃ³n)
+      : (snap.renovaciones?.total || 0); // fallback si no hay detalle (ej. Natación)
     const mem  = rows.filter(r=>r.cat==='memb').reduce((a,r)=>a+r.total,0);
     const min  = rows.filter(r=>r.cat==='minita').reduce((a,r)=>a+r.total,0);
     const pt_  = rows.filter(r=>r.cat==='pt').reduce((a,r)=>a+r.total,0);
@@ -411,7 +411,7 @@ function buildDashboard(latest) {
       sedeGrid.innerHTML += `
         <div class="sede-card no-data">
           <div class="sede-card-header bg-${m.cls}"><span class="s-icon">${m.icon}</span><span class="s-name">${s}</span></div>
-          <div class="sede-card-body"><div class="sede-row-label">Sin datos cargados aÃºn</div></div>
+          <div class="sede-card-body"><div class="sede-row-label">Sin datos cargados aún</div></div>
         </div>`;
       return;
     }
@@ -426,7 +426,7 @@ function buildDashboard(latest) {
         <div class="sede-card-body">
           <div class="sede-row"><span class="sede-row-label">Mes</span><span class="sede-row-val">${d.mes}</span></div>
           <div class="sede-row">
-            <span class="sede-row-label">MembresÃ­as</span>
+            <span class="sede-row-label">Membresías</span>
             <span class="sede-row-val">${fmt(d.mem)} <span class="sede-row-pct">${pct(d.mem,d.tot)}</span></span>
           </div>
           <div class="sede-row">
@@ -442,10 +442,10 @@ function buildDashboard(latest) {
             <span class="sede-row-val">${fmt(d.acc)} <span class="sede-row-pct">${pct(d.acc,d.tot)}</span></span>
           </div>` : ''}
           <div class="progress-bar"><div class="progress-fill" style="width:${pct(d.mem,d.tot)};background:${m.color}"></div></div>
-          ${top ? `<div class="top-vend-label">ðŸ† Top Vendedor</div>
+          ${top ? `<div class="top-vend-label">🏆 Top Vendedor</div>
           <div class="top-vend-name text-${m.cls}">${top[0]}</div>
-          <div class="top-vend-amt">${fmt(top[1])} Â· ${pct(top[1],d.tot)}</div>`
-          : `<div class="no-vend-note">Esta sede no registra vendedor por transacciÃ³n.</div>`}
+          <div class="top-vend-amt">${fmt(top[1])} · ${pct(top[1],d.tot)}</div>`
+          : `<div class="no-vend-note">Esta sede no registra vendedor por transacción.</div>`}
         </div>
       </div>`;
   });
@@ -463,7 +463,7 @@ function buildDashboard(latest) {
   chartBar = new Chart(document.getElementById('chartBar'), {
     type: 'bar',
     data: { labels: barLabels, datasets: [
-      { label: 'MembresÃ­as',       data: barMemb,   backgroundColor: barColors,                 borderRadius: 4 },
+      { label: 'Membresías',       data: barMemb,   backgroundColor: barColors,                 borderRadius: 4 },
       { label: 'Minita',           data: barMinita, backgroundColor: barColors.map(c=>c+'55'),  borderRadius: 4 },
       { label: 'Personal Trainer', data: barPT,     backgroundColor: barColors.map(c=>c+'33'),  borderRadius: 4 },
       { label: 'Accesorios',       data: barAcc,    backgroundColor: barColors.map(c=>c+'1a'),  borderRadius: 4 },
@@ -471,19 +471,19 @@ function buildDashboard(latest) {
     options: {
       responsive: true,
       plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } },
-        tooltip: { callbacks: { label: ctx => ' â‚¡' + Math.round(ctx.raw).toLocaleString('es-CR') } } },
-      scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => 'â‚¡' + (v/1000000).toFixed(1)+'M' } } }
+        tooltip: { callbacks: { label: ctx => ' ₡' + Math.round(ctx.raw).toLocaleString('es-CR') } } },
+      scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => '₡' + (v/1000000).toFixed(1)+'M' } } }
     }
   });
 
   if (chartPie) chartPie.destroy();
   chartPie = new Chart(document.getElementById('chartPie'), {
     type: 'doughnut',
-    data: { labels: ['MembresÃ­as', 'Minita', 'Personal Trainer', 'Accesorios'],
+    data: { labels: ['Membresías', 'Minita', 'Personal Trainer', 'Accesorios'],
       datasets: [{ data: [memb, minita, pt, accesorios], backgroundColor: ['#2E5FA3','#e67e22','#7030A0','#8d6e63'], borderWidth: 2 }] },
     options: { responsive: true,
       plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } },
-        tooltip: { callbacks: { label: ctx => ' â‚¡' + Math.round(ctx.raw).toLocaleString('es-CR') + ' (' + pct(ctx.raw, total) + ')' } } } }
+        tooltip: { callbacks: { label: ctx => ' ₡' + Math.round(ctx.raw).toLocaleString('es-CR') + ' (' + pct(ctx.raw, total) + ')' } } } }
   });
 
   // Vendedores por sede
@@ -509,7 +509,7 @@ function buildDashboard(latest) {
       </div>`;
   });
 
-  const periodos = SEDES.filter(s=>sedeSummary[s]).map(s=>`${s}: ${sedeSummary[s].mes}`).join(' Â· ');
+  const periodos = SEDES.filter(s=>sedeSummary[s]).map(s=>`${s}: ${sedeSummary[s].mes}`).join(' · ');
   document.getElementById('dashPeriod').textContent = periodos;
 }
 </script>
