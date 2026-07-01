@@ -3503,11 +3503,11 @@ function printListaRecepcionNat() {
     const en30 = new Date(hoy); en30.setDate(en30.getDate() + 30);
     usuarios = G.hoja1
       .filter(u => u.activo === 'Sí')
-      .map(u => ({ nombre: u.nombre, plan: u.planCorregido || u.planOriginal, expira: u.expira, expiraDate: parseDate(u.expira), precio: u.valorPlanGuardado || 0, pin: u.pin }))
+      .map(u => ({ nombre: u.nombre, plan: u.planCorregido || u.planOriginal, expira: u.expira, expiraDate: parseDate(u.expira), precio: u.valorPlanGuardado || 0, pin: u.pin, telefono: u.telefono || '' }))
       .sort((a,b) => (a.expiraDate||new Date(0)) - (b.expiraDate||new Date(0)));
   } else {
     usuarios = [...G.proyeccion, ...G.planCompleto]
-      .map(r => ({ nombre: r.cliente, plan: r.planMain, expira: r.expira, expiraDate: r.expiraDate, precio: r.precioJunio || 0, pin: r.pin }))
+      .map(r => ({ nombre: r.cliente, plan: r.planMain, expira: r.expira, expiraDate: r.expiraDate, precio: r.precioJunio || 0, pin: r.pin, telefono: r.telefono || '' }))
       .sort((a,b) => (a.expiraDate||new Date(0)) - (b.expiraDate||new Date(0)));
   }
   if (!usuarios.length) { alert('No hay usuarios activos para imprimir.'); return; }
@@ -3523,6 +3523,7 @@ function printListaRecepcionNat() {
     return `<tr style="border-bottom:1px solid #eee;${i%2===1?'background:#f9f9f9':''}">
       <td style="padding:5px 8px;font-size:12px;color:#666;">${u.pin||''}</td>
       <td style="padding:5px 8px;font-size:13px;font-weight:600;">${u.nombre||''}</td>
+      <td style="padding:5px 8px;font-size:12px;color:#555;">${u.telefono||'—'}</td>
       <td style="padding:5px 8px;font-size:12px;">${u.plan||''}</td>
       <td style="padding:5px 8px;font-size:12px;text-align:center;color:${color};font-weight:${vencido||pronto?'700':'400'};">${u.expira||'—'}</td>
       <td style="padding:5px 8px;font-size:12px;text-align:right;">${u.precio>0?'₡'+u.precio.toLocaleString('es-CR'):'—'}</td>
@@ -3542,10 +3543,10 @@ function printListaRecepcionNat() {
       <div style="font-size:12px;color:#888;">${new Date().toLocaleDateString('es-CR',{day:'2-digit',month:'long',year:'numeric'})} — ${usuarios.length} usuarios activos</div></div>
       <button onclick="window.print()" style="padding:8px 18px;background:#2d2d5e;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;">🖨️ Imprimir</button>
     </div>
-    <table><thead><tr><th>PIN</th><th>Nombre</th><th>Plan</th><th style="text-align:center;">Vence</th><th style="text-align:right;">Precio</th></tr></thead>
+    <table><thead><tr><th>PIN</th><th>Nombre</th><th>Teléfono</th><th>Plan</th><th style="text-align:center;">Vence</th><th style="text-align:right;">Precio</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr style="background:#f0f2ff;font-weight:700;border-top:2px solid #2d2d5e;">
-      <td colspan="4" style="padding:7px 8px;font-size:13px;">TOTAL PROYECTADO</td>
+      <td colspan="5" style="padding:7px 8px;font-size:13px;">TOTAL PROYECTADO</td>
       <td style="padding:7px 8px;text-align:right;font-size:13px;">₡${Math.round(total).toLocaleString('es-CR')}</td>
     </tr></tfoot></table>
   </body></html>`);
