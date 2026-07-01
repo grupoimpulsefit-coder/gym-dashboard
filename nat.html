@@ -1101,8 +1101,17 @@ async function processUsuariosNat(file) {
     document.getElementById('saveStatus').textContent = '⏳ Cargando usuarios...';
     await loadPricesForSede('Natación');
 
-    // Cargar renov_data de snapshots guardados para corregir planes addon
+    // Cargar snapshots para corregir planes addon y extraer precios
     const renovMap = await buildRenovMapFromSnapshots();
+
+    // Si plan_prices está vacío (dev o primera vez), extraer precios del historial de pagos
+    if (!Object.keys(planPrices).length) {
+      Object.values(renovMap).forEach(entries => {
+        entries.forEach(e => {
+          if (e.plan && e.precio > 0 && !planPrices[e.plan]) planPrices[e.plan] = e.precio;
+        });
+      });
+    }
 
     const data = await file.arrayBuffer();
     const wb = XLSX.read(new Uint8Array(data), { type:'array', cellDates:false });
