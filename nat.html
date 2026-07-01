@@ -1085,9 +1085,10 @@ function procesarVentasSolo(file) {
         const fecha = row[col.fecha], cliente = row[col.cliente], producto = row[col.producto], total = row[col.total];
         const registrado = col.registrado >= 0 ? row[col.registrado] : '';
         if (!fecha || !cliente || !producto) continue;
-        if (norm(String(cliente)) === 'administrativo') continue;
         const tv = Number(total) || 0;
         if (tv <= 0) continue;
+        // Administrativo solo se incluye si es clase/sesión suelta (no membresia ni sin clasificar)
+        if (norm(String(cliente)) === 'administrativo' && !isClaseSuelta(String(producto))) continue;
         rawRows.push({ FechaStr: String(fecha), Cliente: String(cliente).trim(), RegistradoPor: String(registrado||'').trim(), Producto: String(producto).trim(), Total: tv });
       }
       if (!rawRows.length) throw new Error('No se encontraron transacciones válidas en el archivo.');
