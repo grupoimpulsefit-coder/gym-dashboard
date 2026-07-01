@@ -822,6 +822,15 @@ async function cargarResumenGuardado() {
   try {
     const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&select=mes,activos,total_usuarios,proyecciones,renovaciones,renov_data,users_data,updated_at');
     if (!snaps?.length) { document.getElementById('resumenGuardado').style.display = 'none'; return; }
+    // Cargar precios desde snapshots antes de mostrar el dashboard
+    await loadPricesForSede('Natación');
+    if (!Object.keys(planPrices).length) {
+      snaps.forEach(s => {
+        (s.users_data || []).forEach(u => {
+          if (u.ÚltimoProducto && u.ValorPlan > 0 && !planPrices[u.ÚltimoProducto]) planPrices[u.ÚltimoProducto] = u.ValorPlan;
+        });
+      });
+    }
     if (snaps.length > 1) {
       mostrarDashboardDesdeSnapshot(snaps[0]);
       renderMesSelector(snaps);
@@ -932,7 +941,13 @@ function mostrarDashboardDesdeSnapshot(s) {
     `📅 Datos guardados — ${s.mes} <span style="color:var(--muted);font-weight:400;">(actualizado ${new Date(s.updated_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})})</span>`;
 
   // Mostrar cards de proyección si el snapshot tiene users_data con ValorPlan
-  if (G.hoja1.length && G.hoja1.some(u => u.valorPlanGuardado > 0)) updateProjectionCards();
+  // Re-aplicar precios si los del snapshot eran 0 (dev o primera carga)
+  if (G.hoja1.length) {
+    G.hoja1.forEach(u => {
+      if (!(u.valorPlanGuardado > 0)) u.valorPlanGuardado = getPlanPriceNat(u.planCorregido || u.planOriginal) || 0;
+    });
+    updateProjectionCards();
+  }
 
   document.getElementById('resumenGuardado').style.display = 'none';
   document.getElementById('uploadSection').style.display = 'none';
