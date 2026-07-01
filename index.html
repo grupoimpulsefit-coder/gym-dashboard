@@ -207,6 +207,7 @@
                 <span id="userNombre">—</span>
                 <span class="role-badge" id="userRolBadge">—</span>
                 <button id="btnCambiarSede" onclick="volverAlMenu()" style="display:none;margin-left:12px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:white;border-radius:16px;padding:4px 14px;font-size:12px;font-weight:600;cursor:pointer;">← Cambiar sede</button>
+                <select id="mesDashSelector" onchange="cambiarMesDashboard(this.value)" style="display:none;margin-left:8px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);color:white;border-radius:16px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;"></select>
             </div>
             <div style="display:flex;gap:10px;align-items:center;">
                 <button id="btnCargarDatos" onclick="mostrarCarga()" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.35);color:white;border-radius:16px;padding:4px 14px;font-size:12px;font-weight:600;cursor:pointer;">📤 Cargar datos</button>
@@ -764,6 +765,7 @@ const SEDE_ICONS = {
 function volverAlMenu() {
     document.getElementById('dashboard').style.display = 'none';
     document.getElementById('btnCambiarSede').style.display = 'none';
+    document.getElementById('mesDashSelector').style.display = 'none';
     usuariosLoaded = false;
     renoLoaded = false;
     showSedePicker();
@@ -869,10 +871,29 @@ async function loadSedeForColaborador(sede, mesEspecifico) {
         await loadPricesForSede(currentSedeName);
         document.getElementById('sedePicker').style.display = 'none';
         document.getElementById('btnCambiarSede').style.display = 'inline-block';
+        // Poblar selector de meses
+        try {
+            const allSnapsForSede = await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(sede)}&select=mes,mes_orden,activos,updated_at&order=mes_orden.desc`);
+            const selEl = document.getElementById('mesDashSelector');
+            selEl.innerHTML = '';
+            (allSnapsForSede || []).sort((a,b) => (b.mes_orden||'').localeCompare(a.mes_orden||'')).forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.mes;
+                opt.textContent = s.mes;
+                if (s.mes === snap.mes) opt.selected = true;
+                selEl.appendChild(opt);
+            });
+            selEl.style.display = allSnapsForSede?.length > 1 ? 'inline-block' : 'none';
+        } catch(_) {}
         rebuildDashboard();
     } catch(e) {
         document.getElementById('sedePickerStatus').textContent = '⚠️ Error: ' + e.message;
     }
+}
+
+async function cambiarMesDashboard(mes) {
+    if (!mes || !currentSedeName) return;
+    await loadSedeForColaborador(currentSedeName, mes);
 }
 
 // ── VALIDACIÓN DESCUENTOS ──
