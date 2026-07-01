@@ -1165,6 +1165,7 @@ async function processUsuariosNat(file) {
         if (planIncorrecto <= 3) console.log('[addon]', nombre, '→ norm:', norm(nombre), '→ encontrado:', encontrado ? encontrado.map(e=>e.plan) : null);
         if (encontrado) {
           planCorregido = mejorPlanRenov(encontrado);
+          if (planIncorrecto <= 3) console.log('[addon corregido]', nombre, '→ planCorregido:', planCorregido, '→ esAddon?:', isAddon(planCorregido));
           estado = 'corregido';
           fuentePlan = 'snapshot';
           corregidos++;
