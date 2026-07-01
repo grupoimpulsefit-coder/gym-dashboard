@@ -1103,6 +1103,7 @@ async function processUsuariosNat(file) {
 
     // Cargar renov_data de snapshots guardados para corregir planes addon
     const renovMap = await buildRenovMapFromSnapshots();
+    console.log('[processUsuariosNat] renovMap keys:', Object.keys(renovMap).length, 'usuarios con plan conocido');
 
     const data = await file.arrayBuffer();
     const wb = XLSX.read(new Uint8Array(data), { type:'array', cellDates:false });
