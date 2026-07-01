@@ -1162,6 +1162,7 @@ async function processUsuariosNat(file) {
       if (isAddon(planOrig)) {
         planIncorrecto++;
         const encontrado = buscarEnRenovMap(nombre);
+        if (planIncorrecto <= 3) console.log('[addon]', nombre, '→ norm:', norm(nombre), '→ encontrado:', encontrado ? encontrado.map(e=>e.plan) : null);
         if (encontrado) {
           planCorregido = mejorPlanRenov(encontrado);
           estado = 'corregido';
