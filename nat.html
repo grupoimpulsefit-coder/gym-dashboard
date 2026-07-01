@@ -983,31 +983,39 @@ async function doLogout() {
 
 document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
-// usuariosLoaded=true cuando se subió el Excel completo (Hoja1 disponible);
-// false cuando solo se actualizó el archivo de Ventas por Producto — en ese caso
-// no se tocan activos/total_usuarios/proyecciones/users_data ya guardados.
-async function autoSaveNat(mes, usuariosLoaded) {
+// usuariosLoaded=true cuando se subió el Excel completo (Hoja1 disponible).
+// soloUsuarios=true cuando solo se suben usuarios (informe separado) — no toca renov_data.
+async function autoSaveNat(mes, usuariosLoaded, soloUsuarios = false) {
   const statusEl = document.getElementById('saveStatus');
   statusEl.textContent = '⏳ Guardando...';
   try {
-    const record = {
-      sede: 'Natación', mes,
-      mes_orden: mes,
-      renovaciones: {
+    // Verificar si ya existe snapshot para este mes
+    const existing = await supaFetch(`/gym_snapshots?sede=eq.Nataci%C3%B3n&mes=eq.${encodeURIComponent(mes)}&select=id,renov_data,renovaciones`);
+    const existingSnap = existing?.[0] || null;
+
+    const record = { sede: 'Natación', mes, mes_orden: mes, updated_at: new Date().toISOString() };
+
+    if (!soloUsuarios) {
+      // Incluir datos de renovaciones solo cuando vienen del Excel combinado
+      record.renovaciones = {
         nuevos: renovacionesData.filter(r=>r.Tipo==='Nuevo').length,
         renovaciones: renovacionesData.filter(r=>r.Tipo==='Renovación').length,
         reingresos: renovacionesData.filter(r=>r.Tipo==='Reingreso').length,
         total: renovacionesData.reduce((s,r)=>s+r.Total,0),
         clasesSueltas: { count: clasesSueltasData.length, total: clasesSueltasData.reduce((s,c)=>s+c.Total,0) },
         sinClasificar: { count: sinClasificarData.length, total: sinClasificarData.reduce((s,c)=>s+c.Total,0) }
-      },
-      renov_data: [
+      };
+      record.renov_data = [
         ...renovacionesData.map(r => ({ FechaStr:r.FechaStr, Cliente:r.Cliente, RegistradoPor:r.RegistradoPor, Producto:r.Producto, Total:r.Total, Tipo:r.Tipo, Badge:r.Badge, Icon:r.Icon, GapDias:r.GapDias })),
         ...clasesSueltasData.map(c => ({ FechaStr:c.FechaStr, Cliente:c.Cliente, RegistradoPor:c.RegistradoPor, Producto:c.Producto, Total:c.Total, EsClaseSuelta:true })),
         ...sinClasificarData.map(c => ({ FechaStr:c.FechaStr, Cliente:c.Cliente, RegistradoPor:c.RegistradoPor, Producto:c.Producto, Total:c.Total, EsSinClasificar:true }))
-      ],
-      updated_at: new Date().toISOString()
-    };
+      ];
+    } else if (!existingSnap) {
+      // Primera vez que se crea el snapshot de este mes desde solo-usuarios: renov vacío
+      record.renovaciones = { nuevos:0, renovaciones:0, reingresos:0, total:0, clasesSueltas:{count:0,total:0}, sinClasificar:{count:0,total:0} };
+      record.renov_data = [];
+    }
+    // Si soloUsuarios + snapshot ya existe → NO incluir renov_data en el PATCH (preservar el existente)
     if (usuariosLoaded) {
       record.activos = G.hoja1.filter(u => u.activo === 'Sí').length;
       record.total_usuarios = G.hoja1.length;
@@ -1034,8 +1042,7 @@ async function autoSaveNat(mes, usuariosLoaded) {
         expira: r.expira
       }));
     }
-    const existing = await supaFetch(`/gym_snapshots?sede=eq.Nataci%C3%B3n&mes=eq.${encodeURIComponent(mes)}&select=id`);
-    if (existing?.length) {
+    if (existingSnap) {
       await supaFetch(`/gym_snapshots?sede=eq.Nataci%C3%B3n&mes=eq.${encodeURIComponent(mes)}`,
         { method:'PATCH', prefer:'return=minimal', body: record });
     } else {
@@ -1270,7 +1277,7 @@ async function processUsuariosNat(file) {
     if (cCorr)  cCorr.textContent  = corregidos;
 
     const mes = detectarMesNat();
-    await autoSaveNat(mes, true);
+    await autoSaveNat(mes, true, true); // soloUsuarios=true: no sobreescribir renov_data
     document.getElementById('saveStatus').textContent = `✅ ${newHoja1.length} usuarios cargados — ${corregidos} planes corregidos (${mes})`;
 
     // Recargar selector de meses
@@ -1587,9 +1594,9 @@ async function editarPrecioNat(plan) {
   });
   updateProjectionCards();
 
-  // Guardar snapshot actualizado
+  // Guardar snapshot actualizado (solo precios, no tocar renov_data)
   const mes = detectarMesNat();
-  await autoSaveNat(mes, true);
+  await autoSaveNat(mes, true, true);
   document.getElementById('saveStatus').textContent = `✅ Precio guardado: ${plan} → ₡${precio.toLocaleString('es-CR')}`;
 }
 
