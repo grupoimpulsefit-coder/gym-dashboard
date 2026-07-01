@@ -536,7 +536,7 @@
   <div id="tabJunio" class="tab-panel">
 
     <div class="alert alert-info">
-      Transacciones de la hoja <strong>junio</strong> clasificadas como Nuevo / Renovación / Reingreso
+      Transacciones de <strong id="renovMesLabel">junio</strong> clasificadas como Nuevo / Renovación / Reingreso
       según el último <strong>Informe de Usuarios</strong> conocido (de este archivo o del último guardado).
     </div>
 
@@ -705,7 +705,7 @@
   <div id="tabSeguimiento" class="tab-panel">
     <div class="alert alert-info">
       Clientes <strong>activos vencidos</strong> según el Informe de Usuarios que <strong>no aparecen pagando</strong> en las
-      transacciones de la hoja junio cargadas. Si un cliente ya pagó este período pero el Informe de Usuarios todavía
+      transacciones de <strong id="seguimientoMesLabel">junio</strong> cargadas. Si un cliente ya pagó este período pero el Informe de Usuarios todavía
       no refleja el nuevo vencimiento, no aparece aquí.
     </div>
 
@@ -931,6 +931,7 @@ function mostrarDashboardDesdeSnapshot(s) {
   // ── Renovaciones / Seguimiento ──
   buildUsersDataFromHoja1();
   buildRenovacionesState(s.renov_data || []);
+  actualizarTextoRenovMes(detectarMesDeRenov(s.renov_data) || s.mes || null);
 
   // ── Render ──
   G.filtered.usuarios = [...G.hoja1];
@@ -1326,6 +1327,23 @@ async function buildRenovMapFromSnapshots() {
     });
   } catch(e) { console.warn('buildRenovMapFromSnapshots:', e.message); }
   return { renovMap: map, discountMap };
+}
+
+function actualizarTextoRenovMes(mesLabel) {
+  const label = mesLabel || 'mes anterior';
+  ['renovMesLabel','seguimientoMesLabel'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = label;
+  });
+}
+
+// Detecta el mes de las transacciones en renov_data del snapshot
+function detectarMesDeRenov(renovData) {
+  if (!renovData || !renovData.length) return null;
+  const fechas = renovData.map(r => parseDate(r.FechaStr)).filter(Boolean);
+  if (!fechas.length) return null;
+  const ref = new Date(Math.max(...fechas.map(d => d.getTime())));
+  return ref.toLocaleString('es-CR', { month:'long' }).replace(/^\w/, c=>c.toUpperCase()) + ' ' + ref.getFullYear();
 }
 
 function detectarMesNat() {
@@ -2351,7 +2369,10 @@ function analizar(wb) {
       .filter(d => !isNaN(d));
     const ref = allDates.length ? new Date(Math.max(...allDates.map(d=>d.getTime()))) : new Date();
     const mesNombre = ref.toLocaleString('es-CR', { month:'long', year:'numeric' });
-    const mes = mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1) + ' de ' + ref.getFullYear();
+    const mes = mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1);
+    // Guardar el mes de las transacciones (para mostrar en tab renovaciones)
+    G.renovMes = ref.toLocaleString('es-CR', { month:'long' }).replace(/^\w/, c=>c.toUpperCase()) + ' ' + ref.getFullYear();
+    actualizarTextoRenovMes(G.renovMes);
     autoSaveNat(mes, true);
   }
 }
