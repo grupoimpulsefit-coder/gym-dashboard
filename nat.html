@@ -874,6 +874,7 @@ function cargarMesNat(idx) {
 }
 
 const PCT_DESCUENTO = { '20%': 0.2, '25%': 0.25, 'G20': 0.2, 'Completo': 0 };
+const LEALTAD_RE = /lealtad|fidelidad/i;
 
 function mostrarDashboardDesdeSnapshot(s) {
   const ud = s.users_data || [];
@@ -903,7 +904,7 @@ function mostrarDashboardDesdeSnapshot(s) {
   });
   G.totalJunio = s.proyecciones?.total_junio || [...G.proyeccion, ...G.planCompleto].reduce((sum,r)=>sum+(r.precioJunio||0),0);
 
-  // ── Reconstruir Validación de Descuentos (tab Validación) ──
+  // ── Reconstruir Validación de Descuentos + Lealtad (tab Validación) ──
   G.validacion = ud.filter(u => u.EstadoValidacion).map(u => ({
     pin: u.PIN, cliente: u.Nombre, fuente: u.Descuento, pct: PCT_DESCUENTO[u.Descuento] ?? 0,
     planMain: u.ProyPlan || u.ÚltimoProducto, precioJunio: u.PrecioJunio,
@@ -911,6 +912,19 @@ function mostrarDashboardDesdeSnapshot(s) {
     estado: u.EstadoValidacion, pagoTardio: u.PagoTardio || null,
     pago: u.PagoMonto != null ? { total: u.PagoMonto, fecha: u.PagoFecha } : null
   }));
+  // Agregar usuarios de planes lealtad/fidelidad no incluidos aún
+  const yaEnVal = new Set(G.validacion.map(r => norm(r.cliente)));
+  ud.filter(u => u.Activo === 'Sí' && LEALTAD_RE.test(u.ÚltimoProducto || '') && !yaEnVal.has(norm(u.Nombre))).forEach(u => {
+    const expiraDate = parseDate(u.Expira);
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const dias = expiraDate ? Math.round((expiraDate - hoy) / 86400000) : null;
+    const estado = dias === null ? 'al_dia' : dias < 0 ? 'vencido_sin_pago' : dias <= 15 ? 'por_vencer_sin_pago' : 'al_dia';
+    G.validacion.push({
+      pin: u.PIN, cliente: u.Nombre, fuente: 'Lealtad', pct: 0,
+      planMain: u.ÚltimoProducto, precioJunio: u.ValorPlan || 0, precioBase: u.ValorPlan || 0,
+      expira: u.Expira, expiraDate, estado, pagoTardio: null, pago: null
+    });
+  });
 
   // ── Renovaciones / Seguimiento ──
   buildUsersDataFromHoja1();
@@ -1199,15 +1213,16 @@ async function processUsuariosNat(file) {
         }
       }
 
-      // Aplicar descuento del mes anterior si corresponde
+      // Registrar descuento de junio (en julio todos pagan precio completo)
       const discInfo = discountMap[norm(nombre)];
       let descuento = null, descuentoPct = 0, promoExpirada = false;
       if (discInfo && discInfo.pct > 0) {
-        if (discInfo.promoExpirada) { promoExpirada = true; }
-        else { descuento = discInfo.descuento; descuentoPct = discInfo.pct; }
+        descuento = discInfo.descuento;
+        descuentoPct = discInfo.pct;
+        promoExpirada = discInfo.promoExpirada;
       }
       const precioBase = getPlanPriceNat(planCorregido);
-      const precioEfectivo = descuentoPct > 0 ? Math.round(precioBase * (1 - descuentoPct)) : precioBase;
+      const precioEfectivo = precioBase; // En julio todos pagan precio completo
 
       newHoja1.push({
         pin, nombre, activo, expira, telefono, email,
@@ -1385,19 +1400,12 @@ function renderResumenDescuentos(activos) {
   const el = document.getElementById('resumenDescuentos');
   if (!el) return;
 
-  const con20 = activos.filter(u => u.descuento && u.descuentoPct === 0.20 && !u.promoExpirada);
-  const con25 = activos.filter(u => u.descuento && u.descuentoPct === 0.25 && !u.promoExpirada);
+  const con20    = activos.filter(u => u.descuentoPct === 0.20 && !u.promoExpirada);
+  const con25    = activos.filter(u => u.descuentoPct === 0.25 && !u.promoExpirada);
   const promoExp = activos.filter(u => u.promoExpirada);
-  const sinDesc = activos.filter(u => !u.descuento && !u.promoExpirada);
+  const conDescuento = activos.filter(u => u.descuentoPct > 0 || u.promoExpirada);
 
-  const total = activos.reduce((s,u) => s + (u.valorPlanGuardado||0), 0);
-  const totalSinDesc = activos.reduce((s,u) => s + (u.precioBase||u.valorPlanGuardado||0), 0);
-  const ahorro = totalSinDesc - total;
-
-  if (!con20.length && !con25.length && !promoExp.length) {
-    el.style.display = 'none';
-    return;
-  }
+  if (!conDescuento.length) { el.style.display = 'none'; return; }
 
   const mkTable = (usuarios) => {
     if (!usuarios.length) return '<em style="color:#aaa;">Ninguno</em>';
@@ -1405,13 +1413,13 @@ function renderResumenDescuentos(activos) {
       <thead><tr style="background:#f5f5f5;">
         <th style="padding:4px 8px;text-align:left;">Nombre</th>
         <th style="padding:4px 8px;text-align:left;">Plan</th>
-        <th style="padding:4px 8px;text-align:right;">Precio base</th>
-        <th style="padding:4px 8px;text-align:right;">Precio efectivo</th>
+        <th style="padding:4px 8px;text-align:center;">Desc. junio</th>
+        <th style="padding:4px 8px;text-align:right;">Precio julio (completo)</th>
       </tr></thead>
       <tbody>${usuarios.map(u => `<tr style="border-top:1px solid #eee;">
         <td style="padding:4px 8px;">${u.nombre}</td>
         <td style="padding:4px 8px;">${u.planCorregido||u.planOriginal||'—'}</td>
-        <td style="padding:4px 8px;text-align:right;">${u.precioBase>0?'₡'+(u.precioBase).toLocaleString('es-CR'):'—'}</td>
+        <td style="padding:4px 8px;text-align:center;">${u.descuento||'Promo Junio'}</td>
         <td style="padding:4px 8px;text-align:right;font-weight:700;">${u.valorPlanGuardado>0?'₡'+(u.valorPlanGuardado).toLocaleString('es-CR'):'—'}</td>
       </tr>`).join('')}</tbody>
     </table>`;
@@ -1419,30 +1427,30 @@ function renderResumenDescuentos(activos) {
 
   el.style.display = '';
   el.innerHTML = `
-    <div class="proy-section-title">🏷️ Análisis de Descuentos</div>
+    <div class="proy-section-title">🏷️ Usuarios con descuento en junio — pagan precio completo en julio</div>
+    <div style="background:#fff3e0;border-left:4px solid #e65100;padding:10px 14px;border-radius:6px;margin-bottom:16px;font-size:13px;color:#5d4037;">
+      ⚠️ Los <strong>${conDescuento.length}</strong> usuarios listados a continuación tenían descuento en junio.
+      En julio <strong>deben pagar precio completo</strong>. La proyección ya refleja el precio sin descuento.
+    </div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
-      <div style="flex:1;min-width:160px;background:#e3f2fd;border-radius:8px;padding:12px;text-align:center;">
+      <div style="flex:1;min-width:140px;background:#e3f2fd;border-radius:8px;padding:12px;text-align:center;">
         <div style="font-size:22px;font-weight:700;color:#1565c0;">${con20.length}</div>
-        <div style="font-size:12px;color:#555;">Descuento 20% válido</div>
+        <div style="font-size:12px;color:#555;">Tenían 20% en junio</div>
       </div>
-      <div style="flex:1;min-width:160px;background:#f3e5f5;border-radius:8px;padding:12px;text-align:center;">
+      <div style="flex:1;min-width:140px;background:#f3e5f5;border-radius:8px;padding:12px;text-align:center;">
         <div style="font-size:22px;font-weight:700;color:#6a1b9a;">${con25.length}</div>
-        <div style="font-size:12px;color:#555;">Descuento 25% válido</div>
+        <div style="font-size:12px;color:#555;">Tenían 25% en junio</div>
       </div>
-      <div style="flex:1;min-width:160px;background:#fce4ec;border-radius:8px;padding:12px;text-align:center;">
+      <div style="flex:1;min-width:140px;background:#fce4ec;border-radius:8px;padding:12px;text-align:center;">
         <div style="font-size:22px;font-weight:700;color:#c62828;">${promoExp.length}</div>
-        <div style="font-size:12px;color:#555;">Promo Junio expirada</div>
-      </div>
-      <div style="flex:1;min-width:160px;background:#e8f5e9;border-radius:8px;padding:12px;text-align:center;">
-        <div style="font-size:14px;font-weight:700;color:#2e7d32;">₡${Math.round(ahorro).toLocaleString('es-CR')}</div>
-        <div style="font-size:12px;color:#555;">Descuento total aplicado</div>
+        <div style="font-size:12px;color:#555;">Promo Solo Junio</div>
       </div>
     </div>
 
     ${promoExp.length > 0 ? `
-    <details style="margin-bottom:12px;">
+    <details style="margin-bottom:12px;" open>
       <summary style="cursor:pointer;font-weight:700;color:#c62828;padding:8px;background:#fce4ec;border-radius:6px;">
-        ⚠️ ${promoExp.length} usuario(s) con Promo Solo Junio expirada — deben pagar precio completo
+        🔴 ${promoExp.length} usuario(s) — Promo Solo Junio (plan especial expirado)
       </summary>
       <div style="margin-top:8px;">${mkTable(promoExp)}</div>
     </details>` : ''}
@@ -1450,7 +1458,7 @@ function renderResumenDescuentos(activos) {
     ${con20.length > 0 ? `
     <details style="margin-bottom:12px;">
       <summary style="cursor:pointer;font-weight:700;color:#1565c0;padding:8px;background:#e3f2fd;border-radius:6px;">
-        🔵 ${con20.length} usuario(s) con 20% de descuento válido
+        🔵 ${con20.length} usuario(s) — tenían 20% de descuento en junio
       </summary>
       <div style="margin-top:8px;">${mkTable(con20)}</div>
     </details>` : ''}
@@ -1458,7 +1466,7 @@ function renderResumenDescuentos(activos) {
     ${con25.length > 0 ? `
     <details style="margin-bottom:12px;">
       <summary style="cursor:pointer;font-weight:700;color:#6a1b9a;padding:8px;background:#f3e5f5;border-radius:6px;">
-        🟣 ${con25.length} usuario(s) con 25% de descuento válido
+        🟣 ${con25.length} usuario(s) — tenían 25% de descuento en junio
       </summary>
       <div style="margin-top:8px;">${mkTable(con25)}</div>
     </details>` : ''}
@@ -2164,6 +2172,37 @@ function analizar(wb) {
       }
       G.validacion.push({ ...r, pago, estado, pagoTardio });
     });
+
+  // ── Planes Lealtad/Fidelidad (fuera de G.proyeccion) ──
+  const yaEnValidacion = new Set(G.validacion.map(r => norm(r.cliente)));
+  G.hoja1.filter(u => u.activo === 'Sí' && LEALTAD_RE.test(u.planCorregido || u.planOriginal || '') && !yaEnValidacion.has(norm(u.nombre))).forEach(u => {
+    const key = norm(u.nombre);
+    const pago = G.junio.find(j => { const nj = norm(j.nombre); return nj === key || nj.includes(key) || key.includes(nj); });
+    const expiraDate = parseDate(u.expira);
+    const dias = expiraDate ? Math.round((expiraDate - new Date().setHours(0,0,0,0)) / 86400000) : null;
+    let estado;
+    if (pago) {
+      estado = 'ok';
+    } else if (dias !== null && dias < 0) {
+      estado = 'vencido_sin_pago';
+    } else if (dias !== null && dias <= 15) {
+      estado = 'por_vencer_sin_pago';
+    } else {
+      estado = 'al_dia';
+    }
+    let pagoTardio = null;
+    if (pago && expiraDate) {
+      const fechaPagoDate = parseDate(pago.fecha);
+      if (fechaPagoDate) { const diff = Math.round((fechaPagoDate - expiraDate) / 86400000); if (diff > 0) pagoTardio = diff; }
+    }
+    G.validacion.push({
+      pin: u.pin, cliente: u.nombre, fuente: 'Lealtad', pct: 0,
+      planMain: u.planCorregido || u.planOriginal || '—',
+      precioJunio: u.valorPlanGuardado || 0, precioBase: u.valorPlanGuardado || 0,
+      expira: u.expira, expiraDate, estado, pagoTardio,
+      pago: pago ? { total: pago.total, fecha: pago.fecha } : null
+    });
+  });
 
   // ── Anotar G.hoja1 con el resultado de Validación (para guardarlo y poder
   //    verlo sin re-subir el Excel) ──
@@ -3459,7 +3498,7 @@ const ESTADO_VALIDACION = {
   por_vencer_sin_pago: { label: '🟠 Por vencer sin pagar',         bg:'#fef5e7', color:'#e67e22' },
   sin_descuento:       { label: '⚠ Pagó sin descuento',           bg:'#fef9e7', color:'#9a7d0a' },
   monto_diferente:     { label: '⚠ Monto diferente',              bg:'#fef9e7', color:'#9a7d0a' },
-  ok:                  { label: '✅ Descuento aplicado',           bg:'#e8f8f0', color:'#27ae60' },
+  ok:                  { label: '✅ Pagó correctamente',           bg:'#e8f8f0', color:'#27ae60' },
   al_dia:              { label: '🟢 Al día (no vence aún)',        bg:'#eaf2fb', color:'#2980b9' }
 };
 
@@ -3482,8 +3521,10 @@ function renderValidacion() {
       ? ` <span class="tag tag-noplan" title="Pagó ${r.pagoTardio} día(s) después de la fecha de vencimiento del plan anterior (${esc(r.expira)})">⏰ +${r.pagoTardio}d tarde</span>`
       : '';
     const fechaPagoCell = r.pago ? (esc(r.pago.fecha) || '—') + tardioTag : '—';
-    const tagMap = { '20%':'tag-20','25%':'tag-25','G20':'tag-g20' };
-    const descBadge = `<span class="tag ${tagMap[r.fuente]||''}">${esc(r.fuente)} (${Math.round(r.pct*100)}%)</span>`;
+    const tagMap = { '20%':'tag-20','25%':'tag-25','G20':'tag-g20','Lealtad':'tag-noplan','Completo':'' };
+    const descBadge = r.fuente === 'Lealtad'
+      ? `<span class="tag tag-noplan">💳 Lealtad</span>`
+      : `<span class="tag ${tagMap[r.fuente]||''}">${esc(r.fuente)} (${Math.round(r.pct*100)}%)</span>`;
     return `<tr style="${r.estado==='vencido_sin_pago'||r.estado==='por_vencer_sin_pago'?'background:#fff8f8':''}">
       <td style="color:#667eea;font-weight:600;">${esc(r.pin)}</td>
       <td><strong>${esc(r.cliente)}</strong></td>
