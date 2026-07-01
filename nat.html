@@ -1030,8 +1030,8 @@ async function autoSaveNat(mes, usuariosLoaded, soloUsuarios = false) {
         ÚltimoProducto: u.planCorregido || u.planOriginal,
         PlanOriginal: u.planOriginal, EstadoCorrecion: u.estado, FuentePlan: u.fuentePlan || null,
         ValorPlan: buscarPrecio(u.planCorregido || u.planOriginal) || 0,
-        Descuento: u.proyDescuento || null, ProyPlan: u.proyPlan || null,
-        PrecioJunio: u.proyPrecioJunio ?? null, Pendiente: u.proyPendiente || null,
+        Descuento: u.proyDescuento || u.descuento || null, ProyPlan: u.proyPlan || null,
+        PrecioJunio: u.proyPrecioJunio ?? (u.valorPlanGuardado > 0 ? u.valorPlanGuardado : null), Pendiente: u.proyPendiente || null,
         EstadoValidacion: u.validEstado || null, PagoTardio: u.validPagoTardio || null,
         PagoMonto: u.validPagoMonto ?? null, PagoFecha: u.validPagoFecha || null
       }));
