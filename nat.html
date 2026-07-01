@@ -1031,7 +1031,7 @@ async function autoSaveNat(mes, usuariosLoaded, soloUsuarios = false) {
         PlanOriginal: u.planOriginal, EstadoCorrecion: u.estado, FuentePlan: u.fuentePlan || null,
         ValorPlan: buscarPrecio(u.planCorregido || u.planOriginal) || 0,
         Descuento: u.proyDescuento || u.descuento || null, ProyPlan: u.proyPlan || null,
-        PrecioJunio: u.proyPrecioJunio ?? (u.valorPlanGuardado > 0 ? u.valorPlanGuardado : null), Pendiente: u.proyPendiente || null,
+        PrecioJunio: u.proyPrecioJunio ?? null, Pendiente: u.proyPendiente || null,
         EstadoValidacion: u.validEstado || null, PagoTardio: u.validPagoTardio || null,
         PagoMonto: u.validPagoMonto ?? null, PagoFecha: u.validPagoFecha || null
       }));
@@ -1237,16 +1237,19 @@ async function processUsuariosNat(file) {
       const precioBase = getPlanPriceNat(planCorregido);
       // Lógica de precio proyectado:
       // - Promo Solo Junio expirada → precio completo
-      // - Descuento válido (20%/25%/G20) + pagó en junio → usar monto exacto de junio
-      // - Descuento válido + no pagó en junio → calcular descuento sobre precio base
+      // - Descuento válido (20%/25%/G20) → calcular sobre precioBase
+      //   (precioJunio solo se usa si viene de analizar() con datos reales de transacciones)
       // - Sin descuento → precio completo
       let precioEfectivo;
       if (promoExpirada || !discInfo || !(discInfo.pct > 0)) {
         precioEfectivo = precioBase;
-      } else if (discInfo.precioJunio > 0 && !noPagoJunio) {
-        precioEfectivo = discInfo.precioJunio;
       } else {
-        precioEfectivo = Math.round(precioBase * (1 - discInfo.pct));
+        // Usar precio de junio de analizar() si está disponible y es razonable
+        // (proyPrecioJunio solo se setea cuando analizar() procesa las hojas de descuento reales)
+        const calculado = Math.round(precioBase * (1 - discInfo.pct));
+        const junioOk = discInfo.precioJunio > 0 && !noPagoJunio
+          && Math.abs(discInfo.precioJunio - calculado) < calculado * 0.3; // <30% diferencia
+        precioEfectivo = junioOk ? discInfo.precioJunio : calculado;
       }
 
       newHoja1.push({
