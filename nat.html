@@ -335,10 +335,15 @@
   <div class="tabs">
     <div class="tab active" onclick="switchTab('tabUsuarios',this)">👤 Usuarios</div>
     <div class="tab" onclick="switchTab('tabVentas',this)">🧾 Ventas Mayo</div>
-    <div class="tab" onclick="switchTab('tabProyeccion',this)">📊 Proyección Junio</div>
+    <div class="tab" onclick="switchTab('tabProyeccion',this)" id="tabProyeccionBtn">📊 Proyección del Mes</div>
     <div class="tab" onclick="switchTab('tabJunio',this)">🔄 Análisis de Renovaciones</div>
     <div class="tab" onclick="switchTab('tabValidacion',this)">✅ Validación Descuentos</div>
     <div class="tab" onclick="switchTab('tabSeguimiento',this)">📋 Seguimiento Vencidos</div>
+  </div>
+
+  <!-- Selector de mes (visible dentro del dashboard) -->
+  <div id="mesSelectorNat" style="display:none;background:#f0f0fa;border-radius:8px;padding:10px 16px;margin-bottom:4px;display:none;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span style="font-size:13px;font-weight:600;color:#555;">📅 Ver mes:</span>
   </div>
 
   <!-- TAB 1: Usuarios -->
@@ -475,7 +480,7 @@
 
     <!-- GRÁFICO -->
     <div class="proy-chart-section">
-      <div class="proy-section-title">📈 Proyección Junio por Plan (Top 10)</div>
+      <div class="proy-section-title" id="tituloGrafico">📈 Proyección del Mes por Plan (Top 10)</div>
       <canvas id="proyChart"></canvas>
     </div>
 
@@ -500,6 +505,27 @@
 
     <!-- TOTALES ocultos (usados por PDF) -->
     <div id="totalesProyeccion" style="display:none;"></div>
+
+    <!-- DESGLOSE POR PLAN (visible al cargar Informe de Usuarios) -->
+    <div id="desgloseByPlan" style="display:none;margin-top:20px;">
+      <div class="proy-section-title" id="tituloDesglose">📋 Desglose de Planes del Mes</div>
+      <div class="proy-table-wrap">
+        <table id="tablaDesglose">
+          <thead>
+            <tr>
+              <th>Plan</th>
+              <th style="text-align:center;">Activos</th>
+              <th style="text-align:center;">Con precio</th>
+              <th style="text-align:center;">Sin precio</th>
+              <th style="text-align:right;">Precio unitario</th>
+              <th style="text-align:right;">Ingreso proyectado</th>
+            </tr>
+          </thead>
+          <tbody id="bodyDesglose"></tbody>
+          <tfoot id="footDesglose"></tfoot>
+        </table>
+      </div>
+    </div>
   </div>
 
   <!-- TAB 4: Análisis de Renovaciones -->
@@ -809,18 +835,16 @@ async function cargarResumenGuardado() {
 }
 
 function renderMesSelector(snaps) {
-  const el = document.getElementById('resumenGuardado');
-  const selector = document.createElement('div');
-  selector.id = 'mesSelectorNat';
-  selector.style.cssText = 'background:#f5f5f5;border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
-  selector.innerHTML = `<span style="font-size:13px;font-weight:600;color:#555;">📅 Ver mes:</span>` +
+  window._natSnaps = snaps;
+  window._natSnapIdx = 0;
+  const el = document.getElementById('mesSelectorNat');
+  if (!el) return;
+  el.style.display = 'flex';
+  el.innerHTML = `<span style="font-size:13px;font-weight:600;color:#555;">📅 Ver mes:</span>` +
     snaps.map((s,i) => `<button onclick="cargarMesNat(${i})" id="mesBtnNat${i}"
       style="padding:5px 14px;border-radius:20px;border:1.5px solid ${i===0?'#5c6bc0':'#ccc'};
       background:${i===0?'#5c6bc0':'#fff'};color:${i===0?'#fff':'#333'};font-size:13px;cursor:pointer;font-weight:${i===0?'700':'400'};">
       ${s.mes||'Sin nombre'}</button>`).join('');
-  window._natSnaps = snaps;
-  window._natSnapIdx = 0;
-  el.insertAdjacentElement('afterbegin', selector);
 }
 
 function cargarMesNat(idx) {
@@ -1182,6 +1206,48 @@ function updateProjectionCards() {
   document.getElementById('pIngresos').textContent = '₡' + Math.round(ingresos).toLocaleString('es-CR');
   document.getElementById('pSinPrecio').textContent = sinPrecio.length;
   document.getElementById('cardsProyeccion').style.display = '';
+  renderDesgloseByPlan(activos);
+}
+
+function renderDesgloseByPlan(activos) {
+  const planes = {};
+  activos.forEach(u => {
+    const plan = u.planCorregido || u.planOriginal || 'Desconocido';
+    if (!planes[plan]) planes[plan] = { plan, total: 0, conPrecio: 0, sinPrecio: 0, precio: 0, ingreso: 0 };
+    planes[plan].total++;
+    const p = u.valorPlanGuardado || 0;
+    if (p > 0) { planes[plan].conPrecio++; planes[plan].precio = p; planes[plan].ingreso += p; }
+    else planes[plan].sinPrecio++;
+  });
+
+  const rows = Object.values(planes).sort((a,b) => b.ingreso - a.ingreso);
+  const totalIngreso = rows.reduce((s,r) => s + r.ingreso, 0);
+  const totalActivos = rows.reduce((s,r) => s + r.total, 0);
+  const totalSin = rows.reduce((s,r) => s + r.sinPrecio, 0);
+
+  const body = document.getElementById('bodyDesglose');
+  const foot = document.getElementById('footDesglose');
+  if (!body) return;
+
+  body.innerHTML = rows.map(r => `<tr>
+    <td><strong>${r.plan}</strong></td>
+    <td style="text-align:center;">${r.total}</td>
+    <td style="text-align:center;">${r.conPrecio}</td>
+    <td style="text-align:center;color:${r.sinPrecio>0?'#c62828':'#555'}">${r.sinPrecio > 0 ? r.sinPrecio : '—'}</td>
+    <td style="text-align:right;">${r.precio > 0 ? '₡' + r.precio.toLocaleString('es-CR') : '<span style="color:#aaa;">—</span>'}</td>
+    <td style="text-align:right;font-weight:700;">${r.ingreso > 0 ? '₡' + r.ingreso.toLocaleString('es-CR') : '<span style="color:#aaa;">—</span>'}</td>
+  </tr>`).join('');
+
+  foot.innerHTML = `<tr style="font-weight:700;background:#f5f5f5;">
+    <td>TOTAL</td>
+    <td style="text-align:center;">${totalActivos}</td>
+    <td style="text-align:center;"></td>
+    <td style="text-align:center;color:${totalSin>0?'#c62828':'#555'}">${totalSin > 0 ? totalSin : '—'}</td>
+    <td></td>
+    <td style="text-align:right;">₡${Math.round(totalIngreso).toLocaleString('es-CR')}</td>
+  </tr>`;
+
+  document.getElementById('desgloseByPlan').style.display = '';
 }
 
 // Extrae plan principal de un string con comas (multi-producto)
