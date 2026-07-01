@@ -1113,15 +1113,15 @@ function processLegacyFile(wb, filename) {
 }
 
 // ── USUARIOS (Informe_de_Usuarios.xlsx → "Page 1") ──
-function processUsuariosFile(data, filename) {
+async function processUsuariosFile(data, filename) {
     try {
         currentFileName = filename || currentFileName;
         if (!document.getElementById('sedeSelector')?.value) {
             currentSedeName = detectSede(currentFileName);
         }
         applySedeUI();
-        loadPricesForSede(currentSedeName);
         document.getElementById('uploadStatusU').innerHTML = '<span style="color:#667eea;font-weight:600;">⏳ Procesando usuarios...</span>';
+        await loadPricesForSede(currentSedeName);
 
         const wb  = XLSX.read(data, { type:'array' });
 
