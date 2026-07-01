@@ -1232,12 +1232,19 @@ async function processUsuariosNat(file) {
         if (!promoExpirada && !(discInfo.precioJunio > 0)) noPagoJunio = true;
       }
       const precioBase = getPlanPriceNat(planCorregido);
-      // Precio julio: si pagó en junio con descuento → usar ese monto exacto
-      // Si no pagó en junio (noPagoJunio) → precio completo (sin descuento en julio)
-      // En todos los demás casos → precio completo (descuentos de junio no aplican en julio)
-      const precioEfectivo = (discInfo && discInfo.precioJunio > 0 && !promoExpirada && !noPagoJunio)
-        ? discInfo.precioJunio
-        : precioBase;
+      // Lógica de precio proyectado:
+      // - Promo Solo Junio expirada → precio completo
+      // - Descuento válido (20%/25%/G20) + pagó en junio → usar monto exacto de junio
+      // - Descuento válido + no pagó en junio → calcular descuento sobre precio base
+      // - Sin descuento → precio completo
+      let precioEfectivo;
+      if (promoExpirada || !discInfo || !(discInfo.pct > 0)) {
+        precioEfectivo = precioBase;
+      } else if (discInfo.precioJunio > 0 && !noPagoJunio) {
+        precioEfectivo = discInfo.precioJunio;
+      } else {
+        precioEfectivo = Math.round(precioBase * (1 - discInfo.pct));
+      }
 
       newHoja1.push({
         pin, nombre, activo, expira, telefono, email,
@@ -1491,7 +1498,7 @@ function renderResumenDescuentos(activos) {
 
   el.style.display = '';
   el.innerHTML = `
-    <div class="proy-section-title">🏷️ Análisis de Descuentos — Junio → Julio</div>
+    <div class="proy-section-title">🏷️ Análisis de Descuentos — Proyección julio (descuentos 20%/25%/G20 se mantienen)</div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
       <div style="flex:1;min-width:130px;background:#e3f2fd;border-radius:8px;padding:12px;text-align:center;">
         <div style="font-size:22px;font-weight:700;color:#1565c0;">${con20.length}</div>
@@ -1530,7 +1537,7 @@ function renderResumenDescuentos(activos) {
     ${con20.length > 0 ? `
     <details style="margin-bottom:12px;">
       <summary style="cursor:pointer;font-weight:700;color:#1565c0;padding:8px;background:#e3f2fd;border-radius:6px;">
-        🔵 ${con20.length} usuario(s) con 20% — pagaron en junio — se usa ese monto en proyección julio
+        🔵 ${con20.length} usuario(s) con 20% de descuento (descuento vigente en julio)
       </summary>
       <div style="margin-top:8px;">${mkTable(con20, 'junio')}</div>
     </details>` : ''}
@@ -1538,7 +1545,7 @@ function renderResumenDescuentos(activos) {
     ${con25.length > 0 ? `
     <details style="margin-bottom:12px;">
       <summary style="cursor:pointer;font-weight:700;color:#6a1b9a;padding:8px;background:#f3e5f5;border-radius:6px;">
-        🟣 ${con25.length} usuario(s) con 25% — pagaron en junio — se usa ese monto en proyección julio
+        🟣 ${con25.length} usuario(s) con 25% de descuento (descuento vigente en julio)
       </summary>
       <div style="margin-top:8px;">${mkTable(con25, 'junio')}</div>
     </details>` : ''}
