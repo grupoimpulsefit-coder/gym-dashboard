@@ -315,7 +315,7 @@
     <div class="cards">
       <div class="card blue"><div class="card-label">👥 Usuarios activos</div><div class="card-value" id="pActivos">—</div><div class="card-sub" id="pActivosSub" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
       <div class="card orange"><div class="card-label">⚠️ Expiran en 30 días</div><div class="card-value" id="pExpiran" style="color:#e65100;">—</div><div class="card-sub" id="pExpiranSub" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
-      <div class="card green"><div class="card-label">💰 Ingresos mensuales</div><div class="card-value" id="pIngresos">—</div><div class="card-sub" style="font-size:11px;color:var(--muted);margin-top:2px">Activos con precio</div></div>
+      <div class="card green"><div class="card-label">💰 Ingresos mensuales</div><div class="card-value" id="pIngresos">—</div><div class="card-sub" id="pIngresosSub" style="font-size:11px;margin-top:2px">Activos con precio</div></div>
       <div class="card red"><div class="card-label">⚠️ Sin precio definido</div><div class="card-value" id="pSinPrecio" style="color:#c62828;">—</div><div class="card-sub" style="font-size:11px;color:var(--muted);margin-top:2px">Activos sin precio</div></div>
     </div>
   </div>
@@ -921,7 +921,9 @@ function mostrarDashboardDesdeSnapshot(s) {
     const estado = dias === null ? 'al_dia' : dias < 0 ? 'vencido_sin_pago' : dias <= 15 ? 'por_vencer_sin_pago' : 'al_dia';
     G.validacion.push({
       pin: u.PIN, cliente: u.Nombre, fuente: 'Lealtad', pct: 0,
-      planMain: u.ÚltimoProducto, precioJunio: u.ValorPlan || 0, precioBase: u.ValorPlan || 0,
+      planMain: u.ÚltimoProducto,
+      precioJunio: u.ValorPlan || getPlanPriceNat(u.ÚltimoProducto) || 0,
+      precioBase: u.ValorPlan || getPlanPriceNat(u.ÚltimoProducto) || 0,
       expira: u.Expira, expiraDate, estado, pagoTardio: null, pago: null
     });
   });
@@ -1360,16 +1362,30 @@ function updateProjectionCards() {
   // Proyección: solo usuarios que renuevan este mes (excluye anuales/trimestrales pagados de antemano)
   const paraProyeccion = activos.filter(renovaEsteMes);
   const expiran = activos.filter(u => { const d = parseDate(u.expira); return d && d >= hoy && d <= en30; });
-  const conPrecio = paraProyeccion.filter(u => (u.valorPlanGuardado||0) > 0);
-  const sinPrecio = paraProyeccion.filter(u => !(u.valorPlanGuardado > 0));
-  const ingresos  = conPrecio.reduce((s,u) => s + (u.valorPlanGuardado||0), 0);
+  const conPrecio    = paraProyeccion.filter(u => (u.valorPlanGuardado||0) > 0);
+  const sinPrecio    = paraProyeccion.filter(u => !(u.valorPlanGuardado > 0));
+  const ingresos     = conPrecio.reduce((s,u) => s + (u.valorPlanGuardado||0), 0);
   const conDescuento = activos.filter(u => u.descuentoPct > 0 || u.promoExpirada);
+  // Desglose: quienes renuevan este mes y tienen precio de junio (descontado) vs precio completo
+  const conDescRenueva = paraProyeccion.filter(u => (u.descuentoPct > 0) && !u.promoExpirada && !u.noPagoJunio && (u.valorPlanGuardado > 0));
+  const sinDescRenueva = paraProyeccion.filter(u => !(u.descuentoPct > 0 && !u.promoExpirada && !u.noPagoJunio) && (u.valorPlanGuardado > 0));
+  const ingDesc  = conDescRenueva.reduce((s,u) => s + (u.valorPlanGuardado||0), 0);
+  const ingSinDesc = sinDescRenueva.reduce((s,u) => s + (u.valorPlanGuardado||0), 0);
 
   document.getElementById('pActivos').textContent = activos.length;
   document.getElementById('pActivosSub').textContent = `${paraProyeccion.length} renuevan este mes`;
   document.getElementById('pExpiran').textContent = expiran.length;
   document.getElementById('pExpiranSub').textContent = `próximos 30 días`;
   document.getElementById('pIngresos').textContent = '₡' + Math.round(ingresos).toLocaleString('es-CR');
+  // Subtexto mostrando si ya incluye los montos con descuento
+  const elIngSub = document.getElementById('pIngresosSub');
+  if (elIngSub) {
+    if (conDescRenueva.length > 0) {
+      elIngSub.innerHTML = `<span style="color:#e65100;">Incluye ${conDescRenueva.length} con desc. (₡${Math.round(ingDesc).toLocaleString('es-CR')})</span><br><span style="color:#2e7d32;">${sinDescRenueva.length} precio completo (₡${Math.round(ingSinDesc).toLocaleString('es-CR')})</span>`;
+    } else {
+      elIngSub.textContent = 'Todos a precio completo';
+    }
+  }
   document.getElementById('pSinPrecio').textContent = sinPrecio.length;
   // Actualizar card cDescuento si existe (ruta snapshot/usuarios)
   const elDesc = document.getElementById('cDescuento');
@@ -2255,7 +2271,8 @@ function analizar(wb) {
     G.validacion.push({
       pin: u.pin, cliente: u.nombre, fuente: 'Lealtad', pct: 0,
       planMain: u.planCorregido || u.planOriginal || '—',
-      precioJunio: u.valorPlanGuardado || 0, precioBase: u.valorPlanGuardado || 0,
+      precioJunio: u.valorPlanGuardado || getPlanPriceNat(u.planCorregido||u.planOriginal) || 0,
+      precioBase: u.valorPlanGuardado || getPlanPriceNat(u.planCorregido||u.planOriginal) || 0,
       expira: u.expira, expiraDate, estado, pagoTardio,
       pago: pago ? { total: pago.total, fecha: pago.fecha } : null
     });
