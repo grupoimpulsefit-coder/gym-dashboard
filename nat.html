@@ -1331,25 +1331,40 @@ function detectarMesNat() {
   return new Date().toLocaleString('es-CR', { month:'long', year:'numeric' }).replace(/^\w/, c=>c.toUpperCase());
 }
 
+// Retorna true si el usuario renueva este mes (su plan vence en los próximos 35 días o ya venció)
+function renovaEsteMes(u) {
+  const d = parseDate(u.expira);
+  if (!d) return true; // sin fecha → incluir
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const en35 = new Date(hoy); en35.setDate(en35.getDate() + 35);
+  return d <= en35; // vence pronto o ya venció → paga este mes
+}
+
 function updateProjectionCards() {
   const hoy = new Date(); hoy.setHours(0,0,0,0);
   const en30 = new Date(hoy); en30.setDate(en30.getDate() + 30);
   const activos = G.hoja1.filter(u => u.activo === 'Sí');
+  // Proyección: solo usuarios que renuevan este mes (excluye anuales/trimestrales pagados de antemano)
+  const paraProyeccion = activos.filter(renovaEsteMes);
   const expiran = activos.filter(u => { const d = parseDate(u.expira); return d && d >= hoy && d <= en30; });
-  const conPrecio = activos.filter(u => (u.valorPlanGuardado||0) > 0);
-  const sinPrecio = activos.filter(u => !(u.valorPlanGuardado > 0));
+  const conPrecio = paraProyeccion.filter(u => (u.valorPlanGuardado||0) > 0);
+  const sinPrecio = paraProyeccion.filter(u => !(u.valorPlanGuardado > 0));
   const ingresos  = conPrecio.reduce((s,u) => s + (u.valorPlanGuardado||0), 0);
+  const conDescuento = activos.filter(u => u.descuentoPct > 0 || u.promoExpirada);
 
   document.getElementById('pActivos').textContent = activos.length;
-  document.getElementById('pActivosSub').textContent = `${G.hoja1.length} total`;
+  document.getElementById('pActivosSub').textContent = `${paraProyeccion.length} renuevan este mes`;
   document.getElementById('pExpiran').textContent = expiran.length;
   document.getElementById('pExpiranSub').textContent = `próximos 30 días`;
   document.getElementById('pIngresos').textContent = '₡' + Math.round(ingresos).toLocaleString('es-CR');
   document.getElementById('pSinPrecio').textContent = sinPrecio.length;
+  // Actualizar card cDescuento si existe (ruta snapshot/usuarios)
+  const elDesc = document.getElementById('cDescuento');
+  if (elDesc) elDesc.textContent = conDescuento.length;
   document.getElementById('cardsProyeccion').style.display = '';
 
-  renderDesgloseByPlan(activos);
-  renderResumenDescuentos(activos);
+  renderDesgloseByPlan(paraProyeccion); // solo quienes renuevan este mes
+  renderResumenDescuentos(activos);    // todos los activos (para ver descuentos)
 }
 
 function renderDesgloseByPlan(activos) {
@@ -1379,7 +1394,7 @@ function renderDesgloseByPlan(activos) {
     <td style="text-align:center;color:${r.sinPrecio>0?'#c62828':'#555'}">${r.sinPrecio > 0 ? r.sinPrecio : '—'}</td>
     <td style="text-align:right;">
       ${r.precio > 0 ? '₡' + r.precio.toLocaleString('es-CR') : '<span style="color:#aaa;">—</span>'}
-      <button onclick="editarPrecioNat(${JSON.stringify(r.plan)})" style="margin-left:6px;padding:2px 8px;font-size:11px;border:1px solid #bbb;border-radius:4px;cursor:pointer;background:#f5f5f5;">✏️</button>
+      <button onclick="event.stopPropagation();editarPrecioNat(${JSON.stringify(r.plan)})" style="margin-left:6px;padding:2px 8px;font-size:11px;border:1px solid #bbb;border-radius:4px;cursor:pointer;background:#f5f5f5;">✏️</button>
     </td>
     <td style="text-align:right;font-weight:700;">${r.ingreso > 0 ? '₡' + r.ingreso.toLocaleString('es-CR') : '<span style="color:#aaa;">—</span>'}</td>
   </tr>`).join('');
