@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Proyección Gym — Junio 2026</title>
+<title>ProyecciÃ³n Gym â€” Junio 2026</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -28,7 +28,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
 
-  /* ── Header ── */
+  /* â”€â”€ Header â”€â”€ */
   .header {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
     color: white; padding: 20px 32px; display: flex; align-items: center; gap: 16px;
@@ -38,7 +38,7 @@
   .header h1 { font-size: 22px; font-weight: 700; }
   .header p { font-size: 13px; opacity: .85; margin-top: 2px; }
 
-  /* ── Upload zone ── */
+  /* â”€â”€ Upload zone â”€â”€ */
   .upload-zone {
     margin: 32px auto; max-width: 560px; border: 2.5px dashed var(--primary-light);
     border-radius: 14px; padding: 40px 24px; text-align: center; background: white;
@@ -56,12 +56,12 @@
   }
   .btn-upload:hover { background: var(--primary-light); }
 
-  /* ── Loading ── */
+  /* â”€â”€ Loading â”€â”€ */
   .loading { display: none; text-align: center; padding: 40px; }
   .spinner { width: 40px; height: 40px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Dashboard ── */
+  /* â”€â”€ Dashboard â”€â”€ */
   #dashboard { display: none; }
   .dash-header {
     padding: 16px 32px; background: white; border-bottom: 1px solid var(--border);
@@ -70,7 +70,7 @@
   .dash-title { font-size: 16px; font-weight: 700; color: var(--primary); }
   .dash-file { font-size: 12px; color: var(--muted); }
 
-  /* ── Summary cards ── */
+  /* â”€â”€ Summary cards â”€â”€ */
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; padding: 24px 32px 8px; }
   .card {
     background: white; border-radius: 12px; padding: 18px 20px;
@@ -87,7 +87,7 @@
   .card.red .card-value { color: var(--warn); }
   .card.purple .card-value { color: #8e44ad; }
 
-  /* ── Tabs ── */
+  /* â”€â”€ Tabs â”€â”€ */
   .tabs { padding: 0 32px; margin-top: 16px; display: flex; gap: 4px; border-bottom: 2px solid var(--border); }
   .tab {
     padding: 10px 20px; cursor: pointer; border-radius: 8px 8px 0 0; font-size: 13px; font-weight: 600;
@@ -96,11 +96,11 @@
   .tab.active { background: white; color: var(--primary); border-color: var(--border); margin-bottom: -2px; }
   .tab:hover:not(.active) { background: #e8edf4; color: var(--primary); }
 
-  /* ── Tab panels ── */
+  /* â”€â”€ Tab panels â”€â”€ */
   .tab-panel { display: none; padding: 24px 32px; }
   .tab-panel.active { display: block; }
 
-  /* ── Filters bar ── */
+  /* â”€â”€ Filters bar â”€â”€ */
   .filters { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
   .search-box {
     padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; width: 260px;
@@ -122,7 +122,7 @@
   .btn-pdf { background: var(--warn); color: white; }
   .btn-pdf:hover { background: #a93226; }
 
-  /* ── Table ── */
+  /* â”€â”€ Table â”€â”€ */
   .table-wrap { overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
   table { width: 100%; border-collapse: collapse; background: white; }
   thead th {
@@ -145,7 +145,7 @@
   .tag-hist { background: #fff3cd; color: #856404; }
   .tag-mayo { background: #d1ecf1; color: #0c5460; }
 
-  /* ── Badges tipo renovación (Análisis de Renovaciones / Seguimiento) ── */
+  /* â”€â”€ Badges tipo renovaciÃ³n (AnÃ¡lisis de Renovaciones / Seguimiento) â”€â”€ */
   .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; white-space: nowrap; }
   .badge-nuevo     { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
   .badge-renova    { background: #e3f2fd; color: #1565c0; border: 1px solid #90caf9; }
@@ -168,12 +168,12 @@
   .pager button:hover:not(.active) { background: var(--bg); }
   .pager-info { font-size: 12px; color: var(--muted); }
 
-  /* ── Alert ── */
+  /* â”€â”€ Alert â”€â”€ */
   .alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
   .alert-info { background: #eaf2fb; color: #1a5276; border-left: 4px solid var(--primary-light); }
   .alert-warn { background: #fef9e7; color: #7d6608; border-left: 4px solid #f0c300; }
 
-  /* ── Proyección — estilo informe5 ── */
+  /* â”€â”€ ProyecciÃ³n â€” estilo informe5 â”€â”€ */
   .proy-controls { padding: 20px 24px; background: #f7f8fc; border: 1px solid #eaecf5; border-radius: 12px; margin-bottom: 20px; }
   .proy-controls-title { font-size: 11px; font-weight: 700; color: #667eea; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; }
   .proy-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 12px; }
@@ -244,11 +244,11 @@
 <!-- LOGIN -->
 <div id="loginScreen">
   <div class="login-card">
-    <div class="login-logo">🏊</div>
-    <div class="login-title">Natación — JK Sistemas</div>
-    <div class="login-sub">Proyección y análisis de ventas</div>
-    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
-    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <div class="login-logo">ðŸŠ</div>
+    <div class="login-title">NataciÃ³n â€” JK Sistemas</div>
+    <div class="login-sub">ProyecciÃ³n y anÃ¡lisis de ventas</div>
+    <div class="login-field"><label>Correo electrÃ³nico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
+    <div class="login-field"><label>ContraseÃ±a</label><input type="password" id="loginPassword" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" autocomplete="current-password"></div>
     <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
     <div id="loginError"></div>
   </div>
@@ -256,32 +256,32 @@
 
 <!-- HEADER -->
 <div class="header">
-  <div class="header-icon">🏊</div>
+  <div class="header-icon">ðŸŠ</div>
   <div style="flex:1;">
-    <h1>Proyección de Ventas — Natación</h1>
-    <p>Análisis de planes, corrección de reposiciones y proyección con descuentos</p>
+    <h1>ProyecciÃ³n de Ventas â€” NataciÃ³n</h1>
+    <p>AnÃ¡lisis de planes, correcciÃ³n de reposiciones y proyecciÃ³n con descuentos</p>
   </div>
 </div>
 <div class="user-toolbar">
   <div style="display:flex;align-items:center;gap:10px;color:white;">
-    <span>👤</span><span id="userNombre">—</span>
-    <span class="role-badge" id="userRolBadge">—</span>
+    <span>ðŸ‘¤</span><span id="userNombre">â€”</span>
+    <span class="role-badge" id="userRolBadge">â€”</span>
   </div>
   <div style="display:flex;align-items:center;gap:12px;">
     <span id="saveStatus"></span>
-    <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+    <button class="logout-btn" onclick="doLogout()">Cerrar sesiÃ³n</button>
   </div>
 </div>
 
-<!-- RESUMEN DE LO ÚLTIMO GUARDADO -->
+<!-- RESUMEN DE LO ÃšLTIMO GUARDADO -->
 <div id="resumenGuardado" style="display:none;max-width:1100px;margin:24px auto 0;padding:0 24px;"></div>
 
 <!-- UPLOAD -->
 <div id="uploadSection">
   <div class="upload-zone" id="dropZone">
-    <div class="icon">📂</div>
+    <div class="icon">ðŸ“‚</div>
     <h2>Cargar archivo Excel</h2>
-    <p>Arrastra y suelta el archivo <strong>nat.xlsx</strong> aquí, o haz clic para buscarlo</p>
+    <p>Arrastra y suelta el archivo <strong>nat.xlsx</strong> aquÃ­, o haz clic para buscarlo</p>
     <label class="btn-upload" for="fileInput">Seleccionar archivo</label>
     <input type="file" id="fileInput" accept=".xlsx,.xls">
   </div>
@@ -290,64 +290,64 @@
 <!-- LOADING -->
 <div class="loading" id="loadingSection">
   <div class="spinner"></div>
-  <p>Procesando datos…</p>
+  <p>Procesando datosâ€¦</p>
 </div>
 
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="dash-header">
     <div>
-      <div class="dash-title">Panel de Análisis</div>
+      <div class="dash-title">Panel de AnÃ¡lisis</div>
       <div class="dash-file" id="fileNameLabel"></div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-      <label class="btn btn-accent" for="ventasSoloInputDash" style="cursor:pointer;">📤 Actualizar solo Ventas</label>
+      <label class="btn btn-accent" for="ventasSoloInputDash" style="cursor:pointer;">ðŸ“¤ Actualizar solo Ventas</label>
       <input type="file" id="ventasSoloInputDash" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) procesarVentasSolo(this.files[0])">
-      <button class="btn btn-primary" onclick="cambiarArchivo()">📂 Cambiar archivo</button>
+      <button class="btn btn-primary" onclick="cambiarArchivo()">ðŸ“‚ Cambiar archivo</button>
     </div>
   </div>
 
   <!-- Cards -->
   <div class="cards">
-    <div class="card"><div class="card-label">Total Usuarios Hoja1</div><div class="card-value" id="cTotalUsuarios">—</div></div>
-    <div class="card red"><div class="card-label">Con plan incorrecto</div><div class="card-value" id="cPlanIncorrecto">—</div></div>
-    <div class="card green"><div class="card-label">Planes corregidos</div><div class="card-value" id="cCorregidos">—</div><div class="card-sub" id="cCorregidosHist" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
-    <div class="card orange"><div class="card-label">Clientes en descuento</div><div class="card-value" id="cDescuento">—</div></div>
-    <div class="card purple"><div class="card-label">Proyección junio (todos)</div><div class="card-value" id="cProyeccion">—</div></div>
-    <div class="card green"><div class="card-label">💰 Total membresías cobrado</div><div class="card-value" id="cTotalMembresias">—</div><div class="card-sub" id="cTotalMembresiasCount" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
-    <div class="card" style="border-left-color:#00bcd4;"><div class="card-label">📅 Membresías hoy</div><div class="card-value" id="cMembresiasHoy" style="color:#00bcd4;">—</div><div class="card-sub" id="cMembresiasHoyCount" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
+    <div class="card"><div class="card-label">Total Usuarios Hoja1</div><div class="card-value" id="cTotalUsuarios">â€”</div></div>
+    <div class="card red"><div class="card-label">Con plan incorrecto</div><div class="card-value" id="cPlanIncorrecto">â€”</div></div>
+    <div class="card green"><div class="card-label">Planes corregidos</div><div class="card-value" id="cCorregidos">â€”</div><div class="card-sub" id="cCorregidosHist" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
+    <div class="card orange"><div class="card-label">Clientes en descuento</div><div class="card-value" id="cDescuento">â€”</div></div>
+    <div class="card purple"><div class="card-label">ProyecciÃ³n junio (todos)</div><div class="card-value" id="cProyeccion">â€”</div></div>
+    <div class="card green"><div class="card-label">ðŸ’° Total membresÃ­as cobrado</div><div class="card-value" id="cTotalMembresias">â€”</div><div class="card-sub" id="cTotalMembresiasCount" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
+    <div class="card" style="border-left-color:#00bcd4;"><div class="card-label">ðŸ“… MembresÃ­as hoy</div><div class="card-value" id="cMembresiasHoy" style="color:#00bcd4;">â€”</div><div class="card-sub" id="cMembresiasHoyCount" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
   </div>
 
   <!-- Tabs -->
   <div class="tabs">
-    <div class="tab active" onclick="switchTab('tabUsuarios',this)">👤 Usuarios</div>
-    <div class="tab" onclick="switchTab('tabVentas',this)">🧾 Ventas Mayo</div>
-    <div class="tab" onclick="switchTab('tabProyeccion',this)">📊 Proyección Junio</div>
-    <div class="tab" onclick="switchTab('tabJunio',this)">🔄 Análisis de Renovaciones</div>
-    <div class="tab" onclick="switchTab('tabValidacion',this)">✅ Validación Descuentos</div>
-    <div class="tab" onclick="switchTab('tabSeguimiento',this)">📋 Seguimiento Vencidos</div>
+    <div class="tab active" onclick="switchTab('tabUsuarios',this)">ðŸ‘¤ Usuarios</div>
+    <div class="tab" onclick="switchTab('tabVentas',this)">ðŸ§¾ Ventas Mayo</div>
+    <div class="tab" onclick="switchTab('tabProyeccion',this)">ðŸ“Š ProyecciÃ³n Junio</div>
+    <div class="tab" onclick="switchTab('tabJunio',this)">ðŸ”„ AnÃ¡lisis de Renovaciones</div>
+    <div class="tab" onclick="switchTab('tabValidacion',this)">âœ… ValidaciÃ³n Descuentos</div>
+    <div class="tab" onclick="switchTab('tabSeguimiento',this)">ðŸ“‹ Seguimiento Vencidos</div>
   </div>
 
   <!-- TAB 1: Usuarios -->
   <div id="tabUsuarios" class="tab-panel active">
     <div class="alert alert-info">
-      Usuarios cuyo <strong>Último Producto</strong> era "Reposicion" o "Gym incluido" fueron buscados en el historial de Hoja3 para determinar su plan principal real.
+      Usuarios cuyo <strong>Ãšltimo Producto</strong> era "Reposicion" o "Gym incluido" fueron buscados en el historial de Hoja3 para determinar su plan principal real.
     </div>
     <div class="filters">
-      <input class="search-box" id="searchUsuarios" placeholder="Buscar por nombre o PIN…" oninput="filtrarTabla('usuarios')">
+      <input class="search-box" id="searchUsuarios" placeholder="Buscar por nombre o PINâ€¦" oninput="filtrarTabla('usuarios')">
       <select class="filter-select" id="filtroEstado" onchange="filtrarTabla('usuarios')">
         <option value="">Todos los estados</option>
         <option value="corregido">Solo corregidos</option>
-        <option value="corregido_historico">Corregidos vía histórico</option>
-        <option value="sin_correccion">Sin corrección necesaria</option>
+        <option value="corregido_historico">Corregidos vÃ­a histÃ³rico</option>
+        <option value="sin_correccion">Sin correcciÃ³n necesaria</option>
         <option value="sin_plan">Sin plan encontrado</option>
       </select>
       <select class="filter-select" id="filtroActivo" onchange="filtrarTabla('usuarios')">
         <option value="">Todos</option>
-        <option value="Sí">Activos</option>
+        <option value="SÃ­">Activos</option>
         <option value="No">Inactivos</option>
       </select>
-      <button class="btn btn-pdf" onclick="pdfUsuarios()">📄 Exportar PDF</button>
+      <button class="btn btn-pdf" onclick="pdfUsuarios()">ðŸ“„ Exportar PDF</button>
     </div>
     <div class="table-wrap">
       <table id="tablaUsuarios">
@@ -366,10 +366,10 @@
   <!-- TAB 2: Ventas Mayo -->
   <div id="tabVentas" class="tab-panel">
     <div class="alert alert-info">
-      Transacciones de Hoja3 con el <strong>plan efectivo identificado</strong>. Las entradas de "Reposicion" o "Gym incluido" muestran el plan principal de esa transacción.
+      Transacciones de Hoja3 con el <strong>plan efectivo identificado</strong>. Las entradas de "Reposicion" o "Gym incluido" muestran el plan principal de esa transacciÃ³n.
     </div>
     <div class="filters">
-      <input class="search-box" id="searchVentas" placeholder="Buscar por cliente o plan…" oninput="filtrarTabla('ventas')">
+      <input class="search-box" id="searchVentas" placeholder="Buscar por cliente o planâ€¦" oninput="filtrarTabla('ventas')">
       <select class="filter-select" id="filtroVentaTipo" onchange="filtrarTabla('ventas')">
         <option value="">Todos los productos</option>
         <option value="reposicion">Solo reposiciones</option>
@@ -389,16 +389,16 @@
     <div class="pager" id="pagerVentas"></div>
   </div>
 
-  <!-- TAB 3: Proyección Junio -->
+  <!-- TAB 3: ProyecciÃ³n Junio -->
   <div id="tabProyeccion" class="tab-panel">
 
     <!-- FILTROS -->
     <div class="proy-controls">
-      <div class="proy-controls-title">🔎 Filtros y Búsqueda</div>
+      <div class="proy-controls-title">ðŸ”Ž Filtros y BÃºsqueda</div>
       <div class="proy-filter-grid">
         <div class="proy-filter-item">
           <label>Buscar por nombre</label>
-          <input type="text" id="searchProy" placeholder="Escriba el nombre…" oninput="filtrarTabla('proy')">
+          <input type="text" id="searchProy" placeholder="Escriba el nombreâ€¦" oninput="filtrarTabla('proy')">
         </div>
         <div class="proy-filter-item">
           <label>Tipo de descuento</label>
@@ -411,14 +411,14 @@
           </select>
         </div>
         <div class="proy-filter-item">
-          <label>Expira en (días)</label>
+          <label>Expira en (dÃ­as)</label>
           <select id="filtroVence" onchange="filtrarTabla('proy')">
             <option value="">Todos</option>
-            <option value="7">Próximos 7 días</option>
-            <option value="15">Próximos 15 días</option>
-            <option value="30">Próximos 30 días</option>
-            <option value="60">Próximos 60 días</option>
-            <option value="90">Próximos 90 días</option>
+            <option value="7">PrÃ³ximos 7 dÃ­as</option>
+            <option value="15">PrÃ³ximos 15 dÃ­as</option>
+            <option value="30">PrÃ³ximos 30 dÃ­as</option>
+            <option value="60">PrÃ³ximos 60 dÃ­as</option>
+            <option value="90">PrÃ³ximos 90 dÃ­as</option>
             <option value="vencido">Ya vencidos</option>
           </select>
         </div>
@@ -427,8 +427,8 @@
           <select id="filtroPlanEncontrado" onchange="filtrarTabla('proy')">
             <option value="">Todos</option>
             <option value="si">Con precio definido</option>
-            <option value="pendiente">⚠ Pendientes (sin precio)</option>
-            <option value="sin_correccion">⚠ Sin plan corregido</option>
+            <option value="pendiente">âš  Pendientes (sin precio)</option>
+            <option value="sin_correccion">âš  Sin plan corregido</option>
           </select>
         </div>
         <div class="proy-filter-item">
@@ -449,9 +449,9 @@
         </div>
         <div class="proy-filter-item" style="justify-content:flex-end;">
           <div class="proy-btn-row" style="margin-top:auto;">
-            <button class="proy-btn proy-btn-purple" onclick="openResumenModal()">📊 Resumen por Plan</button>
-            <button class="proy-btn proy-btn-orange" onclick="limpiarFiltrosProy()">✖ Limpiar filtros</button>
-            <button class="proy-btn proy-btn-red" onclick="pdfProyeccion()">📄 PDF</button>
+            <button class="proy-btn proy-btn-purple" onclick="openResumenModal()">ðŸ“Š Resumen por Plan</button>
+            <button class="proy-btn proy-btn-orange" onclick="limpiarFiltrosProy()">âœ– Limpiar filtros</button>
+            <button class="proy-btn proy-btn-red" onclick="pdfProyeccion()">ðŸ“„ PDF</button>
           </div>
         </div>
       </div>
@@ -460,22 +460,22 @@
     <!-- STAT CARDS -->
     <div class="proy-stats" id="proy-cards"></div>
 
-    <!-- GRÁFICO -->
+    <!-- GRÃFICO -->
     <div class="proy-chart-section">
-      <div class="proy-section-title">📈 Proyección Junio por Plan (Top 10)</div>
+      <div class="proy-section-title">ðŸ“ˆ ProyecciÃ³n Junio por Plan (Top 10)</div>
       <canvas id="proyChart"></canvas>
     </div>
 
     <!-- TABLA -->
     <div class="proy-table-section">
-      <div class="proy-section-title">👥 Listado de Renovaciones</div>
+      <div class="proy-section-title">ðŸ‘¥ Listado de Renovaciones</div>
       <div class="proy-table-wrap">
         <table id="tablaProyeccion">
           <thead>
             <tr>
               <th>PIN</th><th>Cliente</th><th>Plan Principal</th>
               <th>Precio Base</th><th>Descuento</th><th>Precio Junio</th>
-              <th>Pagó en Mayo</th><th>Vence</th><th>Días</th>
+              <th>PagÃ³ en Mayo</th><th>Vence</th><th>DÃ­as</th>
             </tr>
           </thead>
           <tbody id="bodyProyeccion"></tbody>
@@ -489,12 +489,12 @@
     <div id="totalesProyeccion" style="display:none;"></div>
   </div>
 
-  <!-- TAB 4: Análisis de Renovaciones -->
+  <!-- TAB 4: AnÃ¡lisis de Renovaciones -->
   <div id="tabJunio" class="tab-panel">
 
     <div class="alert alert-info">
-      Transacciones de la hoja <strong>junio</strong> clasificadas como Nuevo / Renovación / Reingreso
-      según el último <strong>Informe de Usuarios</strong> conocido (de este archivo o del último guardado).
+      Transacciones de la hoja <strong>junio</strong> clasificadas como Nuevo / RenovaciÃ³n / Reingreso
+      segÃºn el Ãºltimo <strong>Informe de Usuarios</strong> conocido (de este archivo o del Ãºltimo guardado).
     </div>
 
     <!-- Resumen general -->
@@ -503,20 +503,20 @@
 
     <!-- Filtros -->
     <div class="proy-controls">
-      <div class="proy-controls-title">🔎 Filtrar Renovaciones</div>
+      <div class="proy-controls-title">ðŸ”Ž Filtrar Renovaciones</div>
       <div class="proy-filter-grid">
         <div class="proy-filter-item">
           <label>Tipo</label>
           <select id="renoFilterTipo" onchange="renderRenovaciones()">
             <option value="all">Todos</option>
-            <option value="Nuevo">🆕 Nuevo</option>
-            <option value="Renovación">✅ Renovación</option>
-            <option value="Reingreso">🔄 Reingreso</option>
+            <option value="Nuevo">ðŸ†• Nuevo</option>
+            <option value="RenovaciÃ³n">âœ… RenovaciÃ³n</option>
+            <option value="Reingreso">ðŸ”„ Reingreso</option>
           </select>
         </div>
         <div class="proy-filter-item">
           <label>Buscar cliente</label>
-          <input type="text" id="renoSearchName" placeholder="Nombre del cliente…" oninput="renderRenovaciones()">
+          <input type="text" id="renoSearchName" placeholder="Nombre del clienteâ€¦" oninput="renderRenovaciones()">
         </div>
         <div class="proy-filter-item">
           <label>Plan</label>
@@ -532,38 +532,38 @@
         </div>
         <div class="proy-filter-item" style="justify-content:flex-end;">
           <div class="proy-btn-row" style="margin-top:auto;">
-            <button class="proy-btn proy-btn-purple" onclick="filterRenoHoy()">📅 Hoy</button>
-            <button class="proy-btn proy-btn-orange" onclick="clearRenoFilters()">✖ Limpiar</button>
+            <button class="proy-btn proy-btn-purple" onclick="filterRenoHoy()">ðŸ“… Hoy</button>
+            <button class="proy-btn proy-btn-orange" onclick="clearRenoFilters()">âœ– Limpiar</button>
           </div>
         </div>
       </div>
       <div class="proy-btn-row">
-        <button class="proy-btn proy-btn-teal" onclick="exportRenoCSV()">📥 Exportar CSV</button>
-        <button class="proy-btn proy-btn-red" onclick="exportRenoPDF()">📄 Exportar PDF</button>
+        <button class="proy-btn proy-btn-teal" onclick="exportRenoCSV()">ðŸ“¥ Exportar CSV</button>
+        <button class="proy-btn proy-btn-red" onclick="exportRenoPDF()">ðŸ“„ Exportar PDF</button>
       </div>
     </div>
 
-    <!-- Gráficos lado a lado -->
+    <!-- GrÃ¡ficos lado a lado -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px;">
       <div class="proy-chart-section" style="margin-bottom:0;">
-        <div class="proy-section-title">🍩 Distribución por Tipo</div>
+        <div class="proy-section-title">ðŸ© DistribuciÃ³n por Tipo</div>
         <canvas id="renoTypePie" style="max-height:240px;"></canvas>
       </div>
       <div class="proy-chart-section" style="margin-bottom:0;">
-        <div class="proy-section-title">📊 Recaudado por Plan</div>
+        <div class="proy-section-title">ðŸ“Š Recaudado por Plan</div>
         <canvas id="renoPlanBar" style="max-height:240px;"></canvas>
       </div>
     </div>
 
     <!-- Tabla principal -->
     <div class="proy-table-section" style="margin-bottom:22px;">
-      <div class="proy-section-title">🔄 Detalle de Transacciones de Membresía</div>
+      <div class="proy-section-title">ðŸ”„ Detalle de Transacciones de MembresÃ­a</div>
       <div class="proy-table-wrap">
         <table>
           <thead>
             <tr>
               <th>Fecha y Hora</th><th>Cliente</th><th>Plan / Producto</th><th>Tipo</th>
-              <th>Total (₡)</th><th>Días sin renovar</th><th>Ingreso</th><th>Expira actual</th><th>Registrado por</th>
+              <th>Total (â‚¡)</th><th>DÃ­as sin renovar</th><th>Ingreso</th><th>Expira actual</th><th>Registrado por</th>
             </tr>
           </thead>
           <tbody id="renoTableBody"></tbody>
@@ -574,10 +574,10 @@
 
     <!-- Clases sueltas -->
     <div class="proy-table-section" style="margin-bottom:22px;">
-      <div class="proy-section-title">🤸 Clases Sueltas / Sesiones (no son membresías)</div>
+      <div class="proy-section-title">ðŸ¤¸ Clases Sueltas / Sesiones (no son membresÃ­as)</div>
       <div class="proy-table-wrap">
         <table>
-          <thead><tr><th>Fecha y Hora</th><th>Cliente</th><th>Producto</th><th>Total (₡)</th><th>Registrado por</th></tr></thead>
+          <thead><tr><th>Fecha y Hora</th><th>Cliente</th><th>Producto</th><th>Total (â‚¡)</th><th>Registrado por</th></tr></thead>
           <tbody id="clasesSueltasTableBody"></tbody>
         </table>
       </div>
@@ -586,10 +586,10 @@
 
     <!-- Sin clasificar -->
     <div class="proy-table-section">
-      <div class="proy-section-title">❓ Sin Clasificar (revisar — no calzan con ningún plan conocido)</div>
+      <div class="proy-section-title">â“ Sin Clasificar (revisar â€” no calzan con ningÃºn plan conocido)</div>
       <div class="proy-table-wrap">
         <table>
-          <thead><tr><th>Fecha y Hora</th><th>Cliente</th><th>Producto</th><th>Total (₡)</th><th>Registrado por</th></tr></thead>
+          <thead><tr><th>Fecha y Hora</th><th>Cliente</th><th>Producto</th><th>Total (â‚¡)</th><th>Registrado por</th></tr></thead>
           <tbody id="sinClasificarTableBody"></tbody>
         </table>
       </div>
@@ -597,42 +597,42 @@
     </div>
   </div>
 
-  <!-- TAB 5: Validación Descuentos -->
+  <!-- TAB 5: ValidaciÃ³n Descuentos -->
   <div id="tabValidacion" class="tab-panel">
     <div class="alert alert-info">
-      Clientes que pagan con <strong>descuento (20%, 25% o G20 — plan lealtad)</strong>, cruzados con los pagos registrados en la hoja <strong>Junio</strong>.
-      Se valida si ya pagaron, si se les aplicó el descuento correcto, y si están por vencer/vencidos sin haber pagado (riesgo de quedar inactivos).
+      Clientes que pagan con <strong>descuento (20%, 25% o G20 â€” plan lealtad)</strong>, cruzados con los pagos registrados en la hoja <strong>Junio</strong>.
+      Se valida si ya pagaron, si se les aplicÃ³ el descuento correcto, y si estÃ¡n por vencer/vencidos sin haber pagado (riesgo de quedar inactivos).
     </div>
 
     <div class="proy-controls">
-      <div class="proy-controls-title">🔎 Filtros</div>
+      <div class="proy-controls-title">ðŸ”Ž Filtros</div>
       <div class="proy-filter-grid">
         <div class="proy-filter-item">
           <label>Buscar por nombre</label>
-          <input type="text" id="searchValidacion" placeholder="Escriba el nombre…" oninput="filtrarTabla('validacion')">
+          <input type="text" id="searchValidacion" placeholder="Escriba el nombreâ€¦" oninput="filtrarTabla('validacion')">
         </div>
         <div class="proy-filter-item">
           <label>Estado</label>
           <select id="filtroValidacionEstado" onchange="filtrarTabla('validacion')">
             <option value="">Todos</option>
-            <option value="vencido_sin_pago">🔴 Vencido sin pagar</option>
-            <option value="por_vencer_sin_pago">🟠 Por vencer sin pagar</option>
-            <option value="sin_descuento">⚠ Pagó sin descuento aplicado</option>
-            <option value="monto_diferente">⚠ Monto diferente al esperado</option>
-            <option value="ok">✅ Pagó con descuento correcto</option>
-            <option value="al_dia">🟢 Al día (aún no vence)</option>
+            <option value="vencido_sin_pago">ðŸ”´ Vencido sin pagar</option>
+            <option value="por_vencer_sin_pago">ðŸŸ  Por vencer sin pagar</option>
+            <option value="sin_descuento">âš  PagÃ³ sin descuento aplicado</option>
+            <option value="monto_diferente">âš  Monto diferente al esperado</option>
+            <option value="ok">âœ… PagÃ³ con descuento correcto</option>
+            <option value="al_dia">ðŸŸ¢ Al dÃ­a (aÃºn no vence)</option>
           </select>
         </div>
         <div class="proy-filter-item">
           <label>Pago</label>
           <select id="filtroValidacionTardio" onchange="filtrarTabla('validacion')">
             <option value="">Todos</option>
-            <option value="tardio">⏰ Solo pagos tardíos</option>
+            <option value="tardio">â° Solo pagos tardÃ­os</option>
           </select>
         </div>
         <div class="proy-filter-item" style="justify-content:flex-end;">
           <div class="proy-btn-row" style="margin-top:auto;">
-            <button class="proy-btn proy-btn-orange" onclick="limpiarFiltrosValidacion()">✖ Limpiar</button>
+            <button class="proy-btn proy-btn-orange" onclick="limpiarFiltrosValidacion()">âœ– Limpiar</button>
           </div>
         </div>
       </div>
@@ -641,13 +641,13 @@
     <div class="proy-stats" id="validacion-cards"></div>
 
     <div class="proy-table-section">
-      <div class="proy-section-title">👥 Detalle de Validación</div>
+      <div class="proy-section-title">ðŸ‘¥ Detalle de ValidaciÃ³n</div>
       <div class="proy-table-wrap">
         <table>
           <thead>
             <tr>
               <th>PIN</th><th>Cliente</th><th>Plan</th><th>Descuento</th>
-              <th>Precio Junio Esperado</th><th>Pagó en Junio</th><th>Fecha Pago</th>
+              <th>Precio Junio Esperado</th><th>PagÃ³ en Junio</th><th>Fecha Pago</th>
               <th>Vence</th><th>Estado</th>
             </tr>
           </thead>
@@ -661,26 +661,26 @@
   <!-- TAB 6: Seguimiento Vencidos -->
   <div id="tabSeguimiento" class="tab-panel">
     <div class="alert alert-info">
-      Clientes <strong>activos vencidos</strong> según el Informe de Usuarios que <strong>no aparecen pagando</strong> en las
-      transacciones de la hoja junio cargadas. Si un cliente ya pagó este período pero el Informe de Usuarios todavía
-      no refleja el nuevo vencimiento, no aparece aquí.
+      Clientes <strong>activos vencidos</strong> segÃºn el Informe de Usuarios que <strong>no aparecen pagando</strong> en las
+      transacciones de la hoja junio cargadas. Si un cliente ya pagÃ³ este perÃ­odo pero el Informe de Usuarios todavÃ­a
+      no refleja el nuevo vencimiento, no aparece aquÃ­.
     </div>
 
     <div class="proy-controls">
-      <div class="proy-controls-title">🔎 Filtros de Seguimiento</div>
+      <div class="proy-controls-title">ðŸ”Ž Filtros de Seguimiento</div>
       <div class="proy-filter-grid">
         <div class="proy-filter-item">
           <label>Buscar cliente</label>
-          <input type="text" id="segSearch" placeholder="Nombre del cliente…" oninput="renderSeguimiento()">
+          <input type="text" id="segSearch" placeholder="Nombre del clienteâ€¦" oninput="renderSeguimiento()">
         </div>
         <div class="proy-filter-item">
           <label>Vencido hace</label>
           <select id="segRango" onchange="renderSeguimiento()">
-            <option value="all">Cualquier antigüedad</option>
-            <option value="1-15">1 a 15 días</option>
-            <option value="16-30">16 a 30 días</option>
-            <option value="31-60">31 a 60 días</option>
-            <option value="61-9999">Más de 60 días</option>
+            <option value="all">Cualquier antigÃ¼edad</option>
+            <option value="1-15">1 a 15 dÃ­as</option>
+            <option value="16-30">16 a 30 dÃ­as</option>
+            <option value="31-60">31 a 60 dÃ­as</option>
+            <option value="61-9999">MÃ¡s de 60 dÃ­as</option>
           </select>
         </div>
         <div class="proy-filter-item">
@@ -689,26 +689,26 @@
         </div>
         <div class="proy-filter-item" style="justify-content:flex-end;">
           <div class="proy-btn-row" style="margin-top:auto;">
-            <button class="proy-btn proy-btn-orange" onclick="clearSegFilters()">✖ Limpiar</button>
+            <button class="proy-btn proy-btn-orange" onclick="clearSegFilters()">âœ– Limpiar</button>
           </div>
         </div>
       </div>
       <div class="proy-btn-row">
-        <button class="proy-btn proy-btn-teal" onclick="exportSegCSV()">📥 Exportar CSV</button>
-        <button class="proy-btn proy-btn-red" onclick="printSeguimiento()">🖨️ Imprimir</button>
+        <button class="proy-btn proy-btn-teal" onclick="exportSegCSV()">ðŸ“¥ Exportar CSV</button>
+        <button class="proy-btn proy-btn-red" onclick="printSeguimiento()">ðŸ–¨ï¸ Imprimir</button>
       </div>
     </div>
 
     <div class="proy-stats" id="segStatsContainer"></div>
 
     <div class="proy-table-section">
-      <div class="proy-section-title">📋 Clientes Vencidos sin Renovar</div>
+      <div class="proy-section-title">ðŸ“‹ Clientes Vencidos sin Renovar</div>
       <div class="proy-table-wrap">
         <table>
           <thead>
             <tr>
-              <th>PIN</th><th>Cliente</th><th>Teléfono</th><th>Plan</th>
-              <th>Venció</th><th>Días vencido</th><th>Valor Plan</th>
+              <th>PIN</th><th>Cliente</th><th>TelÃ©fono</th><th>Plan</th>
+              <th>VenciÃ³</th><th>DÃ­as vencido</th><th>Valor Plan</th>
             </tr>
           </thead>
           <tbody id="segTableBody"></tbody>
@@ -720,11 +720,11 @@
 </div>
 
 <script>
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // SUPABASE
-// ─────────────────────────────────────────
-const SUPA_URL = 'https://cwyqjbuhhjpefhqdcdey.supabase.co';
-const SUPA_KEY = 'sb_publishable_fCUyex-9rN7ChxV_tX8IuA_lX_6loqN';
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const SUPA_URL = '__SUPA_URL__';
+const SUPA_KEY = '__SUPA_KEY__';
 let currentToken = null, currentRole = null;
 
 async function supaFetch(path, opts = {}) {
@@ -761,8 +761,8 @@ async function doLogin() {
     currentRole = roles?.[0]?.role || 'colaborador';
     const nombre = roles?.[0]?.nombre || email;
     document.getElementById('userNombre').textContent = nombre;
-    document.getElementById('userRolBadge').textContent = currentRole === 'admin' ? '⚙ Admin' : '👁 Colaborador';
-    // Ocultar sección de carga si es colaborador
+    document.getElementById('userRolBadge').textContent = currentRole === 'admin' ? 'âš™ Admin' : 'ðŸ‘ Colaborador';
+    // Ocultar secciÃ³n de carga si es colaborador
     if (currentRole !== 'admin') {
       document.getElementById('uploadSection').style.display = 'none';
     }
@@ -775,8 +775,8 @@ async function doLogin() {
   }
 }
 
-// Al entrar, reconstruir el dashboard completo (Usuarios, Proyección, Validación,
-// Renovaciones, Seguimiento) a partir de lo último guardado en Supabase, sin
+// Al entrar, reconstruir el dashboard completo (Usuarios, ProyecciÃ³n, ValidaciÃ³n,
+// Renovaciones, Seguimiento) a partir de lo Ãºltimo guardado en Supabase, sin
 // obligar a resubir el Excel. "Ventas Mayo" no se reconstruye porque depende de
 // las transacciones crudas de Hoja3, que no se guardan en el snapshot.
 async function cargarResumenGuardado() {
@@ -795,23 +795,23 @@ const PCT_DESCUENTO = { '20%': 0.2, '25%': 0.25, 'G20': 0.2, 'Completo': 0 };
 function mostrarDashboardDesdeSnapshot(s) {
   const ud = s.users_data || [];
 
-  // ── Reconstruir G.hoja1 (tab Usuarios) ──
+  // â”€â”€ Reconstruir G.hoja1 (tab Usuarios) â”€â”€
   G.hoja1 = ud.map(u => ({
     pin: u.PIN || '', nombre: u.Nombre || '', activo: u.Activo || '', expira: u.Expira || '',
     telefono: u.Telefono || '', email: u.Email || '',
-    planOriginal: u.PlanOriginal || u.ÚltimoProducto || '',
-    planCorregido: u.ÚltimoProducto || '',
+    planOriginal: u.PlanOriginal || u.ÃšltimoProducto || '',
+    planCorregido: u.ÃšltimoProducto || '',
     estado: u.EstadoCorrecion || 'ok', fuentePlan: u.FuentePlan || null,
     valorPlanGuardado: u.ValorPlan ?? null
   }));
 
-  // ── Reconstruir Proyección / Plan Completo (tab Proyección) ──
+  // â”€â”€ Reconstruir ProyecciÃ³n / Plan Completo (tab ProyecciÃ³n) â”€â”€
   G.proyeccion = []; G.planCompleto = [];
   ud.forEach(u => {
     if (!u.Descuento) return;
     const row = {
       pin: u.PIN, cliente: u.Nombre, fuente: u.Descuento, pct: PCT_DESCUENTO[u.Descuento] ?? 0,
-      planMain: u.ProyPlan || u.ÚltimoProducto, precioBase: null,
+      planMain: u.ProyPlan || u.ÃšltimoProducto, precioBase: null,
       precioJunio: u.PrecioJunio, precioFuente: null, pendiente: u.Pendiente || null,
       pagoMayo: null, expira: u.Expira, expiraDate: parseDate(u.Expira)
     };
@@ -820,20 +820,20 @@ function mostrarDashboardDesdeSnapshot(s) {
   });
   G.totalJunio = s.proyecciones?.total_junio || [...G.proyeccion, ...G.planCompleto].reduce((sum,r)=>sum+(r.precioJunio||0),0);
 
-  // ── Reconstruir Validación de Descuentos (tab Validación) ──
+  // â”€â”€ Reconstruir ValidaciÃ³n de Descuentos (tab ValidaciÃ³n) â”€â”€
   G.validacion = ud.filter(u => u.EstadoValidacion).map(u => ({
     pin: u.PIN, cliente: u.Nombre, fuente: u.Descuento, pct: PCT_DESCUENTO[u.Descuento] ?? 0,
-    planMain: u.ProyPlan || u.ÚltimoProducto, precioJunio: u.PrecioJunio,
+    planMain: u.ProyPlan || u.ÃšltimoProducto, precioJunio: u.PrecioJunio,
     expira: u.Expira, expiraDate: parseDate(u.Expira),
     estado: u.EstadoValidacion, pagoTardio: u.PagoTardio || null,
     pago: u.PagoMonto != null ? { total: u.PagoMonto, fecha: u.PagoFecha } : null
   }));
 
-  // ── Renovaciones / Seguimiento ──
+  // â”€â”€ Renovaciones / Seguimiento â”€â”€
   buildUsersDataFromHoja1();
   buildRenovacionesState(s.renov_data || []);
 
-  // ── Render ──
+  // â”€â”€ Render â”€â”€
   G.filtered.usuarios = [...G.hoja1];
   G.filtered.proy = [...G.proyeccion, ...G.planCompleto];
   G.filtered.validacion = [...G.validacion];
@@ -843,9 +843,9 @@ function mostrarDashboardDesdeSnapshot(s) {
   document.getElementById('cPlanIncorrecto').textContent = G.hoja1.filter(u=>u.estado!=='ok').length;
   document.getElementById('cCorregidos').textContent = G.hoja1.filter(u=>u.estado==='corregido').length;
   const corregidosHist = G.hoja1.filter(u => u.estado === 'corregido' && u.fuentePlan === 'historico').length;
-  document.getElementById('cCorregidosHist').textContent = corregidosHist > 0 ? `📅 ${corregidosHist} vía histórico` : '';
+  document.getElementById('cCorregidosHist').textContent = corregidosHist > 0 ? `ðŸ“… ${corregidosHist} vÃ­a histÃ³rico` : '';
   document.getElementById('cDescuento').textContent = G.proyeccion.length;
-  document.getElementById('cProyeccion').textContent = '₡' + Math.round(G.totalJunio).toLocaleString('es-CR');
+  document.getElementById('cProyeccion').textContent = 'â‚¡' + Math.round(G.totalJunio).toLocaleString('es-CR');
 
   poblarFiltroProducto();
   renderTabla('usuarios');
@@ -853,13 +853,13 @@ function mostrarDashboardDesdeSnapshot(s) {
   renderTotalesProyeccion();
   renderTabla('validacion');
 
-  // "Ventas Mayo" depende de transacciones crudas que no se guardan — se oculta en esta vista
+  // "Ventas Mayo" depende de transacciones crudas que no se guardan â€” se oculta en esta vista
   const tabVentasBtn = document.querySelector(`.tab[onclick*="tabVentas"]`);
   if (tabVentasBtn) tabVentasBtn.style.display = 'none';
   document.getElementById('tabVentas').classList.remove('active');
 
   document.getElementById('fileNameLabel').innerHTML =
-    `📅 Datos guardados — ${s.mes} <span style="color:var(--muted);font-weight:400;">(actualizado ${new Date(s.updated_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})})</span>`;
+    `ðŸ“… Datos guardados â€” ${s.mes} <span style="color:var(--muted);font-weight:400;">(actualizado ${new Date(s.updated_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})})</span>`;
 
   document.getElementById('resumenGuardado').style.display = 'none';
   document.getElementById('uploadSection').style.display = 'none';
@@ -874,19 +874,19 @@ async function doLogout() {
 
 document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
-// usuariosLoaded=true cuando se subió el Excel completo (Hoja1 disponible);
-// false cuando solo se actualizó el archivo de Ventas por Producto — en ese caso
+// usuariosLoaded=true cuando se subiÃ³ el Excel completo (Hoja1 disponible);
+// false cuando solo se actualizÃ³ el archivo de Ventas por Producto â€” en ese caso
 // no se tocan activos/total_usuarios/proyecciones/users_data ya guardados.
 async function autoSaveNat(mes, usuariosLoaded) {
   const statusEl = document.getElementById('saveStatus');
-  statusEl.textContent = '⏳ Guardando...';
+  statusEl.textContent = 'â³ Guardando...';
   try {
     const record = {
-      sede: 'Natación', mes,
+      sede: 'NataciÃ³n', mes,
       mes_orden: mes,
       renovaciones: {
         nuevos: renovacionesData.filter(r=>r.Tipo==='Nuevo').length,
-        renovaciones: renovacionesData.filter(r=>r.Tipo==='Renovación').length,
+        renovaciones: renovacionesData.filter(r=>r.Tipo==='RenovaciÃ³n').length,
         reingresos: renovacionesData.filter(r=>r.Tipo==='Reingreso').length,
         total: renovacionesData.reduce((s,r)=>s+r.Total,0),
         clasesSueltas: { count: clasesSueltasData.length, total: clasesSueltasData.reduce((s,c)=>s+c.Total,0) },
@@ -900,7 +900,7 @@ async function autoSaveNat(mes, usuariosLoaded) {
       updated_at: new Date().toISOString()
     };
     if (usuariosLoaded) {
-      record.activos = G.hoja1.filter(u => u.activo === 'Sí').length;
+      record.activos = G.hoja1.filter(u => u.activo === 'SÃ­').length;
       record.total_usuarios = G.hoja1.length;
       record.proyecciones = {
         con_descuento: G.proyeccion.length,
@@ -910,7 +910,7 @@ async function autoSaveNat(mes, usuariosLoaded) {
       record.users_data = G.hoja1.map(u => ({
         PIN: u.pin, Nombre: u.nombre, Activo: u.activo, Expira: u.expira,
         Telefono: u.telefono, Email: u.email,
-        ÚltimoProducto: u.planCorregido || u.planOriginal,
+        ÃšltimoProducto: u.planCorregido || u.planOriginal,
         PlanOriginal: u.planOriginal, EstadoCorrecion: u.estado, FuentePlan: u.fuentePlan || null,
         ValorPlan: buscarPrecio(u.planCorregido || u.planOriginal) || 0,
         Descuento: u.proyDescuento || null, ProyPlan: u.proyPlan || null,
@@ -926,42 +926,42 @@ async function autoSaveNat(mes, usuariosLoaded) {
     } else {
       await supaFetch('/gym_snapshots', { method:'POST', prefer:'return=minimal', body: record });
     }
-    statusEl.textContent = `☁️ Guardado (${mes})`;
+    statusEl.textContent = `â˜ï¸ Guardado (${mes})`;
   } catch(e) {
-    statusEl.textContent = '⚠️ Error: ' + e.message;
+    statusEl.textContent = 'âš ï¸ Error: ' + e.message;
     console.error(e);
   }
 }
 
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // CONSTANTES
-// ─────────────────────────────────────────
-const ADDONS = ['reposicion','gym incluido','matrícula anual','matricula anual','png','fondo'];
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const ADDONS = ['reposicion','gym incluido','matrÃ­cula anual','matricula anual','png','fondo'];
 const PAGE_SIZE = 50;
 
 // Estado global
 let proyChartInst = null;
 
 let G = {
-  planes: {},          // nombre normalizado → precio
+  planes: {},          // nombre normalizado â†’ precio
   planesRaw: [],       // [{nombre, precio}]
-  hoja3Map: {},        // nombre normalizado → [{plan, fecha, fechaDate, precio}, ...] por transacción
-  historicoMap: {},    // igual pero desde hoja histórico (enero-mayo)
+  hoja3Map: {},        // nombre normalizado â†’ [{plan, fecha, fechaDate, precio}, ...] por transacciÃ³n
+  historicoMap: {},    // igual pero desde hoja histÃ³rico (enero-mayo)
   planCompleto: [],    // usuarios activos que pagan precio completo
   hoja1: [],           // filas procesadas
   ventas: [],          // filas procesadas
   proyeccion: [],      // filas procesadas
-  junio: [],           // estadísticas junio
-  validacion: [],      // validación de descuentos vs pagos junio
+  junio: [],           // estadÃ­sticas junio
+  validacion: [],      // validaciÃ³n de descuentos vs pagos junio
   pages: { usuarios:1, ventas:1, proy:1, validacion:1 },
   filtered: { usuarios:[], ventas:[], proy:[], validacion:[] }
 };
 
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // UTILIDADES
-// ─────────────────────────────────────────
-const norm = s => s ? String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim() : '';
-const fmt  = n => n != null ? '₡' + Number(n).toLocaleString('es-CR') : '—';
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const norm = s => s ? String(s).toLowerCase().normalize('NFD').replace(/[Ì€-Í¯]/g,'').replace(/\s+/g,' ').trim() : '';
+const fmt  = n => n != null ? 'â‚¡' + Number(n).toLocaleString('es-CR') : 'â€”';
 const isAddon = s => ADDONS.some(a => norm(s).includes(a));
 
 function parseDate(str) {
@@ -998,22 +998,22 @@ function planPrincipal(productos) {
   return partes[0] || '';
 }
 
-// Busca precio en la tabla de planes (fuzzy: normalización)
+// Busca precio en la tabla de planes (fuzzy: normalizaciÃ³n)
 function buscarPrecio(planStr) {
   const key = norm(cleanPlan(planStr));
   if (!key) return null;
-  // Búsqueda exacta
+  // BÃºsqueda exacta
   if (G.planes[key] != null) return G.planes[key];
-  // Búsqueda parcial
+  // BÃºsqueda parcial
   for (const [k,v] of Object.entries(G.planes)) {
     if (k.includes(key) || key.includes(k)) return v;
   }
   return null;
 }
 
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // FILE UPLOAD / DRAG
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 
@@ -1051,10 +1051,10 @@ function procesarArchivo(file) {
   reader.readAsArrayBuffer(file);
 }
 
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // ACTUALIZAR SOLO "VENTAS POR PRODUCTO"
 // (sin tener que volver a subir el Excel completo de nat.xlsx)
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function procesarVentasSolo(file) {
   const reader = new FileReader();
   reader.onload = async e => {
@@ -1077,7 +1077,7 @@ function procesarVentasSolo(file) {
           break;
         }
       }
-      if (hdrIdx < 0) throw new Error('No se encontró el encabezado (Fecha/Producto). Verifique que sea el reporte "Ventas por Producto".');
+      if (hdrIdx < 0) throw new Error('No se encontrÃ³ el encabezado (Fecha/Producto). Verifique que sea el reporte "Ventas por Producto".');
 
       const rawRows = [];
       for (let i = hdrIdx+1; i < raw.length; i++) {
@@ -1090,11 +1090,11 @@ function procesarVentasSolo(file) {
         if (tv <= 0) continue;
         rawRows.push({ FechaStr: String(fecha), Cliente: String(cliente).trim(), RegistradoPor: String(registrado||'').trim(), Producto: String(producto).trim(), Total: tv });
       }
-      if (!rawRows.length) throw new Error('No se encontraron transacciones válidas en el archivo.');
+      if (!rawRows.length) throw new Error('No se encontraron transacciones vÃ¡lidas en el archivo.');
 
-      // Si ya hay un Informe de Usuarios cargado en esta sesión, se usa ese;
-      // si no, se trae el último guardado en Supabase para poder clasificar
-      // Nuevo/Renovación/Reingreso y calcular Seguimiento de Vencidos.
+      // Si ya hay un Informe de Usuarios cargado en esta sesiÃ³n, se usa ese;
+      // si no, se trae el Ãºltimo guardado en Supabase para poder clasificar
+      // Nuevo/RenovaciÃ³n/Reingreso y calcular Seguimiento de Vencidos.
       if (G.hoja1.length) buildUsersDataFromHoja1();
       else await fetchUsersDataFromSnapshot();
 
@@ -1126,16 +1126,16 @@ function procesarVentasSolo(file) {
   reader.readAsArrayBuffer(file);
 }
 
-// ─────────────────────────────────────────
-// ANÁLISIS PRINCIPAL
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ANÃLISIS PRINCIPAL
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function sheetToArr(ws) {
   const data = XLSX.utils.sheet_to_json(ws, { header:1, defval: null });
   return data;
 }
 
 function analizar(wb) {
-  // ── Hoja2: tabla de precios ──
+  // â”€â”€ Hoja2: tabla de precios â”€â”€
   const arr2 = sheetToArr(wb.Sheets['Hoja2']);
   G.planes = {};
   G.planesRaw = [];
@@ -1147,11 +1147,11 @@ function analizar(wb) {
     }
   }
 
-  // ── Helper: procesar filas de ventas y poblar un mapa cliente→planes ──
-  // colIdx: { fecha, cliente, producto, total } índices de columna
+  // â”€â”€ Helper: procesar filas de ventas y poblar un mapa clienteâ†’planes â”€â”€
+  // colIdx: { fecha, cliente, producto, total } Ã­ndices de columna
   function buildClientMap(arr, colIdx) {
     const txMap = {};
-    // priceMap: norm(cliente) → { norm(plan) → precio más reciente pagado }
+    // priceMap: norm(cliente) â†’ { norm(plan) â†’ precio mÃ¡s reciente pagado }
     const priceMap = {};
 
     for (let i = 1; i < arr.length; i++) {
@@ -1172,14 +1172,14 @@ function analizar(wb) {
       const precio = Number(total) || 0;
       txMap[txKey].planes.push({ plan: planLimpio, precio });
 
-      // Guardar precio real pagado por cliente+plan (se sobreescribe → queda el último cronológicamente)
+      // Guardar precio real pagado por cliente+plan (se sobreescribe â†’ queda el Ãºltimo cronolÃ³gicamente)
       if (!isAddon(planLimpio) && precio > 0) {
         if (!priceMap[nc]) priceMap[nc] = {};
         priceMap[nc][norm(planLimpio)] = precio;
       }
     }
-    // clientMap: normCliente → [{plan, fecha, fechaDate, precio}, ...] (una entrada por transacción,
-    // no deduplicada por plan) para poder elegir la compra más reciente, no solo la de mayor precio.
+    // clientMap: normCliente â†’ [{plan, fecha, fechaDate, precio}, ...] (una entrada por transacciÃ³n,
+    // no deduplicada por plan) para poder elegir la compra mÃ¡s reciente, no solo la de mayor precio.
     const clientMap = {};
     for (const tx of Object.values(txMap)) {
       const key = norm(tx.cliente);
@@ -1192,18 +1192,18 @@ function analizar(wb) {
     return { txMap, clientMap, priceMap };
   }
 
-  // ── Hoja3: construir mapa cliente → planes efectivos (mayo) ──
+  // â”€â”€ Hoja3: construir mapa cliente â†’ planes efectivos (mayo) â”€â”€
   const arr3 = sheetToArr(wb.Sheets['Hoja3']);
   const { txMap, clientMap: h3Map, priceMap: pm3 } = buildClientMap(arr3, { fecha:0, cliente:1, producto:2, total:3 });
   G.hoja3Map = h3Map;
   G.pm3 = pm3;   // precios reales pagados en mayo
-  G.pmH = {};    // precios reales pagados en histórico
+  G.pmH = {};    // precios reales pagados en histÃ³rico
   G.ventas = [];
 
-  // ── Histórico: construir mapa cliente → planes efectivos (ene-may) ──
+  // â”€â”€ HistÃ³rico: construir mapa cliente â†’ planes efectivos (ene-may) â”€â”€
   G.historicoMap = {};
   G.historicoVentas = [];
-  const histSheet = wb.Sheets['historico'] || wb.Sheets['Histórico'] || wb.Sheets['Historico'];
+  const histSheet = wb.Sheets['historico'] || wb.Sheets['HistÃ³rico'] || wb.Sheets['Historico'];
   if (histSheet) {
     const arrH = sheetToArr(histSheet);
     // columnas: Fecha=0, Cliente=1, RegistradoPor=2, Producto=3, Total=4
@@ -1226,11 +1226,11 @@ function analizar(wb) {
     }
   }
 
-  // Helper: precio real pagado por un cliente para un plan (mayo > histórico > null)
+  // Helper: precio real pagado por un cliente para un plan (mayo > histÃ³rico > null)
   function precioRealPagado(clienteNorm, planNorm) {
     if (G.pm3[clienteNorm]?.[planNorm] != null) return { precio: G.pm3[clienteNorm][planNorm], fuente: 'mayo' };
     if (G.pmH[clienteNorm]?.[planNorm] != null) return { precio: G.pmH[clienteNorm][planNorm], fuente: 'historico' };
-    // Búsqueda fuzzy de plan
+    // BÃºsqueda fuzzy de plan
     for (const [kc, planes] of Object.entries(G.pm3)) {
       if (kc === clienteNorm) {
         for (const [kp, precio] of Object.entries(planes)) {
@@ -1278,7 +1278,7 @@ function analizar(wb) {
     });
   }
 
-  // ── Hoja1: corregir planes ──
+  // â”€â”€ Hoja1: corregir planes â”€â”€
   const arr1 = sheetToArr(wb.Sheets['Hoja1']);
   G.hoja1 = [];
   let corregidos = 0, sinPlan = 0, planIncorrecto = 0;
@@ -1309,9 +1309,9 @@ function analizar(wb) {
         return (encontrado && encontrado.length) ? { plans: encontrado, matchedKey } : null;
       }
 
-      // Elige el plan de la compra más reciente respecto a hoy (no la de mayor precio),
+      // Elige el plan de la compra mÃ¡s reciente respecto a hoy (no la de mayor precio),
       // ya que ese es el plan que el cliente realmente tiene vigente. Si hay varias
-      // compras el mismo día, se usa el precio más alto como desempate.
+      // compras el mismo dÃ­a, se usa el precio mÃ¡s alto como desempate.
       const today = new Date(); today.setHours(0,0,0,0);
       function mejorPlan(entries) {
         const candidatos = entries.filter(e => e.fechaDate && e.fechaDate <= today);
@@ -1326,7 +1326,7 @@ function analizar(wb) {
         return mejor.plan;
       }
 
-      // Primero Hoja3 (mayo, más reciente), luego histórico
+      // Primero Hoja3 (mayo, mÃ¡s reciente), luego histÃ³rico
       let encontrado = buscarEnMapa(G.hoja3Map);
       if (encontrado) {
         fuentePlan = 'mayo';
@@ -1361,7 +1361,7 @@ function analizar(wb) {
     });
   }
 
-  // ── Hojas de descuentos ──
+  // â”€â”€ Hojas de descuentos â”€â”€
   G.proyeccion = [];
   const descSheets = [
     { nombre: '20%', pct: 0.20, label: '20%' },
@@ -1380,7 +1380,7 @@ function analizar(wb) {
       const planMain = planPrincipal(String(productosStr));
       if (!planMain) continue;
 
-      // Excluir matrícula del cálculo, pero sí mostrar el plan
+      // Excluir matrÃ­cula del cÃ¡lculo, pero sÃ­ mostrar el plan
       const precio = buscarPrecio(planMain);
       let precioJunio = null;
       if (precio != null && precio > 0) precioJunio = precio * (1 - ds.pct);
@@ -1390,7 +1390,7 @@ function analizar(wb) {
       const hoja1Match = G.hoja1.find(u => norm(u.nombre) === clienteNorm);
 
       G.proyeccion.push({
-        pin: hoja1Match ? hoja1Match.pin : '—',
+        pin: hoja1Match ? hoja1Match.pin : 'â€”',
         cliente: String(cliente).trim(),
         fuente: ds.label,
         pct: ds.pct,
@@ -1412,7 +1412,7 @@ function analizar(wb) {
     seenProy.add(k); return true;
   });
 
-  // ── Mapa nombre → fecha de vencimiento (desde Hoja1) ──
+  // â”€â”€ Mapa nombre â†’ fecha de vencimiento (desde Hoja1) â”€â”€
   const expiraMap = {};
   for (const u of G.hoja1) {
     expiraMap[norm(u.nombre)] = { expira: u.expira, expiraDate: parseDate(u.expira) };
@@ -1421,22 +1421,22 @@ function analizar(wb) {
   for (const r of G.proyeccion) {
     const info = expiraMap[norm(r.cliente)];
     if (info) { r.expira = info.expira; r.expiraDate = info.expiraDate; }
-    else { r.expira = '—'; r.expiraDate = null; }
+    else { r.expira = 'â€”'; r.expiraDate = null; }
   }
 
-  // ── Clientes precio completo: activos de Hoja1 NO en hojas de descuento ──
+  // â”€â”€ Clientes precio completo: activos de Hoja1 NO en hojas de descuento â”€â”€
   const nombresConDescuento = new Set(G.proyeccion.map(r => norm(r.cliente)));
   G.planCompleto = [];
   for (const u of G.hoja1) {
-    if (u.activo !== 'Sí') continue;
+    if (u.activo !== 'SÃ­') continue;
     if (nombresConDescuento.has(norm(u.nombre))) continue;
 
     const plan = u.planCorregido || u.planOriginal;
     const cn = norm(u.nombre);
 
-    // CASO 1: plan es addon y no pudo corregirse → buscar de respaldo en transacciones crudas
+    // CASO 1: plan es addon y no pudo corregirse â†’ buscar de respaldo en transacciones crudas
     if (!plan || isAddon(plan)) {
-      // Respaldo: cualquier transacción (mayo o histórico) con producto no-addon y precio > 0
+      // Respaldo: cualquier transacciÃ³n (mayo o histÃ³rico) con producto no-addon y precio > 0
       const candidatos = [
         ...G.ventas.filter(r => !r.esAddon && r.total > 0)
           .map(r => ({ cliente: r.cliente, producto: r.productoOriginal, total: r.total, fuente: 'mayo' })),
@@ -1467,7 +1467,7 @@ function analizar(wb) {
 
       G.planCompleto.push({
         pin: u.pin, cliente: u.nombre, fuente: 'Completo', pct: 0,
-        planMain: u.planOriginal || '—',
+        planMain: u.planOriginal || 'â€”',
         precioBase: null, precioJunio: null,
         precioFuente: null, pendiente: 'sin_correccion',
         pagoMayo: null, expira: u.expira, expiraDate: parseDate(u.expira)
@@ -1477,7 +1477,7 @@ function analizar(wb) {
 
     const precioHoja2 = buscarPrecio(plan);
 
-    // CASO 2: plan reconocido pero sin precio en Hoja2 → incluir como "Pendiente"
+    // CASO 2: plan reconocido pero sin precio en Hoja2 â†’ incluir como "Pendiente"
     if (precioHoja2 == null || precioHoja2 === 0) {
       G.planCompleto.push({
         pin: u.pin, cliente: u.nombre, fuente: 'Completo', pct: 0,
@@ -1489,7 +1489,7 @@ function analizar(wb) {
       continue;
     }
 
-    // CASO 3: plan con precio → verificar si pagó diferente en historial
+    // CASO 3: plan con precio â†’ verificar si pagÃ³ diferente en historial
     const pn = norm(plan);
     const real = precioRealPagado(cn, pn);
     const usarReal = real && real.precio > 0 && real.precio !== precioHoja2;
@@ -1506,8 +1506,8 @@ function analizar(wb) {
     });
   }
 
-  // ── Anotar G.hoja1 con la info de proyección (para poder guardarla en users_data
-  //    y reconstruir la tabla de Proyección sin tener que volver a subir el Excel) ──
+  // â”€â”€ Anotar G.hoja1 con la info de proyecciÃ³n (para poder guardarla en users_data
+  //    y reconstruir la tabla de ProyecciÃ³n sin tener que volver a subir el Excel) â”€â”€
   const proyPorCliente = {};
   [...G.proyeccion, ...G.planCompleto].forEach(r => {
     proyPorCliente[norm(r.cliente)] = r;
@@ -1522,13 +1522,13 @@ function analizar(wb) {
     }
   });
 
-  // ── Hoja Junio: estadísticas del mes ──
+  // â”€â”€ Hoja Junio: estadÃ­sticas del mes â”€â”€
   G.junio = [];
   const junioSheet = wb.Sheets['junio'] || wb.Sheets['Junio'];
   if (junioSheet) {
     const arrJ = sheetToArr(junioSheet);
-    // La exportación cruda trae columnas espaciadoras variables entre cada dato,
-    // por eso ubicamos las columnas por nombre de encabezado en vez de posición fija.
+    // La exportaciÃ³n cruda trae columnas espaciadoras variables entre cada dato,
+    // por eso ubicamos las columnas por nombre de encabezado en vez de posiciÃ³n fija.
     let jHdrIdx = -1, jCol = {};
     for (let i = 0; i < Math.min(arrJ.length, 10); i++) {
       const r = (arrJ[i] || []).map(c => String(c||'').trim().toLowerCase());
@@ -1544,7 +1544,7 @@ function analizar(wb) {
       }
     }
     // Agrupar por cliente (ignorar addons e invitados, solo filas con precio > 0)
-    const jMap = {}; // normNombre → acumulado
+    const jMap = {}; // normNombre â†’ acumulado
     G.junioRaw = []; // filas individuales (con vendedor) para guardar en renov_data
     for (let i = jHdrIdx + 1; jHdrIdx >= 0 && i < arrJ.length; i++) {
       const row = arrJ[i] || [];
@@ -1553,7 +1553,7 @@ function analizar(wb) {
       if (!cliente || !producto) continue;
       const nc = norm(String(cliente));
       const tvRaw = Number(total) || 0;
-      // Invitado sí cuenta aquí (Minita: agua, bebidas, snacks comprados sueltos);
+      // Invitado sÃ­ cuenta aquÃ­ (Minita: agua, bebidas, snacks comprados sueltos);
       // Administrativo se descarta por no ser una venta real.
       if (nc !== 'administrativo' && tvRaw > 0) {
         G.junioRaw.push({
@@ -1574,7 +1574,7 @@ function analizar(wb) {
       if (!jMap[nc].planes.includes(planLimpio)) jMap[nc].planes.push(planLimpio);
     }
 
-    // Mapa expira de Hoja1 para calcular días inactivo
+    // Mapa expira de Hoja1 para calcular dÃ­as inactivo
     const expH1 = {};
     for (const u of G.hoja1) expH1[norm(u.nombre)] = { expira: u.expira, expiraDate: parseDate(u.expira), activo: u.activo };
 
@@ -1584,10 +1584,10 @@ function analizar(wb) {
       let tipo = 'nuevo', diasInactivo = null;
 
       if (h1info) {
-        if (h1info.activo === 'Sí') {
+        if (h1info.activo === 'SÃ­') {
           tipo = 'renovacion';
         } else {
-          // Calcular días desde que expiró hasta que pagó
+          // Calcular dÃ­as desde que expirÃ³ hasta que pagÃ³
           if (h1info.expiraDate && fechaPagoDate) {
             diasInactivo = Math.round((fechaPagoDate - h1info.expiraDate) / 86400000);
             tipo = diasInactivo > 10 ? 'reingreso' : 'renovacion';
@@ -1600,18 +1600,18 @@ function analizar(wb) {
       G.junio.push({
         nombre: data.nombre,
         tipo,
-        planMain: data.planes[0] || '—',
+        planMain: data.planes[0] || 'â€”',
         planes: data.planes,
         total: data.total,
         fecha: data.fecha,
-        expira: h1info ? h1info.expira : '—',
+        expira: h1info ? h1info.expira : 'â€”',
         diasInactivo
       });
     }
     G.junio.sort((a,b) => a.nombre.localeCompare(b.nombre));
   }
 
-  // ── Validación de descuentos (20%/25%/G20) vs pagos de Junio ──
+  // â”€â”€ ValidaciÃ³n de descuentos (20%/25%/G20) vs pagos de Junio â”€â”€
   G.validacion = [];
   const TOL = 100; // tolerancia en colones para considerar montos "iguales"
   G.proyeccion
@@ -1637,7 +1637,7 @@ function analizar(wb) {
       } else {
         estado = 'al_dia';
       }
-      // Pago tardío: pagó después de la fecha de vencimiento de su plan anterior
+      // Pago tardÃ­o: pagÃ³ despuÃ©s de la fecha de vencimiento de su plan anterior
       let pagoTardio = null;
       if (pago) {
         const fechaPagoDate = parseDate(pago.fecha);
@@ -1649,8 +1649,8 @@ function analizar(wb) {
       G.validacion.push({ ...r, pago, estado, pagoTardio });
     });
 
-  // ── Anotar G.hoja1 con el resultado de Validación (para guardarlo y poder
-  //    verlo sin re-subir el Excel) ──
+  // â”€â”€ Anotar G.hoja1 con el resultado de ValidaciÃ³n (para guardarlo y poder
+  //    verlo sin re-subir el Excel) â”€â”€
   const validPorCliente = {};
   G.validacion.forEach(r => { validPorCliente[norm(r.cliente)] = r; });
   G.hoja1.forEach(u => {
@@ -1663,25 +1663,25 @@ function analizar(wb) {
     }
   });
 
-  // ── Actualizar cards ──
+  // â”€â”€ Actualizar cards â”€â”€
   const corregidosHist = G.hoja1.filter(r => r.estado === 'corregido' && r.fuentePlan === 'historico').length;
   document.getElementById('cTotalUsuarios').textContent = G.hoja1.length;
   document.getElementById('cPlanIncorrecto').textContent = planIncorrecto;
   document.getElementById('cCorregidos').textContent = corregidos;
-  document.getElementById('cCorregidosHist').textContent = corregidosHist > 0 ? `📅 ${corregidosHist} vía histórico` : '';
+  document.getElementById('cCorregidosHist').textContent = corregidosHist > 0 ? `ðŸ“… ${corregidosHist} vÃ­a histÃ³rico` : '';
   document.getElementById('cDescuento').textContent = G.proyeccion.length;
   const totalDescuento = G.proyeccion.reduce((s,r) => s + (r.precioJunio || 0), 0);
   const totalCompleto  = G.planCompleto.reduce((s,r) => s + (r.precioJunio || 0), 0);
-  document.getElementById('cProyeccion').textContent = '₡' + Math.round(totalDescuento + totalCompleto).toLocaleString('es-CR');
+  document.getElementById('cProyeccion').textContent = 'â‚¡' + Math.round(totalDescuento + totalCompleto).toLocaleString('es-CR');
   const ventasMembresias = G.ventas.filter(r => !r.esAddon);
   const totalMembresias = ventasMembresias.reduce((s,r) => s + r.total, 0);
-  document.getElementById('cTotalMembresias').textContent = '₡' + Math.round(totalMembresias).toLocaleString('es-CR');
+  document.getElementById('cTotalMembresias').textContent = 'â‚¡' + Math.round(totalMembresias).toLocaleString('es-CR');
   document.getElementById('cTotalMembresiasCount').textContent = ventasMembresias.length + ' transacciones';
   const hoy = new Date().toISOString().substring(0,10);
   const ventasHoy = ventasMembresias.filter(r => (r.fecha||'').substring(0,10) === hoy);
   const totalHoy = ventasHoy.reduce((s,r) => s + r.total, 0);
-  document.getElementById('cMembresiasHoy').textContent = '₡' + Math.round(totalHoy).toLocaleString('es-CR');
-  document.getElementById('cMembresiasHoyCount').textContent = ventasHoy.length + ' membresía(s) hoy';
+  document.getElementById('cMembresiasHoy').textContent = 'â‚¡' + Math.round(totalHoy).toLocaleString('es-CR');
+  document.getElementById('cMembresiasHoyCount').textContent = ventasHoy.length + ' membresÃ­a(s) hoy';
 
   // Render tables
   G.filtered.usuarios = [...G.hoja1];
@@ -1699,8 +1699,8 @@ function analizar(wb) {
   renderProyChart([...G.proyeccion, ...G.planCompleto]);
   renderTabla('validacion');
 
-  // Análisis de Renovaciones / Seguimiento de Vencidos (a partir de la hoja "junio")
-  // Los gráficos se renderizan al abrir esas pestañas (ver switchTab), no aquí.
+  // AnÃ¡lisis de Renovaciones / Seguimiento de Vencidos (a partir de la hoja "junio")
+  // Los grÃ¡ficos se renderizan al abrir esas pestaÃ±as (ver switchTab), no aquÃ­.
   buildUsersDataFromHoja1();
   buildRenovacionesState(G.junioRaw || []);
 
@@ -1715,7 +1715,7 @@ function analizar(wb) {
   // Guardar en Supabase (solo admin)
   G.totalJunio = Math.round(totalDescuento + totalCompleto);
   if (currentRole === 'admin') {
-    // Detectar mes desde la hoja más reciente (junio sheet o Hoja3)
+    // Detectar mes desde la hoja mÃ¡s reciente (junio sheet o Hoja3)
     const allDates = [...G.ventas, ...G.junio]
       .map(r => r.fecha).filter(Boolean)
       .map(f => { const p = String(f).substring(0,10).split('/'); return p.length===3 ? new Date(p[2],p[1]-1,p[0]) : new Date(f); })
@@ -1727,9 +1727,9 @@ function analizar(wb) {
   }
 }
 
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // FILTROS
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function filtrarTabla(tipo) {
   if (tipo === 'usuarios') {
     const q = norm(document.getElementById('searchUsuarios').value);
@@ -1802,9 +1802,9 @@ function limpiarFiltrosValidacion() {
   filtrarTabla('validacion');
 }
 
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // RENDER TABLAS
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function pageData(arr, page) {
   const start = (page-1)*PAGE_SIZE;
   return arr.slice(start, start+PAGE_SIZE);
@@ -1839,26 +1839,26 @@ function renderUsuarios() {
   if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="no-data">Sin resultados</td></tr>'; return; }
   tbody.innerHTML = data.map(r => {
     const fuenteTag = r.fuentePlan === 'historico'
-      ? ' <span class="tag tag-hist" title="Encontrado en historial enero-mayo">📅 Histórico</span>'
+      ? ' <span class="tag tag-hist" title="Encontrado en historial enero-mayo">ðŸ“… HistÃ³rico</span>'
       : r.fuentePlan === 'mayo'
       ? ' <span class="tag tag-mayo" title="Encontrado en ventas mayo">Mayo</span>'
       : '';
     const badgeMap = {
       ok: '',
-      corregido: `<span class="tag tag-corr">✓ Corregido</span>${fuenteTag}`,
+      corregido: `<span class="tag tag-corr">âœ“ Corregido</span>${fuenteTag}`,
       sin_plan: '<span class="tag tag-noplan">Sin plan encontrado</span>'
     };
     const planCell = r.estado === 'corregido'
       ? `<span class="original">${esc(r.planOriginal)}</span><br><span class="corrected">${esc(r.planCorregido)}</span>`
       : r.estado === 'sin_plan'
       ? `<span class="original">${esc(r.planOriginal)}</span>`
-      : `—`;
+      : `â€”`;
     return `<tr>
       <td>${esc(r.pin)}</td>
       <td>${esc(r.nombre)}</td>
-      <td>${r.activo === 'Sí' ? '🟢 Sí' : '⚪ No'}</td>
+      <td>${r.activo === 'SÃ­' ? 'ðŸŸ¢ SÃ­' : 'âšª No'}</td>
       <td>${esc(r.expira)}</td>
-      <td>${esc(r.planOriginal) || '—'}</td>
+      <td>${esc(r.planOriginal) || 'â€”'}</td>
       <td>${r.estado !== 'ok' ? planCell : esc(r.planOriginal)}</td>
       <td>${badgeMap[r.estado] || ''}</td>
     </tr>`;
@@ -1879,7 +1879,7 @@ function renderVentas() {
       <td>${esc(r.cliente)}</td>
       <td>${r.esAddon ? `<span style="color:var(--muted)">${esc(r.productoOriginal)}</span>` : esc(r.productoOriginal)}</td>
       <td>${planCell}</td>
-      <td class="${r.total > 0 ? 'price' : ''}">${r.total > 0 ? fmt(r.total) : '—'}</td>
+      <td class="${r.total > 0 ? 'price' : ''}">${r.total > 0 ? fmt(r.total) : 'â€”'}</td>
     </tr>`;
   }).join('');
 }
@@ -1890,15 +1890,15 @@ function renderProyeccion() {
   const tbody = document.getElementById('bodyProyeccion');
   const tfoot = document.getElementById('footProyeccion');
 
-  // Footer totales (sobre filas filtradas completas, no sólo la página)
+  // Footer totales (sobre filas filtradas completas, no sÃ³lo la pÃ¡gina)
   const allFiltered = G.filtered.proy;
   const footJunio = allFiltered.reduce((s,r) => s+(r.precioJunio||0), 0);
   const footMayo  = allFiltered.reduce((s,r) => s+(r.pagoMayo||0), 0);
   tfoot.innerHTML = `<tr>
     <td colspan="3">TOTAL (${allFiltered.length} clientes)</td>
     <td></td><td></td>
-    <td>₡${Math.round(footJunio).toLocaleString('es-CR')}</td>
-    <td>₡${Math.round(footMayo).toLocaleString('es-CR')}</td>
+    <td>â‚¡${Math.round(footJunio).toLocaleString('es-CR')}</td>
+    <td>â‚¡${Math.round(footMayo).toLocaleString('es-CR')}</td>
     <td colspan="2"></td>
   </tr>`;
 
@@ -1913,54 +1913,54 @@ function renderProyeccion() {
     // Pendientes: plan sin corregir o sin precio
     const esPendiente = !!r.pendiente;
     const pendienteTag = r.pendiente === 'sin_correccion'
-      ? `<span class="tag tag-noplan" title="Plan original es Reposicion/Gym incluido sin corrección encontrada">⚠ Sin corrección</span>`
+      ? `<span class="tag tag-noplan" title="Plan original es Reposicion/Gym incluido sin correcciÃ³n encontrada">âš  Sin correcciÃ³n</span>`
       : r.pendiente === 'sin_precio'
-      ? `<span class="tag tag-noplan" title="Plan identificado pero sin precio en Hoja2">⚠ Sin precio</span>`
+      ? `<span class="tag tag-noplan" title="Plan identificado pero sin precio en Hoja2">âš  Sin precio</span>`
       : '';
 
     const baseCell = r.precioBase != null
       ? `<span class="price-base">${fmt(r.precioBase)}</span>`
       : esPendiente
       ? pendienteTag
-      : `<span style="color:var(--muted);font-style:italic">—</span>`;
+      : `<span style="color:var(--muted);font-style:italic">â€”</span>`;
 
     // Indicador de fuente del precio junio
     const fuenteTag = r.precioFuente === 'historico'
-      ? ` <span class="tag tag-hist" title="Precio ajustado desde historial ene-may">📅 hist.</span>`
+      ? ` <span class="tag tag-hist" title="Precio ajustado desde historial ene-may">ðŸ“… hist.</span>`
       : r.precioFuente === 'mayo'
       ? ` <span class="tag tag-mayo" title="Precio ajustado desde ventas mayo">mayo</span>`
       : '';
     const precioModificado = r.precioFuente && r.precioFuente !== 'hoja2' && r.precioJunio !== r.precioBase;
     const junioCell = r.precioJunio != null
       ? `<span class="price">${fmt(Math.round(r.precioJunio))}</span>${fuenteTag}`
-      : esPendiente ? `<span style="color:var(--warn);font-style:italic">Pendiente</span>` : '—';
+      : esPendiente ? `<span style="color:var(--warn);font-style:italic">Pendiente</span>` : 'â€”';
     const mayoCell = r.pagoMayo != null
       ? `<span style="color:${precioModificado ? 'var(--accent2)' : 'inherit'};font-weight:${precioModificado?'700':'400'}">${fmt(r.pagoMayo)}</span>`
-      : `<span style="color:var(--muted)">—</span>`;
+      : `<span style="color:var(--muted)">â€”</span>`;
 
-    // Columna vencimiento con semáforo
+    // Columna vencimiento con semÃ¡foro
     const dias = daysUntil(r.expiraDate);
-    let venceCell = '—', rowStyle = esPendiente ? 'background:#fff8f8' : precioModificado ? 'background:#fffbf0' : (esCompleto ? 'background:#f8fff9' : '');
+    let venceCell = 'â€”', rowStyle = esPendiente ? 'background:#fff8f8' : precioModificado ? 'background:#fffbf0' : (esCompleto ? 'background:#f8fff9' : '');
     if (dias !== null) {
       let color, icon;
-      if (dias < 0)      { color = '#c0392b'; icon = '🔴'; rowStyle += (rowStyle?';':'') + 'background:#fff5f5'; }
-      else if (dias <= 7) { color = '#c0392b'; icon = '🔴'; }
-      else if (dias <= 15){ color = '#e67e22'; icon = '🟠'; }
-      else if (dias <= 30){ color = '#f0ad00'; icon = '🟡'; }
-      else                { color = 'var(--accent)'; icon = '🟢'; }
+      if (dias < 0)      { color = '#c0392b'; icon = 'ðŸ”´'; rowStyle += (rowStyle?';':'') + 'background:#fff5f5'; }
+      else if (dias <= 7) { color = '#c0392b'; icon = 'ðŸ”´'; }
+      else if (dias <= 15){ color = '#e67e22'; icon = 'ðŸŸ '; }
+      else if (dias <= 30){ color = '#f0ad00'; icon = 'ðŸŸ¡'; }
+      else                { color = 'var(--accent)'; icon = 'ðŸŸ¢'; }
       const label = dias < 0 ? `Vencido (${Math.abs(dias)}d)` : `${r.expira}`;
       venceCell = `<span style="color:${color};font-weight:600;">${icon} ${label}</span>`;
     }
     const diasCell = dias !== null
       ? `<span style="font-weight:700;color:${dias < 0 ? '#c0392b' : dias <= 15 ? '#e67e22' : 'var(--accent)'}">${dias < 0 ? dias : '+'+dias}</span>`
-      : '—';
+      : 'â€”';
 
-    const pin = r.pin || '—';
+    const pin = r.pin || 'â€”';
     const clienteCell = (esPendiente || r.detectadoAuto)
-      ? `<strong style="cursor:pointer;text-decoration:underline dotted;color:var(--primary);" onclick="diagnosticoCliente('${esc(r.cliente).replace(/'/g,"\\'")}')" title="Ver historial de transacciones">${esc(r.cliente)} 🔍</strong>`
+      ? `<strong style="cursor:pointer;text-decoration:underline dotted;color:var(--primary);" onclick="diagnosticoCliente('${esc(r.cliente).replace(/'/g,"\\'")}')" title="Ver historial de transacciones">${esc(r.cliente)} ðŸ”</strong>`
       : `<strong>${esc(r.cliente)}</strong>`;
     const autoTag = r.detectadoAuto
-      ? ` <span class="tag tag-hist" title="Plan detectado automáticamente desde ${r.detectadoAuto === 'mayo' ? 'ventas de mayo' : 'el histórico'} (su Último Producto en Hoja1 era un addon como Reposición/Fondo). Verifique que sea correcto.">🔍 auto</span>`
+      ? ` <span class="tag tag-hist" title="Plan detectado automÃ¡ticamente desde ${r.detectadoAuto === 'mayo' ? 'ventas de mayo' : 'el histÃ³rico'} (su Ãšltimo Producto en Hoja1 era un addon como ReposiciÃ³n/Fondo). Verifique que sea correcto.">ðŸ” auto</span>`
       : '';
     return `<tr style="${rowStyle}">
       <td style="color:#667eea;font-weight:600;">${esc(pin)}</td>
@@ -1975,7 +1975,7 @@ function renderProyeccion() {
     </tr>`;
   }).join('');
 
-  // Cards y gráfico (sobre datos filtrados completos)
+  // Cards y grÃ¡fico (sobre datos filtrados completos)
   renderProyCards(G.filtered.proy);
   renderProyChart(G.filtered.proy);
 }
@@ -1994,14 +1994,14 @@ function renderProyCards(rows) {
     `<div class="proy-stat ${cls}"><h3>${icon} ${label}</h3><div class="sv">${val}</div><div class="ss">${sub}</div></div>`;
 
   document.getElementById('proy-cards').innerHTML =
-    mk('red',    '🔴', 'Vencen en 7 días',  c7.length,   '₡'+Math.round(c7.reduce((s,r)=>s+(r.precioJunio||0),0)).toLocaleString('es-CR')) +
-    mk('orange', '🟠', 'Vencen en 15 días', c15.length,  '₡'+Math.round(c15.reduce((s,r)=>s+(r.precioJunio||0),0)).toLocaleString('es-CR')) +
-    mk('yellow', '🟡', 'Vencen en 30 días', c30.length,  '₡'+Math.round(c30.reduce((s,r)=>s+(r.precioJunio||0),0)).toLocaleString('es-CR')) +
-    mk('blue',   '⚪', 'Ya vencidos',        cvenc.length,'Revisar renovación') +
-    mk('purple', '💰', 'Ingresos Junio',     '₡'+Math.round(totalJunio).toLocaleString('es-CR'), rows.length+' clientes') +
-    mk('green',  '📅', 'Pagado en Mayo',     '₡'+Math.round(totalMayo).toLocaleString('es-CR'),  'base de comparación') +
-    (cajustados  > 0 ? mk('orange', '🔄', 'Precio ajustado',  cajustados,  'desde historial real') : '') +
-    (cpendientes > 0 ? mk('red',    '⚠',  'Pendientes',       cpendientes, 'requieren revisión') : '');
+    mk('red',    'ðŸ”´', 'Vencen en 7 dÃ­as',  c7.length,   'â‚¡'+Math.round(c7.reduce((s,r)=>s+(r.precioJunio||0),0)).toLocaleString('es-CR')) +
+    mk('orange', 'ðŸŸ ', 'Vencen en 15 dÃ­as', c15.length,  'â‚¡'+Math.round(c15.reduce((s,r)=>s+(r.precioJunio||0),0)).toLocaleString('es-CR')) +
+    mk('yellow', 'ðŸŸ¡', 'Vencen en 30 dÃ­as', c30.length,  'â‚¡'+Math.round(c30.reduce((s,r)=>s+(r.precioJunio||0),0)).toLocaleString('es-CR')) +
+    mk('blue',   'âšª', 'Ya vencidos',        cvenc.length,'Revisar renovaciÃ³n') +
+    mk('purple', 'ðŸ’°', 'Ingresos Junio',     'â‚¡'+Math.round(totalJunio).toLocaleString('es-CR'), rows.length+' clientes') +
+    mk('green',  'ðŸ“…', 'Pagado en Mayo',     'â‚¡'+Math.round(totalMayo).toLocaleString('es-CR'),  'base de comparaciÃ³n') +
+    (cajustados  > 0 ? mk('orange', 'ðŸ”„', 'Precio ajustado',  cajustados,  'desde historial real') : '') +
+    (cpendientes > 0 ? mk('red',    'âš ',  'Pendientes',       cpendientes, 'requieren revisiÃ³n') : '');
 }
 
 function limpiarFiltrosProy() {
@@ -2018,7 +2018,7 @@ function limpiarFiltrosProy() {
 function poblarFiltroProducto() {
   const sel = document.getElementById('filtroProducto');
   const todos = [...G.proyeccion, ...G.planCompleto];
-  const planes = new Map(); // norm → nombre original
+  const planes = new Map(); // norm â†’ nombre original
   todos.forEach(r => {
     if (r.planMain) planes.set(norm(r.planMain), r.planMain);
   });
@@ -2030,7 +2030,7 @@ function poblarFiltroProducto() {
 }
 
 function renderTotalesProyeccion() {
-  // solo mantiene datos para el PDF — la UI usa renderProyCards
+  // solo mantiene datos para el PDF â€” la UI usa renderProyCards
   const grupos = ['20%','25%','G20','Completo'];
   let grandTotal = 0;
   grupos.forEach(g => {
@@ -2054,7 +2054,7 @@ function renderProyChart(rows) {
     data: {
       labels: sorted.map(i => i[0]),
       datasets: [{
-        label: 'Proyección Junio (₡)',
+        label: 'ProyecciÃ³n Junio (â‚¡)',
         data: sorted.map(i => i[1]),
         backgroundColor: sorted.map((_,i) => `hsla(${230+i*14},68%,${54+i*2}%,0.85)`),
         borderRadius: 8,
@@ -2065,29 +2065,29 @@ function renderProyChart(rows) {
       responsive: true,
       plugins: { legend: { display: false } },
       scales: {
-        y: { ticks: { callback: v => '₡'+v.toLocaleString('es-CR') }, grid: { color: '#f0f2f8' } },
+        y: { ticks: { callback: v => 'â‚¡'+v.toLocaleString('es-CR') }, grid: { color: '#f0f2f8' } },
         x: { grid: { display: false } }
       }
     }
   });
 }
 
-// ─────────────────────────────────────────
-// DIAGNÓSTICO: por qué un cliente no tiene plan corregido
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// DIAGNÃ“STICO: por quÃ© un cliente no tiene plan corregido
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function diagnosticoCliente(nombre) {
   const key = norm(nombre);
 
   // Hoja1: datos del usuario
   const u = G.hoja1.find(r => norm(r.nombre) === key);
 
-  // Transacciones de mayo (Hoja3) — match exacto y parcial
+  // Transacciones de mayo (Hoja3) â€” match exacto y parcial
   const ventasMayo = G.ventas.filter(r => {
     const nc = norm(r.cliente);
     return nc === key || nc.includes(key) || key.includes(nc);
   });
 
-  // Transacciones del histórico — match exacto y parcial
+  // Transacciones del histÃ³rico â€” match exacto y parcial
   const ventasHist = (G.historicoVentas || []).filter(r => {
     const nc = norm(r.cliente);
     return nc === key || nc.includes(key) || key.includes(nc);
@@ -2097,12 +2097,12 @@ function diagnosticoCliente(nombre) {
 
   if (u) {
     html += `<div class="alert alert-info" style="margin-bottom:14px;">
-      <strong>Hoja1:</strong> PIN ${esc(u.pin)} · Activo: ${u.activo === 'Sí' ? 'Sí' : 'No'} · Expira: ${esc(u.expira) || '—'}
-      · Último producto: <strong>${esc(u.planOriginal) || '—'}</strong>
-      · Estado corrección: <strong>${esc(u.estado)}</strong>
+      <strong>Hoja1:</strong> PIN ${esc(u.pin)} Â· Activo: ${u.activo === 'SÃ­' ? 'SÃ­' : 'No'} Â· Expira: ${esc(u.expira) || 'â€”'}
+      Â· Ãšltimo producto: <strong>${esc(u.planOriginal) || 'â€”'}</strong>
+      Â· Estado correcciÃ³n: <strong>${esc(u.estado)}</strong>
     </div>`;
   } else {
-    html += `<div class="alert alert-warn" style="margin-bottom:14px;">No se encontró este cliente en Hoja1.</div>`;
+    html += `<div class="alert alert-warn" style="margin-bottom:14px;">No se encontrÃ³ este cliente en Hoja1.</div>`;
   }
 
   function tablaTx(titulo, rows, getProducto) {
@@ -2122,31 +2122,31 @@ function diagnosticoCliente(nombre) {
       const producto = getProducto(r);
       const addonTag = r.esAddon ? ` <span class="tag tag-noplan">addon</span>` : '';
       h += `<tr style="border-bottom:1px solid #f0f2f8;${i%2===1?'background:#f8f9ff':''}">
-        <td style="padding:7px 10px;">${esc(r.fecha) || '—'}</td>
+        <td style="padding:7px 10px;">${esc(r.fecha) || 'â€”'}</td>
         <td style="padding:7px 10px;">${esc(r.cliente)}</td>
         <td style="padding:7px 10px;">${esc(producto)}${addonTag}</td>
-        <td style="padding:7px 10px;text-align:right;" class="${r.total>0?'price':''}">${r.total>0?fmt(r.total):'—'}</td>
+        <td style="padding:7px 10px;text-align:right;" class="${r.total>0?'price':''}">${r.total>0?fmt(r.total):'â€”'}</td>
       </tr>`;
     });
     h += `</tbody></table>`;
     return h;
   }
 
-  html += tablaTx('🧾 Transacciones en Mayo (Hoja3)', ventasMayo, r => r.productoOriginal + (r.esAddon && r.planEfectivo !== r.productoOriginal ? ` → ${r.planEfectivo}` : ''));
-  html += tablaTx('📅 Transacciones en Histórico (ene–may)', ventasHist, r => r.producto);
+  html += tablaTx('ðŸ§¾ Transacciones en Mayo (Hoja3)', ventasMayo, r => r.productoOriginal + (r.esAddon && r.planEfectivo !== r.productoOriginal ? ` â†’ ${r.planEfectivo}` : ''));
+  html += tablaTx('ðŸ“… Transacciones en HistÃ³rico (eneâ€“may)', ventasHist, r => r.producto);
 
-  // Conclusión
+  // ConclusiÃ³n
   const todasNoAddon = [...ventasMayo.filter(r=>!r.esAddon), ...ventasHist.filter(r=>!r.esAddon)];
   const noAddonConPrecio = todasNoAddon.filter(r => r.total > 0);
   const noAddonEnCero = todasNoAddon.filter(r => r.total <= 0);
   if (!ventasMayo.length && !ventasHist.length) {
-    html += `<div class="alert alert-warn">⚠ No se encontró <strong>ninguna transacción</strong> para este cliente (ni en Mayo ni en histórico). Por eso no se pudo determinar su plan principal — verifique si el nombre está escrito de forma distinta en las hojas.</div>`;
+    html += `<div class="alert alert-warn">âš  No se encontrÃ³ <strong>ninguna transacciÃ³n</strong> para este cliente (ni en Mayo ni en histÃ³rico). Por eso no se pudo determinar su plan principal â€” verifique si el nombre estÃ¡ escrito de forma distinta en las hojas.</div>`;
   } else if (!todasNoAddon.length) {
-    html += `<div class="alert alert-warn">⚠ Todas las transacciones encontradas para este cliente son <strong>addons</strong> (Reposición, Gym incluido, Fondo, etc.). No hay ninguna transacción con un plan principal real, por lo que no se pudo asignar un plan.</div>`;
+    html += `<div class="alert alert-warn">âš  Todas las transacciones encontradas para este cliente son <strong>addons</strong> (ReposiciÃ³n, Gym incluido, Fondo, etc.). No hay ninguna transacciÃ³n con un plan principal real, por lo que no se pudo asignar un plan.</div>`;
   } else if (!noAddonConPrecio.length) {
-    html += `<div class="alert alert-warn">⚠ Este cliente sí tiene transacciones con un plan principal (no addon), pero <strong>todas se facturaron en ₡0</strong> (cortesía/sin cobro). El sistema solo considera planes con un total mayor a ₡0 para determinar el plan principal, por lo que no se asignó ninguno. Revise manualmente cuál de estos planes en ₡0 corresponde al plan real del cliente.</div>`;
+    html += `<div class="alert alert-warn">âš  Este cliente sÃ­ tiene transacciones con un plan principal (no addon), pero <strong>todas se facturaron en â‚¡0</strong> (cortesÃ­a/sin cobro). El sistema solo considera planes con un total mayor a â‚¡0 para determinar el plan principal, por lo que no se asignÃ³ ninguno. Revise manualmente cuÃ¡l de estos planes en â‚¡0 corresponde al plan real del cliente.</div>`;
   } else {
-    html += `<div class="alert alert-info">ℹ Sí existen transacciones con plan principal y precio mayor a ₡0 (arriba). Si el cliente sigue marcado como "Sin corrección", probablemente el nombre en Hoja1 no coincide exactamente con el de estas transacciones — revise tildes, mayúsculas o nombres compuestos.</div>`;
+    html += `<div class="alert alert-info">â„¹ SÃ­ existen transacciones con plan principal y precio mayor a â‚¡0 (arriba). Si el cliente sigue marcado como "Sin correcciÃ³n", probablemente el nombre en Hoja1 no coincide exactamente con el de estas transacciones â€” revise tildes, mayÃºsculas o nombres compuestos.</div>`;
   }
 
   let modal = document.getElementById('diagnosticoModal');
@@ -2157,14 +2157,14 @@ function diagnosticoCliente(nombre) {
     modal.innerHTML = `<div style="background:white;margin:3% auto;padding:28px;border-radius:18px;width:92%;max-width:820px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.3);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
         <h3 id="diagnosticoTitulo" style="font-size:16px;font-weight:800;color:#2d2d5e;"></h3>
-        <button onclick="document.getElementById('diagnosticoModal').style.display='none'" style="border:none;background:#f0f2f8;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-family:inherit;">✖ Cerrar</button>
+        <button onclick="document.getElementById('diagnosticoModal').style.display='none'" style="border:none;background:#f0f2f8;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-family:inherit;">âœ– Cerrar</button>
       </div>
       <div id="diagnosticoBody"></div>
     </div>`;
     document.body.appendChild(modal);
     modal.addEventListener('click', e => { if (e.target === modal) modal.style.display='none'; });
   }
-  document.getElementById('diagnosticoTitulo').textContent = '🔍 Diagnóstico — ' + nombre;
+  document.getElementById('diagnosticoTitulo').textContent = 'ðŸ” DiagnÃ³stico â€” ' + nombre;
   document.getElementById('diagnosticoBody').innerHTML = html;
   modal.style.display = 'block';
 }
@@ -2196,15 +2196,15 @@ function openResumenModal() {
     html += `<tr style="border-bottom:1px solid #f0f2f8;${i%2===1?'background:#f8f9ff':''}">
       <td style="padding:9px 12px;font-weight:600;">${esc(r.plan)}</td>
       <td style="padding:9px 12px;text-align:center;">${r.clientes}</td>
-      <td style="padding:9px 12px;text-align:right;color:#888;">${r.totalMayo>0?'₡'+Math.round(r.totalMayo).toLocaleString('es-CR'):'—'}</td>
-      <td style="padding:9px 12px;text-align:right;font-weight:700;color:#2d2d5e;">₡${Math.round(r.totalJunio).toLocaleString('es-CR')}</td>
+      <td style="padding:9px 12px;text-align:right;color:#888;">${r.totalMayo>0?'â‚¡'+Math.round(r.totalMayo).toLocaleString('es-CR'):'â€”'}</td>
+      <td style="padding:9px 12px;text-align:right;font-weight:700;color:#2d2d5e;">â‚¡${Math.round(r.totalJunio).toLocaleString('es-CR')}</td>
     </tr>`;
   });
   html += `</tbody><tfoot><tr style="background:linear-gradient(135deg,#f0f2ff,#e8ebff);border-top:2px solid #667eea;font-weight:800;">
     <td style="padding:10px 12px;">TOTAL GENERAL</td>
     <td style="padding:10px 12px;text-align:center;">${rows.length}</td>
-    <td style="padding:10px 12px;text-align:right;color:#888;">₡${Math.round(grandM).toLocaleString('es-CR')}</td>
-    <td style="padding:10px 12px;text-align:right;color:#667eea;">₡${Math.round(grandJ).toLocaleString('es-CR')}</td>
+    <td style="padding:10px 12px;text-align:right;color:#888;">â‚¡${Math.round(grandM).toLocaleString('es-CR')}</td>
+    <td style="padding:10px 12px;text-align:right;color:#667eea;">â‚¡${Math.round(grandJ).toLocaleString('es-CR')}</td>
   </tr></tfoot></table></div>`;
 
   // Modal simple
@@ -2215,10 +2215,10 @@ function openResumenModal() {
     modal.style.cssText = 'display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background:rgba(15,12,41,.65);backdrop-filter:blur(4px);';
     modal.innerHTML = `<div style="background:white;margin:4% auto;padding:28px;border-radius:18px;width:92%;max-width:780px;box-shadow:0 24px 60px rgba(0,0,0,.3);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-        <h3 style="font-size:16px;font-weight:800;color:#2d2d5e;">📊 Resumen por Plan — Proyección Junio</h3>
+        <h3 style="font-size:16px;font-weight:800;color:#2d2d5e;">ðŸ“Š Resumen por Plan â€” ProyecciÃ³n Junio</h3>
         <div style="display:flex;gap:8px;">
-          <button onclick="pdfResumenPlanes()" style="border:none;background:linear-gradient(135deg,#e53935,#b71c1c);color:white;border-radius:8px;padding:7px 16px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;">📄 Descargar PDF</button>
-          <button onclick="document.getElementById('resumenProyModal').style.display='none'" style="border:none;background:#f0f2f8;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-family:inherit;">✖ Cerrar</button>
+          <button onclick="pdfResumenPlanes()" style="border:none;background:linear-gradient(135deg,#e53935,#b71c1c);color:white;border-radius:8px;padding:7px 16px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;">ðŸ“„ Descargar PDF</button>
+          <button onclick="document.getElementById('resumenProyModal').style.display='none'" style="border:none;background:#f0f2f8;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-family:inherit;">âœ– Cerrar</button>
         </div>
       </div>
       <div id="resumenProyBody"></div>
@@ -2230,12 +2230,12 @@ function openResumenModal() {
   modal.style.display = 'block';
 }
 
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // PDF RESUMEN POR PLAN
-// ─────────────────────────────────────────
-// Formateador seguro para jsPDF: evita Unicode especial del ₡ y separadores raros
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Formateador seguro para jsPDF: evita Unicode especial del â‚¡ y separadores raros
 function fmtPDF(n) {
-  if (n == null || isNaN(n)) return '—';
+  if (n == null || isNaN(n)) return 'â€”';
   return 'CRC ' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
@@ -2262,7 +2262,7 @@ function pdfResumenPlanes() {
   const pageW = doc.internal.pageSize.getWidth();
   const fecha = new Date().toLocaleDateString('es-CR', { year:'numeric', month:'long', day:'numeric' });
 
-  // Detectar filtros activos para subtítulo
+  // Detectar filtros activos para subtÃ­tulo
   const filtros = [];
   const q2    = document.getElementById('searchProy').value.trim();
   const desc  = document.getElementById('filtroDescuento').value;
@@ -2271,26 +2271,26 @@ function pdfResumenPlanes() {
   const hasta = document.getElementById('proyFechaHasta').value.trim();
   if (q2)    filtros.push('"' + q2 + '"');
   if (desc)  filtros.push('Descuento: ' + desc);
-  const vL = { '7':'≤7d','15':'≤15d','30':'≤30d','60':'≤60d','90':'≤90d','vencido':'Ya vencidos' };
+  const vL = { '7':'â‰¤7d','15':'â‰¤15d','30':'â‰¤30d','60':'â‰¤60d','90':'â‰¤90d','vencido':'Ya vencidos' };
   if (vence) filtros.push('Vence: ' + (vL[vence]||vence));
   if (desde) filtros.push('Desde: ' + desde);
   if (hasta) filtros.push('Hasta: ' + hasta);
-  const subtitulo = filtros.length ? 'Filtros activos: ' + filtros.join(' · ') : 'Sin filtros — todos los clientes';
+  const subtitulo = filtros.length ? 'Filtros activos: ' + filtros.join(' Â· ') : 'Sin filtros â€” todos los clientes';
 
-  // ── Header ──
+  // â”€â”€ Header â”€â”€
   doc.setFillColor(102,126,234);
   doc.rect(0, 0, pageW, 26, 'F');
   doc.setFillColor(118,75,162);
   doc.rect(pageW-60, 0, 60, 26, 'F');
   doc.setTextColor(255,255,255);
   doc.setFontSize(16); doc.setFont(undefined,'bold');
-  doc.text('Resumen Global de Planes — Proyección Junio 2026', 14, 11);
+  doc.text('Resumen Global de Planes â€” ProyecciÃ³n Junio 2026', 14, 11);
   doc.setFontSize(8); doc.setFont(undefined,'normal');
   doc.text(subtitulo, 14, 18);
   doc.text('Generado: ' + fecha, pageW - 14, 18, { align: 'right' });
   doc.setTextColor(0,0,0);
 
-  // ── Chips de totales ──
+  // â”€â”€ Chips de totales â”€â”€
   const resY = 30;
   const chips = [
     { label:'Planes distintos', val: sorted.length,                           color:[102,126,234] },
@@ -2311,11 +2311,11 @@ function pdfResumenPlanes() {
   });
   doc.setTextColor(0,0,0);
 
-  // ── Tabla ──
+  // â”€â”€ Tabla â”€â”€
   const tableRows = sorted.map(r => [
     r.plan,
     r.clientes,
-    r.totalMayo > 0 ? fmtPDF(r.totalMayo) : '—',
+    r.totalMayo > 0 ? fmtPDF(r.totalMayo) : 'â€”',
     fmtPDF(r.totalJunio)
   ]);
   tableRows.push([
@@ -2353,7 +2353,7 @@ function pdfResumenPlanes() {
     margin: { left:14, right:14 }
   });
 
-  // ── Resumen final ──
+  // â”€â”€ Resumen final â”€â”€
   const finalY = doc.lastAutoTable.finalY + 10;
   doc.setFillColor(240,242,255);
   doc.roundedRect(14, finalY, pageW-28, 14, 4, 4, 'F');
@@ -2364,23 +2364,23 @@ function pdfResumenPlanes() {
   );
   doc.setTextColor(0,0,0); doc.setFont(undefined,'normal');
 
-  // ── Footer páginas ──
+  // â”€â”€ Footer pÃ¡ginas â”€â”€
   const totalPages = doc.internal.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
     doc.setFontSize(7); doc.setTextColor(160,160,160);
-    doc.text(`Página ${p} de ${totalPages}`, pageW/2, doc.internal.pageSize.getHeight()-6, { align:'center' });
+    doc.text(`PÃ¡gina ${p} de ${totalPages}`, pageW/2, doc.internal.pageSize.getHeight()-6, { align:'center' });
   }
 
   doc.save('resumen_planes_junio_' + new Date().toISOString().slice(0,10) + '.pdf');
 }
 
-// ═══════════════════════════════════════════════════════
-// ANÁLISIS DE RENOVACIONES / SEGUIMIENTO DE VENCIDOS
-// (misma lógica que index.html, adaptada a la hoja "junio" de nat.xlsx
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ANÃLISIS DE RENOVACIONES / SEGUIMIENTO DE VENCIDOS
+// (misma lÃ³gica que index.html, adaptada a la hoja "junio" de nat.xlsx
 //  y reutilizable cuando solo se sube el archivo de Ventas por Producto)
-// ═══════════════════════════════════════════════════════
-let usersData = [];           // construido desde G.hoja1, o desde el último snapshot guardado
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+let usersData = [];           // construido desde G.hoja1, o desde el Ãºltimo snapshot guardado
 let renovacionesData = [];
 let clasesSueltasData = [];
 let sinClasificarData = [];
@@ -2397,39 +2397,39 @@ function parseRenoDateTime(str) {
   return parseDate(datepart);
 }
 
-// "Clases de Natación ... - X vez/veces por semana" son planes mensuales (membresía),
+// "Clases de NataciÃ³n ... - X vez/veces por semana" son planes mensuales (membresÃ­a),
 // no ventas sueltas, aunque el nombre contenga la palabra "clase(s)".
 function esPlanDeNatacionRecurrente(pl) {
-  return (pl.includes('natacion') || pl.includes('natación') || pl.includes('aquafitness') || pl.includes('estimulaci'))
+  return (pl.includes('natacion') || pl.includes('nataciÃ³n') || pl.includes('aquafitness') || pl.includes('estimulaci'))
     && (pl.includes('vez por semana') || pl.includes('veces por semana') || pl.includes('x semana'));
 }
 function isMembershipPlan(product) {
   const p = String(product||'').trim();
-  if (/\(\d+\)/.test(p)) return false; // "Agua (1)" etc. — venta suelta con cantidad
+  if (/\(\d+\)/.test(p)) return false; // "Agua (1)" etc. â€” venta suelta con cantidad
   const pl = p.toLowerCase();
   if (esPlanDeNatacionRecurrente(pl)) return true;
-  if (pl.includes('sesion') || pl.includes('sesión') || pl.includes('clase')) return false;
+  if (pl.includes('sesion') || pl.includes('sesiÃ³n') || pl.includes('clase')) return false;
   for (const key of Object.keys(G.planes||{})) {
     if (key === norm(p) || norm(p).includes(key) || key.includes(norm(p))) return true;
   }
-  return /plan|promo|anual|lealtad|fidelidad|bloqueado|verano|exclusivo|platium|semestral|trimest|estudiante|renovaci[oó]n|matr[ií]cula|nataci[oó]n|gym|aquafitness|estimulaci[oó]n|ejecutivo/i.test(p);
+  return /plan|promo|anual|lealtad|fidelidad|bloqueado|verano|exclusivo|platium|semestral|trimest|estudiante|renovaci[oÃ³]n|matr[iÃ­]cula|nataci[oÃ³]n|gym|aquafitness|estimulaci[oÃ³]n|ejecutivo/i.test(p);
 }
 function isClaseSuelta(product) {
   const pl = String(product||'').trim().toLowerCase();
   if (esPlanDeNatacionRecurrente(pl)) return false;
-  return pl.includes('sesion') || pl.includes('sesión') || pl.includes('clase');
+  return pl.includes('sesion') || pl.includes('sesiÃ³n') || pl.includes('clase');
 }
 function classifyTransaction(txDate, user, product) {
-  if (!user) return { tipo: 'Nuevo', badge: 'badge-nuevo', icon: '🆕', gapDias: null };
+  if (!user) return { tipo: 'Nuevo', badge: 'badge-nuevo', icon: 'ðŸ†•', gapDias: null };
   if (user.IngresoDate) {
     const diffI = Math.abs(daysBetween(txDate, user.IngresoDate));
-    if (diffI !== null && diffI <= 5) return { tipo: 'Nuevo', badge: 'badge-nuevo', icon: '🆕', gapDias: null };
+    if (diffI !== null && diffI <= 5) return { tipo: 'Nuevo', badge: 'badge-nuevo', icon: 'ðŸ†•', gapDias: null };
   }
   if (user.ExpiraDate) {
     const gap = daysBetween(txDate, user.ExpiraDate);
-    if (gap !== null && gap > 10) return { tipo: 'Reingreso', badge: 'badge-reingreso', icon: '🔄', gapDias: gap };
+    if (gap !== null && gap > 10) return { tipo: 'Reingreso', badge: 'badge-reingreso', icon: 'ðŸ”„', gapDias: gap };
   }
-  return { tipo: 'Renovación', badge: 'badge-renova', icon: '✅', gapDias: null };
+  return { tipo: 'RenovaciÃ³n', badge: 'badge-renova', icon: 'âœ…', gapDias: null };
 }
 function findUserByName(clientName, list) {
   list = list || usersData;
@@ -2453,15 +2453,15 @@ function buildUsersDataFromHoja1() {
   usersData = G.hoja1.map(u => ({
     PIN: u.pin, Nombre: u.nombre, Activo: u.activo, Expira: u.expira,
     ExpiraDate: parseDate(u.expira), IngresoDate: null,
-    ÚltimoProducto: u.planCorregido || u.planOriginal,
+    ÃšltimoProducto: u.planCorregido || u.planOriginal,
     Telefono: u.telefono || '', Email: u.email || '',
     // Si viene de un snapshot (sin Hoja2 cargada), usar el valor ya guardado
     ValorPlan: u.valorPlanGuardado ?? (buscarPrecio(u.planCorregido || u.planOriginal) || 0)
   }));
 }
 
-// Trae usersData desde el último snapshot guardado en Supabase (cuando solo se sube
-// el archivo de Ventas y no se tiene el Informe de Usuarios cargado en esta sesión).
+// Trae usersData desde el Ãºltimo snapshot guardado en Supabase (cuando solo se sube
+// el archivo de Ventas y no se tiene el Informe de Usuarios cargado en esta sesiÃ³n).
 async function fetchUsersDataFromSnapshot() {
   try {
     const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&limit=1&select=users_data');
@@ -2469,11 +2469,11 @@ async function fetchUsersDataFromSnapshot() {
     usersData = saved.map(u => ({
       PIN: u.PIN, Nombre: u.Nombre, Activo: u.Activo, Expira: u.Expira,
       ExpiraDate: parseDate(u.Expira), IngresoDate: null,
-      ÚltimoProducto: u.ÚltimoProducto, Telefono: u.Telefono || '', Email: u.Email || '',
+      ÃšltimoProducto: u.ÃšltimoProducto, Telefono: u.Telefono || '', Email: u.Email || '',
       ValorPlan: u.ValorPlan || 0
     }));
   } catch(e) {
-    console.warn('No se pudo cargar usersData del último snapshot:', e.message);
+    console.warn('No se pudo cargar usersData del Ãºltimo snapshot:', e.message);
     usersData = [];
   }
 }
@@ -2488,7 +2488,7 @@ function buildRenovacionesState(rawRows) {
     if (!fechaStr || !cliente) return;
     const txDate = parseRenoDateTime(fechaStr);
     if (/^invitado$/i.test(cliente.trim())) {
-      // Invitado nunca es renovación de socio, pero sí cuenta como Minita/sin clasificar
+      // Invitado nunca es renovaciÃ³n de socio, pero sÃ­ cuenta como Minita/sin clasificar
       if (isClaseSuelta(producto)) clasesSueltasData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
       else sinClasificarData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
       return;
@@ -2511,7 +2511,7 @@ function buildRenovacionesState(rawRows) {
   });
 }
 
-// ── Filtros ──
+// â”€â”€ Filtros â”€â”€
 function getFilteredRenovaciones() {
   const tipo = document.getElementById('renoFilterTipo')?.value || 'all';
   const search = document.getElementById('renoSearchName')?.value.toLowerCase() || '';
@@ -2555,7 +2555,7 @@ function filterRenoHoy() {
 function updateRenoStats() {
   const all = renovacionesData;
   const nuevos = all.filter(r=>r.Tipo==='Nuevo').length;
-  const renova = all.filter(r=>r.Tipo==='Renovación').length;
+  const renova = all.filter(r=>r.Tipo==='RenovaciÃ³n').length;
   const reing  = all.filter(r=>r.Tipo==='Reingreso').length;
   const totalCRC = all.reduce((s,r)=>s+r.Total,0);
   const dias = [...new Set(all.map(r=>r.TxDate?.toDateString()).filter(Boolean))].length;
@@ -2563,13 +2563,13 @@ function updateRenoStats() {
   const sinClasifTotal = sinClasificarData.reduce((s,c)=>s+c.Total,0);
   const granTotal = totalCRC + clasesTotal + sinClasifTotal;
   document.getElementById('renoStatsContainer').innerHTML = `
-    <div class="card purple"><div class="card-label">📋 Total Membresías</div><div class="card-value">${all.length}</div></div>
-    <div class="card green"><div class="card-label">🆕 Nuevos</div><div class="card-value">${nuevos}</div><div class="card-sub">${all.length?Math.round(nuevos/all.length*100):0}% del total</div></div>
-    <div class="card blue"><div class="card-label">✅ Renovaciones</div><div class="card-value">${renova}</div><div class="card-sub">${all.length?Math.round(renova/all.length*100):0}% del total</div></div>
-    <div class="card orange"><div class="card-label">🔄 Reingresos</div><div class="card-value">${reing}</div><div class="card-sub">Inactivos +10 días que volvieron</div></div>
-    <div class="card teal"><div class="card-label">💰 Total General</div><div class="card-value">₡${granTotal.toLocaleString('es-CR')}</div><div class="card-sub">En ${dias} día(s)</div></div>
-    <div class="card" style="border-color:#888;"><div class="card-label">🤸 Clases Sueltas</div><div class="card-value" style="color:#555;">₡${clasesTotal.toLocaleString('es-CR')}</div><div class="card-sub">${clasesSueltasData.length} clases/sesiones</div></div>
-    <div class="card red"><div class="card-label">❓ Sin Clasificar</div><div class="card-value">₡${sinClasifTotal.toLocaleString('es-CR')}</div><div class="card-sub">${sinClasificarData.length} producto(s) no reconocido(s)</div></div>`;
+    <div class="card purple"><div class="card-label">ðŸ“‹ Total MembresÃ­as</div><div class="card-value">${all.length}</div></div>
+    <div class="card green"><div class="card-label">ðŸ†• Nuevos</div><div class="card-value">${nuevos}</div><div class="card-sub">${all.length?Math.round(nuevos/all.length*100):0}% del total</div></div>
+    <div class="card blue"><div class="card-label">âœ… Renovaciones</div><div class="card-value">${renova}</div><div class="card-sub">${all.length?Math.round(renova/all.length*100):0}% del total</div></div>
+    <div class="card orange"><div class="card-label">ðŸ”„ Reingresos</div><div class="card-value">${reing}</div><div class="card-sub">Inactivos +10 dÃ­as que volvieron</div></div>
+    <div class="card teal"><div class="card-label">ðŸ’° Total General</div><div class="card-value">â‚¡${granTotal.toLocaleString('es-CR')}</div><div class="card-sub">En ${dias} dÃ­a(s)</div></div>
+    <div class="card" style="border-color:#888;"><div class="card-label">ðŸ¤¸ Clases Sueltas</div><div class="card-value" style="color:#555;">â‚¡${clasesTotal.toLocaleString('es-CR')}</div><div class="card-sub">${clasesSueltasData.length} clases/sesiones</div></div>
+    <div class="card red"><div class="card-label">â“ Sin Clasificar</div><div class="card-value">â‚¡${sinClasifTotal.toLocaleString('es-CR')}</div><div class="card-sub">${sinClasificarData.length} producto(s) no reconocido(s)</div></div>`;
 }
 
 function renderRenovaciones() {
@@ -2584,9 +2584,9 @@ function renderRenovaciones() {
   const totalClasesFiltrado = filteredClases.reduce((s,c)=>s+c.Total,0);
   const totalSinClasifFiltrado = filteredSinClasif.reduce((s,c)=>s+c.Total,0);
   document.getElementById('renoFilteredStatsContainer').innerHTML = !filtroActivo ? '' : `
-    <div class="card green"><div class="card-label">💰 Membresías (filtro)</div><div class="card-value">₡${totalMembFiltrado.toLocaleString('es-CR')}</div><div class="card-sub">${filtered.length} transacción(es)</div></div>
-    <div class="card" style="border-color:#888;"><div class="card-label">🤸 Clases Sueltas (filtro)</div><div class="card-value" style="color:#555;">₡${totalClasesFiltrado.toLocaleString('es-CR')}</div><div class="card-sub">${filteredClases.length} clase(s)</div></div>
-    <div class="card red"><div class="card-label">❓ Sin Clasificar (filtro)</div><div class="card-value">₡${totalSinClasifFiltrado.toLocaleString('es-CR')}</div><div class="card-sub">${filteredSinClasif.length} producto(s)</div></div>`;
+    <div class="card green"><div class="card-label">ðŸ’° MembresÃ­as (filtro)</div><div class="card-value">â‚¡${totalMembFiltrado.toLocaleString('es-CR')}</div><div class="card-sub">${filtered.length} transacciÃ³n(es)</div></div>
+    <div class="card" style="border-color:#888;"><div class="card-label">ðŸ¤¸ Clases Sueltas (filtro)</div><div class="card-value" style="color:#555;">â‚¡${totalClasesFiltrado.toLocaleString('es-CR')}</div><div class="card-sub">${filteredClases.length} clase(s)</div></div>
+    <div class="card red"><div class="card-label">â“ Sin Clasificar (filtro)</div><div class="card-value">â‚¡${totalSinClasifFiltrado.toLocaleString('es-CR')}</div><div class="card-sub">${filteredSinClasif.length} producto(s)</div></div>`;
   updateRenoStats();
 
   // Poblar filtro de plan
@@ -2597,41 +2597,41 @@ function renderRenovaciones() {
 
   // Charts
   const nv = filtered.filter(r=>r.Tipo==='Nuevo').length;
-  const rv = filtered.filter(r=>r.Tipo==='Renovación').length;
+  const rv = filtered.filter(r=>r.Tipo==='RenovaciÃ³n').length;
   const ri = filtered.filter(r=>r.Tipo==='Reingreso').length;
   const ctxPie = document.getElementById('renoTypePie').getContext('2d');
   if (renoTypePieChart) renoTypePieChart.destroy();
-  renoTypePieChart = new Chart(ctxPie, { type:'doughnut', data:{ labels:['Nuevo','Renovación','Reingreso'], datasets:[{ data:[nv,rv,ri], backgroundColor:['#43a047','#1e88e5','#ff9800'], borderWidth:2, borderColor:'#fff' }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom' } } } });
+  renoTypePieChart = new Chart(ctxPie, { type:'doughnut', data:{ labels:['Nuevo','RenovaciÃ³n','Reingreso'], datasets:[{ data:[nv,rv,ri], backgroundColor:['#43a047','#1e88e5','#ff9800'], borderWidth:2, borderColor:'#fff' }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom' } } } });
 
   const planTot = {};
   filtered.forEach(r => { const p = r.Producto.trim(); planTot[p] = (planTot[p]||0) + r.Total; });
   const barSorted = Object.entries(planTot).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const ctxBar = document.getElementById('renoPlanBar').getContext('2d');
   if (renoPlanBarChart) renoPlanBarChart.destroy();
-  if (barSorted.length) renoPlanBarChart = new Chart(ctxBar, { type:'bar', data:{ labels:barSorted.map(i=>i[0]), datasets:[{ label:'CRC Recaudado', data:barSorted.map(i=>i[1]), backgroundColor: barSorted.map((_,i)=>`hsla(${200+i*18},65%,50%,0.82)`), borderRadius:6, borderSkipped:false }] }, options:{ responsive:true, plugins:{ legend:{display:false} }, scales:{ y:{ ticks:{ callback:v=>'₡'+v.toLocaleString('es-CR') } }, x:{} } } });
+  if (barSorted.length) renoPlanBarChart = new Chart(ctxBar, { type:'bar', data:{ labels:barSorted.map(i=>i[0]), datasets:[{ label:'CRC Recaudado', data:barSorted.map(i=>i[1]), backgroundColor: barSorted.map((_,i)=>`hsla(${200+i*18},65%,50%,0.82)`), borderRadius:6, borderSkipped:false }] }, options:{ responsive:true, plugins:{ legend:{display:false} }, scales:{ y:{ ticks:{ callback:v=>'â‚¡'+v.toLocaleString('es-CR') } }, x:{} } } });
 
   // Tabla principal
   const tbody = document.getElementById('renoTableBody'); tbody.innerHTML = '';
   filtered.sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0));
   filtered.forEach(r => {
     const tr = tbody.insertRow();
-    const gap = r.GapDias!=null ? `<span style="color:#e65100;font-weight:700;">${r.GapDias} días</span>` : '<span style="color:#aaa;">—</span>';
-    const ingreso = '<span style="color:#aaa;">—</span>';
-    const expira = r.User?.Expira || '<span style="color:#aaa;">—</span>';
+    const gap = r.GapDias!=null ? `<span style="color:#e65100;font-weight:700;">${r.GapDias} dÃ­as</span>` : '<span style="color:#aaa;">â€”</span>';
+    const ingreso = '<span style="color:#aaa;">â€”</span>';
+    const expira = r.User?.Expira || '<span style="color:#aaa;">â€”</span>';
     const clienteDisplay = r.User ? `<strong>${esc(r.Cliente)}</strong>` :
-      `<strong>${esc(r.Cliente)}</strong> <span style="background:#fff3e0;color:#e65100;font-size:11px;padding:2px 6px;border-radius:10px;">¿nuevo?</span>`;
+      `<strong>${esc(r.Cliente)}</strong> <span style="background:#fff3e0;color:#e65100;font-size:11px;padding:2px 6px;border-radius:10px;">Â¿nuevo?</span>`;
     tr.innerHTML = `
       <td style="white-space:nowrap;font-size:12px;color:#666;">${esc(r.FechaStr)}</td>
       <td>${clienteDisplay}</td>
       <td style="font-size:12.5px;">${esc(r.Producto)}</td>
       <td><span class="badge ${r.Badge}">${r.Icon} ${r.Tipo}</span></td>
-      <td style="font-weight:700;color:#2d2d5e;">₡${r.Total.toLocaleString('es-CR')}</td>
+      <td style="font-weight:700;color:#2d2d5e;">â‚¡${r.Total.toLocaleString('es-CR')}</td>
       <td>${gap}</td>
       <td style="font-size:12px;">${ingreso}</td>
       <td style="font-size:12px;">${expira}</td>
       <td style="font-size:12px;color:#888;">${esc(r.RegistradoPor)}</td>`;
   });
-  document.getElementById('renoTableInfo').textContent = `Mostrando ${filtered.length} transacciones — Nuevos: ${nv} · Renovaciones: ${rv} · Reingresos: ${ri} · Total: ₡${filtered.reduce((s,r)=>s+r.Total,0).toLocaleString('es-CR')}`;
+  document.getElementById('renoTableInfo').textContent = `Mostrando ${filtered.length} transacciones â€” Nuevos: ${nv} Â· Renovaciones: ${rv} Â· Reingresos: ${ri} Â· Total: â‚¡${filtered.reduce((s,r)=>s+r.Total,0).toLocaleString('es-CR')}`;
 
   // Clases sueltas
   const csBody = document.getElementById('clasesSueltasTableBody'); csBody.innerHTML = '';
@@ -2641,10 +2641,10 @@ function renderRenovaciones() {
       <td style="white-space:nowrap;font-size:12px;color:#666;">${esc(c.FechaStr)}</td>
       <td>${esc(c.Cliente)}</td>
       <td style="font-size:12.5px;">${esc(c.Producto)}</td>
-      <td style="font-weight:700;color:#2d2d5e;">₡${c.Total.toLocaleString('es-CR')}</td>
+      <td style="font-weight:700;color:#2d2d5e;">â‚¡${c.Total.toLocaleString('es-CR')}</td>
       <td style="font-size:12px;color:#888;">${esc(c.RegistradoPor)}</td>`;
   });
-  document.getElementById('clasesSueltasInfo').textContent = `Mostrando ${filteredClases.length} clases/sesiones sueltas — Total: ₡${totalClasesFiltrado.toLocaleString('es-CR')} (no se suma al total de membresías)`;
+  document.getElementById('clasesSueltasInfo').textContent = `Mostrando ${filteredClases.length} clases/sesiones sueltas â€” Total: â‚¡${totalClasesFiltrado.toLocaleString('es-CR')} (no se suma al total de membresÃ­as)`;
 
   // Sin clasificar
   const scBody = document.getElementById('sinClasificarTableBody'); scBody.innerHTML = '';
@@ -2654,10 +2654,10 @@ function renderRenovaciones() {
       <td style="white-space:nowrap;font-size:12px;color:#666;">${esc(c.FechaStr)}</td>
       <td>${esc(c.Cliente)}</td>
       <td style="font-size:12.5px;">${esc(c.Producto)}</td>
-      <td style="font-weight:700;color:#c62828;">₡${c.Total.toLocaleString('es-CR')}</td>
+      <td style="font-weight:700;color:#c62828;">â‚¡${c.Total.toLocaleString('es-CR')}</td>
       <td style="font-size:12px;color:#888;">${esc(c.RegistradoPor)}</td>`;
   });
-  document.getElementById('sinClasificarInfo').textContent = `Mostrando ${filteredSinClasif.length} transacciones sin clasificar — Total: ₡${totalSinClasifFiltrado.toLocaleString('es-CR')} (revisar nombres de producto)`;
+  document.getElementById('sinClasificarInfo').textContent = `Mostrando ${filteredSinClasif.length} transacciones sin clasificar â€” Total: â‚¡${totalSinClasifFiltrado.toLocaleString('es-CR')} (revisar nombres de producto)`;
 }
 
 function exportRenoCSV() {
@@ -2682,7 +2682,7 @@ function exportRenoPDF() {
   doc.text('Clasificacion de membresias: Nuevos, Renovaciones y Reingresos',36,48);
   doc.text('Generado: '+fecha,36,64);
   doc.setFontSize(9); doc.text('JK Sistemas',pW-90,46,{align:'center'});
-  const nv=f.filter(r=>r.Tipo==='Nuevo').length, rv=f.filter(r=>r.Tipo==='Renovación').length, ri=f.filter(r=>r.Tipo==='Reingreso').length;
+  const nv=f.filter(r=>r.Tipo==='Nuevo').length, rv=f.filter(r=>r.Tipo==='RenovaciÃ³n').length, ri=f.filter(r=>r.Tipo==='Reingreso').length;
   const tot=f.reduce((s,r)=>s+r.Total,0);
   doc.setFillColor(240,242,255); doc.roundedRect(36,86,pW-72,28,4,4,'F');
   doc.setFontSize(9); doc.setTextColor(45,45,94); doc.setFont(undefined,'bold');
@@ -2695,7 +2695,7 @@ function exportRenoPDF() {
   ]);
   doc.autoTable({
     startY:122,
-    head:[['Fecha','Cliente','Plan','Tipo','Total (CRC)','Días gap','Registrado por']],
+    head:[['Fecha','Cliente','Plan','Tipo','Total (CRC)','DÃ­as gap','Registrado por']],
     body:tableRows,
     headStyles:{ fillColor:[102,126,234], textColor:255, fontStyle:'bold', fontSize:8.5 },
     didParseCell(data) {
@@ -2718,7 +2718,7 @@ function exportRenoPDF() {
   doc.save('renovaciones_natacion_'+hoy()+'.pdf');
 }
 
-// ── Seguimiento de vencidos ──
+// â”€â”€ Seguimiento de vencidos â”€â”€
 function getSeguimientoVencidos() {
   const today = new Date(); today.setHours(0,0,0,0);
   const pagaronEstePeriodo = new Set(renovacionesData.map(r => norm(r.Cliente)));
@@ -2731,7 +2731,7 @@ function getFilteredSeguimiento() {
   const plan = document.getElementById('segFilterPlan')?.value || 'all';
   return getSeguimientoVencidos().filter(u => {
     if (search && !u.Nombre.toLowerCase().includes(search)) return false;
-    if (plan !== 'all' && u.ÚltimoProducto !== plan) return false;
+    if (plan !== 'all' && u.ÃšltimoProducto !== plan) return false;
     const diasVencido = Math.round((today - u.ExpiraDate) / 864e5);
     if (rango !== 'all') {
       const [min, max] = rango.split('-').map(Number);
@@ -2752,7 +2752,7 @@ function renderSeguimiento() {
   const todos = getSeguimientoVencidos();
   const planSel = document.getElementById('segFilterPlan');
   const curPlan = planSel.value;
-  const planes = [...new Set(todos.map(u => u.ÚltimoProducto).filter(Boolean))].sort();
+  const planes = [...new Set(todos.map(u => u.ÃšltimoProducto).filter(Boolean))].sort();
   planSel.innerHTML = '<option value="all">Todos</option>' + planes.map(p => `<option value="${esc(p)}"${p===curPlan?' selected':''}>${esc(p)}</option>`).join('');
 
   const rows = getFilteredSeguimiento().sort((a,b) => a.ExpiraDate - b.ExpiraDate);
@@ -2760,10 +2760,10 @@ function renderSeguimiento() {
   const r15 = todos.filter(u => Math.round((today-u.ExpiraDate)/864e5) <= 15).length;
   const r60 = todos.filter(u => Math.round((today-u.ExpiraDate)/864e5) > 60).length;
   document.getElementById('segStatsContainer').innerHTML = `
-    <div class="card red"><div class="card-label">📋 Total Vencidos</div><div class="card-value">${todos.length}</div><div class="card-sub">Sin renovar a la fecha</div></div>
-    <div class="card orange"><div class="card-label">🟠 Vencidos 1-15 días</div><div class="card-value">${r15}</div><div class="card-sub">Aún recientes</div></div>
-    <div class="card red"><div class="card-label">🔴 Vencidos +60 días</div><div class="card-value">${r60}</div><div class="card-sub">Riesgo de pérdida</div></div>
-    <div class="card purple"><div class="card-label">💰 Valor en Riesgo (filtro)</div><div class="card-value">₡${valorRiesgo.toLocaleString('es-CR')}</div><div class="card-sub">${rows.length} cliente(s) mostrados</div></div>`;
+    <div class="card red"><div class="card-label">ðŸ“‹ Total Vencidos</div><div class="card-value">${todos.length}</div><div class="card-sub">Sin renovar a la fecha</div></div>
+    <div class="card orange"><div class="card-label">ðŸŸ  Vencidos 1-15 dÃ­as</div><div class="card-value">${r15}</div><div class="card-sub">AÃºn recientes</div></div>
+    <div class="card red"><div class="card-label">ðŸ”´ Vencidos +60 dÃ­as</div><div class="card-value">${r60}</div><div class="card-sub">Riesgo de pÃ©rdida</div></div>
+    <div class="card purple"><div class="card-label">ðŸ’° Valor en Riesgo (filtro)</div><div class="card-value">â‚¡${valorRiesgo.toLocaleString('es-CR')}</div><div class="card-sub">${rows.length} cliente(s) mostrados</div></div>`;
 
   const tbody = document.getElementById('segTableBody'); tbody.innerHTML = '';
   rows.forEach(u => {
@@ -2772,20 +2772,20 @@ function renderSeguimiento() {
     tr.innerHTML = `
       <td>${esc(u.PIN)}</td>
       <td><strong>${esc(u.Nombre)}</strong></td>
-      <td style="font-size:12.5px;white-space:nowrap;">${esc(u.Telefono)||'<span style="color:#aaa;">—</span>'}</td>
-      <td style="font-size:12.5px;">${esc(u.ÚltimoProducto)||'-'}</td>
+      <td style="font-size:12.5px;white-space:nowrap;">${esc(u.Telefono)||'<span style="color:#aaa;">â€”</span>'}</td>
+      <td style="font-size:12.5px;">${esc(u.ÃšltimoProducto)||'-'}</td>
       <td>${esc(u.Expira)||'-'}</td>
-      <td style="font-weight:700;color:${diasVencido>60?'#c62828':'#e65100'};">${diasVencido} días</td>
-      <td>${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString('es-CR'):'<span style="color:#aaa;">—</span>'}</td>`;
+      <td style="font-weight:700;color:${diasVencido>60?'#c62828':'#e65100'};">${diasVencido} dÃ­as</td>
+      <td>${u.ValorPlan>0?'â‚¡'+u.ValorPlan.toLocaleString('es-CR'):'<span style="color:#aaa;">â€”</span>'}</td>`;
   });
-  document.getElementById('segTableInfo').textContent = `Mostrando ${rows.length} de ${todos.length} clientes vencidos sin renovar — Valor en riesgo: ₡${valorRiesgo.toLocaleString('es-CR')}`;
+  document.getElementById('segTableInfo').textContent = `Mostrando ${rows.length} de ${todos.length} clientes vencidos sin renovar â€” Valor en riesgo: â‚¡${valorRiesgo.toLocaleString('es-CR')}`;
 }
 
 function exportSegCSV() {
   const f = getFilteredSeguimiento(); if (!f.length) { alert('No hay datos'); return; }
   const today = new Date(); today.setHours(0,0,0,0);
   const h = ['PIN','Nombre','Telefono','Plan','Vencio','Dias vencido','Valor Plan (CRC)'];
-  const rows = f.map(u => [u.PIN, u.Nombre, u.Telefono, u.ÚltimoProducto, u.Expira, Math.round((today-u.ExpiraDate)/864e5), u.ValorPlan]);
+  const rows = f.map(u => [u.PIN, u.Nombre, u.Telefono, u.ÃšltimoProducto, u.Expira, Math.round((today-u.ExpiraDate)/864e5), u.ValorPlan]);
   const csv = [h, ...rows].map(row => row.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
   dlBlob(csv, 'seguimiento_vencidos_natacion_'+hoy()+'.csv', 'text/csv;charset=utf-8');
 }
@@ -2799,15 +2799,15 @@ function printSeguimiento() {
   const rows = f.map(u => {
     const dias = Math.round((today - u.ExpiraDate) / 864e5);
     return `<tr>
-      <td>${esc(u.PIN)}</td><td>${esc(u.Nombre)}</td><td>${esc(u.Telefono)||'—'}</td>
-      <td>${esc(u.ÚltimoProducto)||'-'}</td><td>${esc(u.Expira)||'-'}</td><td>${dias}</td>
-      <td>${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString('es-CR'):'—'}</td><td class="notas"></td>
+      <td>${esc(u.PIN)}</td><td>${esc(u.Nombre)}</td><td>${esc(u.Telefono)||'â€”'}</td>
+      <td>${esc(u.ÃšltimoProducto)||'-'}</td><td>${esc(u.Expira)||'-'}</td><td>${dias}</td>
+      <td>${u.ValorPlan>0?'â‚¡'+u.ValorPlan.toLocaleString('es-CR'):'â€”'}</td><td class="notas"></td>
     </tr>`;
   }).join('');
   const win = window.open('', '_blank');
   win.document.write(`
   <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-  <title>Seguimiento Vencidos - Natación</title>
+  <title>Seguimiento Vencidos - NataciÃ³n</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 24px; color: #222; }
     h1 { font-size: 1.3em; margin-bottom: 2px; }
@@ -2818,10 +2818,10 @@ function printSeguimiento() {
     td.notas { width: 160px; }
     @media print { body { padding: 8px; } }
   </style></head><body>
-    <h1>Seguimiento de Clientes Vencidos — Natación</h1>
-    <div class="sub">Generado: ${fecha} &nbsp;·&nbsp; Total: ${f.length} cliente(s)</div>
+    <h1>Seguimiento de Clientes Vencidos â€” NataciÃ³n</h1>
+    <div class="sub">Generado: ${fecha} &nbsp;Â·&nbsp; Total: ${f.length} cliente(s)</div>
     <table>
-      <thead><tr><th>PIN</th><th>Nombre</th><th>Teléfono</th><th>Plan</th><th>Venció</th><th>Días vencido</th><th>Valor</th><th>Notas / Contacto</th></tr></thead>
+      <thead><tr><th>PIN</th><th>Nombre</th><th>TelÃ©fono</th><th>Plan</th><th>VenciÃ³</th><th>DÃ­as vencido</th><th>Valor</th><th>Notas / Contacto</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   </body></html>`);
@@ -2832,20 +2832,20 @@ function printSeguimiento() {
 
 function hoy() { return new Date().toISOString().slice(0,10); }
 function dlBlob(content, filename, type) {
-  const blob = new Blob(['﻿'+content], { type });
+  const blob = new Blob(['ï»¿'+content], { type });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href);
 }
 
-// ─────────────────────────────────────────
-// VALIDACIÓN DE DESCUENTOS vs PAGOS JUNIO
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// VALIDACIÃ“N DE DESCUENTOS vs PAGOS JUNIO
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ESTADO_VALIDACION = {
-  vencido_sin_pago:    { label: '🔴 Vencido sin pagar',           bg:'#fdecea', color:'#c0392b' },
-  por_vencer_sin_pago: { label: '🟠 Por vencer sin pagar',         bg:'#fef5e7', color:'#e67e22' },
-  sin_descuento:       { label: '⚠ Pagó sin descuento',           bg:'#fef9e7', color:'#9a7d0a' },
-  monto_diferente:     { label: '⚠ Monto diferente',              bg:'#fef9e7', color:'#9a7d0a' },
-  ok:                  { label: '✅ Descuento aplicado',           bg:'#e8f8f0', color:'#27ae60' },
-  al_dia:              { label: '🟢 Al día (no vence aún)',        bg:'#eaf2fb', color:'#2980b9' }
+  vencido_sin_pago:    { label: 'ðŸ”´ Vencido sin pagar',           bg:'#fdecea', color:'#c0392b' },
+  por_vencer_sin_pago: { label: 'ðŸŸ  Por vencer sin pagar',         bg:'#fef5e7', color:'#e67e22' },
+  sin_descuento:       { label: 'âš  PagÃ³ sin descuento',           bg:'#fef9e7', color:'#9a7d0a' },
+  monto_diferente:     { label: 'âš  Monto diferente',              bg:'#fef9e7', color:'#9a7d0a' },
+  ok:                  { label: 'âœ… Descuento aplicado',           bg:'#e8f8f0', color:'#27ae60' },
+  al_dia:              { label: 'ðŸŸ¢ Al dÃ­a (no vence aÃºn)',        bg:'#eaf2fb', color:'#2980b9' }
 };
 
 function renderValidacion() {
@@ -2859,14 +2859,14 @@ function renderValidacion() {
 
   tbody.innerHTML = data.map(r => {
     const dias = daysUntil(r.expiraDate);
-    const venceCell = r.expira ? `${esc(r.expira)}${dias!=null ? ` (${dias<0?dias:'+'+dias}d)` : ''}` : '—';
+    const venceCell = r.expira ? `${esc(r.expira)}${dias!=null ? ` (${dias<0?dias:'+'+dias}d)` : ''}` : 'â€”';
     const cfg = ESTADO_VALIDACION[r.estado] || {};
     const badge = `<span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:${cfg.bg};color:${cfg.color};white-space:nowrap;">${cfg.label||r.estado}</span>`;
-    const pagoCell = r.pago ? `<span class="price">${fmt(r.pago.total)}</span>` : `<span style="color:var(--muted)">—</span>`;
+    const pagoCell = r.pago ? `<span class="price">${fmt(r.pago.total)}</span>` : `<span style="color:var(--muted)">â€”</span>`;
     const tardioTag = r.pagoTardio
-      ? ` <span class="tag tag-noplan" title="Pagó ${r.pagoTardio} día(s) después de la fecha de vencimiento del plan anterior (${esc(r.expira)})">⏰ +${r.pagoTardio}d tarde</span>`
+      ? ` <span class="tag tag-noplan" title="PagÃ³ ${r.pagoTardio} dÃ­a(s) despuÃ©s de la fecha de vencimiento del plan anterior (${esc(r.expira)})">â° +${r.pagoTardio}d tarde</span>`
       : '';
-    const fechaPagoCell = r.pago ? (esc(r.pago.fecha) || '—') + tardioTag : '—';
+    const fechaPagoCell = r.pago ? (esc(r.pago.fecha) || 'â€”') + tardioTag : 'â€”';
     const tagMap = { '20%':'tag-20','25%':'tag-25','G20':'tag-g20' };
     const descBadge = `<span class="tag ${tagMap[r.fuente]||''}">${esc(r.fuente)} (${Math.round(r.pct*100)}%)</span>`;
     return `<tr style="${r.estado==='vencido_sin_pago'||r.estado==='por_vencer_sin_pago'?'background:#fff8f8':''}">
@@ -2874,7 +2874,7 @@ function renderValidacion() {
       <td><strong>${esc(r.cliente)}</strong></td>
       <td>${esc(r.planMain)}</td>
       <td>${descBadge}</td>
-      <td>${r.precioJunio!=null?fmt(Math.round(r.precioJunio)):'—'}</td>
+      <td>${r.precioJunio!=null?fmt(Math.round(r.precioJunio)):'â€”'}</td>
       <td>${pagoCell}</td>
       <td>${fechaPagoCell}</td>
       <td>${venceCell}</td>
@@ -2894,47 +2894,47 @@ function renderValidacionCards(rows) {
     `<div class="proy-stat ${cls}"><h3>${icon} ${label}</h3><div class="sv">${val}</div><div class="ss">${sub}</div></div>`;
 
   document.getElementById('validacion-cards').innerHTML =
-    mk('red',    '🔴', 'Vencidos sin pagar',    counts.vencido_sin_pago.length,    'riesgo de quedar inactivos') +
-    mk('orange', '🟠', 'Por vencer sin pagar',  counts.por_vencer_sin_pago.length, '≤15 días') +
-    mk('purple', '💰', 'Monto en riesgo',       fmt(Math.round(montoRiesgo)),      riesgo.length+' clientes') +
-    mk('yellow', '⚠',  'Sin descuento aplicado',counts.sin_descuento.length,       'revisar cobro') +
-    mk('yellow', '⚠',  'Monto diferente',       counts.monto_diferente.length,     'revisar cobro') +
-    mk('orange', '⏰', 'Pagos tardíos',         pagosTardios.length,               'pagaron tras vencer su plan') +
-    mk('green',  '✅', 'Descuento OK',          counts.ok.length,                  'pagaron correctamente') +
-    mk('blue',   '🟢', 'Al día',                counts.al_dia.length,              'aún no vencen');
+    mk('red',    'ðŸ”´', 'Vencidos sin pagar',    counts.vencido_sin_pago.length,    'riesgo de quedar inactivos') +
+    mk('orange', 'ðŸŸ ', 'Por vencer sin pagar',  counts.por_vencer_sin_pago.length, 'â‰¤15 dÃ­as') +
+    mk('purple', 'ðŸ’°', 'Monto en riesgo',       fmt(Math.round(montoRiesgo)),      riesgo.length+' clientes') +
+    mk('yellow', 'âš ',  'Sin descuento aplicado',counts.sin_descuento.length,       'revisar cobro') +
+    mk('yellow', 'âš ',  'Monto diferente',       counts.monto_diferente.length,     'revisar cobro') +
+    mk('orange', 'â°', 'Pagos tardÃ­os',         pagosTardios.length,               'pagaron tras vencer su plan') +
+    mk('green',  'âœ…', 'Descuento OK',          counts.ok.length,                  'pagaron correctamente') +
+    mk('blue',   'ðŸŸ¢', 'Al dÃ­a',                counts.al_dia.length,              'aÃºn no vencen');
 }
 
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // PDF JUNIO
-// ─────────────────────────────────────────
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // TABS
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function switchTab(id, el) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   el.classList.add('active');
-  // Los gráficos de Chart.js necesitan que el canvas ya esté visible para medir
-  // su tamaño, por eso estas pestañas se renderizan al activarlas, no antes.
+  // Los grÃ¡ficos de Chart.js necesitan que el canvas ya estÃ© visible para medir
+  // su tamaÃ±o, por eso estas pestaÃ±as se renderizan al activarlas, no antes.
   if (id === 'tabJunio') renderRenovaciones();
   if (id === 'tabSeguimiento') renderSeguimiento();
 }
 
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // ESCAPE HTML
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function esc(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // EXPORTAR PDF
-// ─────────────────────────────────────────
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // PDF USUARIOS (usa G.filtered.usuarios)
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function pdfUsuarios() {
   const rows = G.filtered.usuarios;
   if (!rows.length) { alert('No hay usuarios con los filtros actuales.'); return; }
@@ -2944,17 +2944,17 @@ function pdfUsuarios() {
   const pageW = doc.internal.pageSize.getWidth();
   const fecha = new Date().toLocaleDateString('es-CR');
 
-  // Detectar filtros activos para el subtítulo
+  // Detectar filtros activos para el subtÃ­tulo
   const filtros = [];
   const q = document.getElementById('searchUsuarios').value.trim();
   const estado = document.getElementById('filtroEstado').value;
   const activo = document.getElementById('filtroActivo').value;
-  if (q) filtros.push('Búsqueda: "' + q + '"');
-  const estadoLabels = { corregido:'Solo corregidos', corregido_historico:'Corregidos vía histórico', sin_correccion:'Sin corrección', sin_plan:'Sin plan encontrado' };
+  if (q) filtros.push('BÃºsqueda: "' + q + '"');
+  const estadoLabels = { corregido:'Solo corregidos', corregido_historico:'Corregidos vÃ­a histÃ³rico', sin_correccion:'Sin correcciÃ³n', sin_plan:'Sin plan encontrado' };
   if (estado && estadoLabels[estado]) filtros.push(estadoLabels[estado]);
-  if (activo === 'Sí') filtros.push('Solo activos');
+  if (activo === 'SÃ­') filtros.push('Solo activos');
   if (activo === 'No') filtros.push('Solo inactivos');
-  const subtitulo = filtros.length ? 'Filtros: ' + filtros.join(' · ') : 'Todos los usuarios';
+  const subtitulo = filtros.length ? 'Filtros: ' + filtros.join(' Â· ') : 'Todos los usuarios';
 
   // Header
   doc.setFillColor(102,126,234);
@@ -2969,8 +2969,8 @@ function pdfUsuarios() {
   doc.text('Generado: ' + fecha + '  |  ' + rows.length + ' registros', pageW-14, 17, { align:'right' });
   doc.setTextColor(0,0,0);
 
-  // Resumen rápido por estado
-  const activos   = rows.filter(r => r.activo === 'Sí').length;
+  // Resumen rÃ¡pido por estado
+  const activos   = rows.filter(r => r.activo === 'SÃ­').length;
   const corregidos= rows.filter(r => r.estado === 'corregido').length;
   const sinPlan   = rows.filter(r => r.estado === 'sin_plan').length;
   const resY = 28;
@@ -2999,19 +2999,19 @@ function pdfUsuarios() {
     body: rows.map(r => [
       r.pin,
       r.nombre,
-      r.activo === 'Sí' ? '✓ Activo' : '✗ Inactivo',
-      r.expira || '—',
-      r.planOriginal || '—',
+      r.activo === 'SÃ­' ? 'âœ“ Activo' : 'âœ— Inactivo',
+      r.expira || 'â€”',
+      r.planOriginal || 'â€”',
       r.estado !== 'ok' ? (r.planCorregido || r.planOriginal) : r.planOriginal,
       r.estado === 'corregido' ? (r.fuentePlan === 'historico' ? 'Corregido (hist.)' : 'Corregido') :
-      r.estado === 'sin_plan'  ? 'Sin plan encontrado' : '—'
+      r.estado === 'sin_plan'  ? 'Sin plan encontrado' : 'â€”'
     ]),
     styles: { fontSize: 8, cellPadding: 2.5 },
     headStyles: { fillColor: [102,126,234], textColor:255, fontStyle:'bold' },
     alternateRowStyles: { fillColor: [248,249,255] },
     didParseCell(data) {
       if (data.section === 'body' && data.column.index === 2) {
-        data.cell.styles.textColor = data.cell.raw.includes('✓') ? [43,160,71] : [192,57,43];
+        data.cell.styles.textColor = data.cell.raw.includes('âœ“') ? [43,160,71] : [192,57,43];
         data.cell.styles.fontStyle = 'bold';
       }
       if (data.section === 'body' && data.column.index === 5 && data.row.raw[6] && data.row.raw[6].includes('Corregido')) {
@@ -3026,20 +3026,20 @@ function pdfUsuarios() {
     margin: { left:14, right:14 }
   });
 
-  // Footer páginas
+  // Footer pÃ¡ginas
   const totalPages = doc.internal.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
     doc.setFontSize(7); doc.setTextColor(150,150,150);
-    doc.text(`Página ${p} de ${totalPages}`, pageW/2, doc.internal.pageSize.getHeight()-6, { align:'center' });
+    doc.text(`PÃ¡gina ${p} de ${totalPages}`, pageW/2, doc.internal.pageSize.getHeight()-6, { align:'center' });
   }
 
   doc.save('usuarios_' + new Date().toISOString().slice(0,10) + '.pdf');
 }
 
-// ─────────────────────────────────────────
-// PDF PROYECCIÓN (usa G.filtered.proy — respeta filtros activos)
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// PDF PROYECCIÃ“N (usa G.filtered.proy â€” respeta filtros activos)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function pdfProyeccion() {
   const rows = G.filtered.proy;
   if (!rows.length) { alert('No hay registros con los filtros actuales.'); return; }
@@ -3056,13 +3056,13 @@ function pdfProyeccion() {
   const vence= document.getElementById('filtroVence').value;
   const desde= document.getElementById('proyFechaDesde').value.trim();
   const hasta= document.getElementById('proyFechaHasta').value.trim();
-  if (q2)    filtros.push('Búsqueda: "' + q2 + '"');
+  if (q2)    filtros.push('BÃºsqueda: "' + q2 + '"');
   if (desc)  filtros.push('Descuento: ' + desc);
-  const venceLabels = { '7':'≤7 días','15':'≤15 días','30':'≤30 días','60':'≤60 días','90':'≤90 días','vencido':'Ya vencidos' };
+  const venceLabels = { '7':'â‰¤7 dÃ­as','15':'â‰¤15 dÃ­as','30':'â‰¤30 dÃ­as','60':'â‰¤60 dÃ­as','90':'â‰¤90 dÃ­as','vencido':'Ya vencidos' };
   if (vence) filtros.push('Vence: ' + (venceLabels[vence]||vence));
   if (desde) filtros.push('Desde: ' + desde);
   if (hasta) filtros.push('Hasta: ' + hasta);
-  const subtitulo = filtros.length ? 'Filtros: ' + filtros.join(' · ') : 'Todos los clientes';
+  const subtitulo = filtros.length ? 'Filtros: ' + filtros.join(' Â· ') : 'Todos los clientes';
 
   // Header
   doc.setFillColor(102,126,234);
@@ -3071,7 +3071,7 @@ function pdfProyeccion() {
   doc.rect(pageW-60,0,60,24,'F');
   doc.setTextColor(255,255,255);
   doc.setFontSize(15); doc.setFont(undefined,'bold');
-  doc.text('Proyección de Renovaciones — Junio 2026', 14, 10);
+  doc.text('ProyecciÃ³n de Renovaciones â€” Junio 2026', 14, 10);
   doc.setFontSize(8); doc.setFont(undefined,'normal');
   doc.text(subtitulo, 14, 17);
   doc.text('Generado: ' + fecha + '  |  ' + rows.length + ' clientes', pageW-14, 17, { align:'right' });
@@ -3111,19 +3111,19 @@ function pdfProyeccion() {
   // Tabla principal
   doc.autoTable({
     startY: resY + 20,
-    head: [['PIN','Cliente','Plan','Precio Base','Desc.','Precio Junio','Pagó Mayo','Vence','Días']],
+    head: [['PIN','Cliente','Plan','Precio Base','Desc.','Precio Junio','PagÃ³ Mayo','Vence','DÃ­as']],
     body: rows.map(r => {
       const dias = daysUntil(r.expiraDate);
       return [
-        r.pin || '—',
+        r.pin || 'â€”',
         r.cliente,
         r.planMain,
         r.precioBase != null ? fmtPDF(r.precioBase) : 'N/D',
         r.fuente === 'Completo' ? 'Sin desc.' : Math.round(r.pct*100)+'%',
-        r.precioJunio != null ? fmtPDF(r.precioJunio) : '—',
-        r.pagoMayo != null ? fmtPDF(r.pagoMayo) : '—',
-        r.expira || '—',
-        dias !== null ? (dias < 0 ? dias : '+'+dias) : '—'
+        r.precioJunio != null ? fmtPDF(r.precioJunio) : 'â€”',
+        r.pagoMayo != null ? fmtPDF(r.pagoMayo) : 'â€”',
+        r.expira || 'â€”',
+        dias !== null ? (dias < 0 ? dias : '+'+dias) : 'â€”'
       ];
     }),
     foot: [[
@@ -3153,12 +3153,12 @@ function pdfProyeccion() {
     margin: { left:14, right:14 }
   });
 
-  // Footer páginas
+  // Footer pÃ¡ginas
   const totalPages = doc.internal.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
     doc.setFontSize(7); doc.setTextColor(150,150,150);
-    doc.text(`Página ${p} de ${totalPages}`, pageW/2, doc.internal.pageSize.getHeight()-6, { align:'center' });
+    doc.text(`PÃ¡gina ${p} de ${totalPages}`, pageW/2, doc.internal.pageSize.getHeight()-6, { align:'center' });
   }
 
   doc.save('proyeccion-junio-' + new Date().toISOString().slice(0,10) + '.pdf');
