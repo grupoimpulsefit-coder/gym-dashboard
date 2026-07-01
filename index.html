@@ -853,14 +853,15 @@ async function loadSedeForColaborador(sede, mesEspecifico) {
         usersData = snap.users_data.map(u => ({
             ...u, ExpiraDate: parseDate(u.Expira), IngresoDate: parseDate(u.Ingreso)
         }));
-        renovacionesData = snap.renov_data.filter(r => !r.EsClaseSuelta && !r.EsSinClasificar).map(r => ({
+        const renovRaw = snap.renov_data || [];
+        renovacionesData = renovRaw.filter(r => !r.EsClaseSuelta && !r.EsSinClasificar).map(r => ({
             ...r, TxDate: parseRenoDateTime(r.FechaStr),
             User: usersData.find(u => u.Nombre === r.Cliente) || null
         }));
-        clasesSueltasData = snap.renov_data.filter(r => r.EsClaseSuelta).map(c => ({
+        clasesSueltasData = renovRaw.filter(r => r.EsClaseSuelta).map(c => ({
             ...c, TxDate: parseRenoDateTime(c.FechaStr)
         }));
-        sinClasificarData = snap.renov_data.filter(r => r.EsSinClasificar).map(c => ({
+        sinClasificarData = renovRaw.filter(r => r.EsSinClasificar).map(c => ({
             ...c, TxDate: parseRenoDateTime(c.FechaStr)
         }));
         usuariosLoaded = true;
