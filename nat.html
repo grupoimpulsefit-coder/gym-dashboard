@@ -468,6 +468,7 @@
         <div class="proy-filter-item" style="justify-content:flex-end;">
           <div class="proy-btn-row" style="margin-top:auto;">
             <button class="proy-btn proy-btn-purple" onclick="openResumenModal()">📊 Resumen por Plan</button>
+            <button class="proy-btn" style="background:#e53935;color:white;" onclick="printListaRecepcionNat()">🖨️ Lista Recepción</button>
             <button class="proy-btn proy-btn-orange" onclick="limpiarFiltrosProy()">✖ Limpiar filtros</button>
             <button class="proy-btn proy-btn-red" onclick="pdfProyeccion()">📄 PDF</button>
           </div>
@@ -2534,42 +2535,84 @@ function diagnosticoCliente(nombre) {
 }
 
 function openResumenModal() {
-  // Agrupa por plan todos los datos filtrados
-  const rows = G.filtered.proy;
-  const plans = {};
-  rows.forEach(r => {
-    if (!r.planMain) return;
-    if (!plans[r.planMain]) plans[r.planMain] = { plan: r.planMain, clientes: 0, totalJunio: 0, totalMayo: 0 };
-    plans[r.planMain].clientes++;
-    plans[r.planMain].totalJunio += r.precioJunio || 0;
-    plans[r.planMain].totalMayo  += r.pagoMayo || 0;
-  });
-  const sorted = Object.values(plans).sort((a,b) => b.totalJunio - a.totalJunio);
-  const grandJ = sorted.reduce((s,r)=>s+r.totalJunio,0);
-  const grandM = sorted.reduce((s,r)=>s+r.totalMayo,0);
+  let html, grandTotal = 0, grandClientes = 0;
 
-  let html = `<div style="max-height:70vh;overflow-y:auto;">
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+  // Si hay datos del sistema de descuentos (analizar), usarlos; si no, usar G.hoja1
+  if (G.filtered.proy && G.filtered.proy.length) {
+    const plans = {};
+    G.filtered.proy.forEach(r => {
+      if (!r.planMain) return;
+      if (!plans[r.planMain]) plans[r.planMain] = { plan: r.planMain, clientes: 0, totalJunio: 0, totalMayo: 0 };
+      plans[r.planMain].clientes++;
+      plans[r.planMain].totalJunio += r.precioJunio || 0;
+      plans[r.planMain].totalMayo  += r.pagoMayo || 0;
+    });
+    const sorted = Object.values(plans).sort((a,b) => b.totalJunio - a.totalJunio);
+    grandTotal = sorted.reduce((s,r)=>s+r.totalJunio,0);
+    grandClientes = G.filtered.proy.length;
+    html = `<div style="max-height:70vh;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead><tr style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;">
         <th style="padding:10px 12px;text-align:left;">Plan</th>
         <th style="padding:10px 12px;">Clientes</th>
-        <th style="padding:10px 12px;">Pagado Mayo</th>
-        <th style="padding:10px 12px;">Precio Junio</th>
+        <th style="padding:10px 12px;">Pagado mes anterior</th>
+        <th style="padding:10px 12px;">Precio proyectado</th>
       </tr></thead><tbody>`;
-  sorted.forEach((r,i) => {
-    html += `<tr style="border-bottom:1px solid #f0f2f8;${i%2===1?'background:#f8f9ff':''}">
-      <td style="padding:9px 12px;font-weight:600;">${esc(r.plan)}</td>
-      <td style="padding:9px 12px;text-align:center;">${r.clientes}</td>
-      <td style="padding:9px 12px;text-align:right;color:#888;">${r.totalMayo>0?'₡'+Math.round(r.totalMayo).toLocaleString('es-CR'):'—'}</td>
-      <td style="padding:9px 12px;text-align:right;font-weight:700;color:#2d2d5e;">₡${Math.round(r.totalJunio).toLocaleString('es-CR')}</td>
-    </tr>`;
-  });
-  html += `</tbody><tfoot><tr style="background:linear-gradient(135deg,#f0f2ff,#e8ebff);border-top:2px solid #667eea;font-weight:800;">
-    <td style="padding:10px 12px;">TOTAL GENERAL</td>
-    <td style="padding:10px 12px;text-align:center;">${rows.length}</td>
-    <td style="padding:10px 12px;text-align:right;color:#888;">₡${Math.round(grandM).toLocaleString('es-CR')}</td>
-    <td style="padding:10px 12px;text-align:right;color:#667eea;">₡${Math.round(grandJ).toLocaleString('es-CR')}</td>
-  </tr></tfoot></table></div>`;
+    sorted.forEach((r,i) => {
+      html += `<tr style="border-bottom:1px solid #f0f2f8;${i%2===1?'background:#f8f9ff':''}">
+        <td style="padding:9px 12px;font-weight:600;">${esc(r.plan)}</td>
+        <td style="padding:9px 12px;text-align:center;">${r.clientes}</td>
+        <td style="padding:9px 12px;text-align:right;color:#888;">${r.totalMayo>0?'₡'+Math.round(r.totalMayo).toLocaleString('es-CR'):'—'}</td>
+        <td style="padding:9px 12px;text-align:right;font-weight:700;color:#2d2d5e;">₡${Math.round(r.totalJunio).toLocaleString('es-CR')}</td>
+      </tr>`;
+    });
+    const grandM = sorted.reduce((s,r)=>s+r.totalMayo,0);
+    html += `</tbody><tfoot><tr style="background:linear-gradient(135deg,#f0f2ff,#e8ebff);border-top:2px solid #667eea;font-weight:800;">
+      <td style="padding:10px 12px;">TOTAL GENERAL</td>
+      <td style="padding:10px 12px;text-align:center;">${grandClientes}</td>
+      <td style="padding:10px 12px;text-align:right;color:#888;">₡${Math.round(grandM).toLocaleString('es-CR')}</td>
+      <td style="padding:10px 12px;text-align:right;color:#667eea;">₡${Math.round(grandTotal).toLocaleString('es-CR')}</td>
+    </tr></tfoot></table></div>`;
+  } else {
+    // Modo simple: usar G.hoja1 (activos)
+    const activos = G.hoja1.filter(u => u.activo === 'Sí');
+    const plans = {};
+    activos.forEach(u => {
+      const plan = u.planCorregido || u.planOriginal || 'Desconocido';
+      if (!plans[plan]) plans[plan] = { plan, clientes: 0, conPrecio: 0, sinPrecio: 0, ingreso: 0, precio: 0 };
+      plans[plan].clientes++;
+      const p = u.valorPlanGuardado || 0;
+      if (p > 0) { plans[plan].conPrecio++; plans[plan].ingreso += p; plans[plan].precio = p; }
+      else plans[plan].sinPrecio++;
+    });
+    const sorted = Object.values(plans).sort((a,b) => b.ingreso - a.ingreso);
+    grandTotal = sorted.reduce((s,r)=>s+r.ingreso,0);
+    grandClientes = activos.length;
+    html = `<div style="max-height:70vh;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;">
+        <th style="padding:10px 12px;text-align:left;">Plan</th>
+        <th style="padding:10px 12px;">Activos</th>
+        <th style="padding:10px 12px;">Con precio</th>
+        <th style="padding:10px 12px;">Sin precio</th>
+        <th style="padding:10px 12px;">Precio unitario</th>
+        <th style="padding:10px 12px;">Ingreso proyectado</th>
+      </tr></thead><tbody>`;
+    sorted.forEach((r,i) => {
+      html += `<tr style="border-bottom:1px solid #f0f2f8;${i%2===1?'background:#f8f9ff':''}">
+        <td style="padding:9px 12px;font-weight:600;">${esc(r.plan)}</td>
+        <td style="padding:9px 12px;text-align:center;">${r.clientes}</td>
+        <td style="padding:9px 12px;text-align:center;">${r.conPrecio}</td>
+        <td style="padding:9px 12px;text-align:center;color:${r.sinPrecio>0?'#c62828':'#555'}">${r.sinPrecio||'—'}</td>
+        <td style="padding:9px 12px;text-align:right;">${r.precio>0?'₡'+r.precio.toLocaleString('es-CR'):'—'}</td>
+        <td style="padding:9px 12px;text-align:right;font-weight:700;color:#2d2d5e;">${r.ingreso>0?'₡'+Math.round(r.ingreso).toLocaleString('es-CR'):'—'}</td>
+      </tr>`;
+    });
+    html += `</tbody><tfoot><tr style="background:linear-gradient(135deg,#f0f2ff,#e8ebff);border-top:2px solid #667eea;font-weight:800;">
+      <td style="padding:10px 12px;">TOTAL GENERAL</td>
+      <td style="padding:10px 12px;text-align:center;">${grandClientes}</td>
+      <td colspan="3"></td>
+      <td style="padding:10px 12px;text-align:right;color:#667eea;">₡${Math.round(grandTotal).toLocaleString('es-CR')}</td>
+    </tr></tfoot></table></div>`;
+  }
 
   // Modal simple
   let modal = document.getElementById('resumenProyModal');
@@ -3152,6 +3195,63 @@ function exportSegCSV() {
   const rows = f.map(u => [u.PIN, u.Nombre, u.Telefono, u.ÚltimoProducto, u.Expira, Math.round((today-u.ExpiraDate)/864e5), u.ValorPlan]);
   const csv = [h, ...rows].map(row => row.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
   dlBlob(csv, 'seguimiento_vencidos_natacion_'+hoy()+'.csv', 'text/csv;charset=utf-8');
+}
+
+function printListaRecepcionNat() {
+  // Usa G.hoja1 (activos) si está disponible; si no, usa G.filtered.proy (sistema descuentos)
+  let usuarios = [];
+  if (G.hoja1.length) {
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const en30 = new Date(hoy); en30.setDate(en30.getDate() + 30);
+    usuarios = G.hoja1
+      .filter(u => u.activo === 'Sí')
+      .map(u => ({ nombre: u.nombre, plan: u.planCorregido || u.planOriginal, expira: u.expira, expiraDate: parseDate(u.expira), precio: u.valorPlanGuardado || 0, pin: u.pin }))
+      .sort((a,b) => (a.expiraDate||new Date(0)) - (b.expiraDate||new Date(0)));
+  } else {
+    usuarios = [...G.proyeccion, ...G.planCompleto]
+      .map(r => ({ nombre: r.cliente, plan: r.planMain, expira: r.expira, expiraDate: r.expiraDate, precio: r.precioJunio || 0, pin: r.pin }))
+      .sort((a,b) => (a.expiraDate||new Date(0)) - (b.expiraDate||new Date(0)));
+  }
+  if (!usuarios.length) { alert('No hay usuarios activos para imprimir.'); return; }
+
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const en30 = new Date(hoy); en30.setDate(en30.getDate() + 30);
+
+  const rows = usuarios.map((u,i) => {
+    const d = u.expiraDate;
+    const vencido = d && d < hoy;
+    const pronto  = d && d >= hoy && d <= en30;
+    const color = vencido ? '#c62828' : pronto ? '#e65100' : '#1b5e20';
+    return `<tr style="border-bottom:1px solid #eee;${i%2===1?'background:#f9f9f9':''}">
+      <td style="padding:5px 8px;font-size:12px;color:#666;">${u.pin||''}</td>
+      <td style="padding:5px 8px;font-size:13px;font-weight:600;">${u.nombre||''}</td>
+      <td style="padding:5px 8px;font-size:12px;">${u.plan||''}</td>
+      <td style="padding:5px 8px;font-size:12px;text-align:center;color:${color};font-weight:${vencido||pronto?'700':'400'};">${u.expira||'—'}</td>
+      <td style="padding:5px 8px;font-size:12px;text-align:right;">${u.precio>0?'₡'+u.precio.toLocaleString('es-CR'):'—'}</td>
+    </tr>`;
+  }).join('');
+
+  const total = usuarios.reduce((s,u)=>s+u.precio,0);
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>Lista Recepción — Natación</title>
+    <style>body{font-family:Arial,sans-serif;margin:20px;}h2{color:#2d2d5e;margin-bottom:4px;}
+    table{width:100%;border-collapse:collapse;}th{background:#2d2d5e;color:white;padding:7px 8px;font-size:12px;text-align:left;}
+    @media print{button{display:none!important;}}</style>
+  </head><body>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div><h2>Lista de Recepción — Natación</h2>
+      <div style="font-size:12px;color:#888;">${new Date().toLocaleDateString('es-CR',{day:'2-digit',month:'long',year:'numeric'})} — ${usuarios.length} usuarios activos</div></div>
+      <button onclick="window.print()" style="padding:8px 18px;background:#2d2d5e;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;">🖨️ Imprimir</button>
+    </div>
+    <table><thead><tr><th>PIN</th><th>Nombre</th><th>Plan</th><th style="text-align:center;">Vence</th><th style="text-align:right;">Precio</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr style="background:#f0f2ff;font-weight:700;border-top:2px solid #2d2d5e;">
+      <td colspan="4" style="padding:7px 8px;font-size:13px;">TOTAL PROYECTADO</td>
+      <td style="padding:7px 8px;text-align:right;font-size:13px;">₡${Math.round(total).toLocaleString('es-CR')}</td>
+    </tr></tfoot></table>
+  </body></html>`);
+  w.document.close();
 }
 
 function printSeguimiento() {
