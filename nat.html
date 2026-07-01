@@ -527,6 +527,9 @@
         </table>
       </div>
     </div>
+
+    <!-- Resumen descuentos -->
+    <div id="resumenDescuentos" style="display:none;margin-top:20px;"></div>
   </div>
 
   <!-- TAB 4: Análisis de Renovaciones -->
@@ -1117,8 +1120,8 @@ async function processUsuariosNat(file) {
     document.getElementById('saveStatus').textContent = '⏳ Cargando usuarios...';
     await loadPricesForSede('Natación');
 
-    // Cargar snapshots para corregir planes addon y extraer precios
-    const renovMap = await buildRenovMapFromSnapshots();
+    // Cargar snapshots para corregir planes addon, extraer precios y descuentos
+    const { renovMap, discountMap } = await buildRenovMapFromSnapshots();
 
     // Si plan_prices está vacío (dev o primera vez), extraer precios del historial de pagos
     if (!Object.keys(planPrices).length) {
@@ -1196,11 +1199,22 @@ async function processUsuariosNat(file) {
         }
       }
 
+      // Aplicar descuento del mes anterior si corresponde
+      const discInfo = discountMap[norm(nombre)];
+      let descuento = null, descuentoPct = 0, promoExpirada = false;
+      if (discInfo && discInfo.pct > 0) {
+        if (discInfo.promoExpirada) { promoExpirada = true; }
+        else { descuento = discInfo.descuento; descuentoPct = discInfo.pct; }
+      }
+      const precioBase = getPlanPriceNat(planCorregido);
+      const precioEfectivo = descuentoPct > 0 ? Math.round(precioBase * (1 - descuentoPct)) : precioBase;
+
       newHoja1.push({
         pin, nombre, activo, expira, telefono, email,
         planOriginal: planOrig, planCorregido,
         estado, fuentePlan,
-        valorPlanGuardado: getPlanPriceNat(planCorregido)
+        valorPlanGuardado: precioEfectivo,
+        precioBase, descuento, descuentoPct, promoExpirada
       });
     }
 
@@ -1234,11 +1248,13 @@ async function processUsuariosNat(file) {
 // Construye mapa cliente → [{plan, fecha, fechaDate, precio}] para corregir planes addon.
 // Fuente primaria: users_data de snapshots anteriores (ya tienen planes corregidos con Hoja3).
 // Fuente secundaria: renov_data (pagos reales del mes).
+// Retorna { renovMap, discountMap }
+// discountMap: norm(nombre) → { descuento, pct, promoExpirada }
 async function buildRenovMapFromSnapshots() {
-  const map = {};
+  const map = {}, discountMap = {};
   try {
     const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&limit=6&select=mes,users_data,renov_data,updated_at');
-    if (!snaps?.length) return map;
+    if (!snaps?.length) return { renovMap: map, discountMap };
 
     // 1. users_data: plan corregido ya procesado por analizar() en meses anteriores
     snaps.forEach(snap => {
@@ -1246,10 +1262,18 @@ async function buildRenovMapFromSnapshots() {
       (snap.users_data || []).forEach(u => {
         if (!u.Nombre) return;
         const plan = u.ÚltimoProducto;
-        if (!plan || isAddon(plan)) return;
         const key = norm(u.Nombre);
+
+        // Extraer info de descuento (solo del snapshot más reciente que tenga Descuento)
+        if (u.Descuento && !discountMap[key]) {
+          const PCT = { '20%': 0.20, '25%': 0.25, 'G20': 0.20 };
+          const pct = PCT[u.Descuento] ?? 0;
+          const promoExpirada = !!(u.ProyPlan && /promo.*junio|junio.*promo/i.test(u.ProyPlan));
+          discountMap[key] = { descuento: u.Descuento, pct, promoExpirada };
+        }
+
+        if (!plan || isAddon(plan)) return;
         if (!map[key]) map[key] = [];
-        // Fecha del snapshot como referencia temporal
         map[key].push({ plan, fecha: snap.mes || '', fechaDate: snapDate, precio: u.ValorPlan || 0 });
       });
     });
@@ -1271,7 +1295,7 @@ async function buildRenovMapFromSnapshots() {
       });
     });
   } catch(e) { console.warn('buildRenovMapFromSnapshots:', e.message); }
-  return map;
+  return { renovMap: map, discountMap };
 }
 
 function detectarMesNat() {
@@ -1296,10 +1320,7 @@ function updateProjectionCards() {
   const hoy = new Date(); hoy.setHours(0,0,0,0);
   const en30 = new Date(hoy); en30.setDate(en30.getDate() + 30);
   const activos = G.hoja1.filter(u => u.activo === 'Sí');
-  const expiran = activos.filter(u => {
-    const d = parseDate(u.expira);
-    return d && d >= hoy && d <= en30;
-  });
+  const expiran = activos.filter(u => { const d = parseDate(u.expira); return d && d >= hoy && d <= en30; });
   const conPrecio = activos.filter(u => (u.valorPlanGuardado||0) > 0);
   const sinPrecio = activos.filter(u => !(u.valorPlanGuardado > 0));
   const ingresos  = conPrecio.reduce((s,u) => s + (u.valorPlanGuardado||0), 0);
@@ -1311,7 +1332,9 @@ function updateProjectionCards() {
   document.getElementById('pIngresos').textContent = '₡' + Math.round(ingresos).toLocaleString('es-CR');
   document.getElementById('pSinPrecio').textContent = sinPrecio.length;
   document.getElementById('cardsProyeccion').style.display = '';
+
   renderDesgloseByPlan(activos);
+  renderResumenDescuentos(activos);
 }
 
 function renderDesgloseByPlan(activos) {
@@ -1356,6 +1379,90 @@ function renderDesgloseByPlan(activos) {
   </tr>`;
 
   document.getElementById('desgloseByPlan').style.display = '';
+}
+
+function renderResumenDescuentos(activos) {
+  const el = document.getElementById('resumenDescuentos');
+  if (!el) return;
+
+  const con20 = activos.filter(u => u.descuento && u.descuentoPct === 0.20 && !u.promoExpirada);
+  const con25 = activos.filter(u => u.descuento && u.descuentoPct === 0.25 && !u.promoExpirada);
+  const promoExp = activos.filter(u => u.promoExpirada);
+  const sinDesc = activos.filter(u => !u.descuento && !u.promoExpirada);
+
+  const total = activos.reduce((s,u) => s + (u.valorPlanGuardado||0), 0);
+  const totalSinDesc = activos.reduce((s,u) => s + (u.precioBase||u.valorPlanGuardado||0), 0);
+  const ahorro = totalSinDesc - total;
+
+  if (!con20.length && !con25.length && !promoExp.length) {
+    el.style.display = 'none';
+    return;
+  }
+
+  const mkTable = (usuarios) => {
+    if (!usuarios.length) return '<em style="color:#aaa;">Ninguno</em>';
+    return `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#f5f5f5;">
+        <th style="padding:4px 8px;text-align:left;">Nombre</th>
+        <th style="padding:4px 8px;text-align:left;">Plan</th>
+        <th style="padding:4px 8px;text-align:right;">Precio base</th>
+        <th style="padding:4px 8px;text-align:right;">Precio efectivo</th>
+      </tr></thead>
+      <tbody>${usuarios.map(u => `<tr style="border-top:1px solid #eee;">
+        <td style="padding:4px 8px;">${u.nombre}</td>
+        <td style="padding:4px 8px;">${u.planCorregido||u.planOriginal||'—'}</td>
+        <td style="padding:4px 8px;text-align:right;">${u.precioBase>0?'₡'+(u.precioBase).toLocaleString('es-CR'):'—'}</td>
+        <td style="padding:4px 8px;text-align:right;font-weight:700;">${u.valorPlanGuardado>0?'₡'+(u.valorPlanGuardado).toLocaleString('es-CR'):'—'}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  };
+
+  el.style.display = '';
+  el.innerHTML = `
+    <div class="proy-section-title">🏷️ Análisis de Descuentos</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+      <div style="flex:1;min-width:160px;background:#e3f2fd;border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:#1565c0;">${con20.length}</div>
+        <div style="font-size:12px;color:#555;">Descuento 20% válido</div>
+      </div>
+      <div style="flex:1;min-width:160px;background:#f3e5f5;border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:#6a1b9a;">${con25.length}</div>
+        <div style="font-size:12px;color:#555;">Descuento 25% válido</div>
+      </div>
+      <div style="flex:1;min-width:160px;background:#fce4ec;border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:#c62828;">${promoExp.length}</div>
+        <div style="font-size:12px;color:#555;">Promo Junio expirada</div>
+      </div>
+      <div style="flex:1;min-width:160px;background:#e8f5e9;border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:14px;font-weight:700;color:#2e7d32;">₡${Math.round(ahorro).toLocaleString('es-CR')}</div>
+        <div style="font-size:12px;color:#555;">Descuento total aplicado</div>
+      </div>
+    </div>
+
+    ${promoExp.length > 0 ? `
+    <details style="margin-bottom:12px;">
+      <summary style="cursor:pointer;font-weight:700;color:#c62828;padding:8px;background:#fce4ec;border-radius:6px;">
+        ⚠️ ${promoExp.length} usuario(s) con Promo Solo Junio expirada — deben pagar precio completo
+      </summary>
+      <div style="margin-top:8px;">${mkTable(promoExp)}</div>
+    </details>` : ''}
+
+    ${con20.length > 0 ? `
+    <details style="margin-bottom:12px;">
+      <summary style="cursor:pointer;font-weight:700;color:#1565c0;padding:8px;background:#e3f2fd;border-radius:6px;">
+        🔵 ${con20.length} usuario(s) con 20% de descuento válido
+      </summary>
+      <div style="margin-top:8px;">${mkTable(con20)}</div>
+    </details>` : ''}
+
+    ${con25.length > 0 ? `
+    <details style="margin-bottom:12px;">
+      <summary style="cursor:pointer;font-weight:700;color:#6a1b9a;padding:8px;background:#f3e5f5;border-radius:6px;">
+        🟣 ${con25.length} usuario(s) con 25% de descuento válido
+      </summary>
+      <div style="margin-top:8px;">${mkTable(con25)}</div>
+    </details>` : ''}
+  `;
 }
 
 function verUsuariosPorPlan(plan) {
