@@ -1024,6 +1024,12 @@ async function autoSaveNat(mes, usuariosLoaded) {
         EstadoValidacion: u.validEstado || null, PagoTardio: u.validPagoTardio || null,
         PagoMonto: u.validPagoMonto ?? null, PagoFecha: u.validPagoFecha || null
       }));
+      // Guardar historial de descuentos (20%/25%/G20) para cruce futuro
+      record.descuento_data = [...G.proyeccion].map(r => ({
+        cliente: r.cliente, descuento: r.fuente, pct: r.pct,
+        planMain: r.planMain, precioJunio: r.precioJunio || null, precioBase: r.precioBase || null,
+        expira: r.expira
+      }));
     }
     const existing = await supaFetch(`/gym_snapshots?sede=eq.Nataci%C3%B3n&mes=eq.${encodeURIComponent(mes)}&select=id`);
     if (existing?.length) {
@@ -1213,23 +1219,29 @@ async function processUsuariosNat(file) {
         }
       }
 
-      // Registrar descuento de junio (en julio todos pagan precio completo)
+      // Cruzar con descuentos de junio
       const discInfo = discountMap[norm(nombre)];
-      let descuento = null, descuentoPct = 0, promoExpirada = false;
+      let descuento = null, descuentoPct = 0, promoExpirada = false, noPagoJunio = false;
       if (discInfo && discInfo.pct > 0) {
         descuento = discInfo.descuento;
         descuentoPct = discInfo.pct;
         promoExpirada = discInfo.promoExpirada;
+        if (!promoExpirada && !(discInfo.precioJunio > 0)) noPagoJunio = true;
       }
       const precioBase = getPlanPriceNat(planCorregido);
-      const precioEfectivo = precioBase; // En julio todos pagan precio completo
+      // Precio julio: si pagó en junio con descuento → usar ese monto exacto
+      // Si no pagó en junio (noPagoJunio) → precio completo (sin descuento en julio)
+      // En todos los demás casos → precio completo (descuentos de junio no aplican en julio)
+      const precioEfectivo = (discInfo && discInfo.precioJunio > 0 && !promoExpirada && !noPagoJunio)
+        ? discInfo.precioJunio
+        : precioBase;
 
       newHoja1.push({
         pin, nombre, activo, expira, telefono, email,
         planOriginal: planOrig, planCorregido,
         estado, fuentePlan,
         valorPlanGuardado: precioEfectivo,
-        precioBase, descuento, descuentoPct, promoExpirada
+        precioBase, descuento, descuentoPct, promoExpirada, noPagoJunio
       });
     }
 
@@ -1284,7 +1296,8 @@ async function buildRenovMapFromSnapshots() {
           const PCT = { '20%': 0.20, '25%': 0.25, 'G20': 0.20 };
           const pct = PCT[u.Descuento] ?? 0;
           const promoExpirada = !!(u.ProyPlan && /promo.*junio|junio.*promo/i.test(u.ProyPlan));
-          discountMap[key] = { descuento: u.Descuento, pct, promoExpirada };
+          // PrecioJunio > 0 → pagó en junio con descuento; null/0 → no pagó
+          discountMap[key] = { descuento: u.Descuento, pct, promoExpirada, precioJunio: u.PrecioJunio || null };
         }
 
         if (!plan || isAddon(plan)) return;
@@ -1415,21 +1428,23 @@ function renderResumenDescuentos(activos) {
   const el = document.getElementById('resumenDescuentos');
   if (!el) return;
 
-  const con20    = activos.filter(u => u.descuentoPct === 0.20 && !u.promoExpirada);
-  const con25    = activos.filter(u => u.descuentoPct === 0.25 && !u.promoExpirada);
-  const promoExp = activos.filter(u => u.promoExpirada);
+  const con20       = activos.filter(u => u.descuentoPct === 0.20 && !u.promoExpirada && !u.noPagoJunio);
+  const con25       = activos.filter(u => u.descuentoPct === 0.25 && !u.promoExpirada && !u.noPagoJunio);
+  const promoExp    = activos.filter(u => u.promoExpirada);
+  const noPagaron   = activos.filter(u => u.noPagoJunio);
   const conDescuento = activos.filter(u => u.descuentoPct > 0 || u.promoExpirada);
 
   if (!conDescuento.length) { el.style.display = 'none'; return; }
 
-  const mkTable = (usuarios) => {
+  const mkTable = (usuarios, cols) => {
     if (!usuarios.length) return '<em style="color:#aaa;">Ninguno</em>';
+    const usaPrecioJunio = cols === 'junio';
     return `<table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead><tr style="background:#f5f5f5;">
         <th style="padding:4px 8px;text-align:left;">Nombre</th>
         <th style="padding:4px 8px;text-align:left;">Plan</th>
-        <th style="padding:4px 8px;text-align:center;">Desc. junio</th>
-        <th style="padding:4px 8px;text-align:right;">Precio julio (completo)</th>
+        <th style="padding:4px 8px;text-align:center;">Código desc.</th>
+        <th style="padding:4px 8px;text-align:right;">${usaPrecioJunio ? 'Pagaron en jun (= proy. jul)' : 'Precio julio (completo)'}</th>
       </tr></thead>
       <tbody>${usuarios.map(u => `<tr style="border-top:1px solid #eee;">
         <td style="padding:4px 8px;">${u.nombre}</td>
@@ -1442,48 +1457,56 @@ function renderResumenDescuentos(activos) {
 
   el.style.display = '';
   el.innerHTML = `
-    <div class="proy-section-title">🏷️ Usuarios con descuento en junio — pagan precio completo en julio</div>
-    <div style="background:#fff3e0;border-left:4px solid #e65100;padding:10px 14px;border-radius:6px;margin-bottom:16px;font-size:13px;color:#5d4037;">
-      ⚠️ Los <strong>${conDescuento.length}</strong> usuarios listados a continuación tenían descuento en junio.
-      En julio <strong>deben pagar precio completo</strong>. La proyección ya refleja el precio sin descuento.
-    </div>
+    <div class="proy-section-title">🏷️ Análisis de Descuentos — Junio → Julio</div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
-      <div style="flex:1;min-width:140px;background:#e3f2fd;border-radius:8px;padding:12px;text-align:center;">
+      <div style="flex:1;min-width:130px;background:#e3f2fd;border-radius:8px;padding:12px;text-align:center;">
         <div style="font-size:22px;font-weight:700;color:#1565c0;">${con20.length}</div>
-        <div style="font-size:12px;color:#555;">Tenían 20% en junio</div>
+        <div style="font-size:12px;color:#555;">20% — pagaron junio</div>
       </div>
-      <div style="flex:1;min-width:140px;background:#f3e5f5;border-radius:8px;padding:12px;text-align:center;">
+      <div style="flex:1;min-width:130px;background:#f3e5f5;border-radius:8px;padding:12px;text-align:center;">
         <div style="font-size:22px;font-weight:700;color:#6a1b9a;">${con25.length}</div>
-        <div style="font-size:12px;color:#555;">Tenían 25% en junio</div>
+        <div style="font-size:12px;color:#555;">25% — pagaron junio</div>
       </div>
-      <div style="flex:1;min-width:140px;background:#fce4ec;border-radius:8px;padding:12px;text-align:center;">
+      <div style="flex:1;min-width:130px;background:#fce4ec;border-radius:8px;padding:12px;text-align:center;">
         <div style="font-size:22px;font-weight:700;color:#c62828;">${promoExp.length}</div>
         <div style="font-size:12px;color:#555;">Promo Solo Junio</div>
       </div>
+      ${noPagaron.length > 0 ? `<div style="flex:1;min-width:130px;background:#fff3e0;border-radius:8px;padding:12px;text-align:center;border:2px solid #e65100;">
+        <div style="font-size:22px;font-weight:700;color:#e65100;">${noPagaron.length}</div>
+        <div style="font-size:12px;color:#555;">No pagaron junio ⚠️</div>
+      </div>` : ''}
     </div>
+
+    ${noPagaron.length > 0 ? `
+    <details style="margin-bottom:12px;" open>
+      <summary style="cursor:pointer;font-weight:700;color:#e65100;padding:8px;background:#fff3e0;border-radius:6px;border:1px solid #e65100;">
+        ⚠️ ${noPagaron.length} usuario(s) con descuento que NO pagaron en junio — se proyecta precio completo en julio
+      </summary>
+      <div style="margin-top:8px;">${mkTable(noPagaron, 'completo')}</div>
+    </details>` : ''}
 
     ${promoExp.length > 0 ? `
     <details style="margin-bottom:12px;" open>
       <summary style="cursor:pointer;font-weight:700;color:#c62828;padding:8px;background:#fce4ec;border-radius:6px;">
-        🔴 ${promoExp.length} usuario(s) — Promo Solo Junio (plan especial expirado)
+        🔴 ${promoExp.length} usuario(s) — Promo Solo Junio expirada — precio completo en julio
       </summary>
-      <div style="margin-top:8px;">${mkTable(promoExp)}</div>
+      <div style="margin-top:8px;">${mkTable(promoExp, 'completo')}</div>
     </details>` : ''}
 
     ${con20.length > 0 ? `
     <details style="margin-bottom:12px;">
       <summary style="cursor:pointer;font-weight:700;color:#1565c0;padding:8px;background:#e3f2fd;border-radius:6px;">
-        🔵 ${con20.length} usuario(s) — tenían 20% de descuento en junio
+        🔵 ${con20.length} usuario(s) con 20% — pagaron en junio — se usa ese monto en proyección julio
       </summary>
-      <div style="margin-top:8px;">${mkTable(con20)}</div>
+      <div style="margin-top:8px;">${mkTable(con20, 'junio')}</div>
     </details>` : ''}
 
     ${con25.length > 0 ? `
     <details style="margin-bottom:12px;">
       <summary style="cursor:pointer;font-weight:700;color:#6a1b9a;padding:8px;background:#f3e5f5;border-radius:6px;">
-        🟣 ${con25.length} usuario(s) — tenían 25% de descuento en junio
+        🟣 ${con25.length} usuario(s) con 25% — pagaron en junio — se usa ese monto en proyección julio
       </summary>
-      <div style="margin-top:8px;">${mkTable(con25)}</div>
+      <div style="margin-top:8px;">${mkTable(con25, 'junio')}</div>
     </details>` : ''}
   `;
 }
@@ -1685,6 +1708,25 @@ function analizar(wb) {
       G.planes[norm(nombre)] = Number(precio) || 0;
     }
   }
+
+  // Sincronizar precios de Hoja2 con Supabase plan_prices (en background, sin bloquear UI)
+  (async () => {
+    try {
+      for (const { nombre, precio } of G.planesRaw) {
+        if (!nombre || !(precio > 0)) continue;
+        planPrices[nombre] = precio; // actualizar cache local
+        const existing = await supaFetch(`/plan_prices?sede=eq.Nataci%C3%B3n&plan=eq.${encodeURIComponent(nombre)}&select=id`);
+        if (existing?.length) {
+          await supaFetch(`/plan_prices?sede=eq.Nataci%C3%B3n&plan=eq.${encodeURIComponent(nombre)}`,
+            { method:'PATCH', prefer:'return=minimal', body: { precio, updated_at: new Date().toISOString() } });
+        } else {
+          await supaFetch('/plan_prices', { method:'POST', prefer:'return=minimal',
+            body: { sede:'Natación', plan: nombre, precio, updated_at: new Date().toISOString() } });
+        }
+      }
+      console.log(`[Nat] ${G.planesRaw.length} precios de Hoja2 sincronizados con plan_prices`);
+    } catch(e) { console.warn('[Nat] No se pudo sincronizar plan_prices:', e.message); }
+  })();
 
   // ── Helper: procesar filas de ventas y poblar un mapa cliente→planes ──
   // colIdx: { fecha, cliente, producto, total } índices de columna
