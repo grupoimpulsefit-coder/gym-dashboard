@@ -1339,7 +1339,10 @@ function renderDesgloseByPlan(activos) {
     <td style="text-align:center;">${r.total}</td>
     <td style="text-align:center;">${r.conPrecio}</td>
     <td style="text-align:center;color:${r.sinPrecio>0?'#c62828':'#555'}">${r.sinPrecio > 0 ? r.sinPrecio : '—'}</td>
-    <td style="text-align:right;">${r.precio > 0 ? '₡' + r.precio.toLocaleString('es-CR') : '<span style="color:#aaa;">—</span>'}</td>
+    <td style="text-align:right;">
+      ${r.precio > 0 ? '₡' + r.precio.toLocaleString('es-CR') : '<span style="color:#aaa;">—</span>'}
+      <button onclick="editarPrecioNat(${JSON.stringify(r.plan)})" style="margin-left:6px;padding:2px 8px;font-size:11px;border:1px solid #bbb;border-radius:4px;cursor:pointer;background:#f5f5f5;">✏️</button>
+    </td>
     <td style="text-align:right;font-weight:700;">${r.ingreso > 0 ? '₡' + r.ingreso.toLocaleString('es-CR') : '<span style="color:#aaa;">—</span>'}</td>
   </tr>`).join('');
 
@@ -1353,6 +1356,38 @@ function renderDesgloseByPlan(activos) {
   </tr>`;
 
   document.getElementById('desgloseByPlan').style.display = '';
+}
+
+async function editarPrecioNat(plan) {
+  const actual = planPrices[plan] || getPlanPriceNat(plan) || '';
+  const input = prompt(`Precio mensual para:\n"${plan}"\n\nActual: ${actual ? '₡' + actual.toLocaleString('es-CR') : 'sin precio'}\n\nIngresá el nuevo precio (solo números):`, actual || '');
+  if (input === null) return;
+  const precio = Number(String(input).replace(/[^\d]/g,''));
+  if (!precio || precio <= 0) { alert('Precio inválido.'); return; }
+
+  // Guardar en memoria
+  planPrices[plan] = precio;
+
+  // Guardar en Supabase plan_prices (si la tabla existe)
+  try {
+    const existing = await supaFetch(`/plan_prices?sede=eq.Nataci%C3%B3n&plan=eq.${encodeURIComponent(plan)}&select=id`);
+    if (existing?.length) {
+      await supaFetch(`/plan_prices?sede=eq.Nataci%C3%B3n&plan=eq.${encodeURIComponent(plan)}`, { method:'PATCH', prefer:'return=minimal', body:{ precio, updated_at: new Date().toISOString() } });
+    } else {
+      await supaFetch('/plan_prices', { method:'POST', prefer:'return=minimal', body:{ sede:'Natación', plan, precio, updated_at: new Date().toISOString() } });
+    }
+  } catch(e) { console.warn('No se pudo guardar en plan_prices:', e.message); }
+
+  // Re-aplicar precio a usuarios con ese plan y re-renderizar
+  G.hoja1.forEach(u => {
+    if ((u.planCorregido || u.planOriginal) === plan) u.valorPlanGuardado = precio;
+  });
+  updateProjectionCards();
+
+  // Guardar snapshot actualizado
+  const mes = detectarMesNat();
+  await autoSaveNat(mes, true);
+  document.getElementById('saveStatus').textContent = `✅ Precio guardado: ${plan} → ₡${precio.toLocaleString('es-CR')}`;
 }
 
 // Extrae plan principal de un string con comas (multi-producto)
