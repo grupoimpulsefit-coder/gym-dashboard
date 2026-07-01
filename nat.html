@@ -1035,12 +1035,8 @@ async function autoSaveNat(mes, usuariosLoaded, soloUsuarios = false) {
         EstadoValidacion: u.validEstado || null, PagoTardio: u.validPagoTardio || null,
         PagoMonto: u.validPagoMonto ?? null, PagoFecha: u.validPagoFecha || null
       }));
-      // Guardar historial de descuentos (20%/25%/G20) para cruce futuro
-      record.descuento_data = [...G.proyeccion].map(r => ({
-        cliente: r.cliente, descuento: r.fuente, pct: r.pct,
-        planMain: r.planMain, precioJunio: r.precioJunio || null, precioBase: r.precioBase || null,
-        expira: r.expira
-      }));
+      // Nota: descuento_data no existe en la tabla gym_snapshots.
+      // La info de descuento se preserva via users_data[].Descuento y PrecioJunio.
     }
     if (existingSnap) {
       await supaFetch(`/gym_snapshots?sede=eq.Nataci%C3%B3n&mes=eq.${encodeURIComponent(mes)}`,
