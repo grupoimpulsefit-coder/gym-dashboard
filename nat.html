@@ -1100,6 +1100,10 @@ async function processUsuariosNat(file) {
   try {
     document.getElementById('saveStatus').textContent = '⏳ Cargando usuarios...';
     await loadPricesForSede('Natación');
+
+    // Cargar renov_data de snapshots guardados para corregir planes addon
+    const renovMap = await buildRenovMapFromSnapshots();
+
     const data = await file.arrayBuffer();
     const wb = XLSX.read(new Uint8Array(data), { type:'array', cellDates:false });
     const ws = wb.Sheets[wb.SheetNames[0]];
@@ -1112,7 +1116,34 @@ async function processUsuariosNat(file) {
       if (r.includes('pin') || r.includes('nombre')) { startRow = i + 1; break; }
     }
 
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    // Elige el plan de la compra más reciente (misma lógica que analizar())
+    function mejorPlanRenov(entries) {
+      const candidatos = entries.filter(e => e.fechaDate && e.fechaDate <= today);
+      const pool = candidatos.length ? candidatos : entries;
+      let mejor = pool[0];
+      for (const e of pool) {
+        if (!mejor.fechaDate || (e.fechaDate && e.fechaDate > mejor.fechaDate) ||
+            (e.fechaDate && mejor.fechaDate && e.fechaDate.getTime() === mejor.fechaDate.getTime() && e.precio > mejor.precio))
+          mejor = e;
+      }
+      return mejor.plan;
+    }
+
+    function buscarEnRenovMap(nombre) {
+      const key = norm(nombre);
+      let found = renovMap[key];
+      if (!found) {
+        for (const [k, v] of Object.entries(renovMap)) {
+          if (k.includes(key) || key.includes(k)) { found = v; break; }
+        }
+      }
+      return found && found.length ? found : null;
+    }
+
     const newHoja1 = [];
+    let planIncorrecto = 0, corregidos = 0;
     for (let i = startRow; i < raw.length; i++) {
       const r = raw[i] || [];
       const pin    = String(r[0]||'').trim();
@@ -1122,51 +1153,81 @@ async function processUsuariosNat(file) {
       let   activo   = String(r[4]||'').trim();
       const expira   = String(r[5]||'').trim();
       const telefono = String(r[6]||'').trim();
-      const plan     = String(r[9]||'').trim() || 'Desconocido';
+      const planOrig = cleanPlan(String(r[9]||'').trim() || 'Desconocido');
       activo = /^s[ií]/i.test(activo) ? 'Sí' : /^no/i.test(activo) ? 'No' : activo;
-      const precio = getPlanPriceNat(plan);
+
+      let planCorregido = planOrig, estado = 'ok', fuentePlan = null;
+
+      if (isAddon(planOrig)) {
+        planIncorrecto++;
+        const encontrado = buscarEnRenovMap(nombre);
+        if (encontrado) {
+          planCorregido = mejorPlanRenov(encontrado);
+          estado = 'corregido';
+          fuentePlan = 'snapshot';
+          corregidos++;
+        } else {
+          estado = 'sin_plan';
+        }
+      }
+
       newHoja1.push({
         pin, nombre, activo, expira, telefono, email,
-        planOriginal: plan, planCorregido: plan,
-        estado: 'ok', fuentePlan: null, valorPlanGuardado: precio
+        planOriginal: planOrig, planCorregido,
+        estado, fuentePlan,
+        valorPlanGuardado: getPlanPriceNat(planCorregido)
       });
     }
 
     if (!newHoja1.length) { alert('No se encontraron usuarios en el archivo.'); return; }
-
-    // Merge con G.hoja1 existente (preservar correcciones de planes si ya estaba cargado el archivo combinado)
-    if (G.hoja1.length) {
-      const byPin = {};
-      G.hoja1.forEach(u => { if (u.pin) byPin[u.pin] = u; });
-      newHoja1.forEach(u => {
-        const prev = byPin[u.pin];
-        if (prev && prev.planCorregido && prev.planCorregido !== prev.planOriginal) {
-          u.planCorregido = prev.planCorregido;
-          u.fuentePlan = prev.fuentePlan;
-          u.estado = prev.estado;
-        }
-        u.valorPlanGuardado = getPlanPriceNat(u.planCorregido);
-      });
-    }
     G.hoja1 = newHoja1;
 
     buildUsersDataFromHoja1();
     updateProjectionCards();
 
-    // Detectar mes del archivo por fecha de expiración más frecuente
+    // Actualizar card de correcciones
+    const cTotal = document.getElementById('cTotalUsuarios');
+    const cInc   = document.getElementById('cPlanIncorrecto');
+    const cCorr  = document.getElementById('cCorregidos');
+    if (cTotal) cTotal.textContent = newHoja1.length;
+    if (cInc)   cInc.textContent   = planIncorrecto;
+    if (cCorr)  cCorr.textContent  = corregidos;
+
     const mes = detectarMesNat();
     await autoSaveNat(mes, true);
-    document.getElementById('saveStatus').textContent = `✅ ${newHoja1.length} usuarios cargados (${mes})`;
+    document.getElementById('saveStatus').textContent = `✅ ${newHoja1.length} usuarios cargados — ${corregidos} planes corregidos (${mes})`;
 
     // Recargar selector de meses
-    const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&select=mes,activos,total_usuarios,proyecciones,renovaciones,renov_data,users_data,updated_at');
-    const selectorEl = document.getElementById('mesSelectorNat');
-    if (selectorEl) selectorEl.remove();
-    if (snaps && snaps.length > 1) renderMesSelector(snaps);
+    const allSnaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&select=mes,activos,total_usuarios,proyecciones,renovaciones,renov_data,users_data,updated_at');
+    if (allSnaps && allSnaps.length > 1) renderMesSelector(allSnaps);
   } catch(e) {
     console.error(e);
     document.getElementById('saveStatus').textContent = '⚠️ Error: ' + e.message;
   }
+}
+
+// Construye mapa cliente → [{plan, fecha, fechaDate, precio}] desde renov_data de snapshots guardados
+async function buildRenovMapFromSnapshots() {
+  const map = {};
+  try {
+    const snaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&limit=6&select=renov_data');
+    const seen = new Set(); // evitar duplicados entre snapshots
+    snaps?.forEach(snap => {
+      (snap.renov_data || []).forEach(r => {
+        if (!r.Cliente || !r.Producto) return;
+        if (r.EsClaseSuelta || r.EsSinClasificar) return;
+        if (isAddon(r.Producto)) return;
+        if (!isMembershipPlan(r.Producto)) return;
+        const dedupeKey = `${norm(r.Cliente)}|${r.FechaStr}|${r.Producto}`;
+        if (seen.has(dedupeKey)) return;
+        seen.add(dedupeKey);
+        const key = norm(r.Cliente);
+        if (!map[key]) map[key] = [];
+        map[key].push({ plan: r.Producto, fecha: r.FechaStr, fechaDate: parseRenoDateTime(r.FechaStr), precio: r.Total || 0 });
+      });
+    });
+  } catch(e) { console.warn('buildRenovMapFromSnapshots:', e.message); }
+  return map;
 }
 
 function detectarMesNat() {
