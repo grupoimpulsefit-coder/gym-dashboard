@@ -341,7 +341,7 @@ async function loadAllSedes(mesElegido) {
   document.getElementById('loading').style.display = 'block';
   try {
     // Traer todos los snapshots para poblar el selector de meses
-    const allSnaps = await supaFetch('/gym_snapshots?order=mes_orden.desc&select=sede,mes,mes_orden,updated_at,activos,total_usuarios,renovaciones,renov_data,fe_total,fe_count');
+    const allSnaps = await supaFetch('/gym_snapshots?order=mes_orden.desc&select=sede,mes,mes_orden,updated_at,activos,total_usuarios,renovaciones,renov_data,fe_total');
     document.getElementById('loading').style.display = 'none';
     if (!allSnaps?.length) {
       document.getElementById('emptyState').style.display = 'block';
