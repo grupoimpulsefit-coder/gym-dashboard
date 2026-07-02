@@ -2427,9 +2427,13 @@ async function processComprobantesFile(data) {
             const monto = Number(rows[i][13]) || 0;
             if (tipo === 'FE') { totalFE += monto; countFE++; }
             if (tipo === 'NC') { totalNC += monto; }
-            // Recopilar fechas para detectar el mes del archivo
-            const fechaStr = String(rows[i][3] || '');
-            if (fechaStr) { const d = new Date(fechaStr); if (!isNaN(d)) fechas.push(d); }
+            // Recopilar fechas para detectar el mes del archivo (serial Excel o Date)
+            const fechaRaw = rows[i][3];
+            if (fechaRaw instanceof Date) { fechas.push(fechaRaw); }
+            else if (typeof fechaRaw === 'number' && fechaRaw > 40000) {
+                // Serial de Excel: días desde 1/1/1900
+                fechas.push(new Date((fechaRaw - 25569) * 86400000));
+            }
         }
         feData = { total: Math.round(totalFE - totalNC), count: countFE, loaded: true };
         // Detectar mes desde las fechas del archivo (no desde today)
