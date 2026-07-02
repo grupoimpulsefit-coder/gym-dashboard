@@ -2406,10 +2406,11 @@ setupUploadBox('uploadBoxFE', 'fileInputFE', processComprobantesFile);
 
 let feData = { total: 0, count: 0, loaded: false };
 
-async function processComprobantesFile(wb) {
+async function processComprobantesFile(data) {
     const statusEl = document.getElementById('uploadStatusFE');
     statusEl.textContent = '⏳ Procesando comprobantes...';
     try {
+        const wb = XLSX.read(data, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
         // Buscar fila de headers (contiene "Tipo" en col 5)
