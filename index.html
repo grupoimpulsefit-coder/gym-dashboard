@@ -253,6 +253,15 @@
             </div>
             <div id="uploadStatusR" style="margin-top:10px;font-size:0.9em;font-weight:500;text-align:center;"></div>
         </div>
+        <div style="flex:1;min-width:280px;max-width:480px;">
+            <div class="upload-box" id="uploadBoxFE">
+                <div class="upload-icon-wrap">🧾</div>
+                <h3>Comprobantes Electrónicos</h3>
+                <p class="upload-hint">Exportar desde el sistema → "Informe de Comprobantes Electrónicos"</p>
+                <input type="file" id="fileInputFE" accept=".xlsx,.xls">
+            </div>
+            <div id="uploadStatusFE" style="margin-top:10px;font-size:0.9em;font-weight:500;text-align:center;"></div>
+        </div>
     </div>
 
     <!-- ══════════════════ SEDE PICKER (colaborador) ══════════════════ -->
@@ -2155,6 +2164,10 @@ async function autoSaveToSupabase() {
                 Ingreso: u.Ingreso, ValorPlan: u.ValorPlan
             }));
         }
+        if (feData.loaded) {
+            record.fe_total = feData.total;
+            record.fe_count = feData.count;
+        }
         if (renoLoaded) {
             // Si no subimos Ventas esta vez, no tocar renovaciones/renov_data ya guardados (evita borrarlos)
             record.renovaciones = {
@@ -2389,6 +2402,36 @@ function setupUploadBox(boxId, inputId, processFn) {
 }
 setupUploadBox('uploadBoxU', 'fileInputU', processUsuariosFile);
 setupUploadBox('uploadBoxR', 'fileInputR', processRenovacionesFile);
+setupUploadBox('uploadBoxFE', 'fileInputFE', processComprobantesFile);
+
+let feData = { total: 0, count: 0, loaded: false };
+
+async function processComprobantesFile(wb) {
+    const statusEl = document.getElementById('uploadStatusFE');
+    statusEl.textContent = '⏳ Procesando comprobantes...';
+    try {
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        // Buscar fila de headers (contiene "Tipo" en col 5)
+        let dataStart = -1;
+        for (let i = 0; i < Math.min(rows.length, 15); i++) {
+            if (String(rows[i][4] || '').trim().toLowerCase() === 'tipo') { dataStart = i + 1; break; }
+        }
+        if (dataStart < 0) throw new Error('No se encontró la fila de encabezados. Verifique que sea el Informe de Comprobantes Electrónicos.');
+        let totalFE = 0, totalNC = 0, countFE = 0;
+        for (let i = dataStart; i < rows.length; i++) {
+            const tipo = String(rows[i][4] || '').trim().toUpperCase();
+            const monto = Number(rows[i][13]) || 0;
+            if (tipo === 'FE') { totalFE += monto; countFE++; }
+            if (tipo === 'NC') { totalNC += monto; }
+        }
+        feData = { total: Math.round(totalFE - totalNC), count: countFE, loaded: true };
+        statusEl.textContent = `✅ ${countFE} facturas — Total FE: ₡${feData.total.toLocaleString('es-CR')}`;
+        await autoSaveToSupabase();
+    } catch(e) {
+        statusEl.textContent = '⚠️ Error: ' + e.message;
+    }
+}
 
 async function loadPricesForSede(sede) {
     try {

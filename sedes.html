@@ -341,7 +341,7 @@ async function loadAllSedes(mesElegido) {
   document.getElementById('loading').style.display = 'block';
   try {
     // Traer todos los snapshots para poblar el selector de meses
-    const allSnaps = await supaFetch('/gym_snapshots?order=mes_orden.desc&select=sede,mes,mes_orden,updated_at,activos,total_usuarios,renovaciones,renov_data');
+    const allSnaps = await supaFetch('/gym_snapshots?order=mes_orden.desc&select=sede,mes,mes_orden,updated_at,activos,total_usuarios,renovaciones,renov_data,fe_total,fe_count');
     document.getElementById('loading').style.display = 'none';
     if (!allSnaps?.length) {
       document.getElementById('emptyState').style.display = 'block';
@@ -405,7 +405,7 @@ function buildDashboard(latest) {
     rows.forEach(r => { vMap[r.vendedor] = (vMap[r.vendedor]||0) + r.total; });
     const vRank = Object.entries(vMap).sort((a,b)=>b[1]-a[1]);
 
-    sedeSummary[s] = { tot, mem, min, pt: pt_, acc, vRank, hasDetalle: rows.length > 0, mes: snap.mes, updated_at: snap.updated_at };
+    sedeSummary[s] = { tot, mem, min, pt: pt_, acc, vRank, hasDetalle: rows.length > 0, mes: snap.mes, updated_at: snap.updated_at, fe: snap.fe_total || 0, feCount: snap.fe_count || 0 };
     total += tot; memb += mem; minita += min; pt += pt_; accesorios += acc;
   });
 
@@ -458,6 +458,14 @@ function buildDashboard(latest) {
             <span class="sede-row-label">Accesorios</span>
             <span class="sede-row-val">${fmt(d.acc)} <span class="sede-row-pct">${pct(d.acc,d.tot)}</span></span>
           </div>` : ''}
+          ${d.fe > 0 ? `<div class="sede-row">
+            <span class="sede-row-label">🧾 Fact. Electrónica</span>
+            <span class="sede-row-val">${fmt(d.fe)} <span class="sede-row-pct">${pct(d.fe,d.tot)}</span></span>
+          </div>
+          <div class="sede-row">
+            <span class="sede-row-label">Sin factura</span>
+            <span class="sede-row-val">${fmt(d.tot - d.fe)} <span class="sede-row-pct">${pct(d.tot-d.fe,d.tot)}</span></span>
+          </div>` : '<div class="sede-row"><span class="sede-row-label" style="color:#bbb;font-style:italic;">🧾 Sin comprobantes cargados</span></div>'}
           <div class="progress-bar"><div class="progress-fill" style="width:${pct(d.mem,d.tot)};background:${m.color}"></div></div>
           ${top ? `<div class="top-vend-label">🏆 Top Vendedor</div>
           <div class="top-vend-name text-${m.cls}">${top[0]}</div>
