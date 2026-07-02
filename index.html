@@ -2132,7 +2132,9 @@ async function autoSaveToSupabase() {
         ? document.getElementById('uploadStatusU')
         : document.getElementById('uploadStatusR');
     try {
-        const { mes, mesOrden } = detectMesFromData();
+        const _mesDetectado = detectMesFromData();
+        const mes      = (feData.loaded && feData.mes && !renoLoaded) ? feData.mes      : _mesDetectado.mes;
+        const mesOrden = (feData.loaded && feData.mesOrden && !renoLoaded) ? feData.mesOrden : _mesDetectado.mesOrden;
         const today = new Date(); today.setHours(0,0,0,0);
         const ranges = [
             { label:'Vencen en 7 días',  days:7  },
@@ -2419,14 +2421,24 @@ async function processComprobantesFile(data) {
         }
         if (dataStart < 0) throw new Error('No se encontró la fila de encabezados. Verifique que sea el Informe de Comprobantes Electrónicos.');
         let totalFE = 0, totalNC = 0, countFE = 0;
+        const fechas = [];
         for (let i = dataStart; i < rows.length; i++) {
             const tipo = String(rows[i][4] || '').trim().toUpperCase();
             const monto = Number(rows[i][13]) || 0;
             if (tipo === 'FE') { totalFE += monto; countFE++; }
             if (tipo === 'NC') { totalNC += monto; }
+            // Recopilar fechas para detectar el mes del archivo
+            const fechaStr = String(rows[i][3] || '');
+            if (fechaStr) { const d = new Date(fechaStr); if (!isNaN(d)) fechas.push(d); }
         }
         feData = { total: Math.round(totalFE - totalNC), count: countFE, loaded: true };
-        statusEl.textContent = `✅ ${countFE} facturas — Total FE: ₡${feData.total.toLocaleString('es-CR')}`;
+        // Detectar mes desde las fechas del archivo (no desde today)
+        if (fechas.length) {
+            const ref = new Date(Math.max(...fechas.map(d => d.getTime())));
+            feData.mes = ref.toLocaleDateString('es-CR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
+            feData.mesOrden = `${ref.getFullYear()}-${String(ref.getMonth()+1).padStart(2,'0')}`;
+        }
+        statusEl.textContent = `✅ ${countFE} facturas — Total FE: ₡${feData.total.toLocaleString('es-CR')}${feData.mes ? ' (' + feData.mes + ')' : ''}`;
         await autoSaveToSupabase();
     } catch(e) {
         statusEl.textContent = '⚠️ Error: ' + e.message;
