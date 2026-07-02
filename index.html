@@ -878,6 +878,12 @@ async function loadSedeForColaborador(sede, mesEspecifico) {
         usuariosLoaded = true;
         renoLoaded = true;
         await loadPricesForSede(currentSedeName);
+        // plan_prices manda sobre el ValorPlan guardado en el snapshot
+        // (así los cambios de precio hechos en Supabase se reflejan sin re-subir el Excel)
+        usersData.forEach(u => {
+            const p = planPrices[u.ÚltimoProducto];
+            if (p > 0 && !manualPrices[`${u.ÚltimoProducto}|${u.PIN}`]) u.ValorPlan = p;
+        });
         document.getElementById('sedePicker').style.display = 'none';
         document.getElementById('btnCambiarSede').style.display = 'inline-block';
         // Poblar selector de meses
