@@ -907,6 +907,7 @@ const LEALTAD_RE = /lealtad|fidelidad/i;
 
 function mostrarDashboardDesdeSnapshot(s) {
   const ud = s.users_data || [];
+  G.mesVista = s.mes || null;
 
   // ── Reconstruir G.hoja1 (tab Usuarios) ──
   G.hoja1 = ud.map(u => ({
@@ -2702,13 +2703,17 @@ function renderProyCards(rows) {
   const mk = (cls, icon, label, val, sub) =>
     `<div class="proy-stat ${cls}"><h3>${icon} ${label}</h3><div class="sv">${val}</div><div class="ss">${sub}</div></div>`;
 
+  // Etiqueta dinámica según el mes visualizado (snapshot o fecha actual)
+  const mesLabel = (G.mesVista || G.renovMes || new Date().toLocaleDateString('es-CR',{month:'long'})).split(' ')[0].replace(/^\w/, c => c.toUpperCase());
+  const hayFiltroFecha = !!(document.getElementById('proyFechaDesde')?.value || document.getElementById('proyFechaHasta')?.value);
+
   document.getElementById('proy-cards').innerHTML =
     mk('red',    '🔴', 'Vencen en 7 días',  c7.length,   '₡'+Math.round(c7.reduce((s,r)=>s+(r.precioJunio||0),0)).toLocaleString('es-CR')) +
     mk('orange', '🟠', 'Vencen en 15 días', c15.length,  '₡'+Math.round(c15.reduce((s,r)=>s+(r.precioJunio||0),0)).toLocaleString('es-CR')) +
     mk('yellow', '🟡', 'Vencen en 30 días', c30.length,  '₡'+Math.round(c30.reduce((s,r)=>s+(r.precioJunio||0),0)).toLocaleString('es-CR')) +
     mk('blue',   '⚪', 'Ya vencidos',        cvenc.length,'Revisar renovación') +
-    mk('purple', '💰', 'Ingresos Junio',     '₡'+Math.round(totalJunio).toLocaleString('es-CR'), rows.length+' clientes') +
-    mk('green',  '📅', 'Pagado en Mayo',     '₡'+Math.round(totalMayo).toLocaleString('es-CR'),  'base de comparación') +
+    mk('purple', '💰', 'Ingresos ' + mesLabel, '₡'+Math.round(totalJunio).toLocaleString('es-CR'), rows.length + ' clientes' + (hayFiltroFecha ? ' (rango filtrado)' : '')) +
+    (totalMayo > 0 ? mk('green', '📅', 'Pagado mes anterior', '₡'+Math.round(totalMayo).toLocaleString('es-CR'), 'base de comparación') : '') +
     (cajustados  > 0 ? mk('orange', '🔄', 'Precio ajustado',  cajustados,  'desde historial real') : '') +
     (cpendientes > 0 ? mk('red',    '⚠',  'Pendientes',       cpendientes, 'requieren revisión') : '');
 }
