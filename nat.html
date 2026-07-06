@@ -904,6 +904,9 @@ function cargarMesNat(idx) {
 
 const PCT_DESCUENTO = { '20%': 0.2, '25%': 0.25, 'G20': 0.2, 'Completo': 0 };
 const LEALTAD_RE = /lealtad|fidelidad/i;
+// Promos detectadas en el nombre del plan "(Promo: Abril)" → % de descuento vigente.
+// "Solo Junio" no está aquí porque esa promo expiró (pagan precio completo).
+const PROMO_PCT = { marzo: 0.25, abril: 0.20 };
 
 function mostrarDashboardDesdeSnapshot(s) {
   const ud = s.users_data || [];
@@ -924,9 +927,13 @@ function mostrarDashboardDesdeSnapshot(s) {
   ud.forEach(u => {
     if (!u.Descuento) return;
     const row = {
-      pin: u.PIN, cliente: u.Nombre, fuente: u.Descuento, pct: PCT_DESCUENTO[u.Descuento] ?? 0,
-      planMain: u.ProyPlan || u.ÚltimoProducto, precioBase: null,
-      precioJunio: u.PrecioJunio, precioFuente: null, pendiente: u.Pendiente || null,
+      pin: u.PIN, cliente: u.Nombre, fuente: u.Descuento,
+      pct: PCT_DESCUENTO[u.Descuento] ?? u.DescuentoPct ?? 0,
+      planMain: u.ProyPlan || u.ÚltimoProducto,
+      precioBase: getPlanPriceNat(u.ÚltimoProducto) || null,
+      // ValorPlan ya trae el precio con descuento aplicado
+      precioJunio: u.PrecioJunio ?? u.ValorPlan ?? null,
+      precioFuente: null, pendiente: u.Pendiente || null,
       pagoMayo: null, expira: u.Expira, expiraDate: parseDate(u.Expira)
     };
     if (u.Descuento === 'Completo') G.planCompleto.push(row);
@@ -1073,8 +1080,10 @@ async function autoSaveNat(mes, usuariosLoaded, soloUsuarios = false) {
         Telefono: u.telefono, Email: u.email,
         ÚltimoProducto: u.planCorregido || u.planOriginal,
         PlanOriginal: u.planOriginal, EstadoCorrecion: u.estado, FuentePlan: u.fuentePlan || null,
-        ValorPlan: buscarPrecio(u.planCorregido || u.planOriginal) || 0,
-        Descuento: u.proyDescuento || u.descuento || null, ProyPlan: u.proyPlan || null,
+        // ValorPlan lleva el precio proyectado (ya con descuento aplicado si corresponde)
+        ValorPlan: (u.valorPlanGuardado > 0 ? u.valorPlanGuardado : (buscarPrecio(u.planCorregido || u.planOriginal) || 0)),
+        Descuento: u.proyDescuento || u.descuento || null,
+        DescuentoPct: u.descuentoPct || null, ProyPlan: u.proyPlan || null,
         PrecioJunio: u.proyPrecioJunio ?? null, Pendiente: u.proyPendiente || null,
         EstadoValidacion: u.validEstado || null, PagoTardio: u.validPagoTardio || null,
         PagoMonto: u.validPagoMonto ?? null, PagoFecha: u.validPagoFecha || null
@@ -1251,7 +1260,8 @@ async function processUsuariosNat(file) {
       let   activo   = String(r[4]||'').trim();
       const expira   = String(r[5]||'').trim();
       const telefono = String(r[6]||'').trim();
-      const planOrig = cleanPlan(String(r[9]||'').trim() || 'Desconocido');
+      const rawPlan  = String(r[9]||'').trim();
+      const planOrig = cleanPlan(rawPlan || 'Desconocido');
       activo = /^s[ií]/i.test(activo) ? 'Sí' : /^no/i.test(activo) ? 'No' : activo;
 
       let planCorregido = planOrig, estado = 'ok', fuentePlan = null;
@@ -1278,20 +1288,33 @@ async function processUsuariosNat(file) {
         promoExpirada = discInfo.promoExpirada;
         if (!promoExpirada && !(discInfo.precioJunio > 0)) noPagoJunio = true;
       }
+      // Detectar promo en el nombre crudo del plan: "(Promo: Abril)" → % conocido
+      if (!descuento && !promoExpirada) {
+        const promoTag = (rawPlan.match(/\(Promo:\s*([^)]+)\)/i) || [])[1]?.trim();
+        if (promoTag) {
+          const key = norm(promoTag);
+          if (/junio/.test(key)) {
+            promoExpirada = true; // Promo Solo Junio: expiró, paga completo
+          } else if (PROMO_PCT[key] != null) {
+            descuento = 'Promo ' + promoTag;
+            descuentoPct = PROMO_PCT[key];
+          }
+        }
+      }
       const precioBase = getPlanPriceNat(planCorregido);
       // Lógica de precio proyectado:
       // - Promo Solo Junio expirada → precio completo
-      // - Descuento válido (20%/25%/G20) → calcular sobre precioBase
+      // - Descuento válido (20%/25%/G20/promo vigente) → calcular sobre precioBase
       //   (precioJunio solo se usa si viene de analizar() con datos reales de transacciones)
       // - Sin descuento → precio completo
       let precioEfectivo;
-      if (promoExpirada || !discInfo || !(discInfo.pct > 0)) {
+      if (promoExpirada || !(descuentoPct > 0)) {
         precioEfectivo = precioBase;
       } else {
         // Usar precio de junio de analizar() si está disponible y es razonable
         // (proyPrecioJunio solo se setea cuando analizar() procesa las hojas de descuento reales)
-        const calculado = Math.round(precioBase * (1 - discInfo.pct));
-        const junioOk = discInfo.precioJunio > 0 && !noPagoJunio
+        const calculado = Math.round(precioBase * (1 - descuentoPct));
+        const junioOk = discInfo && discInfo.precioJunio > 0 && !noPagoJunio
           && Math.abs(discInfo.precioJunio - calculado) < calculado * 0.3; // <30% diferencia
         precioEfectivo = junioOk ? discInfo.precioJunio : calculado;
       }
