@@ -93,6 +93,26 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 .pct-bajo  { background: #ffebee; color: #c62828; }
 .sede-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
 
+/* Cards por sede */
+.sede-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; padding: 8px 32px 16px; }
+.sede-card { background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); cursor: pointer; transition: transform .15s, box-shadow .15s; }
+.sede-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.14); }
+.sede-card.no-data { opacity: .55; cursor: default; }
+.sede-card.no-data:hover { transform: none; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.sede-card-header { padding: 14px 18px; color: white; display: flex; align-items: center; gap: 10px; }
+.sede-card-header .s-icon { font-size: 22px; }
+.sede-card-header .s-name { font-size: 15px; font-weight: 700; }
+.sede-card-header .s-total { margin-left: auto; font-size: 17px; font-weight: 700; }
+.sede-card-body { padding: 14px 18px; }
+.sede-row-c { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f0f4f8; }
+.sede-row-c:last-child { border-bottom: none; }
+.sede-row-label { font-size: 12px; color: var(--muted); }
+.sede-row-val   { font-size: 13px; font-weight: 600; color: var(--text); }
+.sede-row-pct   { font-size: 11px; color: var(--muted); margin-left: 6px; }
+.progress-bar { height: 7px; border-radius: 4px; background: #e8edf4; margin-top: 12px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 4px; transition: width .3s; }
+.card-hint { font-size: 11px; color: var(--muted); margin-top: 10px; font-style: italic; }
+
 /* Detalle expandible */
 .detalle-row td { background: #fafbfd; padding: 0 14px; }
 .detalle-inner { padding: 14px 4px; }
@@ -181,6 +201,9 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
       <div class="kpi-sub" id="kpiPendSub">—</div>
     </div>
   </div>
+
+  <div class="section"><div class="section-title">Resumen por Sede</div></div>
+  <div class="sede-grid" id="sedeGrid"></div>
 
   <div class="section"><div class="section-title">Comparativa por Sede <span style="font-weight:400;font-size:12px;color:var(--muted);">— haga clic en una sede para ver el detalle de clientes</span></div></div>
   <div class="comp-wrap">
@@ -361,6 +384,7 @@ function render(snaps, desde, hasta) {
   let tProy = 0, tCobrado = 0, tClientes = 0, tPagos = 0, tPendMonto = 0, tPendClientes = 0;
   detalleData = {};
   const rows = [];
+  const cards = [];
 
   SEDES.forEach(sede => {
     const snap = bySede[sede];
@@ -368,6 +392,10 @@ function render(snaps, desde, hasta) {
     if (!snap) {
       rows.push(`<tr><td><span class="sede-dot" style="background:${meta.color}"></span>${meta.icon} ${sede}</td>
         <td colspan="6" style="color:var(--muted);font-style:italic;">Sin datos cargados para este mes</td></tr>`);
+      cards.push(`<div class="sede-card no-data">
+        <div class="sede-card-header" style="background:${meta.color}"><span class="s-icon">${meta.icon}</span><span class="s-name">${sede}</span></div>
+        <div class="sede-card-body"><div class="sede-row-label">Sin datos cargados para este mes</div></div>
+      </div>`);
       return;
     }
 
@@ -405,6 +433,25 @@ function render(snaps, desde, hasta) {
     tPagos += cobros.length; tPendMonto += pendMonto; tPendClientes += pendientes.length;
 
     const sinVentas = !(snap.renov_data || []).length;
+    cards.push(`<div class="sede-card" onclick="toggleDetalle('${sede.replace(/'/g,"\\'")}', true)">
+      <div class="sede-card-header" style="background:${meta.color}">
+        <span class="s-icon">${meta.icon}</span>
+        <span class="s-name">${sede}</span>
+        <span class="s-total">${sinVentas ? '—' : fmt(cobrado)}</span>
+      </div>
+      <div class="sede-card-body">
+        <div class="sede-row-c"><span class="sede-row-label">Proyección a cobro</span>
+          <span class="sede-row-val">${fmt(proy)} <span class="sede-row-pct">${proyectados.length} clientes</span></span></div>
+        <div class="sede-row-c"><span class="sede-row-label">Cobrado</span>
+          <span class="sede-row-val" style="color:var(--success);">${sinVentas ? '—' : fmt(cobrado)} <span class="sede-row-pct">${sinVentas ? 'sin ventas cargadas' : cobros.length + ' pagos'}</span></span></div>
+        <div class="sede-row-c"><span class="sede-row-label">% Recuperado</span>
+          <span class="sede-row-val"><span class="pct-badge ${pctCls}">${pct.toFixed(1)}%</span></span></div>
+        <div class="sede-row-c"><span class="sede-row-label">Pendiente</span>
+          <span class="sede-row-val" style="color:var(--warn);">${fmt(pendMonto)} <span class="sede-row-pct">${pendientes.length} clientes</span></span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(pct,100)}%;background:${meta.color}"></div></div>
+        <div class="card-hint">Clic para ver el detalle de clientes</div>
+      </div>
+    </div>`);
     rows.push(`<tr class="sede-row" onclick="toggleDetalle('${sede.replace(/'/g,"\\'")}')">
       <td><span class="sede-dot" style="background:${meta.color}"></span>${meta.icon} <strong>${sede}</strong></td>
       <td class="num">${proyectados.length}</td>
@@ -428,6 +475,7 @@ function render(snaps, desde, hasta) {
     <td class="num" style="color:var(--warn);">${fmt(tPendMonto)}</td>
   </tr>`);
   document.getElementById('compBody').innerHTML = rows.join('');
+  document.getElementById('sedeGrid').innerHTML = cards.join('');
 
   document.getElementById('kpiProy').textContent = fmt(tProy);
   document.getElementById('kpiProySub').textContent = `${tClientes} clientes con vencimiento en el rango`;
@@ -440,11 +488,18 @@ function render(snaps, desde, hasta) {
 
 let detFiltro = {};  // sede → 'todos'|'pendientes'|'pagados'
 
-function toggleDetalle(sede) {
+function toggleDetalle(sede, scroll) {
   const id = norm(sede).replace(/\s/g,'-');
   const row = document.getElementById('det-' + id);
   if (!row) return;
   const visible = row.style.display !== 'none';
+  // Desde las cards: siempre abrir (no cerrar) y hacer scroll al detalle
+  if (scroll) {
+    row.style.display = '';
+    renderDetalle(sede);
+    row.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
   row.style.display = visible ? 'none' : '';
   if (!visible) renderDetalle(sede);
 }
