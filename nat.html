@@ -823,12 +823,23 @@ async function doLogin() {
 // Renovaciones, Seguimiento) a partir de lo último guardado en Supabase, sin
 // obligar a resubir el Excel. "Ventas Mayo" no se reconstruye porque depende de
 // las transacciones crudas de Hoja3, que no se guardan en el snapshot.
+// Convierte "Julio de 2026" (o "2026-07") a "2026-07" para ordenar cronológicamente
+const MESES_ES = { enero:1, febrero:2, marzo:3, abril:4, mayo:5, junio:6, julio:7, agosto:8, septiembre:9, setiembre:9, octubre:10, noviembre:11, diciembre:12 };
+function mesOrdenKey(str) {
+  const s = String(str || '').trim();
+  if (/^\d{4}-\d{2}$/.test(s)) return s;
+  const m = s.toLowerCase().match(/([a-záé]+)\s*(?:de)?\s*(\d{4})/);
+  if (m && MESES_ES[m[1]]) return `${m[2]}-${String(MESES_ES[m[1]]).padStart(2,'0')}`;
+  return s;
+}
+
 async function cargarResumenGuardado() {
   try {
-    const snapsRaw = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=mes_orden.desc&select=mes,mes_orden,activos,total_usuarios,proyecciones,renovaciones,renov_data,users_data,updated_at');
+    const snapsRaw = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&select=mes,mes_orden,activos,total_usuarios,proyecciones,renovaciones,renov_data,users_data,updated_at');
     if (!snapsRaw?.length) { document.getElementById('resumenGuardado').style.display = 'none'; return; }
-    // Ordenar por mes_orden desc para asegurar el más reciente primero
-    const snaps = snapsRaw.slice().sort((a,b) => (b.mes_orden||'').localeCompare(a.mes_orden||''));
+    // Ordenar cronológicamente (mes más reciente primero); mes_orden puede venir
+    // como "Julio de 2026" en snapshots viejos, por eso se normaliza con mesOrdenKey
+    const snaps = snapsRaw.slice().sort((a,b) => mesOrdenKey(b.mes_orden || b.mes).localeCompare(mesOrdenKey(a.mes_orden || a.mes)));
     // Cargar precios desde snapshots antes de mostrar el dashboard
     await loadPricesForSede('Natación');
     if (!Object.keys(planPrices).length) {
@@ -1011,7 +1022,7 @@ async function autoSaveNat(mes, usuariosLoaded, soloUsuarios = false) {
     const existing = await supaFetch(`/gym_snapshots?sede=eq.Nataci%C3%B3n&mes=eq.${encodeURIComponent(mes)}&select=id,renov_data,renovaciones`);
     const existingSnap = existing?.[0] || null;
 
-    const record = { sede: 'Natación', mes, mes_orden: mes, updated_at: new Date().toISOString() };
+    const record = { sede: 'Natación', mes, mes_orden: mesOrdenKey(mes), updated_at: new Date().toISOString() };
 
     if (!soloUsuarios) {
       // Incluir datos de renovaciones solo cuando vienen del Excel combinado
@@ -1298,8 +1309,11 @@ async function processUsuariosNat(file) {
     document.getElementById('saveStatus').textContent = `✅ ${newHoja1.length} usuarios cargados — ${corregidos} planes corregidos (${mes})`;
 
     // Recargar selector de meses
-    const allSnaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&select=mes,activos,total_usuarios,proyecciones,renovaciones,renov_data,users_data,updated_at');
-    if (allSnaps && allSnaps.length > 1) renderMesSelector(allSnaps);
+    const allSnaps = await supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&select=mes,mes_orden,activos,total_usuarios,proyecciones,renovaciones,renov_data,users_data,updated_at');
+    if (allSnaps && allSnaps.length > 1) {
+      allSnaps.sort((a,b) => mesOrdenKey(b.mes_orden || b.mes).localeCompare(mesOrdenKey(a.mes_orden || a.mes)));
+      renderMesSelector(allSnaps);
+    }
   } catch(e) {
     console.error(e);
     document.getElementById('saveStatus').textContent = '⚠️ Error: ' + e.message;
