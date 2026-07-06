@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comparativa de Sedes — Proyección vs Cobro</title>
+<style>
+:root {
+  --primary: #1a5276;
+  --primary-light: #2e86c1;
+  --accent: #148f77;
+  --accent2: #e67e22;
+  --bg: #f0f4f8;
+  --border: #d5dce8;
+  --text: #1c2833;
+  --muted: #6c757d;
+  --warn: #c0392b;
+  --success: #27ae60;
+
+  --c-tresrios:   #00838f;
+  --c-natacion:   #6a1b9a;
+  --c-pinares:    #2e7d32;
+  --c-sabanilla:  #1565c0;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+/* ── Login ── */
+#loginScreen { position: fixed; inset: 0; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+.login-card { background: white; border-radius: 24px; padding: 40px 44px; width: 100%; max-width: 420px; box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
+.login-logo { width: 64px; height: 64px; background: linear-gradient(135deg, #1a5276, #2e86c1); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 20px; }
+.login-card h2 { text-align: center; font-size: 1.4em; font-weight: 800; color: #2d2d5e; margin-bottom: 6px; }
+.login-card .login-sub { text-align: center; font-size: 0.85em; color: #888; margin-bottom: 28px; }
+.login-field { margin-bottom: 16px; }
+.login-field label { display: block; font-size: 0.8em; font-weight: 700; color: #444; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+.login-field input { width: 100%; padding: 11px 14px; border: 1.5px solid #dde1f0; border-radius: 10px; font-size: 14px; font-family: inherit; color: #333; }
+.login-field input:focus { outline: none; border-color: #2e86c1; box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
+.login-btn { width: 100%; padding: 13px; background: linear-gradient(135deg, #1a5276, #2e86c1); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+.login-btn:disabled { opacity: .6; cursor: not-allowed; }
+#loginError { text-align: center; color: #c62828; font-size: 13px; margin-top: 12px; min-height: 18px; }
+
+/* ── Header ── */
+.header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: white; padding: 18px 32px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.25); flex-wrap: wrap; }
+.header-icon { font-size: 34px; }
+.header h1 { font-size: 21px; font-weight: 700; }
+.header p  { font-size: 13px; opacity: .85; margin-top: 2px; }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; color: white; font-size: 13px; }
+.logout-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35); color: white; border-radius: 16px; padding: 5px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+/* ── Loading ── */
+.loading, .empty-state { display: none; text-align: center; padding: 60px 32px; color: var(--muted); }
+.spinner { width: 44px; height: 44px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Dashboard ── */
+#dashboard { display: none; }
+.filter-bar { padding: 14px 32px; background: white; border-bottom: 1px solid var(--border); display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.filter-item label { display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px; }
+.filter-item input[type="date"] { border: 1.5px solid var(--border); border-radius: 10px; padding: 8px 12px; font-size: 13px; font-family: inherit; color: var(--text); }
+.btn-aplicar { padding: 9px 22px; border-radius: 10px; border: none; background: var(--primary); color: white; font-size: 13px; font-weight: 700; cursor: pointer; }
+.btn-aplicar:hover { background: var(--primary-light); }
+.btn-rapido { padding: 8px 14px; border-radius: 20px; border: 1.5px solid var(--border); background: white; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.btn-rapido:hover { border-color: var(--primary-light); color: var(--primary); }
+.filter-note { width: 100%; font-size: 12px; color: var(--muted); }
+
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; padding: 22px 32px 8px; }
+.kpi { background: white; border-radius: 12px; padding: 16px 18px; border-left: 4px solid var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+.kpi.green  { border-color: var(--success); }
+.kpi.orange { border-color: var(--accent2); }
+.kpi.red    { border-color: var(--warn); }
+.kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+.kpi-value { font-size: 23px; font-weight: 700; color: var(--primary); margin-top: 4px; line-height: 1.1; }
+.kpi.green  .kpi-value { color: var(--success); }
+.kpi.orange .kpi-value { color: var(--accent2); }
+.kpi.red    .kpi-value { color: var(--warn); }
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.section { padding: 8px 32px; }
+.section-title { font-size: 15px; font-weight: 700; color: var(--primary); margin-bottom: 14px; border-left: 4px solid var(--primary-light); padding-left: 10px; }
+
+/* Tabla comparativa */
+.comp-wrap { padding: 0 32px 24px; overflow-x: auto; }
+.comp-table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+.comp-table th { background: var(--primary); color: white; font-size: 12px; padding: 11px 14px; text-align: left; }
+.comp-table th.num, .comp-table td.num { text-align: right; }
+.comp-table td { padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #f0f4f8; }
+.comp-table tr.total-row td { background: #eef3fa; font-weight: 700; border-top: 2px solid var(--primary); }
+.comp-table tr.sede-row { cursor: pointer; }
+.comp-table tr.sede-row:hover td { background: #f7fafd; }
+.pct-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+.pct-alto  { background: #e8f5e9; color: #2e7d32; }
+.pct-medio { background: #fff3e0; color: #e65100; }
+.pct-bajo  { background: #ffebee; color: #c62828; }
+.sede-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+
+/* Detalle expandible */
+.detalle-row td { background: #fafbfd; padding: 0 14px; }
+.detalle-inner { padding: 14px 4px; }
+.det-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.det-table th { background: #f0f2f8; color: var(--muted); font-size: 11px; padding: 6px 10px; text-align: left; }
+.det-table td { padding: 6px 10px; border-bottom: 1px solid #f0f2f8; }
+.det-table td.num { text-align: right; }
+.tag-pagado    { background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.tag-pendiente { background: #ffebee; color: #c62828; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.det-filtros { margin-bottom: 8px; display: flex; gap: 8px; }
+.det-filtros button { padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border); background: white; font-size: 11px; cursor: pointer; }
+.det-filtros button.on { background: var(--primary); color: white; border-color: var(--primary); }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">⚖️</div>
+    <h2>Comparativa de Sedes</h2>
+    <p class="login-sub">Proyección vs Cobro por rango de fechas</p>
+    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
+    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-icon">⚖️</div>
+  <div>
+    <h1>Comparativa de Sedes</h1>
+    <p>Proyección de cobro vs cobrado real, en el rango de fechas que elija</p>
+  </div>
+  <div class="header-right">
+    <span>👤 <span id="userNombre">—</span></span>
+    <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+  </div>
+</div>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div>Cargando datos de las sedes…</div>
+</div>
+
+<div class="empty-state" id="emptyState">No hay datos para el rango seleccionado.</div>
+
+<div id="dashboard">
+
+  <div class="filter-bar">
+    <div class="filter-item">
+      <label>Desde</label>
+      <input type="date" id="fDesde">
+    </div>
+    <div class="filter-item">
+      <label>Hasta</label>
+      <input type="date" id="fHasta">
+    </div>
+    <button class="btn-aplicar" onclick="aplicarFiltro()">Aplicar</button>
+    <button class="btn-rapido" onclick="rangoRapido('hoy')">Hoy</button>
+    <button class="btn-rapido" onclick="rangoRapido('mes')">Mes a la fecha</button>
+    <button class="btn-rapido" onclick="rangoRapido('mescompleto')">Mes completo</button>
+    <div class="filter-note" id="filterNote"></div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Proyección a cobro</div>
+      <div class="kpi-value" id="kpiProy">—</div>
+      <div class="kpi-sub" id="kpiProySub">—</div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-label">Cobrado</div>
+      <div class="kpi-value" id="kpiCobrado">—</div>
+      <div class="kpi-sub" id="kpiCobradoSub">—</div>
+    </div>
+    <div class="kpi orange">
+      <div class="kpi-label">% Recuperado</div>
+      <div class="kpi-value" id="kpiPct">—</div>
+      <div class="kpi-sub">cobrado / proyección</div>
+    </div>
+    <div class="kpi red">
+      <div class="kpi-label">Pendiente</div>
+      <div class="kpi-value" id="kpiPend">—</div>
+      <div class="kpi-sub" id="kpiPendSub">—</div>
+    </div>
+  </div>
+
+  <div class="section"><div class="section-title">Comparativa por Sede <span style="font-weight:400;font-size:12px;color:var(--muted);">— haga clic en una sede para ver el detalle de clientes</span></div></div>
+  <div class="comp-wrap">
+    <table class="comp-table">
+      <thead><tr>
+        <th>Sede</th>
+        <th class="num">Clientes a cobro</th>
+        <th class="num">Proyección (₡)</th>
+        <th class="num">Pagos recibidos</th>
+        <th class="num">Cobrado (₡)</th>
+        <th class="num">% Recuperado</th>
+        <th class="num">Pendiente (₡)</th>
+      </tr></thead>
+      <tbody id="compBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+// ── Supabase ──────────────────────────────────────────────────────────────
+const SUPA_URL = '__SUPA_URL__';
+const SUPA_KEY = '__SUPA_KEY__';
+let currentToken = null, currentRole = null;
+
+async function supaFetch(path, opts = {}) {
+  const token = currentToken || SUPA_KEY;
+  const res = await fetch(SUPA_URL + '/rest/v1' + path, {
+    method: opts.method || 'GET',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json', 'Prefer': opts.prefer || 'return=minimal',
+      ...(opts.headers || {}) },
+    body: opts.body != null ? JSON.stringify(opts.body) : undefined
+  });
+  if (!res.ok) { const t = await res.text(); throw new Error(t); }
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+const ROLES_PERMITIDOS = ['admin', 'admin_sedes'];
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pwd   = document.getElementById('loginPassword').value;
+  const btn   = document.getElementById('loginBtn');
+  const errEl = document.getElementById('loginError');
+  if (!email || !pwd) { errEl.textContent = 'Complete todos los campos.'; return; }
+  btn.textContent = 'Ingresando...'; btn.disabled = true; errEl.textContent = '';
+  try {
+    const res = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'apikey': SUPA_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pwd })
+    });
+    const data = await res.json();
+    if (!data.access_token) throw new Error(data.error_description || data.msg || 'Credenciales incorrectas');
+    currentToken = data.access_token;
+    const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre`);
+    currentRole = roles?.[0]?.role || null;
+    if (!ROLES_PERMITIDOS.includes(currentRole)) {
+      errEl.textContent = 'Su cuenta no tiene acceso a este reporte.';
+      await doLogout(true);
+      return;
+    }
+    document.getElementById('userNombre').textContent = roles?.[0]?.nombre || email;
+    document.getElementById('loginScreen').style.display = 'none';
+    rangoRapido('mes');
+  } catch(e) {
+    errEl.textContent = e.message;
+  } finally {
+    btn.textContent = 'Entrar'; btn.disabled = false;
+  }
+}
+document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+async function doLogout(silent) {
+  try { await fetch(`${SUPA_URL}/auth/v1/logout`, { method:'POST', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken} }); } catch(_) {}
+  currentToken = null; currentRole = null;
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+  if (!silent) {
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+  }
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+// ── Config ──────────────────────────────────────────────────────────────
+const SEDE_META = {
+  '3 Ríos':   { icon: '🌊', color: '#00838f' },
+  'Natación': { icon: '🏊', color: '#6a1b9a' },
+  'Pinares':  { icon: '🌲', color: '#2e7d32' },
+  'Sabanilla':{ icon: '🏙️', color: '#1565c0' },
+};
+const SEDES = ['3 Ríos','Natación','Pinares','Sabanilla'];
+
+// ── Helpers ─────────────────────────────────────────────────────────────
+const fmt = n => '₡' + Math.round(n).toLocaleString('es-CR');
+const norm = s => s ? String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim() : '';
+
+// Extrae fecha de un string "dd/mm/yy" o "dd/mm/yyyy [hora]"
+function parseDMY(str) {
+  const m = String(str||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (!m) return null;
+  let y = parseInt(m[3]); if (y < 100) y += 2000;
+  const d = new Date(y, parseInt(m[2]) - 1, parseInt(m[1]));
+  return isNaN(d) ? null : d;
+}
+
+function mesNombre(d) {
+  const s = d.toLocaleDateString('es-CR', { month: 'long', year: 'numeric' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// ── Rangos rápidos ──────────────────────────────────────────────────────
+function isoDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+function rangoRapido(tipo) {
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  let desde, hasta;
+  if (tipo === 'hoy') { desde = hoy; hasta = hoy; }
+  else if (tipo === 'mes') { desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1); hasta = hoy; }
+  else { desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1); hasta = new Date(hoy.getFullYear(), hoy.getMonth()+1, 0); }
+  document.getElementById('fDesde').value = isoDate(desde);
+  document.getElementById('fHasta').value = isoDate(hasta);
+  aplicarFiltro();
+}
+
+// ── Carga y cálculo ─────────────────────────────────────────────────────
+let snapCache = {};   // mes → snapshots[]
+
+async function aplicarFiltro() {
+  const dv = document.getElementById('fDesde').value;
+  const hv = document.getElementById('fHasta').value;
+  if (!dv || !hv) return;
+  const desde = new Date(dv + 'T00:00:00');
+  const hasta = new Date(hv + 'T23:59:59');
+  if (desde > hasta) { document.getElementById('filterNote').textContent = '⚠️ "Desde" no puede ser mayor que "Hasta".'; return; }
+
+  const mes = mesNombre(desde);
+  const mesHasta = mesNombre(hasta);
+  document.getElementById('filterNote').textContent = mes !== mesHasta
+    ? `⚠️ El rango cruza dos meses — se usan los datos del snapshot de ${mes}.`
+    : '';
+
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('loading').style.display = 'block';
+
+  try {
+    if (!snapCache[mes]) {
+      snapCache[mes] = await supaFetch(`/gym_snapshots?mes=eq.${encodeURIComponent(mes)}&select=sede,mes,users_data,renov_data`) || [];
+    }
+    const snaps = snapCache[mes];
+    document.getElementById('loading').style.display = 'none';
+    if (!snaps.length) {
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('emptyState').textContent = `No hay datos cargados para ${mes}.`;
+      document.getElementById('dashboard').style.display = 'block';
+      document.getElementById('compBody').innerHTML = '';
+      return;
+    }
+    render(snaps, desde, hasta);
+    document.getElementById('dashboard').style.display = 'block';
+  } catch(e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('emptyState').textContent = '⚠️ Error al cargar datos: ' + e.message;
+  }
+}
+
+let detalleData = {};  // sede → { proyectados: [...] }
+
+function render(snaps, desde, hasta) {
+  const bySede = {};
+  snaps.forEach(s => { if (!bySede[s.sede]) bySede[s.sede] = s; });
+
+  let tProy = 0, tCobrado = 0, tClientes = 0, tPagos = 0, tPendMonto = 0, tPendClientes = 0;
+  detalleData = {};
+  const rows = [];
+
+  SEDES.forEach(sede => {
+    const snap = bySede[sede];
+    const meta = SEDE_META[sede] || { icon: '🏋️', color: '#555' };
+    if (!snap) {
+      rows.push(`<tr><td><span class="sede-dot" style="background:${meta.color}"></span>${meta.icon} ${sede}</td>
+        <td colspan="6" style="color:var(--muted);font-style:italic;">Sin datos cargados para este mes</td></tr>`);
+      return;
+    }
+
+    // Cobros reales del rango (membresías; excluye clases sueltas y sin clasificar)
+    const cobros = (snap.renov_data || []).filter(r => {
+      if (r.EsClaseSuelta || r.EsSinClasificar) return false;
+      const d = parseDMY(r.FechaStr);
+      return d && d >= desde && d <= hasta;
+    });
+    const cobrado = cobros.reduce((s,r) => s + (Number(r.Total) || 0), 0);
+    const pagadores = new Set(cobros.map(r => norm(r.Cliente)));
+
+    // Proyección: activos cuyo plan vence dentro del rango
+    const proyectados = (snap.users_data || [])
+      .filter(u => {
+        if (u.Activo !== 'Sí') return false;
+        const d = parseDMY(u.Expira);
+        return d && d >= desde && d <= hasta;
+      })
+      .map(u => ({
+        nombre: u.Nombre, plan: u.ÚltimoProducto || '—', telefono: u.Telefono || '—',
+        expira: u.Expira, valor: Number(u.ValorPlan) || 0,
+        pagado: pagadores.has(norm(u.Nombre))
+      }))
+      .sort((a,b) => (parseDMY(a.expira)||0) - (parseDMY(b.expira)||0));
+
+    const proy = proyectados.reduce((s,u) => s + u.valor, 0);
+    const pendientes = proyectados.filter(u => !u.pagado);
+    const pendMonto = pendientes.reduce((s,u) => s + u.valor, 0);
+    const pct = proy > 0 ? cobrado / proy * 100 : (cobrado > 0 ? 100 : 0);
+    const pctCls = pct >= 70 ? 'pct-alto' : pct >= 40 ? 'pct-medio' : 'pct-bajo';
+
+    detalleData[sede] = proyectados;
+    tProy += proy; tCobrado += cobrado; tClientes += proyectados.length;
+    tPagos += cobros.length; tPendMonto += pendMonto; tPendClientes += pendientes.length;
+
+    const sinVentas = !(snap.renov_data || []).length;
+    rows.push(`<tr class="sede-row" onclick="toggleDetalle('${sede.replace(/'/g,"\\'")}')">
+      <td><span class="sede-dot" style="background:${meta.color}"></span>${meta.icon} <strong>${sede}</strong></td>
+      <td class="num">${proyectados.length}</td>
+      <td class="num"><strong>${fmt(proy)}</strong></td>
+      <td class="num">${sinVentas ? '<span style="color:var(--muted);font-style:italic;" title="No se ha subido el archivo de ventas de este mes">sin ventas cargadas</span>' : cobros.length}</td>
+      <td class="num" style="color:var(--success);font-weight:700;">${fmt(cobrado)}</td>
+      <td class="num"><span class="pct-badge ${pctCls}">${pct.toFixed(1)}%</span></td>
+      <td class="num" style="color:var(--warn);">${fmt(pendMonto)}</td>
+    </tr>
+    <tr class="detalle-row" id="det-${norm(sede).replace(/\s/g,'-')}" style="display:none;"><td colspan="7"><div class="detalle-inner" id="detInner-${norm(sede).replace(/\s/g,'-')}"></div></td></tr>`);
+  });
+
+  const tPct = tProy > 0 ? tCobrado / tProy * 100 : 0;
+  rows.push(`<tr class="total-row">
+    <td>TOTAL</td>
+    <td class="num">${tClientes}</td>
+    <td class="num">${fmt(tProy)}</td>
+    <td class="num">${tPagos}</td>
+    <td class="num" style="color:var(--success);">${fmt(tCobrado)}</td>
+    <td class="num">${tPct.toFixed(1)}%</td>
+    <td class="num" style="color:var(--warn);">${fmt(tPendMonto)}</td>
+  </tr>`);
+  document.getElementById('compBody').innerHTML = rows.join('');
+
+  document.getElementById('kpiProy').textContent = fmt(tProy);
+  document.getElementById('kpiProySub').textContent = `${tClientes} clientes con vencimiento en el rango`;
+  document.getElementById('kpiCobrado').textContent = fmt(tCobrado);
+  document.getElementById('kpiCobradoSub').textContent = `${tPagos} pagos de membresía registrados`;
+  document.getElementById('kpiPct').textContent = tPct.toFixed(1) + '%';
+  document.getElementById('kpiPend').textContent = fmt(tPendMonto);
+  document.getElementById('kpiPendSub').textContent = `${tPendClientes} clientes sin pago detectado`;
+}
+
+let detFiltro = {};  // sede → 'todos'|'pendientes'|'pagados'
+
+function toggleDetalle(sede) {
+  const id = norm(sede).replace(/\s/g,'-');
+  const row = document.getElementById('det-' + id);
+  if (!row) return;
+  const visible = row.style.display !== 'none';
+  row.style.display = visible ? 'none' : '';
+  if (!visible) renderDetalle(sede);
+}
+
+function setDetFiltro(sede, f) {
+  detFiltro[sede] = f;
+  renderDetalle(sede);
+}
+
+function renderDetalle(sede) {
+  const id = norm(sede).replace(/\s/g,'-');
+  const el = document.getElementById('detInner-' + id);
+  const data = detalleData[sede] || [];
+  const filtro = detFiltro[sede] || 'pendientes';
+  const filtered = filtro === 'todos' ? data
+    : filtro === 'pagados' ? data.filter(u => u.pagado)
+    : data.filter(u => !u.pagado);
+
+  const btn = (f, label) => `<button class="${(detFiltro[sede]||'pendientes')===f?'on':''}" onclick="event.stopPropagation();setDetFiltro('${sede.replace(/'/g,"\\'")}','${f}')">${label}</button>`;
+  const filtros = `<div class="det-filtros">
+    ${btn('pendientes', `Pendientes (${data.filter(u=>!u.pagado).length})`)}
+    ${btn('pagados', `Pagados (${data.filter(u=>u.pagado).length})`)}
+    ${btn('todos', `Todos (${data.length})`)}
+  </div>`;
+
+  if (!filtered.length) { el.innerHTML = filtros + '<div style="color:var(--muted);font-size:12px;padding:8px;">Sin clientes en esta vista.</div>'; return; }
+
+  el.innerHTML = filtros + `<table class="det-table">
+    <thead><tr><th>Cliente</th><th>Teléfono</th><th>Plan</th><th>Vence</th><th class="num">Valor</th><th>Estado</th></tr></thead>
+    <tbody>${filtered.map(u => `<tr>
+      <td><strong>${u.nombre}</strong></td>
+      <td>${u.telefono}</td>
+      <td>${u.plan}</td>
+      <td>${u.expira}</td>
+      <td class="num">${u.valor > 0 ? fmt(u.valor) : '—'}</td>
+      <td>${u.pagado ? '<span class="tag-pagado">✓ Pagó</span>' : '<span class="tag-pendiente">Pendiente</span>'}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+</script>
+</body>
+</html>
