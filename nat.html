@@ -931,6 +931,20 @@ function mostrarDashboardDesdeSnapshot(s) {
     if (u.Descuento === 'Completo') G.planCompleto.push(row);
     else G.proyeccion.push(row);
   });
+  // Fallback: si el snapshot no trae proyección guardada (solo se subió el
+  // informe de usuarios), reconstruir el listado con los activos que renuevan este mes
+  const yaEnProy = new Set([...G.proyeccion, ...G.planCompleto].map(r => norm(r.cliente)));
+  ud.filter(u => u.Activo === 'Sí' && !yaEnProy.has(norm(u.Nombre))).forEach(u => {
+    if (!renovaEsteMes({ expira: u.Expira })) return;
+    const precio = u.ValorPlan || getPlanPriceNat(u.ÚltimoProducto) || 0;
+    if (!(precio > 0)) return;
+    G.planCompleto.push({
+      pin: u.PIN, cliente: u.Nombre, fuente: 'Completo', pct: 0,
+      planMain: u.ÚltimoProducto, precioBase: precio,
+      precioJunio: precio, precioFuente: null, pendiente: null,
+      pagoMayo: null, expira: u.Expira, expiraDate: parseDate(u.Expira)
+    });
+  });
   G.totalJunio = s.proyecciones?.total_junio || [...G.proyeccion, ...G.planCompleto].reduce((sum,r)=>sum+(r.precioJunio||0),0);
 
   // ── Reconstruir Validación de Descuentos + Lealtad (tab Validación) ──
