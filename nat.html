@@ -1288,16 +1288,19 @@ async function processUsuariosNat(file) {
         promoExpirada = discInfo.promoExpirada;
         if (!promoExpirada && !(discInfo.precioJunio > 0)) noPagoJunio = true;
       }
-      // Detectar promo en el nombre crudo del plan: "(Promo: Abril)" → % conocido
+      // Detectar promo en el nombre crudo del plan: "(Promo: Abril)".
+      // Solo Marzo y Abril son descuentos permanentes (hasta diciembre);
+      // cualquier otra promo (Solo Junio, Julio, etc.) aplica solo el primer
+      // mes, así que en la renovación pagan precio completo.
       if (!descuento && !promoExpirada) {
         const promoTag = (rawPlan.match(/\(Promo:\s*([^)]+)\)/i) || [])[1]?.trim();
         if (promoTag) {
           const key = norm(promoTag);
-          if (/junio/.test(key)) {
-            promoExpirada = true; // Promo Solo Junio: expiró, paga completo
-          } else if (PROMO_PCT[key] != null) {
+          if (PROMO_PCT[key] != null) {
             descuento = 'Promo ' + promoTag;
             descuentoPct = PROMO_PCT[key];
+          } else {
+            promoExpirada = true; // promo de un solo mes ya consumida
           }
         }
       }
