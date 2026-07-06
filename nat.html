@@ -1213,6 +1213,17 @@ async function processUsuariosNat(file) {
 
     const data = await file.arrayBuffer();
     const wb = XLSX.read(new Uint8Array(data), { type:'array', cellDates:false });
+
+    // Detección automática: si es el nat.xlsx combinado (trae hojas de
+    // descuentos/precios), procesarlo por la ruta completa aunque se haya
+    // subido con el botón de "Informe Usuarios"
+    if (wb.Sheets['20%'] || wb.Sheets['25%'] || wb.Sheets['g20'] || (wb.Sheets['Hoja2'] && wb.Sheets['Hoja3'])) {
+      document.getElementById('fileNameLabel').textContent = file.name;
+      document.getElementById('saveStatus').textContent = '📂 Archivo combinado detectado — procesando completo...';
+      analizar(wb);
+      return;
+    }
+
     const ws = wb.Sheets[wb.SheetNames[0]];
     const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
 
@@ -1723,6 +1734,14 @@ function procesarArchivo(file) {
   reader.onload = e => {
     try {
       const wb = XLSX.read(e.target.result, { type: 'array', cellDates: false });
+      // Detección automática: si NO es el combinado (sin Hoja2/Hoja3),
+      // tratarlo como Informe de Usuarios
+      if (!wb.Sheets['Hoja2'] || !wb.Sheets['Hoja3']) {
+        document.getElementById('loadingSection').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        processUsuariosNat(file);
+        return;
+      }
       analizar(wb);
     } catch(err) {
       alert('Error al leer el archivo: ' + err.message);
