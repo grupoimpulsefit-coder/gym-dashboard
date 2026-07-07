@@ -243,7 +243,7 @@ async function supaFetch(path, opts = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
-const ROLES_PERMITIDOS = ['admin', 'admin_sedes'];
+const ROLES_PERMITIDOS = ['admin_sedes'];
 
 async function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();
