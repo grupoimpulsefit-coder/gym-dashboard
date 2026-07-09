@@ -1343,6 +1343,7 @@ function rebuildDashboard() {
 
     renderTable();
     updateRenoStats();
+    renderRenovaciones();   // refresca gráficos y tabla aunque el tab ya esté abierto (cambio de sede)
     buildValidacion();
     renderValidacion();
     if (usersData.length) renderSeguimiento();
