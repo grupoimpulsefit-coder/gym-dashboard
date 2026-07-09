@@ -332,6 +332,32 @@ function rangoRapido(tipo) {
   aplicarFiltro();
 }
 
+// ── Precios de respaldo desde plan_prices (cuando el snapshot trae ValorPlan 0) ──
+let planPricesBySede = null;   // sede → { normPlan: precio }
+
+async function loadPlanPrices() {
+  if (planPricesBySede) return;
+  planPricesBySede = {};
+  try {
+    const rows = await supaFetch('/plan_prices?select=sede,plan,precio') || [];
+    rows.forEach(r => {
+      if (!planPricesBySede[r.sede]) planPricesBySede[r.sede] = {};
+      planPricesBySede[r.sede][norm(r.plan)] = r.precio;
+    });
+  } catch(e) { console.warn('No se pudieron cargar plan_prices:', e.message); }
+}
+
+function precioRespaldo(sede, plan) {
+  const m = planPricesBySede?.[sede];
+  if (!m || !plan) return 0;
+  const key = norm(plan);
+  if (m[key] != null) return m[key];
+  for (const k of Object.keys(m)) {
+    if (k.includes(key) || key.includes(k)) return m[k];
+  }
+  return 0;
+}
+
 // ── Carga y cálculo ─────────────────────────────────────────────────────
 let snapCache = {};   // mes → snapshots[]
 
@@ -354,6 +380,7 @@ async function aplicarFiltro() {
   document.getElementById('loading').style.display = 'block';
 
   try {
+    await loadPlanPrices();
     if (!snapCache[mes]) {
       snapCache[mes] = await supaFetch(`/gym_snapshots?mes=eq.${encodeURIComponent(mes)}&select=sede,mes,users_data,renov_data`) || [];
     }
@@ -417,7 +444,8 @@ function render(snaps, desde, hasta) {
       })
       .map(u => ({
         nombre: u.Nombre, plan: u.ÚltimoProducto || '—', telefono: u.Telefono || '—',
-        expira: u.Expira, valor: Number(u.ValorPlan) || 0,
+        expira: u.Expira,
+        valor: Number(u.ValorPlan) || precioRespaldo(sede, u.ÚltimoProducto),
         pagado: pagadores.has(norm(u.Nombre))
       }))
       .sort((a,b) => (parseDMY(a.expira)||0) - (parseDMY(b.expira)||0));
