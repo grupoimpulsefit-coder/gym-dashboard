@@ -963,15 +963,20 @@ function mostrarDashboardDesdeSnapshot(s) {
     estado: u.EstadoValidacion, pagoTardio: u.PagoTardio || null,
     pago: u.PagoMonto != null ? { total: u.PagoMonto, fecha: u.PagoFecha } : null
   }));
-  // Agregar usuarios de planes lealtad/fidelidad no incluidos aún
+  // Agregar usuarios de planes lealtad/fidelidad y promos permanentes (Marzo/Abril)
+  // no incluidos aún — las promos Marzo/Abril también se consideran lealtad
   const yaEnVal = new Set(G.validacion.map(r => norm(r.cliente)));
-  ud.filter(u => u.Activo === 'Sí' && LEALTAD_RE.test(u.ÚltimoProducto || '') && !yaEnVal.has(norm(u.Nombre))).forEach(u => {
+  ud.filter(u => u.Activo === 'Sí' && !yaEnVal.has(norm(u.Nombre))
+      && (LEALTAD_RE.test(u.ÚltimoProducto || '') || /^promo/i.test(u.Descuento || ''))).forEach(u => {
     const expiraDate = parseDate(u.Expira);
     const hoy = new Date(); hoy.setHours(0,0,0,0);
     const dias = expiraDate ? Math.round((expiraDate - hoy) / 86400000) : null;
     const estado = dias === null ? 'al_dia' : dias < 0 ? 'vencido_sin_pago' : dias <= 15 ? 'por_vencer_sin_pago' : 'al_dia';
+    const esPromo = /^promo/i.test(u.Descuento || '');
     G.validacion.push({
-      pin: u.PIN, cliente: u.Nombre, fuente: 'Lealtad', pct: 0,
+      pin: u.PIN, cliente: u.Nombre,
+      fuente: esPromo ? u.Descuento : 'Lealtad',
+      pct: esPromo ? (u.DescuentoPct || 0) : 0,
       planMain: u.ÚltimoProducto,
       precioJunio: u.ValorPlan || getPlanPriceNat(u.ÚltimoProducto) || 0,
       precioBase: u.ValorPlan || getPlanPriceNat(u.ÚltimoProducto) || 0,
