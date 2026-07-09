@@ -1893,15 +1893,17 @@ function buildValidacion() {
     allValidacion = [];
     const TOL = 100;
     const today = new Date(); today.setHours(0,0,0,0);
-    // Lealtad/fidelidad por nombre de plan + promos permanentes (Marzo/Abril, Natación)
-    usersData.filter(m => m.Activo === 'Sí' && (LEALTAD_RE.test(m.ÚltimoProducto || '') || /^promo/i.test(m.Descuento || ''))).forEach(m => {
-        const esPromo = /^promo/i.test(m.Descuento || '');
-        // Para promos el precio esperado es el ValorPlan guardado (ya con descuento aplicado)
-        const precioEsperado = esPromo
+    // Lealtad/fidelidad por nombre de plan + clientes con descuento
+    // (hojas 20%/25%/G20 y promos Marzo/Abril de Natación)
+    const tieneDesc = m => !!(m.Descuento && m.Descuento !== 'Completo');
+    usersData.filter(m => m.Activo === 'Sí' && (LEALTAD_RE.test(m.ÚltimoProducto || '') || tieneDesc(m))).forEach(m => {
+        const esDescuento = tieneDesc(m);
+        // Para descuentos el precio esperado es el ValorPlan guardado (ya con descuento aplicado)
+        const precioEsperado = esDescuento
             ? ((m.ValorPlan || 0) || null)
             : ((planPrices[m.ÚltimoProducto] || m.ValorPlan || 0) || null);
         const pagos = renovacionesData
-            .filter(r => r.User === m && (esPromo || LEALTAD_RE.test(r.Producto)))
+            .filter(r => r.User === m && (esDescuento || LEALTAD_RE.test(r.Producto)))
             .sort((a, b) => (b.TxDate?.getTime() || 0) - (a.TxDate?.getTime() || 0));
         const pago = pagos[0] || null;
         const dias = m.ExpiraDate ? Math.round((m.ExpiraDate - today) / 864e5) : null;
