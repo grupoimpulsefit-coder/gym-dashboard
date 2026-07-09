@@ -881,8 +881,10 @@ async function loadSedeForColaborador(sede, mesEspecifico) {
         renoLoaded = true;
         await loadPricesForSede(currentSedeName);
         // plan_prices manda sobre el ValorPlan guardado en el snapshot
-        // (así los cambios de precio hechos en Supabase se reflejan sin re-subir el Excel)
+        // (así los cambios de precio hechos en Supabase se reflejan sin re-subir el Excel).
+        // Excepción: usuarios con Descuento (Natación) conservan su precio rebajado.
         usersData.forEach(u => {
+            if (u.Descuento) return;
             const p = planPrices[u.ÚltimoProducto];
             if (p > 0 && !manualPrices[`${u.ÚltimoProducto}|${u.PIN}`]) u.ValorPlan = p;
         });
@@ -1891,10 +1893,15 @@ function buildValidacion() {
     allValidacion = [];
     const TOL = 100;
     const today = new Date(); today.setHours(0,0,0,0);
-    usersData.filter(m => m.Activo === 'Sí' && LEALTAD_RE.test(m.ÚltimoProducto || '')).forEach(m => {
-        const precioEsperado = (planPrices[m.ÚltimoProducto] || m.ValorPlan || 0) || null;
+    // Lealtad/fidelidad por nombre de plan + promos permanentes (Marzo/Abril, Natación)
+    usersData.filter(m => m.Activo === 'Sí' && (LEALTAD_RE.test(m.ÚltimoProducto || '') || /^promo/i.test(m.Descuento || ''))).forEach(m => {
+        const esPromo = /^promo/i.test(m.Descuento || '');
+        // Para promos el precio esperado es el ValorPlan guardado (ya con descuento aplicado)
+        const precioEsperado = esPromo
+            ? ((m.ValorPlan || 0) || null)
+            : ((planPrices[m.ÚltimoProducto] || m.ValorPlan || 0) || null);
         const pagos = renovacionesData
-            .filter(r => r.User === m && LEALTAD_RE.test(r.Producto))
+            .filter(r => r.User === m && (esPromo || LEALTAD_RE.test(r.Producto)))
             .sort((a, b) => (b.TxDate?.getTime() || 0) - (a.TxDate?.getTime() || 0));
         const pago = pagos[0] || null;
         const dias = m.ExpiraDate ? Math.round((m.ExpiraDate - today) / 864e5) : null;
