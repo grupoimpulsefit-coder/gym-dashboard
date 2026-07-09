@@ -1023,7 +1023,9 @@ function isMembershipPlan(product) {
         if (normName(key) === normName(p) || normName(p).includes(normName(key)) || normName(key).includes(normName(p))) return true;
     }
     // Fallback: contains "plan" or "promo" or "anualidad" or "lealtad" or "bloqueado" or "verano" or "estudiante" or "renovacion"
-    return /plan|promo|anual|lealtad|bloqueado|verano|exclusivo|platium|semestral|trimest|estudiante|renovaci[oó]n|black|ejecutivo|\bpng\b|\bcps\b/i.test(p);
+    // "N x NNmil" (ej. "JULIO 2 X 40MIL") y planes nombrados por mes son promos de membresía
+    if (/\d+\s*x\s*\d+\s*mil/i.test(p)) return true;
+    return /plan|promo|anual|lealtad|bloqueado|verano|exclusivo|platium|semestral|trimest|estudiante|renovaci[oó]n|black|ejecutivo|mensualidad|matr[ií]cula|\bpng\b|\bcps\b/i.test(p);
 }
 function isClaseSuelta(product) {
     let pl = String(product||'').trim().toLowerCase();
