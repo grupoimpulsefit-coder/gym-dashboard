@@ -402,7 +402,7 @@
                             <th>Tipo</th>
                             <th>Total (₡)</th>
                             <th>Días sin renovar</th>
-                            <th>Ingreso Pinares</th>
+                            <th id="thIngresoSede">Fecha Ingreso</th>
                             <th>Expira actual</th>
                             <th>Registrado por</th>
                         </tr></thead>
@@ -635,6 +635,8 @@ function detectSede(filename) {
 function applySedeUI() {
     document.querySelector('.header-titles h1').textContent = `Sistema de Gestión — ${currentSedeName}`;
     document.querySelector('.header-titles p').textContent  = `${currentSedeName} · Análisis de ingresos, membresías y renovaciones`;
+    const thIng = document.getElementById('thIngresoSede');
+    if (thIng) thIng.textContent = `Ingreso ${currentSedeName}`;
 }
 
 function onSedeSelected() {
@@ -1770,7 +1772,7 @@ function renderRenovaciones() {
 
 function exportRenoCSV() {
     let f=getFilteredRenovaciones(); if(!f.length){alert('No hay datos');return;}
-    let h=['Fecha','Cliente','Plan','Tipo','Total CRC','Dias sin renovar','Ingreso Pinares','Expira actual','Registrado por'];
+    let h=['Fecha','Cliente','Plan','Tipo','Total CRC','Dias sin renovar','Ingreso '+currentSedeName,'Expira actual','Registrado por'];
     let rows=f.map(r=>[r.FechaStr,r.Cliente,r.Producto,r.Tipo,r.Total,r.GapDias??'',r.User?.Ingreso||'',r.User?.Expira||'',r.RegistradoPor]);
     let csv=[h,...rows].map(row=>row.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
     dlBlob(csv,'renovaciones_'+hoy()+'.csv','text/csv;charset=utf-8');
@@ -1807,7 +1809,7 @@ function exportRenoPDF() {
     ]);
     doc.autoTable({
         startY:122,
-        head:[['Fecha','Cliente','Plan','Tipo','Total (CRC)','Días gap','Ingreso Pinares','Registrado por']],
+        head:[['Fecha','Cliente','Plan','Tipo','Total (CRC)','Días gap','Ingreso '+currentSedeName,'Registrado por']],
         body:tableRows,
         headStyles:{ fillColor:[102,126,234], textColor:255, fontStyle:'bold', fontSize:8.5 },
         didParseCell(data) {
