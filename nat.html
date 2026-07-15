@@ -237,6 +237,44 @@
   .role-badge { background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.3); border-radius:20px; padding:3px 12px; font-size:11px; font-weight:700; text-transform:uppercase; }
   .logout-btn { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:white; border-radius:16px; padding:5px 16px; font-size:12px; font-weight:600; cursor:pointer; }
   #saveStatus { font-size:12px; color:rgba(255,255,255,.85); }
+
+  /* ── Tab Calendario (reservaciones semanales) ── */
+  .cal-toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:4px 0 18px; }
+  .cal-views { display:flex; gap:4px; background:#e8edf4; border-radius:8px; padding:3px; }
+  .cal-views button { border:0; background:transparent; color:var(--muted); font:inherit; font-size:13px; font-weight:600; padding:6px 14px; border-radius:6px; cursor:pointer; }
+  .cal-views button.on { background:var(--primary); color:white; }
+  #calSearch { flex:1; min-width:200px; max-width:340px; border:1px solid var(--border); border-radius:8px; padding:8px 12px; font:inherit; font-size:13px; background:white; }
+  .cal-legend { display:flex; flex-wrap:wrap; gap:6px; margin-left:auto; }
+  .cal-leg { display:inline-flex; align-items:center; gap:6px; cursor:pointer; border:1px solid var(--border); background:white; border-radius:20px; padding:4px 11px; font-size:12px; font-weight:600; color:var(--text); }
+  .cal-leg .dot { width:9px; height:9px; border-radius:50%; }
+  .cal-leg.off { opacity:.4; }
+  .cal-board-scroll { overflow-x:auto; padding-bottom:6px; }
+  .cal-board { display:grid; grid-template-columns:repeat(7,minmax(190px,1fr)); gap:12px; min-width:1150px; }
+  .cal-day h4 { font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--primary); margin-bottom:10px; padding-bottom:6px; border-bottom:2px solid var(--border); display:flex; justify-content:space-between; align-items:baseline; }
+  .cal-day h4 small { color:var(--muted); font-weight:600; letter-spacing:0; }
+  .cal-cards { display:flex; flex-direction:column; gap:10px; }
+  .cal-sess { background:white; border:1px solid var(--border); border-left:4px solid var(--cat); border-radius:9px; padding:10px 12px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .cal-sess .top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .cal-sess time { font-weight:700; font-size:13.5px; white-space:nowrap; }
+  .cal-sess .occ { font-size:11.5px; color:var(--muted); white-space:nowrap; }
+  .cal-sess .act { font-size:12px; font-weight:600; color:var(--cat); margin:1px 0 6px; }
+  .cal-occbar { height:3px; border-radius:2px; background:#eef1f6; margin-bottom:8px; overflow:hidden; }
+  .cal-occbar i { display:block; height:100%; background:var(--cat); }
+  .cal-sess ul { list-style:none; margin:0; padding:0; }
+  .cal-sess li { font-size:12.5px; line-height:1.4; padding-left:12px; position:relative; }
+  .cal-sess li::before { content:""; position:absolute; left:0; top:.5em; width:5px; height:5px; border-radius:50%; background:var(--cat); opacity:.55; }
+  .cal-sess mark, .cal-person mark { background:transparent; color:var(--primary-light); font-weight:700; }
+  .cal-empty { color:var(--muted); font-size:12.5px; padding:6px 2px; }
+  .cal-people { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:12px; }
+  .cal-person { background:white; border:1px solid var(--border); border-radius:10px; padding:12px 14px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .cal-person h4 { font-size:13.5px; margin-bottom:8px; }
+  .cal-slots { display:flex; flex-wrap:wrap; gap:5px; }
+  .cal-slot { display:inline-flex; align-items:center; gap:6px; background:#f2f5fa; border:1px solid #e4e9f2; border-radius:6px; padding:3px 8px; font-size:11.5px; }
+  .cal-slot .dot { width:7px; height:7px; border-radius:50%; flex:none; }
+  .cal-slot b { font-weight:700; }
+  .cal-slot span { color:var(--muted); }
+  .cal-none { color:var(--muted); padding:20px 4px; font-size:13px; }
+  .cal-count { color:var(--muted); font-size:12.5px; padding-top:12px; grid-column:1/-1; }
 </style>
 </head>
 <body>
@@ -340,6 +378,7 @@
     <div class="tab" onclick="switchTab('tabJunio',this)">🔄 Análisis de Renovaciones</div>
     <div class="tab" onclick="switchTab('tabValidacion',this)">✅ Validación Descuentos</div>
     <div class="tab" onclick="switchTab('tabSeguimiento',this)">📋 Seguimiento Vencidos</div>
+    <div class="tab" id="tabCalendarioBtn" style="display:none" onclick="switchTab('tabCalendario',this)">📅 Calendario</div>
   </div>
 
   <!-- Selector de mes (visible dentro del dashboard) -->
@@ -761,6 +800,41 @@
       <div id="segTableInfo" style="padding:10px 0;font-size:12.5px;color:#888;"></div>
     </div>
   </div>
+
+  <!-- TAB 7: Calendario de reservaciones (solo admin_sedes) -->
+  <div id="tabCalendario" class="tab-panel">
+    <div class="alert alert-info">
+      Calendario de <strong>reservaciones semanales</strong>: personas inscritas y sus horarios por día, hora y actividad.
+      Solo se muestran las sesiones con al menos una persona inscrita.
+    </div>
+
+    <div class="upload-zone" id="calUploadZone">
+      <div class="icon">📅</div>
+      <h2>Cargar informe de reservaciones</h2>
+      <p>Arrastra y suelta el archivo <strong>Informe_Reservaciones_Semanales.xlsx</strong> aquí, o haz clic para buscarlo</p>
+      <label class="btn-upload" for="calFileInput">Seleccionar archivo</label>
+      <input type="file" id="calFileInput" accept=".xlsx,.xls" style="display:none">
+    </div>
+
+    <div id="calContenido" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+        <span style="font-size:12.5px;color:var(--muted);">📄 <span id="calFileLabel"></span></span>
+        <button class="btn btn-primary" onclick="calCambiarArchivo()">📂 Cargar otro informe</button>
+      </div>
+      <div class="cards" id="calStats" style="padding:0 0 8px;"></div>
+      <div class="cal-toolbar">
+        <div class="cal-views">
+          <button id="calBtnBoard" class="on" onclick="calSetVista('board')">Horario semanal</button>
+          <button id="calBtnPeople" onclick="calSetVista('people')">Por persona</button>
+        </div>
+        <input id="calSearch" type="search" placeholder="Buscar persona…" oninput="calBuscar(this.value)">
+        <div class="cal-legend" id="calLegend"></div>
+      </div>
+      <div id="calVistaBoard" class="cal-board-scroll"><div class="cal-board" id="calBoard"></div></div>
+      <div id="calVistaPeople" class="cal-people" style="display:none"></div>
+      <div id="calSinResultados" class="cal-none" style="display:none">Sin resultados para esa búsqueda.</div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -770,6 +844,8 @@
 const SUPA_URL = '__SUPA_URL__';
 const SUPA_KEY = '__SUPA_KEY__';
 let currentToken = null, currentRole = null;
+// 'admin' conserva su acceso actual; 'admin_sedes' entra con los mismos permisos de admin
+const esRolAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes';
 
 async function supaFetch(path, opts = {}) {
   const token = currentToken || SUPA_KEY;
@@ -805,10 +881,15 @@ async function doLogin() {
     currentRole = roles?.[0]?.role || 'colaborador';
     const nombre = roles?.[0]?.nombre || email;
     document.getElementById('userNombre').textContent = nombre;
-    document.getElementById('userRolBadge').textContent = currentRole === 'admin' ? '⚙ Admin' : '👁 Colaborador';
+    document.getElementById('userRolBadge').textContent =
+      currentRole === 'admin' ? '⚙ Admin' :
+      currentRole === 'admin_sedes' ? '🏢 Admin Sedes' : '👁 Colaborador';
     // Ocultar sección de carga si es colaborador
-    if (currentRole !== 'admin') {
-      document.getElementById('uploadSection').style.display = 'none';
+    document.getElementById('uploadSection').style.display = esRolAdmin() ? '' : 'none';
+    // El calendario de reservaciones solo es visible para admin_sedes
+    document.getElementById('tabCalendarioBtn').style.display = currentRole === 'admin_sedes' ? '' : 'none';
+    if (currentRole !== 'admin_sedes' && document.getElementById('tabCalendario').classList.contains('active')) {
+      switchTab('tabUsuarios', document.querySelector(`.tab[onclick*="tabUsuarios"]`));
     }
     document.getElementById('loginScreen').style.display = 'none';
     cargarResumenGuardado();
@@ -1823,7 +1904,7 @@ function procesarVentasSolo(file) {
       document.querySelector(`.tab[onclick*="tabJunio"]`).classList.add('active');
       renderRenovaciones();
 
-      if (currentRole === 'admin') await autoSaveNat(mes, false);
+      if (esRolAdmin()) await autoSaveNat(mes, false);
     } catch(err) {
       alert('Error al leer el archivo: ' + err.message);
     } finally {
@@ -2473,7 +2554,7 @@ function analizar(wb) {
 
   // Guardar en Supabase (solo admin)
   G.totalJunio = Math.round(totalDescuento + totalCompleto);
-  if (currentRole === 'admin') {
+  if (esRolAdmin()) {
     // Detectar mes desde la hoja más reciente (junio sheet o Hoja3)
     const allDates = [...G.ventas, ...G.junio]
       .map(r => r.fecha).filter(Boolean)
@@ -4031,6 +4112,213 @@ function pdfProyeccion() {
 
   doc.save('proyeccion-junio-' + new Date().toISOString().slice(0,10) + '.pdf');
 }
+
+// ─────────────────────────────────────────
+// TAB CALENDARIO — Reservaciones semanales (solo admin_sedes)
+// Lee el Informe_Reservaciones_Semanales.xlsx: cada fila de sesión tiene el
+// formato "Actividad | Día | HH:MM AM | (X de Y espacios disponibles)" y las
+// filas siguientes son los nombres de las personas inscritas en esa sesión.
+// ─────────────────────────────────────────
+const CAL = {
+  dias: ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'],
+  cats: {
+    adultos:      { label:'Natación adultos',      color:'#0b7285' },
+    mayores:      { label:'Adultos mayores',       color:'#5b67b8' },
+    ninos:        { label:'Natación niños',        color:'#c26a12' },
+    estimulacion: { label:'Estimulación temprana', color:'#9c55a8' },
+    aquafitness:  { label:'Aquafitness',           color:'#2e8f5b' },
+    libre:        { label:'Natación libre',        color:'#4c8ca8' },
+    otros:        { label:'Otros',                 color:'#6c757d' }
+  },
+  data: [], vista: 'board', q: '', activas: null
+};
+
+function calFold(s) { return String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
+
+function calCategoria(act) {
+  const a = calFold(act);
+  if (a.includes('mayores')) return 'mayores';
+  if (a.includes('estimulacion')) return 'estimulacion';
+  if (a.includes('aquafitness')) return 'aquafitness';
+  if (a.includes('libre')) return 'libre';
+  if (a.includes('nin') || a.includes('transicion') || a.includes('trancision') ||
+      a.includes('principiante') || a.includes('avanzado') || a.trim() === 'intermedio') return 'ninos';
+  if (a.includes('natacion') || a.includes('nataion') || a.includes('adulto')) return 'adultos';
+  return 'otros';
+}
+
+function calMin(h) {
+  const m = h.match(/(\d{1,2}):(\d{2})\s*([AP]M)/i);
+  let hh = +m[1];
+  if (m[3].toUpperCase() === 'PM' && hh !== 12) hh += 12;
+  if (m[3].toUpperCase() === 'AM' && hh === 12) hh = 0;
+  return hh * 60 + +m[2];
+}
+
+function calHi(nombre, q) {
+  if (!q) return esc(nombre);
+  const idx = calFold(nombre).indexOf(q);
+  if (idx < 0) return esc(nombre);
+  return esc(nombre.slice(0, idx)) + '<mark>' + esc(nombre.slice(idx, idx + q.length)) + '</mark>' + esc(nombre.slice(idx + q.length));
+}
+
+function calProcesarArchivo(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false });
+      const pat = /^(.*?)\s*\|\s*(\S+)\s*\|\s*(\d{1,2}:\d{2}\s*[AP]M)\s*\|\s*\((\d+)\s+de\s+(\d+)\s+espacios/i;
+      const sesiones = []; let cur = null;
+      rows.forEach(r => {
+        const v = String(r?.[0] ?? '').trim();
+        if (!v || v === 'Informe Reservaciones Semanales') return;
+        const m = v.match(pat);
+        if (m) {
+          cur = { act: m[1].trim().replace(/\s+/g,' '), cat: calCategoria(m[1]), dia: m[2],
+                  hora: m[3].replace(' AM',' a.m.').replace(' PM',' p.m.'), min: calMin(m[3]),
+                  ocupados: +m[5] - +m[4], total: +m[5], personas: [] };
+          sesiones.push(cur);
+        } else if (cur) {
+          cur.personas.push(v.replace(/\s+/g,' '));
+        }
+      });
+      const conGente = sesiones.filter(s => s.personas.length);
+      if (!conGente.length) {
+        alert('No se encontraron reservaciones. Verifique que el archivo sea el Informe de Reservaciones Semanales.');
+        return;
+      }
+      CAL.data = conGente.sort((a,b) => CAL.dias.indexOf(a.dia) - CAL.dias.indexOf(b.dia) || a.min - b.min);
+      CAL.activas = new Set(Object.keys(CAL.cats));
+      CAL.q = '';
+      document.getElementById('calSearch').value = '';
+      document.getElementById('calFileLabel').textContent = file.name;
+      document.getElementById('calUploadZone').style.display = 'none';
+      document.getElementById('calContenido').style.display = '';
+      calRenderStats(); calRenderLegend(); calRender();
+    } catch (err) {
+      alert('Error al leer el archivo: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function calCambiarArchivo() {
+  document.getElementById('calUploadZone').style.display = '';
+  document.getElementById('calFileInput').value = '';
+}
+
+function calRenderStats() {
+  const totalRes = CAL.data.reduce((a,s) => a + s.personas.length, 0);
+  const personas = new Set();
+  CAL.data.forEach(s => s.personas.forEach(p => personas.add(calFold(p))));
+  const porDia = {}; CAL.dias.forEach(d => porDia[d] = 0);
+  CAL.data.forEach(s => { if (porDia[s.dia] != null) porDia[s.dia] += s.personas.length; });
+  const top = CAL.dias.reduce((a,d) => porDia[d] > porDia[a] ? d : a, CAL.dias[0]);
+  document.getElementById('calStats').innerHTML = `
+    <div class="card"><div class="card-label">Reservaciones</div><div class="card-value">${totalRes}</div></div>
+    <div class="card green"><div class="card-label">Personas distintas</div><div class="card-value">${personas.size}</div></div>
+    <div class="card orange"><div class="card-label">Sesiones con inscritos</div><div class="card-value">${CAL.data.length}</div></div>
+    <div class="card purple"><div class="card-label">Día con más reservas</div><div class="card-value" style="font-size:20px;">${top} · ${porDia[top]}</div></div>`;
+}
+
+function calRenderLegend() {
+  const usadas = new Set(CAL.data.map(s => s.cat));
+  document.getElementById('calLegend').innerHTML = Object.entries(CAL.cats)
+    .filter(([k]) => usadas.has(k))
+    .map(([k,c]) => `<span class="cal-leg${CAL.activas.has(k) ? '' : ' off'}" onclick="calToggleCat('${k}')"><span class="dot" style="background:${c.color}"></span>${c.label}</span>`)
+    .join('');
+}
+
+function calToggleCat(k) {
+  if (CAL.activas.has(k) && [...CAL.activas].filter(c => CAL.data.some(s => s.cat === c)).length === 1) {
+    CAL.activas = new Set(Object.keys(CAL.cats));
+  } else if (CAL.activas.has(k)) {
+    CAL.activas.delete(k);
+  } else {
+    CAL.activas.add(k);
+  }
+  calRenderLegend(); calRender();
+}
+
+function calSetVista(v) {
+  CAL.vista = v;
+  document.getElementById('calBtnBoard').classList.toggle('on', v === 'board');
+  document.getElementById('calBtnPeople').classList.toggle('on', v === 'people');
+  calRender();
+}
+
+function calBuscar(txt) {
+  CAL.q = calFold(txt.trim());
+  calRender();
+}
+
+function calRender() {
+  document.getElementById('calVistaBoard').style.display = CAL.vista === 'board' ? '' : 'none';
+  document.getElementById('calVistaPeople').style.display = CAL.vista === 'people' ? '' : 'none';
+  const hay = CAL.vista === 'board' ? calRenderBoard() : calRenderPeople();
+  document.getElementById('calSinResultados').style.display = hay ? 'none' : '';
+}
+
+function calRenderBoard() {
+  const q = CAL.q;
+  let hay = false;
+  document.getElementById('calBoard').innerHTML = CAL.dias.map(dia => {
+    const sesiones = CAL.data
+      .filter(s => s.dia === dia && CAL.activas.has(s.cat))
+      .map(s => ({ ...s, vis: q ? s.personas.filter(p => calFold(p).includes(q)) : s.personas }))
+      .filter(s => s.vis.length);
+    const n = sesiones.reduce((a,s) => a + s.vis.length, 0);
+    if (n) hay = true;
+    const cards = sesiones.map(s => `
+      <div class="cal-sess" style="--cat:${CAL.cats[s.cat].color}">
+        <div class="top"><time>${s.hora}</time><span class="occ">${s.ocupados}/${s.total} cupos</span></div>
+        <div class="act">${esc(s.act)}</div>
+        <div class="cal-occbar"><i style="width:${Math.round(100 * s.ocupados / s.total)}%"></i></div>
+        <ul>${s.vis.map(p => `<li>${calHi(p, q)}</li>`).join('')}</ul>
+      </div>`).join('');
+    return `<div class="cal-day"><h4>${dia}<small>${n || '—'}</small></h4>
+      <div class="cal-cards">${cards || '<div class="cal-empty">Sin reservaciones</div>'}</div></div>`;
+  }).join('');
+  return hay;
+}
+
+function calRenderPeople() {
+  const q = CAL.q;
+  const mapa = new Map();
+  CAL.data.forEach(s => {
+    if (!CAL.activas.has(s.cat)) return;
+    s.personas.forEach(p => {
+      const k = calFold(p);
+      if (!mapa.has(k)) mapa.set(k, { nombre: p, slots: [] });
+      mapa.get(k).slots.push(s);
+    });
+  });
+  const lista = [...mapa.values()]
+    .filter(p => !q || calFold(p.nombre).includes(q))
+    .sort((a,b) => a.nombre.localeCompare(b.nombre, 'es'));
+  document.getElementById('calVistaPeople').innerHTML = lista.map(p => `
+    <div class="cal-person"><h4>${calHi(p.nombre, q)}</h4>
+      <div class="cal-slots">${p.slots.map(s =>
+        `<span class="cal-slot" title="${esc(s.act)}"><span class="dot" style="background:${CAL.cats[s.cat].color}"></span><b>${s.dia.slice(0,3)}</b>&nbsp;${s.hora}<span>· ${esc(s.act)}</span></span>`).join('')}
+      </div></div>`).join('')
+    + (lista.length ? `<div class="cal-count">${lista.length} persona${lista.length === 1 ? '' : 's'}</div>` : '');
+  return lista.length > 0;
+}
+
+// Carga de archivo: clic + arrastrar y soltar
+document.getElementById('calFileInput').addEventListener('change', e => {
+  if (e.target.files[0]) calProcesarArchivo(e.target.files[0]);
+});
+(function(){
+  const zona = document.getElementById('calUploadZone');
+  zona.addEventListener('dragover', e => { e.preventDefault(); zona.classList.add('drag'); });
+  zona.addEventListener('dragleave', () => zona.classList.remove('drag'));
+  zona.addEventListener('drop', e => {
+    e.preventDefault(); zona.classList.remove('drag');
+    if (e.dataTransfer.files[0]) calProcesarArchivo(e.dataTransfer.files[0]);
+  });
+})();
 </script>
 </body>
 </html>

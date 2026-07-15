@@ -713,7 +713,9 @@ async function doLogin() {
         const nombre = roles?.[0]?.nombre || currentUserEmail;
 
         document.getElementById('userNombre').textContent = nombre;
-        document.getElementById('userRolBadge').textContent = currentRole === 'admin' ? '⚙ Admin' : '👁 Colaborador';
+        document.getElementById('userRolBadge').textContent =
+            currentRole === 'admin' ? '⚙ Admin' :
+            currentRole === 'admin_sedes' ? '🏢 Admin Sedes' : '👁 Colaborador';
         applyRole();
         document.getElementById('loginScreen').style.display = 'none';
     } catch(e) {
@@ -741,8 +743,11 @@ async function doLogout() {
     document.getElementById('loginPassword').value = '';
 }
 
+// 'admin' conserva su acceso actual; 'admin_sedes' entra con los mismos permisos de admin
+const esRolAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes';
+
 function applyRole() {
-    const isAdmin = currentRole === 'admin';
+    const isAdmin = esRolAdmin();
     document.querySelectorAll('.admin-only').forEach(el => {
         el.style.display = isAdmin ? '' : 'none';
     });
@@ -1339,7 +1344,7 @@ function rebuildDashboard() {
     document.getElementById('uploadSection').style.display = 'none';
     document.getElementById('sedePicker').style.display = 'none';
     document.getElementById('btnCambiarSede').style.display = 'inline-block';
-    if (currentRole === 'admin') {
+    if (esRolAdmin()) {
         document.getElementById('btnCargarDatos').style.display = 'inline-block';
     }
 
@@ -1440,7 +1445,7 @@ function renderTable() {
     let tbody = document.getElementById('tableBody'); tbody.innerHTML='';
     filtered.forEach(u => {
         let r = tbody.insertRow();
-        const isAdmin = currentRole === 'admin';
+        const isAdmin = esRolAdmin();
         const priceCols = isAdmin ? `
         <td style="font-weight:600;">${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString():'<span style="color:#aaa;">Sin definir</span>'}
           ${manualPrices[`${u.ÚltimoProducto}|${u.PIN}`]?'<span style="color:#ff9800;font-size:11px;"> ✏️</span>':''}</td>
