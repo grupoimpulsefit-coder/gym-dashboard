@@ -340,8 +340,12 @@ async function loadAllSedes(mesElegido) {
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('loading').style.display = 'block';
   try {
-    // Traer todos los snapshots para poblar el selector de meses
-    const allSnaps = await supaFetch('/gym_snapshots?order=mes_orden.desc&select=sede,mes,mes_orden,updated_at,activos,total_usuarios,renovaciones,renov_data,fe_total');
+    // Traer todos los snapshots para poblar el selector de meses.
+    // Se excluye 'Calendario Natación' (snapshot del calendario de reservaciones
+    // de nat.html, con mes='Semanal'): no es una sede real y su "mes" contaminaba
+    // el selector dejando el dashboard vacío por defecto.
+    const allSnaps = (await supaFetch('/gym_snapshots?order=mes_orden.desc&select=sede,mes,mes_orden,updated_at,activos,total_usuarios,renovaciones,renov_data,fe_total') || [])
+      .filter(s => s.sede !== 'Calendario Natación');
     document.getElementById('loading').style.display = 'none';
     if (!allSnaps?.length) {
       document.getElementById('emptyState').style.display = 'block';

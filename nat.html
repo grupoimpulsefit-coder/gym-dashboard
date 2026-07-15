@@ -4223,7 +4223,8 @@ async function calGuardarSnapshot(nombreArchivo) {
     const personas = new Set();
     CAL.data.forEach(s => s.personas.forEach(p => personas.add(calFold(p))));
     const record = {
-      sede: CAL_SEDE, mes: 'Semanal', mes_orden: 'Semanal',
+      // mes_orden '0000-00' para quedar de último en cualquier orden descendente
+      sede: CAL_SEDE, mes: 'Semanal', mes_orden: '0000-00',
       activos: totalRes, total_usuarios: personas.size,
       renovaciones: { nuevos:0, renovaciones:0, reingresos:0, total:0, clasesSueltas:{count:0,total:0}, sinClasificar:{count:0,total:0} },
       renov_data: [],
