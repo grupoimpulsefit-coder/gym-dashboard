@@ -796,7 +796,10 @@ async function showSedePicker() {
     cardsEl.innerHTML = '';
     statusEl.textContent = '⏳ Cargando sedes disponibles...';
     try {
-        const snaps = await supaFetch('/gym_snapshots?order=updated_at.desc&select=id,sede,mes,activos,updated_at');
+        // 'Calendario Natación' es el snapshot del calendario de reservaciones
+        // (tab Calendario en nat.html), no una sede real
+        const snaps = (await supaFetch('/gym_snapshots?order=updated_at.desc&select=id,sede,mes,activos,updated_at') || [])
+            .filter(s => s.sede !== 'Calendario Natación');
         if (!snaps?.length) {
             statusEl.textContent = 'No hay datos cargados aún. Contacte al administrador.';
             return;
