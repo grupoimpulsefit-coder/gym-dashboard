@@ -551,6 +551,7 @@ function renderDetalle(sede) {
     ${btn('pendientes', `Pendientes (${data.filter(u=>!u.pagado).length})`)}
     ${btn('pagados', `Pagados (${data.filter(u=>u.pagado).length})`)}
     ${btn('todos', `Todos (${data.length})`)}
+    <button onclick="event.stopPropagation();exportDetalleCSV('${sede.replace(/'/g,"\\'")}')" style="margin-left:auto;">📥 Exportar CSV</button>
   </div>`;
 
   if (!filtered.length) { el.innerHTML = filtros + '<div style="color:var(--muted);font-size:12px;padding:8px;">Sin clientes en esta vista.</div>'; return; }
@@ -566,6 +567,24 @@ function renderDetalle(sede) {
       <td>${u.pagado ? '<span class="tag-pagado">✓ Pagó</span>' : '<span class="tag-pendiente">Pendiente</span>'}</td>
     </tr>`).join('')}</tbody>
   </table>`;
+}
+
+function exportDetalleCSV(sede) {
+  const data = detalleData[sede] || [];
+  const filtro = detFiltro[sede] || 'pendientes';
+  const filtered = filtro === 'todos' ? data
+    : filtro === 'pagados' ? data.filter(u => u.pagado)
+    : data.filter(u => !u.pagado);
+  if (!filtered.length) { alert('No hay clientes en esta vista.'); return; }
+  const h = ['Cliente','Telefono','Plan','Vence','Valor','Estado'];
+  const rows = filtered.map(u => [u.nombre, u.telefono, u.plan, u.expira, u.valor, u.pagado ? 'Pago' : 'Pendiente']);
+  const csv = [h, ...rows].map(r => r.map(c => `"${String(c ?? '').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `comparativa_${sede.replace(/\s/g,'_')}_${filtro}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 </script>
 </body>
