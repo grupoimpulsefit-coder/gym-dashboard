@@ -824,6 +824,20 @@ async function showSedePicker() {
             card.onclick = () => selectMesForSede(snap.sede, snaps);
             cardsEl.appendChild(card);
         });
+        // Card de Comparativa de Sedes — de momento solo visible para admin_sedes
+        if (currentRole === 'admin_sedes') {
+            const compCard = document.createElement('div');
+            compCard.style.cssText = `cursor:pointer;background:#f3eefc;border:2px solid #7030A033;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;
+            compCard.innerHTML = `
+                <div style="font-size:3em;margin-bottom:12px;">⚖️</div>
+                <div style="font-size:1.2em;font-weight:700;color:#7030A0;">Comparativa de Sedes</div>
+                <div style="font-size:0.85em;color:#666;margin-top:6px;">Proyección vs Cobro</div>
+                <div style="font-size:0.8em;color:#999;margin-top:4px;">Todas las sedes por rango de fechas</div>`;
+            compCard.onmouseenter = () => { compCard.style.transform='translateY(-4px)'; compCard.style.boxShadow='0 12px 32px #7030A033'; };
+            compCard.onmouseleave = () => { compCard.style.transform=''; compCard.style.boxShadow=''; };
+            compCard.onclick = () => { window.location.href = '/comparativa'; };
+            cardsEl.appendChild(compCard);
+        }
     } catch(e) {
         statusEl.textContent = '⚠️ Error al cargar sedes: ' + e.message;
     }
