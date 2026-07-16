@@ -279,6 +279,21 @@ async function doLogin() {
 }
 document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
+// Sesión traspasada desde index.html (card Comparativa) — evita pedir login de nuevo
+(function() {
+  try {
+    const auth = JSON.parse(sessionStorage.getItem('gymAuth') || 'null');
+    if (auth?.token && ROLES_PERMITIDOS.includes(auth.role)) {
+      sessionStorage.removeItem('gymAuth');
+      currentToken = auth.token;
+      currentRole = auth.role;
+      document.getElementById('userNombre').textContent = auth.nombre || '—';
+      document.getElementById('loginScreen').style.display = 'none';
+      rangoRapido('mes');
+    }
+  } catch(_) {}
+})();
+
 async function doLogout(silent) {
   try { await fetch(`${SUPA_URL}/auth/v1/logout`, { method:'POST', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken} }); } catch(_) {}
   currentToken = null; currentRole = null;

@@ -835,7 +835,14 @@ async function showSedePicker() {
                 <div style="font-size:0.8em;color:#999;margin-top:4px;">Todas las sedes por rango de fechas</div>`;
             compCard.onmouseenter = () => { compCard.style.transform='translateY(-4px)'; compCard.style.boxShadow='0 12px 32px #7030A033'; };
             compCard.onmouseleave = () => { compCard.style.transform=''; compCard.style.boxShadow=''; };
-            compCard.onclick = () => { window.location.href = '/comparativa'; };
+            compCard.onclick = () => {
+                // Pasar la sesión a comparativa para no pedir login de nuevo
+                sessionStorage.setItem('gymAuth', JSON.stringify({
+                    token: currentToken, role: currentRole,
+                    nombre: document.getElementById('userNombre').textContent
+                }));
+                window.location.href = '/comparativa';
+            };
             cardsEl.appendChild(compCard);
         }
     } catch(e) {
