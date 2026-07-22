@@ -295,7 +295,7 @@ const SEDES = ['3 Ríos','Natación','Pinares','Sabanilla'];
 
 // ── Categorías de productos "Otros" (metadatos: etiqueta, ícono, color) ──────
 const CATEGORIAS = [
-  { id:'everlast',    label:'Everlast / Mercadería Natación', icon:'🏊', color:'var(--cat-everlast)' },
+  { id:'everlast',    label:'Everlast / Mercadería Natación', icon:'🏊', color:'var(--cat-everlast)', margenFijo:35 },
   { id:'galletas',    label:'Galletas', icon:'🍪', color:'var(--cat-galletas)' },
   { id:'energeticos', label:'Energéticos / Suplementos', icon:'⚡', color:'var(--cat-energeticos)' },
   { id:'minita',      label:'Minita (bebidas y snacks)', icon:'🥤', color:'var(--cat-minita)' },
@@ -481,13 +481,25 @@ function loadMes(mes) {
 
 // ── Cálculo de rentabilidad de un producto ──────────────────────────────────
 function calc(p) {
+  const precioProm = p.units > 0 ? p.revenue / p.units : 0;
+  const catMeta = CAT_BY_ID[p.categoria] || {};
+
+  // Categorías con margen fijo (ej. Everlast 35%): la ganancia es un % del ingreso,
+  // no se ingresa costo por producto (el costo se deriva del margen).
+  if (catMeta.margenFijo != null) {
+    const margen     = catMeta.margenFijo;
+    const ganancia   = p.revenue * margen / 100;
+    const costoTotal = p.revenue - ganancia;
+    const costoUnit  = p.units > 0 ? costoTotal / p.units : 0;
+    return { costoUnit, tieneCosto: true, costoTotal, ganancia, margen, precioProm, margenFijo: true };
+  }
+
   const costoUnit = costMap[norm(p.base)] ?? null;
   const tieneCosto = costoUnit != null && costoUnit > 0;
   const costoTotal = tieneCosto ? costoUnit * p.units : 0;
   const ganancia   = p.revenue - costoTotal;
   const margen     = p.revenue > 0 ? (ganancia / p.revenue * 100) : 0;
-  const precioProm = p.units > 0 ? p.revenue / p.units : 0;
-  return { costoUnit, tieneCosto, costoTotal, ganancia, margen, precioProm };
+  return { costoUnit, tieneCosto, costoTotal, ganancia, margen, precioProm, margenFijo: false };
 }
 
 function render() {
@@ -503,7 +515,8 @@ function render() {
     if (!c.tieneCosto && p.revenue > 0) algunSinCosto = true;
     Object.entries(p.sedes).forEach(([sede, sv]) => {
       const st = sedeTot[sede]; if (!st) return;
-      const costoSede = c.tieneCosto ? c.costoUnit * sv.units : 0;
+      const costoSede = c.margenFijo ? sv.revenue * (1 - c.margen / 100)
+                       : (c.tieneCosto ? c.costoUnit * sv.units : 0);
       st.ingresos += sv.revenue; st.costo += costoSede;
       if (!st.porCat[p.categoria]) st.porCat[p.categoria] = { ingresos: 0, ganancia: 0 };
       st.porCat[p.categoria].ingresos += sv.revenue;
@@ -590,9 +603,9 @@ function renderCatSections() {
         </td>
         <td class="num">${fmtN(p.units)}</td>
         <td class="num">${fmt(c.precioProm)}</td>
-        <td class="num"><input class="cost-input" type="number" min="0" step="1" value="${costVal}"
-             placeholder="—"
-             onchange="onCostChange(this, '${escapeAttr(p.base)}', '${cid}')"></td>
+        <td class="num">${c.margenFijo
+             ? `<span style="color:var(--muted)" title="Costo implícito (${(100-c.margen).toFixed(0)}% del precio)">${fmt(c.costoUnit)}</span>`
+             : `<input class="cost-input" type="number" min="0" step="1" value="${costVal}" placeholder="—" onchange="onCostChange(this, '${escapeAttr(p.base)}', '${cid}')">`}</td>
         <td class="num">${fmt(p.revenue)}</td>
         <td class="num">${c.tieneCosto ? fmt(c.costoTotal) : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="num"><span class="${c.ganancia>=0?'gain-pos':'gain-neg'}">${c.tieneCosto ? fmt(c.ganancia) : '—'}</span></td>
@@ -606,7 +619,7 @@ function renderCatSections() {
     cont.innerHTML += `<div class="cat-section">
       <div class="cat-head">
         <span class="cat-badge" style="background:${cc.color}">${cc.icon} ${cc.label}</span>
-        <span class="cat-summary"><b>${items.length}</b> productos · <b>${fmtN(cUnits)}</b> unidades · <b>${fmt(cIng)}</b> en ventas</span>
+        <span class="cat-summary"><b>${items.length}</b> productos · <b>${fmtN(cUnits)}</b> unidades · <b>${fmt(cIng)}</b> en ventas${cc.margenFijo != null ? ` · <b style="color:${cc.color}">margen fijo ${cc.margenFijo}%</b>` : ''}</span>
       </div>
       <div class="prod-wrap">
         <table class="prod-table">
