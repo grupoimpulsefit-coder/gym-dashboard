@@ -293,24 +293,64 @@ const SEDE_META = {
 };
 const SEDES = ['3 Ríos','Natación','Pinares','Sabanilla'];
 
-// ── Categorías de productos "Otros" ─────────────────────────────────────────
-// El orden importa: se evalúa de arriba hacia abajo y gana la primera que coincida.
+// ── Categorías de productos "Otros" (metadatos: etiqueta, ícono, color) ──────
 const CATEGORIAS = [
-  { id:'everlast',    label:'Everlast / Mercadería Natación', icon:'🏊', color:'var(--cat-everlast)',
-    kw:['everl','everlast','goggle','lente natacion','lente nat','tapon','pantaloneta','bolsito',
-        'traje de bano','traje de b','vestido bano','pano microfibra','2 piezas','bolso'] },
-  { id:'galletas',    label:'Galletas', icon:'🍪', color:'var(--cat-galletas)',
-    kw:['gricket','be come strong','gym bite'] },
-  { id:'energeticos', label:'Energéticos / Suplementos', icon:'⚡', color:'var(--cat-energeticos)',
-    kw:['scoop','rooster','bucked up','creatina','glu','amino','pre entreno','pre-entreno','proteina'] },
-  { id:'minita',      label:'Minita (bebidas y snacks)', icon:'🥤', color:'var(--cat-minita)',
-    kw:['agua','gatorage','gatorade','powerade','pano','pano'] },
-  { id:'gorras',      label:'Gorras (Natación)', icon:'🧢', color:'var(--cat-gorras)',
-    kw:['gorra','lentes nino'] },
+  { id:'everlast',    label:'Everlast / Mercadería Natación', icon:'🏊', color:'var(--cat-everlast)' },
+  { id:'galletas',    label:'Galletas', icon:'🍪', color:'var(--cat-galletas)' },
+  { id:'energeticos', label:'Energéticos / Suplementos', icon:'⚡', color:'var(--cat-energeticos)' },
+  { id:'minita',      label:'Minita (bebidas y snacks)', icon:'🥤', color:'var(--cat-minita)' },
+  { id:'gorras',      label:'Gorras (Natación)', icon:'🧢', color:'var(--cat-gorras)' },
 ];
 const CAT_OTROS = { id:'otros', label:'Otros sin categoría', icon:'❓', color:'var(--cat-otros)' };
 const CAT_ORDER = [...CATEGORIAS.map(c=>c.id), 'otros'];
 const CAT_BY_ID = {}; [...CATEGORIAS, CAT_OTROS].forEach(c => CAT_BY_ID[c.id] = c);
+
+// ── Reglas de clasificación y unificación de nombres ─────────────────────────
+// El orden importa: se evalúa de arriba hacia abajo y gana la PRIMERA regla que
+// coincida (por substring, sobre el nombre normalizado sin acentos ni mayúsculas).
+//   • excluir:true  → el producto NO aparece en el reporte (membresías/servicios).
+//   • canonical     → varios nombres distintos se unifican en uno solo (se suman
+//                     unidades/ventas y comparten un único costo). Sin canonical,
+//                     se usa el nombre tal cual (sin la cantidad entre paréntesis).
+//   • not           → keywords que, si aparecen, hacen que la regla NO aplique.
+const REGLAS = [
+  // ── Excluir: membresías / servicios que se colaron como "sin clasificar" ──
+  { kw:['alquiler','oficina'], excluir:true },
+  { kw:['aqua camp'],          excluir:true },
+  { kw:['taller'],             excluir:true },
+  { kw:['semestre'],           excluir:true },
+  { kw:['trimestre'],          excluir:true },
+
+  // ── Everlast / mercadería natación (antes que "gorras") ──
+  { kw:['everl','everlast','goggle','lente natacion','lente nat','tapon','pantaloneta','bolsito',
+        'traje de bano','traje de b','vestido bano','pano microfibra','2 piezas','bolso'], cat:'everlast' },
+
+  // ── Galletas (unificar variantes de nombre) ──
+  { kw:['pancake'],                      cat:'galletas', canonical:'Pancakes Gricket' }, // antes que "gricket"
+  { kw:['gricket'],                      cat:'galletas', canonical:'Gricket' },          // Gricket / Gricket Galletas / Gricket Proteína
+  { kw:['come strong','become strong'],  cat:'galletas', canonical:'Be come Strong' },   // Be come Strong / ...Cookies / ...Galletas / Become Strong
+  { kw:['gym bite','gymbite'],           cat:'galletas', canonical:'Gym bite' },         // Gym bite / GYMBITE
+
+  // ── Energéticos / suplementos ──
+  { kw:['pre entreno','pre-entreno','preentreno'], cat:'energeticos', canonical:'Scoop de pre entreno' },
+  { kw:['rooster'],   cat:'energeticos', canonical:'Rooster' },
+  { kw:['bucked up'], cat:'energeticos', canonical:'Bucked up' },
+  { kw:['glu'],       cat:'energeticos', canonical:'GLU' },
+  { kw:['amino'],     cat:'energeticos', canonical:'Scoop de Amino' },
+  { kw:['proteina'],  cat:'energeticos', canonical:'Scoop de Proteína' },
+  { kw:['creatina'],  cat:'energeticos' },  // Scoop de creatina y Creatina Daily son distintos
+  { kw:['scoop'],     cat:'energeticos' },
+
+  // ── Minita (bebidas y snacks) ──
+  { kw:['gatorade','gatorage'], cat:'minita', canonical:'Gatorage' },  // Gatorade = Gatorage
+  { kw:['powerade'],            cat:'minita', canonical:'Powerade' },
+  { kw:['agua'],                cat:'minita', canonical:'Agua' },
+  { kw:['pano','paño'],         cat:'minita', canonical:'Paños' },
+
+  // ── Gorras (Natación) ──
+  { kw:['lentes nino'], cat:'gorras', canonical:'Lentes niños' },
+  { kw:['gorra'],       cat:'gorras', canonical:'Gorra' },
+];
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const fmt  = n => '₡' + Math.round(n).toLocaleString('es-CR');
@@ -327,14 +367,20 @@ function baseName(prod) {
   return String(prod||'').replace(/\s*\(\d+\)\s*$/, '').replace(/\s+/g,' ').trim();
 }
 
-// Clasifica un producto en una de las categorías "Otros" (o null si no aplica)
-function categoriaDe(prod) {
-  const p = norm(prod);
+// Resuelve un producto → { cat, canonical } aplicando REGLAS en orden.
+//   • null            → excluido (no debe aparecer en el reporte).
+//   • { cat:null, … } → no coincidió con ninguna categoría conocida.
+function resolverProducto(raw) {
+  const p = norm(raw);
   if (!p) return null;
-  for (const c of CATEGORIAS) {
-    if (c.kw.some(k => p.includes(k))) return c.id;
+  for (const r of REGLAS) {
+    if (r.kw.some(k => p.includes(k))) {
+      if (r.not && r.not.some(k => p.includes(k))) continue;
+      if (r.excluir) return null;
+      return { cat: r.cat, canonical: r.canonical || baseName(raw) };
+    }
   }
-  return null; // no coincide con ninguna categoría conocida
+  return { cat: null, canonical: baseName(raw) };
 }
 
 // ── Costos (tabla product_costs en Supabase) ────────────────────────────────
@@ -406,12 +452,14 @@ function loadMes(mes) {
     const snap = latest[sede];
     if (!snap) return;
     (snap.renov_data || []).forEach(r => {
-      let cat = categoriaDe(r.Producto);
+      const info = resolverProducto(r.Producto);
+      if (!info) return;                       // excluido (membresía/servicio)
+      let cat = info.cat;
       if (!cat) {
         // Solo cae en "Otros sin categoría" si el sistema lo marcó como no clasificado
         if (r.EsSinClasificar) cat = 'otros'; else return;
       }
-      const base = baseName(r.Producto) || '(sin nombre)';
+      const base = info.canonical || '(sin nombre)';
       const qty  = parseCantidad(r.Producto);
       const tot  = Number(r.Total) || 0;
       const key  = norm(base) + '||' + cat;
