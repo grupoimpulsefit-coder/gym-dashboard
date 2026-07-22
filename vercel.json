@@ -5,6 +5,7 @@
   "rewrites": [
     { "source": "/nat", "destination": "/nat.html" },
     { "source": "/sedes", "destination": "/sedes.html" },
-    { "source": "/comparativa", "destination": "/comparativa.html" }
+    { "source": "/comparativa", "destination": "/comparativa.html" },
+    { "source": "/otros", "destination": "/otros.html" }
   ]
 }

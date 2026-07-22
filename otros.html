@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rentabilidad de Productos — Otros</title>
+<style>
+:root {
+  --primary: #1a5276;
+  --primary-light: #2e86c1;
+  --accent: #148f77;
+  --accent2: #e67e22;
+  --bg: #f0f4f8;
+  --border: #d5dce8;
+  --text: #1c2833;
+  --muted: #6c757d;
+  --warn: #c0392b;
+  --success: #27ae60;
+
+  --c-tresrios:   #00838f;
+  --c-natacion:   #6a1b9a;
+  --c-pinares:    #2e7d32;
+  --c-sabanilla:  #1565c0;
+
+  /* Categorías */
+  --cat-minita:     #e67e22;
+  --cat-energeticos:#7030A0;
+  --cat-galletas:   #b9770e;
+  --cat-gorras:     #16a085;
+  --cat-everlast:   #6a1b9a;
+  --cat-otros:      #7f8c8d;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+/* ── Login ── */
+#loginScreen { position: fixed; inset: 0; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+.login-card { background: white; border-radius: 24px; padding: 40px 44px; width: 100%; max-width: 420px; box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
+.login-logo { width: 64px; height: 64px; background: linear-gradient(135deg, #1a5276, #2e86c1); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 20px; }
+.login-card h2 { text-align: center; font-size: 1.4em; font-weight: 800; color: #2d2d5e; margin-bottom: 6px; }
+.login-card .login-sub { text-align: center; font-size: 0.85em; color: #888; margin-bottom: 28px; }
+.login-field { margin-bottom: 16px; }
+.login-field label { display: block; font-size: 0.8em; font-weight: 700; color: #444; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+.login-field input { width: 100%; padding: 11px 14px; border: 1.5px solid #dde1f0; border-radius: 10px; font-size: 14px; font-family: inherit; color: #333; }
+.login-field input:focus { outline: none; border-color: #2e86c1; box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
+.login-btn { width: 100%; padding: 13px; background: linear-gradient(135deg, #1a5276, #2e86c1); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+.login-btn:disabled { opacity: .6; cursor: not-allowed; }
+#loginError { text-align: center; color: #c62828; font-size: 13px; margin-top: 12px; min-height: 18px; }
+
+/* ── Header ── */
+.header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: white; padding: 18px 32px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.25); flex-wrap: wrap; }
+.header-icon { font-size: 34px; }
+.header h1 { font-size: 21px; font-weight: 700; }
+.header p  { font-size: 13px; opacity: .85; margin-top: 2px; }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; color: white; font-size: 13px; }
+.logout-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35); color: white; border-radius: 16px; padding: 5px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+/* ── Loading / empty ── */
+.loading, .empty-state { display: none; text-align: center; padding: 60px 32px; color: var(--muted); }
+.spinner { width: 44px; height: 44px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Dashboard ── */
+#dashboard { display: none; }
+.dash-topbar { padding: 12px 32px; background: white; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.dash-title { font-size: 15px; font-weight: 700; color: var(--primary); }
+.dash-period { font-size: 12px; color: var(--muted); }
+.topbar-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.topbar-controls select { border: 1.5px solid #d0d7e8; border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; color: #333; cursor: pointer; background: white; }
+.btn-back { padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 13px; cursor: pointer; color: var(--primary); font-weight: 600; }
+.btn-back:hover { background: var(--bg); }
+
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; padding: 22px 32px 8px; }
+.kpi { background: white; border-radius: 12px; padding: 16px 18px; border-left: 4px solid var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+.kpi.green  { border-color: var(--success); }
+.kpi.orange { border-color: var(--accent2); }
+.kpi.red    { border-color: var(--warn); }
+.kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+.kpi-value { font-size: 23px; font-weight: 700; color: var(--primary); margin-top: 4px; line-height: 1.1; }
+.kpi.green  .kpi-value { color: var(--success); }
+.kpi.orange .kpi-value { color: var(--accent2); }
+.kpi.red    .kpi-value { color: var(--warn); }
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.section { padding: 8px 32px; }
+.section-title { font-size: 15px; font-weight: 700; color: var(--primary); margin-bottom: 14px; border-left: 4px solid var(--primary-light); padding-left: 10px; }
+.section-note { font-weight: 400; font-size: 12px; color: var(--muted); }
+
+/* Cards por sede */
+.sede-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; padding: 8px 32px 16px; }
+.sede-card { background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.sede-card.no-data { opacity: .55; }
+.sede-card-header { padding: 14px 18px; color: white; display: flex; align-items: center; gap: 10px; }
+.sede-card-header .s-icon { font-size: 22px; }
+.sede-card-header .s-name { font-size: 15px; font-weight: 700; }
+.sede-card-header .s-total { margin-left: auto; font-size: 17px; font-weight: 700; }
+.sede-card-body { padding: 14px 18px; }
+.sede-row-c { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f0f4f8; }
+.sede-row-c:last-child { border-bottom: none; }
+.sede-row-label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.sede-row-val   { font-size: 13px; font-weight: 600; color: var(--text); }
+.sede-row-pct   { font-size: 11px; color: var(--muted); margin-left: 6px; }
+.cat-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.progress-bar { height: 7px; border-radius: 4px; background: #e8edf4; margin-top: 12px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 4px; transition: width .3s; }
+.sede-gain { margin-top: 10px; padding-top: 10px; border-top: 2px solid #eef3fa; display: flex; justify-content: space-between; align-items: baseline; }
+.sede-gain .g-label { font-size: 12px; font-weight: 700; color: var(--primary); }
+.sede-gain .g-val   { font-size: 16px; font-weight: 800; color: var(--success); }
+
+/* Tablas por categoría */
+.cat-section { padding: 8px 32px 8px; }
+.cat-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.cat-badge { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: white; padding: 6px 14px; border-radius: 20px; }
+.cat-summary { font-size: 12px; color: var(--muted); }
+.cat-summary b { color: var(--text); }
+.prod-wrap { overflow-x: auto; background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+.prod-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+.prod-table th { background: #f8f9fb; font-size: 11px; font-weight: 700; color: var(--muted); padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: .3px; }
+.prod-table th.num, .prod-table td.num { text-align: right; }
+.prod-table td { padding: 9px 12px; font-size: 13px; border-bottom: 1px solid #f2f5f9; }
+.prod-table tr:last-child td { border-bottom: none; }
+.prod-table tr.cat-total td { background: #eef3fa; font-weight: 800; border-top: 2px solid var(--primary); }
+.prod-name { font-weight: 600; }
+.prod-sedes { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.cost-input { width: 92px; padding: 6px 8px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-family: inherit; text-align: right; color: var(--text); }
+.cost-input:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
+.cost-input.saved { border-color: var(--success); }
+.margin-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+.m-alto  { background: #e8f5e9; color: #2e7d32; }
+.m-medio { background: #fff3e0; color: #e65100; }
+.m-bajo  { background: #ffebee; color: #c62828; }
+.m-nd    { background: #eceff1; color: #90a4ae; }
+.gain-pos { color: var(--success); font-weight: 700; }
+.gain-neg { color: var(--warn); font-weight: 700; }
+.cat-empty { padding: 16px; color: var(--muted); font-size: 12px; }
+.save-hint { font-size: 11px; color: var(--muted); font-style: italic; padding: 0 32px 4px; }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">📦</div>
+    <h2>Rentabilidad de Productos</h2>
+    <p class="login-sub">Desglose de la categoría "Otros" por sede y producto</p>
+    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
+    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-icon">📦</div>
+  <div>
+    <h1>Rentabilidad de Productos — Otros</h1>
+    <p>Ventas, costo, ganancia y margen por sede y producto</p>
+  </div>
+  <div class="header-right">
+    <span>👤 <span id="userNombre">—</span></span>
+    <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+  </div>
+</div>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div>Cargando ventas de productos…</div>
+</div>
+
+<div class="empty-state" id="emptyState">No hay datos cargados todavía.</div>
+
+<div id="dashboard">
+
+  <div class="dash-topbar">
+    <div>
+      <div class="dash-title">📦 Rentabilidad de la categoría "Otros"</div>
+      <div class="dash-period" id="dashPeriod"></div>
+    </div>
+    <div class="topbar-controls">
+      <label style="font-size:13px;font-weight:600;color:#555;">📅 Mes:</label>
+      <select id="mesSelector" onchange="loadMes(this.value)"></select>
+      <button class="btn-back" onclick="loadMes(document.getElementById('mesSelector').value)">↻ Actualizar</button>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Ingresos (Otros)</div>
+      <div class="kpi-value" id="kpiIngresos">—</div>
+      <div class="kpi-sub" id="kpiIngresosSub">—</div>
+    </div>
+    <div class="kpi orange">
+      <div class="kpi-label">Costo estimado</div>
+      <div class="kpi-value" id="kpiCosto">—</div>
+      <div class="kpi-sub" id="kpiCostoSub">según costos ingresados</div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-label">Ganancia del mes</div>
+      <div class="kpi-value" id="kpiGanancia">—</div>
+      <div class="kpi-sub">ingresos − costo</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Margen promedio</div>
+      <div class="kpi-value" id="kpiMargen">—</div>
+      <div class="kpi-sub">ganancia / ingresos</div>
+    </div>
+  </div>
+
+  <div class="section"><div class="section-title">Resumen por Sede <span class="section-note">— ganancia de productos "Otros" en cada sede</span></div></div>
+  <div class="sede-grid" id="sedeGrid"></div>
+
+  <div class="section"><div class="section-title">Detalle por Producto <span class="section-note">— escriba el costo unitario de cada producto para ver el margen y la ganancia</span></div></div>
+  <div class="save-hint" id="saveHint">💾 Los costos se guardan automáticamente en la nube al salir de cada casilla.</div>
+  <div id="catSections"></div>
+
+</div>
+
+<script>
+// ── Supabase ──────────────────────────────────────────────────────────────
+const SUPA_URL = '__SUPA_URL__';
+const SUPA_KEY = '__SUPA_KEY__';
+let currentToken = null, currentRole = null;
+
+async function supaFetch(path, opts = {}) {
+  const token = currentToken || SUPA_KEY;
+  const res = await fetch(SUPA_URL + '/rest/v1' + path, {
+    method: opts.method || 'GET',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json', 'Prefer': opts.prefer || 'return=minimal',
+      ...(opts.headers || {}) },
+    body: opts.body != null ? JSON.stringify(opts.body) : undefined
+  });
+  if (!res.ok) { const t = await res.text(); throw new Error(t); }
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+const ROL_PERMITIDO = 'admin_sedes';
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pwd   = document.getElementById('loginPassword').value;
+  const btn   = document.getElementById('loginBtn');
+  const errEl = document.getElementById('loginError');
+  if (!email || !pwd) { errEl.textContent = 'Complete todos los campos.'; return; }
+  btn.textContent = 'Ingresando...'; btn.disabled = true; errEl.textContent = '';
+  try {
+    const res = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'apikey': SUPA_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pwd })
+    });
+    const data = await res.json();
+    if (!data.access_token) throw new Error(data.error_description || data.msg || 'Credenciales incorrectas');
+    currentToken = data.access_token;
+    const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre`);
+    currentRole = roles?.[0]?.role || null;
+    if (currentRole !== ROL_PERMITIDO) {
+      errEl.textContent = 'Su cuenta no tiene acceso a este reporte.';
+      await doLogout(true);
+      return;
+    }
+    document.getElementById('userNombre').textContent = roles?.[0]?.nombre || email;
+    document.getElementById('loginScreen').style.display = 'none';
+    init();
+  } catch(e) {
+    errEl.textContent = e.message;
+  } finally {
+    btn.textContent = 'Entrar'; btn.disabled = false;
+  }
+}
+document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+async function doLogout(silent) {
+  try { await fetch(`${SUPA_URL}/auth/v1/logout`, { method:'POST', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken} }); } catch(_) {}
+  currentToken = null; currentRole = null;
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+  if (!silent) {
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+  }
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+// ── Config de sedes ─────────────────────────────────────────────────────────
+const SEDE_META = {
+  '3 Ríos':   { icon: '🌊', color: '#00838f' },
+  'Natación': { icon: '🏊', color: '#6a1b9a' },
+  'Pinares':  { icon: '🌲', color: '#2e7d32' },
+  'Sabanilla':{ icon: '🏙️', color: '#1565c0' },
+};
+const SEDES = ['3 Ríos','Natación','Pinares','Sabanilla'];
+
+// ── Categorías de productos "Otros" ─────────────────────────────────────────
+// El orden importa: se evalúa de arriba hacia abajo y gana la primera que coincida.
+const CATEGORIAS = [
+  { id:'everlast',    label:'Everlast / Mercadería Natación', icon:'🏊', color:'var(--cat-everlast)',
+    kw:['everl','everlast','goggle','lente natacion','lente nat','tapon','pantaloneta','bolsito',
+        'traje de bano','traje de b','vestido bano','pano microfibra','2 piezas','bolso'] },
+  { id:'galletas',    label:'Galletas', icon:'🍪', color:'var(--cat-galletas)',
+    kw:['gricket','be come strong','gym bite'] },
+  { id:'energeticos', label:'Energéticos / Suplementos', icon:'⚡', color:'var(--cat-energeticos)',
+    kw:['scoop','rooster','bucked up','creatina','glu','amino','pre entreno','pre-entreno','proteina'] },
+  { id:'minita',      label:'Minita (bebidas y snacks)', icon:'🥤', color:'var(--cat-minita)',
+    kw:['agua','gatorage','gatorade','powerade','pano','pano'] },
+  { id:'gorras',      label:'Gorras (Natación)', icon:'🧢', color:'var(--cat-gorras)',
+    kw:['gorra','lentes nino'] },
+];
+const CAT_OTROS = { id:'otros', label:'Otros sin categoría', icon:'❓', color:'var(--cat-otros)' };
+const CAT_ORDER = [...CATEGORIAS.map(c=>c.id), 'otros'];
+const CAT_BY_ID = {}; [...CATEGORIAS, CAT_OTROS].forEach(c => CAT_BY_ID[c.id] = c);
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+const fmt  = n => '₡' + Math.round(n).toLocaleString('es-CR');
+const fmtN = n => Math.round(n).toLocaleString('es-CR');
+const norm = s => s ? String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim() : '';
+
+// Cantidad viene en el nombre: "Agua (1)", "Gatorage (3)" → número entre paréntesis al final
+function parseCantidad(prod) {
+  const m = String(prod||'').match(/\((\d+)\)\s*$/);
+  return m ? parseInt(m[1], 10) : 1;
+}
+// Nombre base sin la cantidad final ni espacios extra
+function baseName(prod) {
+  return String(prod||'').replace(/\s*\(\d+\)\s*$/, '').replace(/\s+/g,' ').trim();
+}
+
+// Clasifica un producto en una de las categorías "Otros" (o null si no aplica)
+function categoriaDe(prod) {
+  const p = norm(prod);
+  if (!p) return null;
+  for (const c of CATEGORIAS) {
+    if (c.kw.some(k => p.includes(k))) return c.id;
+  }
+  return null; // no coincide con ninguna categoría conocida
+}
+
+// ── Costos (tabla product_costs en Supabase) ────────────────────────────────
+let costMap = {};   // norm(baseName) → costo (número)
+
+async function loadCostos() {
+  costMap = {};
+  try {
+    const rows = await supaFetch('/product_costs?select=producto,costo') || [];
+    rows.forEach(r => { costMap[norm(r.producto)] = Number(r.costo) || 0; });
+  } catch(e) { console.warn('No se pudieron cargar costos:', e.message); }
+}
+
+async function guardarCosto(baseProd, categoria, costo) {
+  costMap[norm(baseProd)] = Number(costo) || 0;
+  try {
+    await supaFetch('/product_costs', {
+      method: 'POST',
+      prefer: 'resolution=merge-duplicates,return=minimal',
+      body: { producto: baseProd, categoria: categoria, costo: Number(costo) || 0, updated_at: new Date().toISOString() }
+    });
+    return true;
+  } catch(e) {
+    console.error('Error guardando costo:', e.message);
+    return false;
+  }
+}
+
+// ── Carga de snapshots del mes ──────────────────────────────────────────────
+let allSnaps = [];    // todos los snapshots (para el selector de meses)
+let mesActual = null;
+let productos = [];   // agregado del mes actual (para re-render al cambiar costos)
+
+async function init() {
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('loading').style.display = 'block';
+  try {
+    await loadCostos();
+    allSnaps = (await supaFetch('/gym_snapshots?order=mes_orden.desc&select=sede,mes,mes_orden,renov_data') || [])
+      .filter(s => s.sede !== 'Calendario Natación' && SEDES.includes(s.sede));
+    document.getElementById('loading').style.display = 'none';
+    if (!allSnaps.length) { document.getElementById('emptyState').style.display = 'block'; return; }
+
+    const mesesUnicos = [...new Map(allSnaps.map(s => [s.mes_orden || s.mes, s.mes])).entries()]
+      .sort((a,b) => (b[0]||'').localeCompare(a[0]||''));
+    const sel = document.getElementById('mesSelector');
+    mesActual = mesesUnicos[0]?.[1];
+    sel.innerHTML = mesesUnicos.map(([orden, mes]) =>
+      `<option value="${mes}" ${mes === mesActual ? 'selected' : ''}>${mes}</option>`).join('');
+
+    loadMes(mesActual);
+  } catch(e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('emptyState').textContent = '⚠️ Error al cargar datos: ' + e.message;
+  }
+}
+
+function loadMes(mes) {
+  mesActual = mes;
+  // Tomar el snapshot más reciente por sede para el mes elegido
+  const latest = {};
+  allSnaps.filter(s => s.mes === mes).forEach(s => { if (!latest[s.sede]) latest[s.sede] = s; });
+
+  // Agregar por producto base (costo global) con desglose por sede
+  const agg = {};   // base → { categoria, units, revenue, sedes:{sede:{units,revenue}} }
+  SEDES.forEach(sede => {
+    const snap = latest[sede];
+    if (!snap) return;
+    (snap.renov_data || []).forEach(r => {
+      let cat = categoriaDe(r.Producto);
+      if (!cat) {
+        // Solo cae en "Otros sin categoría" si el sistema lo marcó como no clasificado
+        if (r.EsSinClasificar) cat = 'otros'; else return;
+      }
+      const base = baseName(r.Producto) || '(sin nombre)';
+      const qty  = parseCantidad(r.Producto);
+      const tot  = Number(r.Total) || 0;
+      const key  = norm(base) + '||' + cat;
+      if (!agg[key]) agg[key] = { base, categoria: cat, units: 0, revenue: 0, sedes: {} };
+      const a = agg[key];
+      a.units += qty; a.revenue += tot;
+      if (!a.sedes[sede]) a.sedes[sede] = { units: 0, revenue: 0 };
+      a.sedes[sede].units += qty; a.sedes[sede].revenue += tot;
+    });
+  });
+
+  productos = Object.values(agg);
+  const sedesConDatos = SEDES.filter(s => latest[s]);
+  document.getElementById('dashPeriod').textContent =
+    `${mes} · ${sedesConDatos.length ? sedesConDatos.join(' · ') : 'sin sedes con ventas'}`;
+  render();
+  document.getElementById('dashboard').style.display = 'block';
+}
+
+// ── Cálculo de rentabilidad de un producto ──────────────────────────────────
+function calc(p) {
+  const costoUnit = costMap[norm(p.base)] ?? null;
+  const tieneCosto = costoUnit != null && costoUnit > 0;
+  const costoTotal = tieneCosto ? costoUnit * p.units : 0;
+  const ganancia   = p.revenue - costoTotal;
+  const margen     = p.revenue > 0 ? (ganancia / p.revenue * 100) : 0;
+  const precioProm = p.units > 0 ? p.revenue / p.units : 0;
+  return { costoUnit, tieneCosto, costoTotal, ganancia, margen, precioProm };
+}
+
+function render() {
+  // Totales globales y por sede (solo con costo ingresado se cuenta la ganancia real)
+  let tIngresos = 0, tCosto = 0;
+  const sedeTot = {};   // sede → { ingresos, costo, porCat:{cat:{ingresos,ganancia}} }
+  SEDES.forEach(s => sedeTot[s] = { ingresos: 0, costo: 0, porCat: {} });
+  let algunSinCosto = false;
+
+  productos.forEach(p => {
+    const c = calc(p);
+    tIngresos += p.revenue; tCosto += c.costoTotal;
+    if (!c.tieneCosto && p.revenue > 0) algunSinCosto = true;
+    Object.entries(p.sedes).forEach(([sede, sv]) => {
+      const st = sedeTot[sede]; if (!st) return;
+      const costoSede = c.tieneCosto ? c.costoUnit * sv.units : 0;
+      st.ingresos += sv.revenue; st.costo += costoSede;
+      if (!st.porCat[p.categoria]) st.porCat[p.categoria] = { ingresos: 0, ganancia: 0 };
+      st.porCat[p.categoria].ingresos += sv.revenue;
+      st.porCat[p.categoria].ganancia += sv.revenue - costoSede;
+    });
+  });
+
+  const tGanancia = tIngresos - tCosto;
+  const tMargen = tIngresos > 0 ? tGanancia / tIngresos * 100 : 0;
+
+  document.getElementById('kpiIngresos').textContent = fmt(tIngresos);
+  document.getElementById('kpiIngresosSub').textContent = `${productos.length} productos vendidos`;
+  document.getElementById('kpiCosto').textContent = fmt(tCosto);
+  document.getElementById('kpiCostoSub').textContent = algunSinCosto ? '⚠️ hay productos sin costo asignado' : 'todos con costo asignado';
+  document.getElementById('kpiGanancia').textContent = fmt(tGanancia);
+  document.getElementById('kpiMargen').textContent = tMargen.toFixed(1) + '%';
+
+  renderSedeCards(sedeTot);
+  renderCatSections();
+}
+
+function marginCls(m, tieneCosto) {
+  if (!tieneCosto) return 'm-nd';
+  return m >= 50 ? 'm-alto' : m >= 25 ? 'm-medio' : 'm-bajo';
+}
+
+function renderSedeCards(sedeTot) {
+  const grid = document.getElementById('sedeGrid');
+  grid.innerHTML = '';
+  SEDES.forEach(s => {
+    const m = SEDE_META[s];
+    const d = sedeTot[s];
+    if (!d || d.ingresos === 0) {
+      grid.innerHTML += `<div class="sede-card no-data">
+        <div class="sede-card-header" style="background:${m.color}"><span class="s-icon">${m.icon}</span><span class="s-name">${s}</span></div>
+        <div class="sede-card-body"><div class="sede-row-label">Sin ventas de "Otros" este mes</div></div>
+      </div>`;
+      return;
+    }
+    const ganancia = d.ingresos - d.costo;
+    const margen = d.ingresos > 0 ? ganancia / d.ingresos * 100 : 0;
+    const cats = CAT_ORDER.filter(cid => d.porCat[cid]);
+    const rows = cats.map(cid => {
+      const cc = CAT_BY_ID[cid];
+      const v = d.porCat[cid];
+      return `<div class="sede-row-c">
+        <span class="sede-row-label"><span class="cat-dot" style="background:${cc.color}"></span>${cc.icon} ${cc.label.split(' ')[0]}</span>
+        <span class="sede-row-val">${fmt(v.ingresos)} <span class="sede-row-pct">gan ${fmt(v.ganancia)}</span></span>
+      </div>`;
+    }).join('');
+    grid.innerHTML += `<div class="sede-card">
+      <div class="sede-card-header" style="background:${m.color}">
+        <span class="s-icon">${m.icon}</span><span class="s-name">${s}</span>
+        <span class="s-total">${fmt(d.ingresos)}</span>
+      </div>
+      <div class="sede-card-body">
+        ${rows}
+        <div class="progress-bar"><div class="progress-fill" style="width:${Math.max(0,Math.min(margen,100))}%;background:${m.color}"></div></div>
+        <div class="sede-gain"><span class="g-label">Ganancia (${margen.toFixed(0)}% margen)</span><span class="g-val" style="color:${ganancia>=0?'var(--success)':'var(--warn)'}">${fmt(ganancia)}</span></div>
+      </div>
+    </div>`;
+  });
+}
+
+function renderCatSections() {
+  const cont = document.getElementById('catSections');
+  cont.innerHTML = '';
+  CAT_ORDER.forEach(cid => {
+    const cc = CAT_BY_ID[cid];
+    const items = productos.filter(p => p.categoria === cid)
+      .sort((a,b) => b.revenue - a.revenue);
+    if (!items.length) return;
+
+    let cIng = 0, cCosto = 0, cUnits = 0;
+    const rows = items.map(p => {
+      const c = calc(p);
+      cIng += p.revenue; cCosto += c.costoTotal; cUnits += p.units;
+      const sedeList = Object.keys(p.sedes).map(s => (SEDE_META[s]?.icon||'') ).join(' ');
+      const costVal = (costMap[norm(p.base)] != null) ? costMap[norm(p.base)] : '';
+      return `<tr>
+        <td>
+          <div class="prod-name">${escapeHtml(p.base)}</div>
+          <div class="prod-sedes">${sedeList}</div>
+        </td>
+        <td class="num">${fmtN(p.units)}</td>
+        <td class="num">${fmt(c.precioProm)}</td>
+        <td class="num"><input class="cost-input" type="number" min="0" step="1" value="${costVal}"
+             placeholder="—"
+             onchange="onCostChange(this, '${escapeAttr(p.base)}', '${cid}')"></td>
+        <td class="num">${fmt(p.revenue)}</td>
+        <td class="num">${c.tieneCosto ? fmt(c.costoTotal) : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="num"><span class="${c.ganancia>=0?'gain-pos':'gain-neg'}">${c.tieneCosto ? fmt(c.ganancia) : '—'}</span></td>
+        <td class="num"><span class="margin-badge ${marginCls(c.margen, c.tieneCosto)}">${c.tieneCosto ? c.margen.toFixed(1)+'%' : 'N/D'}</span></td>
+      </tr>`;
+    }).join('');
+
+    const cGan = cIng - cCosto;
+    const cMar = cIng > 0 ? cGan / cIng * 100 : 0;
+
+    cont.innerHTML += `<div class="cat-section">
+      <div class="cat-head">
+        <span class="cat-badge" style="background:${cc.color}">${cc.icon} ${cc.label}</span>
+        <span class="cat-summary"><b>${items.length}</b> productos · <b>${fmtN(cUnits)}</b> unidades · <b>${fmt(cIng)}</b> en ventas</span>
+      </div>
+      <div class="prod-wrap">
+        <table class="prod-table">
+          <thead><tr>
+            <th>Producto</th>
+            <th class="num">Unid.</th>
+            <th class="num">₡ venta prom.</th>
+            <th class="num">Costo unit.</th>
+            <th class="num">Ingreso</th>
+            <th class="num">Costo total</th>
+            <th class="num">Ganancia</th>
+            <th class="num">Margen</th>
+          </tr></thead>
+          <tbody>
+            ${rows}
+            <tr class="cat-total">
+              <td>TOTAL ${escapeHtml(cc.label)}</td>
+              <td class="num">${fmtN(cUnits)}</td>
+              <td class="num">—</td>
+              <td class="num">—</td>
+              <td class="num">${fmt(cIng)}</td>
+              <td class="num">${fmt(cCosto)}</td>
+              <td class="num"><span class="${cGan>=0?'gain-pos':'gain-neg'}">${fmt(cGan)}</span></td>
+              <td class="num"><span class="margin-badge ${cMar>=50?'m-alto':cMar>=25?'m-medio':'m-bajo'}">${cMar.toFixed(1)}%</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+}
+
+async function onCostChange(input, base, categoria) {
+  const val = input.value === '' ? 0 : Number(input.value);
+  input.classList.remove('saved');
+  const ok = await guardarCosto(base, categoria, val);
+  if (ok) { input.classList.add('saved'); setTimeout(() => input.classList.remove('saved'), 1200); }
+  render(); // recalcular KPIs, sedes y tablas con el nuevo costo
+}
+
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeAttr(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>

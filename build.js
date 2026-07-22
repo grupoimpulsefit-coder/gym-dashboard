@@ -8,7 +8,7 @@ if (!SUPA_URL || !SUPA_KEY) {
   process.exit(1);
 }
 
-const files = ['index.html', 'nat.html', 'sedes.html', 'comparativa.html'];
+const files = ['index.html', 'nat.html', 'sedes.html', 'comparativa.html', 'otros.html'];
 
 files.forEach(file => {
   if (!fs.existsSync(file)) return;
