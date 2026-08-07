@@ -351,6 +351,7 @@ function classify(p) {
 
 // ── Carga automática desde gym_snapshots ────────────────────────────────────
 let chartBar = null, chartPie = null;
+let gastosMes = {};   // sede → { total, grupales, planta } del mes seleccionado
 
 async function loadAllSedes(mesElegido) {
   document.getElementById('dashboard').style.display = 'none';
@@ -382,6 +383,22 @@ async function loadAllSedes(mesElegido) {
     const snapsDelMes = allSnaps.filter(s => s.mes === mesActual);
     const latest = {};
     snapsDelMes.forEach(s => { if (!latest[s.sede]) latest[s.sede] = s; });
+
+    // Gastos del mes por sede (calzan por mes_orden 'YYYY-MM', que comparten snapshot y gasto)
+    gastosMes = {};
+    const ordenMes = snapsDelMes[0]?.mes_orden || null;
+    if (ordenMes) {
+      try {
+        const gs = (await supaFetch(`/gastos?mes_orden=eq.${encodeURIComponent(ordenMes)}&select=sede,categoria,monto`)) || [];
+        gs.forEach(g => {
+          if (!gastosMes[g.sede]) gastosMes[g.sede] = { total:0, grupales:0, planta:0 };
+          const m = Number(g.monto) || 0;
+          gastosMes[g.sede].total += m;
+          if (g.categoria === 'clases_grupales') gastosMes[g.sede].grupales += m;
+          else if (g.categoria === 'instructores_planta') gastosMes[g.sede].planta += m;
+        });
+      } catch(_) { gastosMes = {}; }
+    }
 
     buildDashboard(latest);
     document.getElementById('dashboard').style.display = 'block';
@@ -487,6 +504,14 @@ function buildDashboard(latest) {
             <span class="sede-row-label">Sin factura</span>
             <span class="sede-row-val">${fmt(d.tot - d.fe)} <span class="sede-row-pct">${pct(d.tot-d.fe,d.tot)}</span></span>
           </div>` : '<div class="sede-row"><span class="sede-row-label" style="color:#bbb;font-style:italic;">🧾 Sin comprobantes cargados</span></div>'}
+          ${gastosMes[s]?.total > 0 ? `<div class="sede-row" style="border-top:1px dashed #e0e0e0;margin-top:4px;padding-top:6px;">
+            <span class="sede-row-label">🧾 Gasto del mes</span>
+            <span class="sede-row-val" style="color:#c0392b;font-weight:700;">−${fmt(gastosMes[s].total)}</span>
+          </div>
+          <div class="sede-row" style="font-size:11px;">
+            <span class="sede-row-label" style="color:#999;">↳ Grupales / Planta</span>
+            <span class="sede-row-val" style="color:#999;font-weight:500;">${fmt(gastosMes[s].grupales)} / ${fmt(gastosMes[s].planta)}</span>
+          </div>` : ''}
           <div class="progress-bar"><div class="progress-fill" style="width:${pct(d.mem,d.tot)};background:${m.color}"></div></div>
           ${top ? `<div class="top-vend-label">🏆 Top Vendedor</div>
           <div class="top-vend-name text-${m.cls}">${top[0]}</div>

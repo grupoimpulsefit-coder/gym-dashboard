@@ -687,7 +687,7 @@ async function supaFetch(path, opts = {}) {
 // ══════════════════════════════════════════════════════
 //  AUTH
 // ══════════════════════════════════════════════════════
-let currentToken = null, currentRole = null, currentUserEmail = '';
+let currentToken = null, currentRole = null, currentUserEmail = '', currentSede = null;
 
 async function doLogin() {
     const email = document.getElementById('loginEmail').value.trim();
@@ -709,14 +709,16 @@ async function doLogin() {
         sessionStorage.setItem('supa_token', currentToken);
 
         // Obtener rol
-        const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre`, { userToken: currentToken });
+        const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede`, { userToken: currentToken });
         currentRole = roles?.[0]?.role || 'colaborador';
+        currentSede = roles?.[0]?.sede || null;
         const nombre = roles?.[0]?.nombre || currentUserEmail;
 
         document.getElementById('userNombre').textContent = nombre;
         document.getElementById('userRolBadge').textContent =
             currentRole === 'admin' ? '⚙ Admin' :
-            currentRole === 'admin_sedes' ? '🏢 Admin Sedes' : '👁 Colaborador';
+            currentRole === 'admin_sedes' ? '🏢 Admin Sedes' :
+            currentRole === 'recepcion' ? '🧾 Recepción' : '👁 Colaborador';
         applyRole();
         document.getElementById('loginScreen').style.display = 'none';
     } catch(e) {
@@ -795,6 +797,36 @@ async function showSedePicker() {
     const statusEl = document.getElementById('sedePickerStatus');
     const cardsEl  = document.getElementById('sedeCards');
     cardsEl.innerHTML = '';
+
+    // Helper: card que traspasa la sesión (SSO) a un reporte/módulo
+    const makeHandoffCard = (emoji, title, sub, sub2, bg, color, path) => {
+        const c = document.createElement('div');
+        c.style.cssText = `cursor:pointer;background:${bg};border:2px solid ${color}33;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;
+        c.innerHTML = `
+            <div style="font-size:3em;margin-bottom:12px;">${emoji}</div>
+            <div style="font-size:1.2em;font-weight:700;color:${color};">${title}</div>
+            <div style="font-size:0.85em;color:#666;margin-top:6px;">${sub}</div>
+            <div style="font-size:0.8em;color:#999;margin-top:4px;">${sub2}</div>`;
+        c.onmouseenter = () => { c.style.transform='translateY(-4px)'; c.style.boxShadow=`0 12px 32px ${color}33`; };
+        c.onmouseleave = () => { c.style.transform=''; c.style.boxShadow=''; };
+        c.onclick = () => {
+            sessionStorage.setItem('gymAuth', JSON.stringify({
+                token: currentToken, role: currentRole,
+                nombre: document.getElementById('userNombre').textContent,
+                email: currentUserEmail, sede: currentSede
+            }));
+            window.location.href = path;
+        };
+        return c;
+    };
+
+    // Recepción: solo el módulo de Gastos de su sede (no ve datos de otras sedes)
+    if (currentRole === 'recepcion') {
+        statusEl.textContent = 'Módulo disponible para su sede' + (currentSede ? ` (${currentSede})` : '') + ':';
+        cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
+        return;
+    }
+
     statusEl.textContent = '⏳ Cargando sedes disponibles...';
     try {
         // 'Calendario Natación' es el snapshot del calendario de reservaciones
@@ -825,33 +857,12 @@ async function showSedePicker() {
             card.onclick = () => selectMesForSede(snap.sede, snaps);
             cardsEl.appendChild(card);
         });
-        // Cards de reportes por sede — visibles para admin y admin_sedes
+        // Cards de reportes/módulos — visibles para admin y admin_sedes
         if (esRolAdmin()) {
-            const reportes = [
-                { emoji:'⚖️', title:'Comparativa de Sedes', sub:'Proyección vs Cobro', sub2:'Todas las sedes por rango de fechas', bg:'#f3eefc', color:'#7030A0', path:'/comparativa' },
-                { emoji:'📊', title:'Reporte de Sedes',     sub:'Facturación por sede',  sub2:'Totales y desglose por sede',        bg:'#e8f4fd', color:'#1565c0', path:'/sedes' },
-                { emoji:'🏷️', title:'Rentabilidad Otros',    sub:'Productos categoría Otros', sub2:'Costo, margen y ganancia del mes', bg:'#eafaf1', color:'#2e7d32', path:'/otros' },
-            ];
-            reportes.forEach(rep => {
-                const c = document.createElement('div');
-                c.style.cssText = `cursor:pointer;background:${rep.bg};border:2px solid ${rep.color}33;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;
-                c.innerHTML = `
-                    <div style="font-size:3em;margin-bottom:12px;">${rep.emoji}</div>
-                    <div style="font-size:1.2em;font-weight:700;color:${rep.color};">${rep.title}</div>
-                    <div style="font-size:0.85em;color:#666;margin-top:6px;">${rep.sub}</div>
-                    <div style="font-size:0.8em;color:#999;margin-top:4px;">${rep.sub2}</div>`;
-                c.onmouseenter = () => { c.style.transform='translateY(-4px)'; c.style.boxShadow=`0 12px 32px ${rep.color}33`; };
-                c.onmouseleave = () => { c.style.transform=''; c.style.boxShadow=''; };
-                c.onclick = () => {
-                    // Pasar la sesión al reporte para no pedir login de nuevo
-                    sessionStorage.setItem('gymAuth', JSON.stringify({
-                        token: currentToken, role: currentRole,
-                        nombre: document.getElementById('userNombre').textContent
-                    }));
-                    window.location.href = rep.path;
-                };
-                cardsEl.appendChild(c);
-            });
+            cardsEl.appendChild(makeHandoffCard('⚖️','Comparativa de Sedes','Proyección vs Cobro','Todas las sedes por rango de fechas','#f3eefc','#7030A0','/comparativa'));
+            cardsEl.appendChild(makeHandoffCard('📊','Reporte de Sedes','Facturación por sede','Totales y desglose por sede','#e8f4fd','#1565c0','/sedes'));
+            cardsEl.appendChild(makeHandoffCard('🏷️','Rentabilidad Otros','Productos categoría Otros','Costo, margen y ganancia del mes','#eafaf1','#2e7d32','/otros'));
+            cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar / ver gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
         }
     } catch(e) {
         statusEl.textContent = '⚠️ Error al cargar sedes: ' + e.message;

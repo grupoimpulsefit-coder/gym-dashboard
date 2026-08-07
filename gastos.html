@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gastos por Sede</title>
+<style>
+:root {
+  --primary: #1a5276;
+  --primary-light: #2e86c1;
+  --accent: #148f77;
+  --accent2: #e67e22;
+  --bg: #f0f4f8;
+  --border: #d5dce8;
+  --text: #1c2833;
+  --muted: #6c757d;
+  --warn: #c0392b;
+  --success: #27ae60;
+  --cat-grupales: #2e86c1;
+  --cat-planta:   #148f77;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+/* ── Login ── */
+#loginScreen { position: fixed; inset: 0; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+.login-card { background: white; border-radius: 24px; padding: 40px 44px; width: 100%; max-width: 420px; box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
+.login-logo { width: 64px; height: 64px; background: linear-gradient(135deg, #1a5276, #2e86c1); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 20px; }
+.login-card h2 { text-align: center; font-size: 1.4em; font-weight: 800; color: #2d2d5e; margin-bottom: 6px; }
+.login-card .login-sub { text-align: center; font-size: 0.85em; color: #888; margin-bottom: 28px; }
+.login-field { margin-bottom: 16px; }
+.login-field label { display: block; font-size: 0.8em; font-weight: 700; color: #444; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+.login-field input { width: 100%; padding: 11px 14px; border: 1.5px solid #dde1f0; border-radius: 10px; font-size: 14px; font-family: inherit; color: #333; }
+.login-field input:focus { outline: none; border-color: #2e86c1; box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
+.login-btn { width: 100%; padding: 13px; background: linear-gradient(135deg, #1a5276, #2e86c1); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+.login-btn:disabled { opacity: .6; cursor: not-allowed; }
+#loginError { text-align: center; color: #c62828; font-size: 13px; margin-top: 12px; min-height: 18px; }
+
+/* ── Header ── */
+.header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: white; padding: 18px 32px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.25); flex-wrap: wrap; }
+.header-icon { font-size: 34px; }
+.header h1 { font-size: 21px; font-weight: 700; }
+.header p  { font-size: 13px; opacity: .85; margin-top: 2px; }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; color: white; font-size: 13px; }
+.logout-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35); color: white; border-radius: 16px; padding: 5px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+/* ── Loading / empty ── */
+.loading, .empty-state { display: none; text-align: center; padding: 60px 32px; color: var(--muted); }
+.spinner { width: 44px; height: 44px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Dashboard ── */
+#dashboard { display: none; }
+.dash-topbar { padding: 12px 32px; background: white; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.dash-title { font-size: 15px; font-weight: 700; color: var(--primary); }
+.dash-period { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.topbar-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.topbar-controls label { font-size: 13px; font-weight: 600; color: #555; }
+.topbar-controls select { border: 1.5px solid #d0d7e8; border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; color: #333; cursor: pointer; background: white; }
+.sede-lock { background: #eef3fa; border: 1.5px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 700; color: var(--primary); }
+.btn-primary { padding: 8px 18px; border-radius: 10px; border: none; background: linear-gradient(135deg, #1a5276, #2e86c1); color: white; font-size: 13px; font-weight: 700; cursor: pointer; }
+.btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+.btn-ghost { padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 13px; cursor: pointer; color: var(--primary); font-weight: 600; }
+.btn-ghost:hover { background: var(--bg); }
+
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; padding: 22px 32px 8px; }
+.kpi { background: white; border-radius: 12px; padding: 16px 18px; border-left: 4px solid var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+.kpi.blue   { border-color: var(--cat-grupales); }
+.kpi.teal   { border-color: var(--cat-planta); }
+.kpi.orange { border-color: var(--accent2); }
+.kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+.kpi-value { font-size: 23px; font-weight: 700; color: var(--primary); margin-top: 4px; line-height: 1.1; }
+.kpi.blue   .kpi-value { color: var(--cat-grupales); }
+.kpi.teal   .kpi-value { color: var(--cat-planta); }
+.kpi.orange .kpi-value { color: var(--accent2); }
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.section { padding: 8px 32px; }
+.section-title { font-size: 15px; font-weight: 700; color: var(--primary); margin-bottom: 14px; border-left: 4px solid var(--primary-light); padding-left: 10px; }
+.section-note { font-weight: 400; font-size: 12px; color: var(--muted); }
+
+/* ── Formulario de gasto ── */
+.form-card { background: white; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.07); padding: 20px 22px; margin: 0 32px 8px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px 18px; }
+.f-field { display: flex; flex-direction: column; gap: 5px; }
+.f-field label { font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .3px; }
+.f-field label .req { color: var(--warn); }
+.f-field input, .f-field select { padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 9px; font-size: 13px; font-family: inherit; color: var(--text); background: white; width: 100%; }
+.f-field input:focus, .f-field select:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
+.f-inline { display: flex; gap: 8px; align-items: flex-end; }
+.f-inline .f-field { flex: 1; }
+.pay-box { font-size: 12px; color: var(--muted); background: #f6f9fc; border: 1px dashed var(--border); border-radius: 9px; padding: 9px 12px; min-height: 38px; }
+.pay-box b { color: var(--text); }
+.form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+.form-msg { font-size: 13px; margin-right: auto; align-self: center; }
+.form-msg.ok  { color: var(--success); font-weight: 600; }
+.form-msg.err { color: var(--warn); font-weight: 600; }
+
+/* ── Tabla de gastos ── */
+.cat-block { padding: 8px 32px 4px; }
+.cat-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.cat-badge { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; color: white; padding: 6px 14px; border-radius: 20px; }
+.cat-summary { font-size: 12px; color: var(--muted); }
+.cat-summary b { color: var(--text); }
+.g-wrap { overflow-x: auto; background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+.g-table { width: 100%; border-collapse: collapse; min-width: 820px; }
+.g-table th { background: #f8f9fb; font-size: 11px; font-weight: 700; color: var(--muted); padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: .3px; }
+.g-table th.num, .g-table td.num { text-align: right; }
+.g-table td { padding: 9px 12px; font-size: 13px; border-bottom: 1px solid #f2f5f9; }
+.g-table tr:last-child td { border-bottom: none; }
+.g-table tr.cat-total td { background: #eef3fa; font-weight: 800; border-top: 2px solid var(--primary); }
+.g-empty { padding: 16px; color: var(--muted); font-size: 12px; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 11px; font-weight: 700; background: #eceff1; color: #607d8b; }
+
+/* ── Modal instructor ── */
+.modal-back { display: none; position: fixed; inset: 0; background: rgba(20,24,40,.55); z-index: 10000; align-items: center; justify-content: center; padding: 20px; }
+.modal-back.open { display: flex; }
+.modal { background: white; border-radius: 16px; width: 100%; max-width: 460px; box-shadow: 0 32px 80px rgba(0,0,0,.4); overflow: hidden; }
+.modal-head { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; padding: 16px 22px; font-size: 16px; font-weight: 700; }
+.modal-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
+.modal-foot { padding: 14px 22px; display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid var(--border); }
+.hint { font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">🧾</div>
+    <h2>Gastos por Sede</h2>
+    <p class="login-sub">Registro de gastos de clases grupales e instructores de planta</p>
+    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
+    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-icon">🧾</div>
+  <div>
+    <h1>Gastos por Sede</h1>
+    <p>Clases grupales e instructores de planta · resumen mensual</p>
+  </div>
+  <div class="header-right">
+    <span>👤 <span id="userNombre">—</span></span>
+    <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+  </div>
+</div>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div>Cargando gastos…</div>
+</div>
+
+<div class="empty-state" id="emptyState"></div>
+
+<div id="dashboard">
+
+  <div class="dash-topbar">
+    <div>
+      <div class="dash-title">🧾 Gastos <span id="sedeTitle"></span></div>
+      <div class="dash-period" id="dashPeriod"></div>
+    </div>
+    <div class="topbar-controls">
+      <span id="sedeControl"></span>
+      <label>📅 Mes:</label>
+      <select id="mesSelector" onchange="renderGastos()"></select>
+      <button class="btn-ghost" onclick="loadGastos()">↻ Actualizar</button>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi orange">
+      <div class="kpi-label">Total gasto del mes</div>
+      <div class="kpi-value" id="kpiTotal">—</div>
+      <div class="kpi-sub" id="kpiTotalSub">—</div>
+    </div>
+    <div class="kpi blue">
+      <div class="kpi-label">Clases grupales</div>
+      <div class="kpi-value" id="kpiGrupales">—</div>
+      <div class="kpi-sub" id="kpiGrupalesSub">—</div>
+    </div>
+    <div class="kpi teal">
+      <div class="kpi-label">Instructores de planta</div>
+      <div class="kpi-value" id="kpiPlanta">—</div>
+      <div class="kpi-sub" id="kpiPlantaSub">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Registros</div>
+      <div class="kpi-value" id="kpiCount">—</div>
+      <div class="kpi-sub">facturas del mes</div>
+    </div>
+  </div>
+
+  <!-- Formulario de nuevo gasto -->
+  <div class="section"><div class="section-title">➕ Registrar gasto <span class="section-note">— el mes se calcula automáticamente según la fecha de la clase</span></div></div>
+  <div class="form-card">
+    <div class="form-grid">
+      <div class="f-field">
+        <label>Categoría <span class="req">*</span></label>
+        <select id="fCategoria">
+          <option value="clases_grupales">🧘 Clases grupales</option>
+          <option value="instructores_planta">🏋️ Instructores de planta</option>
+        </select>
+      </div>
+      <div class="f-field">
+        <label>Fecha de la clase <span class="req">*</span></label>
+        <input type="date" id="fFecha">
+      </div>
+      <div class="f-field">
+        <label>Instructor</label>
+        <div class="f-inline">
+          <div class="f-field" style="gap:0;">
+            <select id="fInstructor" onchange="onInstructorChange()">
+              <option value="">— Seleccione —</option>
+            </select>
+          </div>
+          <button class="btn-ghost" type="button" onclick="openInstructorModal()" title="Nuevo instructor">＋</button>
+        </div>
+      </div>
+      <div class="f-field">
+        <label>Emisor de la factura <span class="req">*</span></label>
+        <input type="text" id="fEmisor" placeholder="Nombre de quien factura">
+      </div>
+      <div class="f-field">
+        <label>Documento de cobro</label>
+        <input type="text" id="fDocumento" placeholder="Factura / Recibo / Comprobante…">
+      </div>
+      <div class="f-field">
+        <label>Número de factura</label>
+        <input type="text" id="fNumFactura" placeholder="Ej. 00123">
+      </div>
+      <div class="f-field">
+        <label>Monto (₡) <span class="req">*</span></label>
+        <input type="number" id="fMonto" min="0" step="1" placeholder="0">
+      </div>
+      <div class="f-field">
+        <label>Método de pago</label>
+        <select id="fMetodo" onchange="onMetodoChange()">
+          <option value="">— Seleccione instructor —</option>
+        </select>
+      </div>
+      <div class="f-field" style="min-width:100%;">
+        <label>Cuenta / número para el pago</label>
+        <div class="pay-box" id="payBox">Seleccione un instructor para autocompletar los datos de pago, o escríbalos manualmente.</div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <div class="form-msg" id="formMsg"></div>
+      <button class="btn-ghost" type="button" onclick="resetForm()">Limpiar</button>
+      <button class="btn-primary" id="btnGuardar" onclick="guardarGasto()">💾 Guardar gasto</button>
+    </div>
+  </div>
+
+  <!-- Tablas por categoría -->
+  <div class="section"><div class="section-title">📋 Gastos registrados</div></div>
+  <div id="gastosContainer"></div>
+
+</div>
+
+<!-- ── Modal nuevo instructor ── -->
+<div class="modal-back" id="instructorModal">
+  <div class="modal">
+    <div class="modal-head">➕ Nuevo instructor</div>
+    <div class="modal-body">
+      <div class="f-field"><label>Nombre <span class="req">*</span></label><input type="text" id="iNombre" placeholder="Nombre completo"></div>
+      <div class="f-field"><label>Número de cuenta BAC</label><input type="text" id="iCuentaBac" placeholder="Cuenta / IBAN BAC"></div>
+      <div class="f-field"><label>Otro banco (si no usa BAC)</label><input type="text" id="iOtroBanco" placeholder="Nombre del banco"></div>
+      <div class="f-field"><label>Número de cuenta del otro banco</label><input type="text" id="iCuentaOtro" placeholder="Cuenta / IBAN"></div>
+      <div class="f-field"><label>SINPE Móvil</label><input type="text" id="iSinpe" placeholder="Número de teléfono"></div>
+      <div class="hint">Los datos de pago se autocompletan al elegir el instructor en el formulario.</div>
+      <div id="instructorErr" style="color:var(--warn);font-size:13px;min-height:16px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" type="button" onclick="closeInstructorModal()">Cancelar</button>
+      <button class="btn-primary" id="btnGuardarInstr" type="button" onclick="guardarInstructor()">Guardar instructor</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Supabase ──────────────────────────────────────────────────────────────
+const SUPA_URL = '__SUPA_URL__';
+const SUPA_KEY = '__SUPA_KEY__';
+let currentToken = null, currentRole = null, currentSede = null, currentEmail = '';
+
+async function supaFetch(path, opts = {}) {
+  const token = currentToken || SUPA_KEY;
+  const res = await fetch(SUPA_URL + '/rest/v1' + path, {
+    method: opts.method || 'GET',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json', 'Prefer': opts.prefer || 'return=minimal',
+      ...(opts.headers || {}) },
+    body: opts.body != null ? JSON.stringify(opts.body) : undefined
+  });
+  if (!res.ok) { const t = await res.text(); throw new Error(t); }
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+// ── Config ──────────────────────────────────────────────────────────────
+const ROLES_PERMITIDOS = ['recepcion', 'admin', 'admin_sedes'];
+const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
+const SEDE_META = {
+  '3 Ríos':   { icon: '🌊', color: '#00838f' },
+  'Natación': { icon: '🏊', color: '#6a1b9a' },
+  'Pinares':  { icon: '🌲', color: '#2e7d32' },
+  'Sabanilla':{ icon: '🏙️', color: '#1565c0' },
+};
+const CATEGORIAS = [
+  { id: 'clases_grupales',     label: 'Clases grupales',        icon: '🧘', color: 'var(--cat-grupales)' },
+  { id: 'instructores_planta', label: 'Instructores de planta', icon: '🏋️', color: 'var(--cat-planta)' },
+];
+const CAT_LABEL = Object.fromEntries(CATEGORIAS.map(c => [c.id, c]));
+const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+let instructores = [];   // directorio
+let gastos = [];         // gastos de la sede actual (todos los meses)
+
+const esAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes';
+const fmtCRC  = n => '₡' + Math.round(n||0).toLocaleString('es-CR');
+function mesEtiqueta(d) { return MESES_ES[d.getMonth()] + ' ' + d.getFullYear(); }
+function mesOrden(d)    { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+// fecha 'YYYY-MM-DD' → Date local (evita corrimiento por zona horaria)
+function parseFecha(s) { const [y,m,d] = String(s).split('-').map(Number); return new Date(y, m-1, d); }
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ── Login ───────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pwd   = document.getElementById('loginPassword').value;
+  const btn   = document.getElementById('loginBtn');
+  const errEl = document.getElementById('loginError');
+  if (!email || !pwd) { errEl.textContent = 'Complete todos los campos.'; return; }
+  btn.textContent = 'Ingresando...'; btn.disabled = true; errEl.textContent = '';
+  try {
+    const res = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'apikey': SUPA_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pwd })
+    });
+    const data = await res.json();
+    if (!data.access_token) throw new Error(data.error_description || data.msg || 'Credenciales incorrectas');
+    currentToken = data.access_token;
+    currentEmail = email;
+    const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede`);
+    currentRole = roles?.[0]?.role || null;
+    currentSede = roles?.[0]?.sede || null;
+    if (!ROLES_PERMITIDOS.includes(currentRole)) {
+      errEl.textContent = 'Su cuenta no tiene acceso a este módulo.';
+      await doLogout(true);
+      return;
+    }
+    if (currentRole === 'recepcion' && !currentSede) {
+      errEl.textContent = 'Su cuenta de recepción no tiene una sede asignada. Contacte al administrador.';
+      await doLogout(true);
+      return;
+    }
+    document.getElementById('userNombre').textContent = roles?.[0]?.nombre || email;
+    document.getElementById('loginScreen').style.display = 'none';
+    initGastos();
+  } catch(e) {
+    errEl.textContent = e.message;
+  } finally {
+    btn.textContent = 'Entrar'; btn.disabled = false;
+  }
+}
+document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+// Sesión traspasada desde index.html (card Gastos / rol recepción) — evita pedir login
+(function() {
+  try {
+    const auth = JSON.parse(sessionStorage.getItem('gymAuth') || 'null');
+    if (auth?.token && ROLES_PERMITIDOS.includes(auth.role)) {
+      sessionStorage.removeItem('gymAuth');
+      currentToken = auth.token;
+      currentRole = auth.role;
+      currentSede = auth.sede || null;
+      currentEmail = auth.email || '';
+      document.getElementById('userNombre').textContent = auth.nombre || '—';
+      document.getElementById('loginScreen').style.display = 'none';
+      // Diferir: initGastos usa const/let de más abajo; esperar a que el script termine de inicializar.
+      setTimeout(initGastos, 0);
+    }
+  } catch(_) {}
+})();
+
+async function doLogout(silent) {
+  try { await fetch(`${SUPA_URL}/auth/v1/logout`, { method:'POST', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken} }); } catch(_) {}
+  currentToken = null; currentRole = null; currentSede = null; currentEmail = '';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+  if (!silent) {
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+  }
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+// ── Init ────────────────────────────────────────────────────────────────
+async function initGastos() {
+  // Control de sede: admin elige; recepción queda fija en su sede
+  const ctrl = document.getElementById('sedeControl');
+  if (esAdmin()) {
+    if (!currentSede) currentSede = SEDES[0];
+    ctrl.innerHTML = `<label>🏢 Sede:</label> <select id="sedeSelector"></select>`;
+    const sel = document.getElementById('sedeSelector');
+    sel.innerHTML = SEDES.map(s => `<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
+    sel.onchange = () => { currentSede = sel.value; loadGastos(); };
+  } else {
+    ctrl.innerHTML = `<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
+  }
+  document.getElementById('sedeTitle').textContent = '· ' + currentSede;
+  // Fecha por defecto = hoy
+  document.getElementById('fFecha').value = new Date().toISOString().slice(0,10);
+  await cargarInstructores();
+  await loadGastos();
+}
+
+async function cargarInstructores() {
+  try {
+    instructores = (await supaFetch('/instructores?activo=eq.true&order=nombre.asc&select=*')) || [];
+  } catch(_) { instructores = []; }
+  const sel = document.getElementById('fInstructor');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Seleccione —</option>' +
+    instructores.map(i => `<option value="${i.id}">${esc(i.nombre)}</option>`).join('');
+  if (prev) sel.value = prev;
+}
+
+async function loadGastos() {
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('loading').style.display = 'block';
+  try {
+    gastos = (await supaFetch(`/gastos?sede=eq.${encodeURIComponent(currentSede)}&order=fecha_clase.desc&select=*`)) || [];
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    poblarMeses();
+    renderGastos();
+  } catch(e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('emptyState').textContent = '⚠️ Error al cargar datos: ' + e.message;
+  }
+}
+
+function poblarMeses() {
+  const sel = document.getElementById('mesSelector');
+  const prev = sel.value;
+  // meses presentes en los gastos + mes actual, ordenados desc
+  const map = new Map();
+  gastos.forEach(g => { if (g.mes_orden) map.set(g.mes_orden, g.mes); });
+  const hoy = new Date();
+  map.set(mesOrden(hoy), mesEtiqueta(hoy));
+  const ordenados = [...map.entries()].sort((a,b) => b[0].localeCompare(a[0]));
+  const actual = prev || mesOrden(hoy);
+  sel.innerHTML = ordenados.map(([ord, et]) => `<option value="${ord}"${ord===actual?' selected':''}>${esc(et)}</option>`).join('');
+}
+
+function renderGastos() {
+  const mesSel = document.getElementById('mesSelector').value;
+  const delMes = gastos.filter(g => g.mes_orden === mesSel);
+  const etiqueta = delMes[0]?.mes || document.getElementById('mesSelector').selectedOptions[0]?.textContent || '';
+  document.getElementById('dashPeriod').textContent = `${currentSede} · ${etiqueta}`;
+
+  const total = delMes.reduce((s,g) => s + Number(g.monto||0), 0);
+  const porCat = {};
+  CATEGORIAS.forEach(c => porCat[c.id] = delMes.filter(g => g.categoria === c.id));
+  const totGrupales = (porCat['clases_grupales']||[]).reduce((s,g)=>s+Number(g.monto||0),0);
+  const totPlanta   = (porCat['instructores_planta']||[]).reduce((s,g)=>s+Number(g.monto||0),0);
+
+  document.getElementById('kpiTotal').textContent    = fmtCRC(total);
+  document.getElementById('kpiTotalSub').textContent = `${delMes.length} registro(s) · ${etiqueta}`;
+  document.getElementById('kpiGrupales').textContent = fmtCRC(totGrupales);
+  document.getElementById('kpiGrupalesSub').textContent = `${(porCat['clases_grupales']||[]).length} factura(s)`;
+  document.getElementById('kpiPlanta').textContent   = fmtCRC(totPlanta);
+  document.getElementById('kpiPlantaSub').textContent = `${(porCat['instructores_planta']||[]).length} factura(s)`;
+  document.getElementById('kpiCount').textContent    = delMes.length;
+
+  const cont = document.getElementById('gastosContainer');
+  cont.innerHTML = CATEGORIAS.map(cat => {
+    const rows = porCat[cat.id] || [];
+    const subtot = rows.reduce((s,g)=>s+Number(g.monto||0),0);
+    const body = rows.length ? rows.map(g => `
+      <tr>
+        <td>${esc(new Date(g.fecha_clase+'T00:00:00').toLocaleDateString('es-CR'))}</td>
+        <td>${esc(g.emisor)}</td>
+        <td>${g.documento_cobro ? esc(g.documento_cobro) : '<span class="pill">—</span>'}</td>
+        <td>${g.numero_factura ? esc(g.numero_factura) : '—'}</td>
+        <td>${g.banco_pago ? esc(g.banco_pago) : '—'}${g.cuenta_pago ? '<br><span style="font-size:11px;color:var(--muted);">'+esc(g.cuenta_pago)+'</span>' : ''}</td>
+        <td class="num">${fmtCRC(g.monto)}</td>
+      </tr>`).join('')
+      : `<tr><td colspan="6" class="g-empty">Sin gastos de esta categoría en el mes.</td></tr>`;
+    return `
+      <div class="cat-block">
+        <div class="cat-head">
+          <span class="cat-badge" style="background:${cat.color};">${cat.icon} ${cat.label}</span>
+          <span class="cat-summary"><b>${rows.length}</b> factura(s) · Subtotal <b>${fmtCRC(subtot)}</b></span>
+        </div>
+        <div class="g-wrap">
+          <table class="g-table">
+            <thead><tr>
+              <th>Fecha clase</th><th>Emisor</th><th>Doc. cobro</th><th>N° factura</th><th>Pago</th><th class="num">Monto</th>
+            </tr></thead>
+            <tbody>${body}
+              <tr class="cat-total"><td colspan="5">Subtotal ${cat.label}</td><td class="num">${fmtCRC(subtot)}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Autocompletado de pago ──────────────────────────────────────────────
+function metodosDe(inst) {
+  const m = [];
+  if (inst.cuenta_bac)  m.push({ value:'bac',        banco:'BAC',                 cuenta: inst.cuenta_bac });
+  if (inst.otro_banco && inst.cuenta_otro) m.push({ value:'otro_banco', banco: inst.otro_banco, cuenta: inst.cuenta_otro });
+  if (inst.sinpe_movil) m.push({ value:'sinpe',      banco:'SINPE Móvil',         cuenta: inst.sinpe_movil });
+  return m;
+}
+function onInstructorChange() {
+  const id = document.getElementById('fInstructor').value;
+  const inst = instructores.find(i => i.id === id);
+  const metSel = document.getElementById('fMetodo');
+  if (!inst) {
+    metSel.innerHTML = '<option value="">— Seleccione instructor —</option>';
+    document.getElementById('payBox').textContent = 'Seleccione un instructor para autocompletar los datos de pago.';
+    return;
+  }
+  if (!document.getElementById('fEmisor').value.trim()) document.getElementById('fEmisor').value = inst.nombre;
+  const met = metodosDe(inst);
+  if (!met.length) {
+    metSel.innerHTML = '<option value="">Sin datos de pago</option>';
+    document.getElementById('payBox').innerHTML = '⚠️ Este instructor no tiene datos de pago. Edítelo para agregar cuenta o SINPE.';
+    return;
+  }
+  metSel.innerHTML = met.map(m => `<option value="${m.value}">${m.banco}</option>`).join('');
+  onMetodoChange();
+}
+function onMetodoChange() {
+  const id = document.getElementById('fInstructor').value;
+  const inst = instructores.find(i => i.id === id);
+  const val = document.getElementById('fMetodo').value;
+  const box = document.getElementById('payBox');
+  if (!inst || !val) { box.textContent = '—'; return; }
+  const m = metodosDe(inst).find(x => x.value === val);
+  if (m) box.innerHTML = `<b>${esc(m.banco)}</b> · ${esc(m.cuenta)}`;
+}
+
+// ── Guardar gasto ───────────────────────────────────────────────────────
+async function guardarGasto() {
+  const msg = document.getElementById('formMsg');
+  const categoria = document.getElementById('fCategoria').value;
+  const fecha     = document.getElementById('fFecha').value;
+  const emisor    = document.getElementById('fEmisor').value.trim();
+  const monto     = Number(document.getElementById('fMonto').value);
+  if (!fecha)  { msg.className='form-msg err'; msg.textContent='Indique la fecha de la clase.'; return; }
+  if (!emisor) { msg.className='form-msg err'; msg.textContent='Indique el emisor de la factura.'; return; }
+  if (!monto || monto <= 0) { msg.className='form-msg err'; msg.textContent='Indique un monto válido.'; return; }
+
+  const d = parseFecha(fecha);
+  const instId = document.getElementById('fInstructor').value || null;
+  const inst = instructores.find(i => i.id === instId);
+  const metVal = document.getElementById('fMetodo').value;
+  const m = inst ? metodosDe(inst).find(x => x.value === metVal) : null;
+
+  const payload = {
+    sede: currentSede,
+    categoria,
+    fecha_clase: fecha,
+    mes: mesEtiqueta(d),
+    mes_orden: mesOrden(d),
+    emisor,
+    instructor_id: instId,
+    documento_cobro: document.getElementById('fDocumento').value.trim() || null,
+    numero_factura: document.getElementById('fNumFactura').value.trim() || null,
+    monto,
+    metodo_pago: metVal || null,
+    banco_pago: m ? m.banco : null,
+    cuenta_pago: m ? m.cuenta : null,
+    created_by: currentEmail || null
+  };
+
+  const btn = document.getElementById('btnGuardar');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try {
+    await supaFetch('/gastos', { method:'POST', body: payload });
+    msg.className='form-msg ok'; msg.textContent='✅ Gasto guardado.';
+    resetForm();
+    // fijar el selector de mes al mes del gasto recién creado
+    await loadGastos();
+    const sel = document.getElementById('mesSelector');
+    if ([...sel.options].some(o => o.value === payload.mes_orden)) { sel.value = payload.mes_orden; renderGastos(); }
+    setTimeout(() => { if (msg.textContent==='✅ Gasto guardado.') msg.textContent=''; }, 4000);
+  } catch(e) {
+    msg.className='form-msg err'; msg.textContent='⚠️ ' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Guardar gasto';
+  }
+}
+
+function resetForm() {
+  document.getElementById('fInstructor').value = '';
+  document.getElementById('fEmisor').value = '';
+  document.getElementById('fDocumento').value = '';
+  document.getElementById('fNumFactura').value = '';
+  document.getElementById('fMonto').value = '';
+  document.getElementById('fMetodo').innerHTML = '<option value="">— Seleccione instructor —</option>';
+  document.getElementById('payBox').textContent = 'Seleccione un instructor para autocompletar los datos de pago, o escríbalos manualmente.';
+}
+
+// ── Instructor modal ────────────────────────────────────────────────────
+function openInstructorModal() {
+  ['iNombre','iCuentaBac','iOtroBanco','iCuentaOtro','iSinpe'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('instructorErr').textContent = '';
+  document.getElementById('instructorModal').classList.add('open');
+}
+function closeInstructorModal() { document.getElementById('instructorModal').classList.remove('open'); }
+
+async function guardarInstructor() {
+  const err = document.getElementById('instructorErr');
+  const nombre = document.getElementById('iNombre').value.trim();
+  if (!nombre) { err.textContent = 'El nombre es obligatorio.'; return; }
+  const payload = {
+    nombre,
+    cuenta_bac:  document.getElementById('iCuentaBac').value.trim() || null,
+    otro_banco:  document.getElementById('iOtroBanco').value.trim() || null,
+    cuenta_otro: document.getElementById('iCuentaOtro').value.trim() || null,
+    sinpe_movil: document.getElementById('iSinpe').value.trim() || null,
+  };
+  const btn = document.getElementById('btnGuardarInstr');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try {
+    const nuevo = await supaFetch('/instructores', { method:'POST', body: payload, prefer:'return=representation' });
+    await cargarInstructores();
+    const id = Array.isArray(nuevo) ? nuevo[0]?.id : nuevo?.id;
+    if (id) { document.getElementById('fInstructor').value = id; onInstructorChange(); }
+    closeInstructorModal();
+  } catch(e) {
+    err.textContent = /duplicate|unique/i.test(e.message) ? 'Ya existe un instructor con ese nombre.' : e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Guardar instructor';
+  }
+}
+</script>
+</body>
+</html>
