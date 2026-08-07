@@ -248,8 +248,8 @@ async function supaFetch(path, opts = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
-// Único rol permitido en este reporte: 'admin_sedes' (distinto de 'admin'/'colaborador')
-const ROL_PERMITIDO = 'admin_sedes';
+// Roles permitidos en este reporte: 'admin_sedes' y 'admin' (no 'colaborador')
+const ROLES_PERMITIDOS = ['admin_sedes', 'admin'];
 
 async function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();
@@ -269,7 +269,7 @@ async function doLogin() {
     currentToken = data.access_token;
     const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre`);
     currentRole = roles?.[0]?.role || null;
-    if (currentRole !== ROL_PERMITIDO) {
+    if (!ROLES_PERMITIDOS.includes(currentRole)) {
       errEl.textContent = 'Su cuenta no tiene acceso a este reporte.';
       await doLogout(true);
       return;
@@ -285,6 +285,21 @@ async function doLogin() {
 }
 
 document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+// Sesión traspasada desde index.html (card Reporte de Sedes) — evita pedir login de nuevo
+(function() {
+  try {
+    const auth = JSON.parse(sessionStorage.getItem('gymAuth') || 'null');
+    if (auth?.token && ROLES_PERMITIDOS.includes(auth.role)) {
+      sessionStorage.removeItem('gymAuth');
+      currentToken = auth.token;
+      currentRole = auth.role;
+      document.getElementById('userNombre').textContent = auth.nombre || '—';
+      document.getElementById('loginScreen').style.display = 'none';
+      loadAllSedes();
+    }
+  } catch(_) {}
+})();
 
 async function doLogout(silent) {
   try { await fetch(`${SUPA_URL}/auth/v1/logout`, { method:'POST', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken} }); } catch(_) {}

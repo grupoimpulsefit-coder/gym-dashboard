@@ -522,6 +522,7 @@
                 </div>
                 <div class="btn-row">
                     <button class="btn btn-teal" onclick="exportSegCSV()">📥 Exportar CSV</button>
+                    <button class="btn btn-red"  onclick="exportSegPDF()">📄 Exportar PDF</button>
                     <button class="btn btn-red"  onclick="printSeguimiento()">🖨️ Imprimir</button>
                 </div>
             </div>
@@ -824,26 +825,33 @@ async function showSedePicker() {
             card.onclick = () => selectMesForSede(snap.sede, snaps);
             cardsEl.appendChild(card);
         });
-        // Card de Comparativa de Sedes — de momento solo visible para admin_sedes
-        if (currentRole === 'admin_sedes') {
-            const compCard = document.createElement('div');
-            compCard.style.cssText = `cursor:pointer;background:#f3eefc;border:2px solid #7030A033;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;
-            compCard.innerHTML = `
-                <div style="font-size:3em;margin-bottom:12px;">⚖️</div>
-                <div style="font-size:1.2em;font-weight:700;color:#7030A0;">Comparativa de Sedes</div>
-                <div style="font-size:0.85em;color:#666;margin-top:6px;">Proyección vs Cobro</div>
-                <div style="font-size:0.8em;color:#999;margin-top:4px;">Todas las sedes por rango de fechas</div>`;
-            compCard.onmouseenter = () => { compCard.style.transform='translateY(-4px)'; compCard.style.boxShadow='0 12px 32px #7030A033'; };
-            compCard.onmouseleave = () => { compCard.style.transform=''; compCard.style.boxShadow=''; };
-            compCard.onclick = () => {
-                // Pasar la sesión a comparativa para no pedir login de nuevo
-                sessionStorage.setItem('gymAuth', JSON.stringify({
-                    token: currentToken, role: currentRole,
-                    nombre: document.getElementById('userNombre').textContent
-                }));
-                window.location.href = '/comparativa';
-            };
-            cardsEl.appendChild(compCard);
+        // Cards de reportes por sede — visibles para admin y admin_sedes
+        if (esRolAdmin()) {
+            const reportes = [
+                { emoji:'⚖️', title:'Comparativa de Sedes', sub:'Proyección vs Cobro', sub2:'Todas las sedes por rango de fechas', bg:'#f3eefc', color:'#7030A0', path:'/comparativa' },
+                { emoji:'📊', title:'Reporte de Sedes',     sub:'Facturación por sede',  sub2:'Totales y desglose por sede',        bg:'#e8f4fd', color:'#1565c0', path:'/sedes' },
+                { emoji:'🏷️', title:'Rentabilidad Otros',    sub:'Productos categoría Otros', sub2:'Costo, margen y ganancia del mes', bg:'#eafaf1', color:'#2e7d32', path:'/otros' },
+            ];
+            reportes.forEach(rep => {
+                const c = document.createElement('div');
+                c.style.cssText = `cursor:pointer;background:${rep.bg};border:2px solid ${rep.color}33;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;
+                c.innerHTML = `
+                    <div style="font-size:3em;margin-bottom:12px;">${rep.emoji}</div>
+                    <div style="font-size:1.2em;font-weight:700;color:${rep.color};">${rep.title}</div>
+                    <div style="font-size:0.85em;color:#666;margin-top:6px;">${rep.sub}</div>
+                    <div style="font-size:0.8em;color:#999;margin-top:4px;">${rep.sub2}</div>`;
+                c.onmouseenter = () => { c.style.transform='translateY(-4px)'; c.style.boxShadow=`0 12px 32px ${rep.color}33`; };
+                c.onmouseleave = () => { c.style.transform=''; c.style.boxShadow=''; };
+                c.onclick = () => {
+                    // Pasar la sesión al reporte para no pedir login de nuevo
+                    sessionStorage.setItem('gymAuth', JSON.stringify({
+                        token: currentToken, role: currentRole,
+                        nombre: document.getElementById('userNombre').textContent
+                    }));
+                    window.location.href = rep.path;
+                };
+                cardsEl.appendChild(c);
+            });
         }
     } catch(e) {
         statusEl.textContent = '⚠️ Error al cargar sedes: ' + e.message;
@@ -1058,7 +1066,7 @@ function isMembershipPlan(product) {
     // Fallback: contains "plan" or "promo" or "anualidad" or "lealtad" or "bloqueado" or "verano" or "estudiante" or "renovacion"
     // "N x NNmil" (ej. "JULIO 2 X 40MIL") y planes nombrados por mes son promos de membresía
     if (/\d+\s*x\s*\d+\s*mil/i.test(p)) return true;
-    return /plan|promo|anual|lealtad|bloqueado|verano|exclusivo|platium|semestral|trimest|estudiante|renovaci[oó]n|black|ejecutivo|mensualidad|matr[ií]cula|\bpng\b|\bcps\b/i.test(p);
+    return /plan|promo|anual|lealtad|bloqueado|verano|exclusivo|platium|semestral|trimest|bimest|estudiante|renovaci[oó]n|black|ejecutivo|mensualidad|matr[ií]cula|\bpng\b|\bcps\b/i.test(p);
 }
 function isClaseSuelta(product) {
     let pl = String(product||'').trim().toLowerCase();
@@ -2115,6 +2123,64 @@ function exportSegCSV() {
     const rows = f.map(u => [u.PIN, u.Nombre, u.Telefono, u.Email, u.ÚltimoProducto, u.Expira, Math.round((today-u.ExpiraDate)/864e5), u.ValorPlan]);
     const csv = [h, ...rows].map(row => row.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
     dlBlob(csv, 'seguimiento_vencidos_'+currentSedeName+'_'+hoy()+'.csv', 'text/csv;charset=utf-8');
+}
+
+function exportSegPDF() {
+    const today = new Date(); today.setHours(0,0,0,0);
+    let f = getFilteredSeguimiento(); if (!f.length) { alert('No hay datos'); return; }
+    f = f.slice().sort((a,b) => a.ExpiraDate - b.ExpiraDate);
+    const { jsPDF } = window.jspdf;
+    let doc = new jsPDF({ orientation:'landscape', unit:'pt', format:'a4' });
+    let pW = doc.internal.pageSize.getWidth();
+    let fecha = new Date().toLocaleDateString('es-CR',{year:'numeric',month:'long',day:'numeric'});
+    // Header
+    doc.setFillColor(102,126,234); doc.rect(0,0,pW,78,'F');
+    doc.setFillColor(118,75,162); doc.rect(pW-180,0,180,78,'F');
+    doc.setFontSize(17); doc.setTextColor(255,255,255); doc.setFont(undefined,'bold');
+    doc.text('Seguimiento de Vencidos - '+currentSedeName,36,30);
+    doc.setFontSize(10); doc.setFont(undefined,'normal');
+    doc.text('Clientes activos vencidos sin renovar - Lista para Recepcion',36,48);
+    doc.text('Generado: '+fecha,36,64);
+    doc.setFontSize(9); doc.text('JK Sistemas',pW-90,46,{align:'center'});
+
+    // Summary row
+    let valorRiesgo = f.reduce((s,u)=>s+(u.ValorPlan||0),0);
+    let r15 = f.filter(u=>Math.round((today-u.ExpiraDate)/864e5)<=15).length;
+    let r60 = f.filter(u=>Math.round((today-u.ExpiraDate)/864e5)>60).length;
+    doc.setFillColor(255,240,240); doc.roundedRect(36,86,pW-72,28,4,4,'F');
+    doc.setFontSize(9); doc.setTextColor(94,45,45); doc.setFont(undefined,'bold');
+    doc.text(`Total vencidos: ${f.length}  |  1-15 dias: ${r15}  |  +60 dias: ${r60}  |  Valor en riesgo: CRC ${valorRiesgo.toLocaleString('es-CR')}`, pW/2, 104, {align:'center'});
+
+    let tableRows = f.map(u => {
+        const dias = Math.round((today - u.ExpiraDate) / 864e5);
+        return [
+            u.PIN||'', u.Nombre||'', u.Telefono||'-', u.ÚltimoProducto||'-', u.Expira||'-',
+            dias+' dias',
+            u.ValorPlan>0?'CRC '+u.ValorPlan.toLocaleString('es-CR'):'-',
+            '' // Notas / Contacto — para llenar a mano
+        ];
+    });
+    doc.autoTable({
+        startY:122,
+        head:[['PIN','Cliente','Telefono','Plan','Vencio','Dias vencido','Valor (CRC)','Notas / Contacto']],
+        body:tableRows,
+        headStyles:{ fillColor:[198,40,40], textColor:255, fontStyle:'bold', fontSize:8.5 },
+        didParseCell(data) {
+            if (data.section==='body'&&data.column.index===5) {
+                let n=parseInt(String(data.cell.raw),10);
+                data.cell.styles.textColor = n>60?[198,40,40]:[230,81,0];
+                data.cell.styles.fontStyle='bold';
+            }
+        },
+        alternateRowStyles:{ fillColor:[255,248,248] },
+        styles:{ fontSize:8.5, cellPadding:6 },
+        columnStyles:{ 1:{cellWidth:130}, 3:{cellWidth:120}, 6:{halign:'right'}, 7:{cellWidth:120} },
+        margin:{ left:36, right:36 }
+    });
+    let fy=doc.lastAutoTable.finalY+14;
+    doc.setFontSize(8); doc.setTextColor(160,160,160); doc.setFont(undefined,'normal');
+    doc.text('Sistema creado por JK Sistemas  |  '+fecha, pW/2, Math.min(fy+12, doc.internal.pageSize.getHeight()-16), {align:'center'});
+    doc.save('seguimiento_vencidos_'+currentSedeName+'_'+hoy()+'.pdf');
 }
 
 function printSeguimiento() {
