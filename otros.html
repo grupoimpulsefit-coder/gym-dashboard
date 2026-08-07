@@ -282,7 +282,9 @@ document.getElementById('loginPassword').addEventListener('keydown', e => { if (
       currentRole = auth.role;
       document.getElementById('userNombre').textContent = auth.nombre || '—';
       document.getElementById('loginScreen').style.display = 'none';
-      init();
+      // Diferir: init() usa const/let declarados más abajo (ej. costMap). Este IIFE corre
+      // durante el parseo del script, así que esperamos a que todo quede inicializado (evita TDZ).
+      setTimeout(init, 0);
     }
   } catch(_) {}
 })();

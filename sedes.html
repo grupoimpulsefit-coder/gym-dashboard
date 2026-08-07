@@ -296,7 +296,9 @@ document.getElementById('loginPassword').addEventListener('keydown', e => { if (
       currentRole = auth.role;
       document.getElementById('userNombre').textContent = auth.nombre || '—';
       document.getElementById('loginScreen').style.display = 'none';
-      loadAllSedes();
+      // Diferir: este IIFE corre durante el parseo; esperamos a que todo el script inicialice
+      // sus const/let antes de cargar datos (evita "Cannot access X before initialization").
+      setTimeout(() => loadAllSedes(), 0);
     }
   } catch(_) {}
 })();
