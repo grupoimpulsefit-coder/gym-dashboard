@@ -241,7 +241,8 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
       <div class="f-field">
         <label>Método de pago</label>
         <select id="fMetodo" onchange="onMetodoChange()">
-          <option value="">— Seleccione instructor —</option>
+          <option value="">— Seleccione —</option>
+          <option value="caja">💵 Pago de caja</option>
         </select>
       </div>
       <div class="f-field" style="min-width:100%;">
@@ -530,6 +531,8 @@ async function deleteGasto(id) {
 }
 
 // ── Autocompletado de pago ──────────────────────────────────────────────
+// "Pago de caja" (efectivo) siempre disponible, no depende del instructor
+const OPT_CAJA = '<option value="caja">💵 Pago de caja</option>';
 function metodosDe(inst) {
   const m = [];
   if (inst.cuenta_bac)  m.push({ value:'bac',        banco:'BAC',                 cuenta: inst.cuenta_bac });
@@ -542,18 +545,19 @@ function onInstructorChange() {
   const inst = instructores.find(i => i.id === id);
   const metSel = document.getElementById('fMetodo');
   if (!inst) {
-    metSel.innerHTML = '<option value="">— Seleccione instructor —</option>';
-    document.getElementById('payBox').textContent = 'Seleccione un instructor para autocompletar los datos de pago.';
+    metSel.innerHTML = '<option value="">— Seleccione —</option>' + OPT_CAJA;
+    document.getElementById('payBox').textContent = 'Seleccione un instructor para autocompletar los datos de pago, o use "Pago de caja".';
     return;
   }
   if (!document.getElementById('fEmisor').value.trim()) document.getElementById('fEmisor').value = inst.nombre;
   const met = metodosDe(inst);
   if (!met.length) {
-    metSel.innerHTML = '<option value="">Sin datos de pago</option>';
-    document.getElementById('payBox').innerHTML = '⚠️ Este instructor no tiene datos de pago. Edítelo para agregar cuenta o SINPE.';
+    metSel.innerHTML = OPT_CAJA;
+    document.getElementById('payBox').innerHTML = 'ℹ️ Este instructor no tiene cuenta/SINPE. Puede registrar el pago como caja o editar el instructor.';
+    onMetodoChange();
     return;
   }
-  metSel.innerHTML = met.map(m => `<option value="${m.value}">${m.banco}</option>`).join('');
+  metSel.innerHTML = met.map(m => `<option value="${m.value}">${m.banco}</option>`).join('') + OPT_CAJA;
   onMetodoChange();
 }
 function onMetodoChange() {
@@ -561,6 +565,7 @@ function onMetodoChange() {
   const inst = instructores.find(i => i.id === id);
   const val = document.getElementById('fMetodo').value;
   const box = document.getElementById('payBox');
+  if (val === 'caja') { box.innerHTML = '<b>💵 Pago de caja</b> · efectivo (no requiere cuenta)'; return; }
   if (!inst || !val) { box.textContent = '—'; return; }
   const m = metodosDe(inst).find(x => x.value === val);
   if (m) box.innerHTML = `<b>${esc(m.banco)}</b> · ${esc(m.cuenta)}`;
@@ -581,7 +586,8 @@ async function guardarGasto() {
   const instId = document.getElementById('fInstructor').value || null;
   const inst = instructores.find(i => i.id === instId);
   const metVal = document.getElementById('fMetodo').value;
-  const m = inst ? metodosDe(inst).find(x => x.value === metVal) : null;
+  const esCaja = metVal === 'caja';
+  const m = (!esCaja && inst) ? metodosDe(inst).find(x => x.value === metVal) : null;
 
   const payload = {
     sede: currentSede,
@@ -595,8 +601,8 @@ async function guardarGasto() {
     numero_factura: document.getElementById('fNumFactura').value.trim() || null,
     monto,
     metodo_pago: metVal || null,
-    banco_pago: m ? m.banco : null,
-    cuenta_pago: m ? m.cuenta : null,
+    banco_pago: esCaja ? 'Pago de caja' : (m ? m.banco : null),
+    cuenta_pago: esCaja ? null : (m ? m.cuenta : null),
     created_by: currentEmail || null
   };
 
@@ -624,7 +630,7 @@ function resetForm() {
   document.getElementById('fDocumento').value = '';
   document.getElementById('fNumFactura').value = '';
   document.getElementById('fMonto').value = '';
-  document.getElementById('fMetodo').innerHTML = '<option value="">— Seleccione instructor —</option>';
+  document.getElementById('fMetodo').innerHTML = '<option value="">— Seleccione —</option>' + OPT_CAJA;
   document.getElementById('payBox').textContent = 'Seleccione un instructor para autocompletar los datos de pago, o escríbalos manualmente.';
 }
 
