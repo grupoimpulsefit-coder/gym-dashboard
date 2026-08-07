@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gastos por Sede</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root {
   --primary: #1a5276;
@@ -170,6 +171,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
       <label>📅 Mes:</label>
       <select id="mesSelector" onchange="renderGastos()"></select>
       <button class="btn-ghost" onclick="loadGastos()">↻ Actualizar</button>
+      <button class="btn-primary" onclick="exportExcel()">⬇️ Excel semanal</button>
     </div>
   </div>
 
@@ -632,6 +634,80 @@ function resetForm() {
   document.getElementById('fMonto').value = '';
   document.getElementById('fMetodo').innerHTML = '<option value="">— Seleccione —</option>' + OPT_CAJA;
   document.getElementById('payBox').textContent = 'Seleccione un instructor para autocompletar los datos de pago, o escríbalos manualmente.';
+}
+
+// ── Exportar Excel semanal (semanas terminan el sábado) ──────────────────
+function finDeSemanaSabado(d) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() + ((6 - x.getDay() + 7) % 7)); // avanzar hasta sábado
+  return x;
+}
+function fmtDMY(d) {
+  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+}
+function exportExcel() {
+  const mesSel = document.getElementById('mesSelector').value;
+  const delMes = gastos.filter(g => g.mes_orden === mesSel);
+  if (!delMes.length) { alert('No hay gastos para exportar en este mes.'); return; }
+  const etiqueta = delMes[0]?.mes || (document.getElementById('mesSelector').selectedOptions[0]?.textContent || '');
+
+  // Agrupar por semana (sábado que la cierra), a partir de la fecha de la clase
+  const semanas = {};
+  delMes.forEach(g => {
+    const fin = finDeSemanaSabado(parseFecha(g.fecha_clase));
+    const key = fin.getFullYear() + '-' + String(fin.getMonth()+1).padStart(2,'0') + '-' + String(fin.getDate()).padStart(2,'0');
+    (semanas[key] = semanas[key] || { fin, rows: [] }).rows.push(g);
+  });
+
+  const aoa = [];
+  aoa.push([`Gastos — ${currentSede} — ${etiqueta}`]);
+  aoa.push([`Generado: ${new Date().toLocaleString('es-CR')} · Semanas de domingo a sábado`]);
+  aoa.push([]);
+  const headers = ['Fecha clase','Categoría','Emisor','Doc. cobro','N° factura','Método de pago','Cuenta / número','Monto'];
+  const montoCol = headers.length - 1;          // índice de la columna Monto (0-based)
+  const montoCells = [];                          // filas (0-based) con montos, para formato numérico
+  let granTotal = 0;
+
+  Object.keys(semanas).sort().forEach(k => {
+    const { fin, rows } = semanas[k];
+    const ini = new Date(fin); ini.setDate(ini.getDate() - 6); // domingo de esa semana
+    aoa.push([`Semana: ${fmtDMY(ini)} al ${fmtDMY(fin)} (cierra sábado)`]);
+    aoa.push(headers);
+    rows.sort((a,b) => parseFecha(a.fecha_clase) - parseFecha(b.fecha_clase));
+    let subtot = 0;
+    rows.forEach(g => {
+      const monto = Number(g.monto) || 0; subtot += monto;
+      aoa.push([
+        fmtDMY(parseFecha(g.fecha_clase)),
+        (CAT_LABEL[g.categoria]?.label) || g.categoria,
+        g.emisor || '',
+        g.documento_cobro || '',
+        g.numero_factura || '',
+        g.banco_pago || '',
+        g.cuenta_pago || '',
+        monto
+      ]);
+      montoCells.push(aoa.length - 1);
+    });
+    aoa.push(['', '', '', '', '', '', 'Subtotal semana', subtot]);
+    montoCells.push(aoa.length - 1);
+    aoa.push([]);
+    granTotal += subtot;
+  });
+  aoa.push(['', '', '', '', '', '', 'TOTAL DEL MES', granTotal]);
+  montoCells.push(aoa.length - 1);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [ {wch:12}, {wch:22}, {wch:26}, {wch:16}, {wch:14}, {wch:16}, {wch:22}, {wch:14} ];
+  // Formato de moneda en la columna Monto
+  montoCells.forEach(r => {
+    const ref = XLSX.utils.encode_cell({ r, c: montoCol });
+    if (ws[ref] && typeof ws[ref].v === 'number') ws[ref].z = '#,##0';
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Gastos');
+  const sedeSlug = currentSede.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'_');
+  XLSX.writeFile(wb, `gastos_semanal_${sedeSlug}_${mesSel}.xlsx`);
 }
 
 // ── Instructor modal ────────────────────────────────────────────────────
