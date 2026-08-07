@@ -47,32 +47,56 @@ create table if not exists gastos (
 create index if not exists gastos_sede_mes_idx on gastos (sede, mes_orden);
 
 -- ══════════════════════════════════════════════════════════════════════════
---  (OPCIONAL, RECOMENDADO) Row Level Security
---  Refuerza en el servidor que una recepcionista SOLO pueda leer/insertar
---  gastos de SU sede. Sin esto, el control es únicamente del lado del cliente
---  (igual que el resto del sistema hoy). Requiere que user_roles sea legible
---  por el usuario autenticado (self-read) para que el subquery funcione.
---  Descomentar el bloque para activarlo y PROBAR el flujo de recepción luego.
+--  Row Level Security (RLS)
+--  Las tablas quedan con RLS activado; estas políticas autorizan las
+--  operaciones que hace la app con el JWT del usuario (rol 'authenticated').
+--  Los gastos se restringen por sede para el rol recepción.
+--  Es idempotente: se puede correr varias veces sin error.
+--  (Requiere que user_roles sea legible por el usuario autenticado para el
+--   subquery; hoy user_roles no usa RLS, así que funciona.)
 -- ──────────────────────────────────────────────────────────────────────────
--- alter table gastos enable row level security;
---
--- create policy gastos_select on gastos for select
---   using (
---     exists (select 1 from user_roles ur where ur.id = auth.uid()
---             and (ur.role in ('admin','admin_sedes')
---                  or (ur.role = 'recepcion' and ur.sede = gastos.sede)))
---   );
---
--- create policy gastos_insert on gastos for insert
---   with check (
---     exists (select 1 from user_roles ur where ur.id = auth.uid()
---             and (ur.role in ('admin','admin_sedes')
---                  or (ur.role = 'recepcion' and ur.sede = gastos.sede)))
---   );
---
--- -- Instructores: cualquier usuario autenticado puede leer y crear
--- alter table instructores enable row level security;
--- create policy instructores_read on instructores for select
---   using (auth.role() = 'authenticated');
--- create policy instructores_write on instructores for insert
---   with check (auth.role() = 'authenticated');
+
+-- ── Instructores: directorio compartido; cualquier autenticado lee y crea ──
+alter table instructores enable row level security;
+
+drop policy if exists instructores_select on instructores;
+create policy instructores_select on instructores
+  for select to authenticated using (true);
+
+drop policy if exists instructores_insert on instructores;
+create policy instructores_insert on instructores
+  for insert to authenticated with check (true);
+
+drop policy if exists instructores_update on instructores;
+create policy instructores_update on instructores
+  for update to authenticated using (true) with check (true);
+
+-- ── Gastos: admin ve/edita todo; recepción SOLO su sede ──
+alter table gastos enable row level security;
+
+drop policy if exists gastos_select on gastos;
+create policy gastos_select on gastos
+  for select to authenticated
+  using (
+    exists (select 1 from user_roles ur where ur.id = auth.uid()
+            and (ur.role in ('admin','admin_sedes')
+                 or (ur.role = 'recepcion' and ur.sede = gastos.sede)))
+  );
+
+drop policy if exists gastos_insert on gastos;
+create policy gastos_insert on gastos
+  for insert to authenticated
+  with check (
+    exists (select 1 from user_roles ur where ur.id = auth.uid()
+            and (ur.role in ('admin','admin_sedes')
+                 or (ur.role = 'recepcion' and ur.sede = gastos.sede)))
+  );
+
+-- Solo admin / admin_sedes pueden eliminar gastos (recepción no)
+drop policy if exists gastos_delete on gastos;
+create policy gastos_delete on gastos
+  for delete to authenticated
+  using (
+    exists (select 1 from user_roles ur where ur.id = auth.uid()
+            and ur.role in ('admin','admin_sedes'))
+  );

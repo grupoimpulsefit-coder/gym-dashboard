@@ -110,6 +110,8 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 .g-table tr:last-child td { border-bottom: none; }
 .g-table tr.cat-total td { background: #eef3fa; font-weight: 800; border-top: 2px solid var(--primary); }
 .g-empty { padding: 16px; color: var(--muted); font-size: 12px; }
+.btn-del { background: #fdecea; border: 1px solid #f5c6c0; color: var(--warn); border-radius: 8px; padding: 4px 9px; font-size: 13px; cursor: pointer; line-height: 1; }
+.btn-del:hover { background: #f9d7d3; }
 .pill { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 11px; font-weight: 700; background: #eceff1; color: #607d8b; }
 
 /* ── Modal instructor ── */
@@ -481,6 +483,7 @@ function renderGastos() {
   document.getElementById('kpiCount').textContent    = delMes.length;
 
   const cont = document.getElementById('gastosContainer');
+  const adm = esAdmin();   // solo admin/admin_sedes pueden eliminar
   cont.innerHTML = CATEGORIAS.map(cat => {
     const rows = porCat[cat.id] || [];
     const subtot = rows.reduce((s,g)=>s+Number(g.monto||0),0);
@@ -492,8 +495,9 @@ function renderGastos() {
         <td>${g.numero_factura ? esc(g.numero_factura) : '—'}</td>
         <td>${g.banco_pago ? esc(g.banco_pago) : '—'}${g.cuenta_pago ? '<br><span style="font-size:11px;color:var(--muted);">'+esc(g.cuenta_pago)+'</span>' : ''}</td>
         <td class="num">${fmtCRC(g.monto)}</td>
+        ${adm ? `<td class="num"><button class="btn-del" title="Eliminar gasto" onclick="deleteGasto('${g.id}')">🗑</button></td>` : ''}
       </tr>`).join('')
-      : `<tr><td colspan="6" class="g-empty">Sin gastos de esta categoría en el mes.</td></tr>`;
+      : `<tr><td colspan="${adm?7:6}" class="g-empty">Sin gastos de esta categoría en el mes.</td></tr>`;
     return `
       <div class="cat-block">
         <div class="cat-head">
@@ -503,15 +507,26 @@ function renderGastos() {
         <div class="g-wrap">
           <table class="g-table">
             <thead><tr>
-              <th>Fecha clase</th><th>Emisor</th><th>Doc. cobro</th><th>N° factura</th><th>Pago</th><th class="num">Monto</th>
+              <th>Fecha clase</th><th>Emisor</th><th>Doc. cobro</th><th>N° factura</th><th>Pago</th><th class="num">Monto</th>${adm?'<th></th>':''}
             </tr></thead>
             <tbody>${body}
-              <tr class="cat-total"><td colspan="5">Subtotal ${cat.label}</td><td class="num">${fmtCRC(subtot)}</td></tr>
+              <tr class="cat-total"><td colspan="5">Subtotal ${cat.label}</td><td class="num">${fmtCRC(subtot)}</td>${adm?'<td></td>':''}</tr>
             </tbody>
           </table>
         </div>
       </div>`;
   }).join('');
+}
+
+async function deleteGasto(id) {
+  if (!esAdmin()) return;
+  if (!confirm('¿Eliminar este gasto? Esta acción no se puede deshacer.')) return;
+  try {
+    await supaFetch(`/gastos?id=eq.${encodeURIComponent(id)}`, { method:'DELETE' });
+    await loadGastos();
+  } catch(e) {
+    alert('No se pudo eliminar: ' + e.message);
+  }
 }
 
 // ── Autocompletado de pago ──────────────────────────────────────────────

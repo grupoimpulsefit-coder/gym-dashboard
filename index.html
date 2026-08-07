@@ -588,6 +588,41 @@
     </div>
 </div>
 
+<!-- ── Modal: Crear cuenta de acceso (solo admin) ── -->
+<div id="crearCuentaModal" class="modal">
+    <div class="summary-modal-content" style="max-width:460px;">
+        <h3>👤➕ Crear cuenta de acceso</h3>
+        <p style="color:#888;margin-top:6px;font-size:13px;">Crea el usuario y le asigna rol y sede en un solo paso.</p>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px;">
+            <div><label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Nombre</label>
+                <input type="text" id="ccNombre" placeholder="Nombre de la persona" style="width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:14px;"></div>
+            <div><label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Correo electrónico *</label>
+                <input type="email" id="ccEmail" placeholder="correo@ejemplo.com" autocomplete="off" style="width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:14px;"></div>
+            <div><label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Contraseña temporal *</label>
+                <input type="text" id="ccPassword" placeholder="Mínimo 6 caracteres" autocomplete="off" style="width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:14px;"></div>
+            <div><label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Rol *</label>
+                <select id="ccRole" onchange="ccToggleSede()" style="width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:14px;background:white;">
+                    <option value="recepcion">🧾 Recepción (una sede)</option>
+                    <option value="colaborador">👁 Colaborador</option>
+                    <option value="admin_sedes">🏢 Admin Sedes</option>
+                    <option value="admin">⚙ Admin</option>
+                </select></div>
+            <div id="ccSedeWrap"><label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Sede *</label>
+                <select id="ccSede" style="width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:14px;background:white;">
+                    <option value="3 Ríos">🌊 3 Ríos</option>
+                    <option value="Natación">🏊 Natación</option>
+                    <option value="Pinares">🌲 Pinares</option>
+                    <option value="Sabanilla">🏙️ Sabanilla</option>
+                </select></div>
+            <div id="ccMsg" style="font-size:13px;min-height:18px;"></div>
+        </div>
+        <div class="modal-buttons" style="margin-top:18px;">
+            <button class="btn btn-green" id="ccBtn" onclick="crearCuenta()">✅ Crear cuenta</button>
+            <button class="btn btn-orange" onclick="document.getElementById('crearCuentaModal').style.display='none'">Cancelar</button>
+        </div>
+    </div>
+</div>
+
 <!-- ══════════ PRICE MODAL ══════════ -->
 <div id="priceModal" class="modal">
     <div class="modal-content">
@@ -746,6 +781,51 @@ async function doLogout() {
     document.getElementById('loginPassword').value = '';
 }
 
+// ── Crear cuenta de acceso (vía Edge Function segura) ──
+function openCrearCuentaModal() {
+    ['ccNombre','ccEmail','ccPassword'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('ccRole').value = 'recepcion';
+    document.getElementById('ccMsg').textContent = '';
+    ccToggleSede();
+    document.getElementById('crearCuentaModal').style.display = 'block';
+}
+function ccToggleSede() {
+    document.getElementById('ccSedeWrap').style.display =
+        document.getElementById('ccRole').value === 'recepcion' ? '' : 'none';
+}
+async function crearCuenta() {
+    const msg = document.getElementById('ccMsg');
+    const nombre = document.getElementById('ccNombre').value.trim();
+    const email = document.getElementById('ccEmail').value.trim();
+    const password = document.getElementById('ccPassword').value;
+    const role = document.getElementById('ccRole').value;
+    const sede = role === 'recepcion' ? document.getElementById('ccSede').value : null;
+    if (!email || !password) { msg.style.color='#c62828'; msg.textContent='Correo y contraseña son obligatorios.'; return; }
+    if (password.length < 6) { msg.style.color='#c62828'; msg.textContent='La contraseña debe tener al menos 6 caracteres.'; return; }
+    const btn = document.getElementById('ccBtn');
+    btn.disabled = true; btn.textContent = 'Creando...';
+    msg.style.color = '#666'; msg.textContent = 'Creando cuenta...';
+    try {
+        const res = await fetch(`${SUPA_URL}/functions/v1/crear-usuario`, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + currentToken, 'apikey': SUPA_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre, email, password, role, sede })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || ('Error ' + res.status));
+        msg.style.color = '#2e7d32';
+        msg.textContent = `✅ Cuenta creada: ${email}` + (sede ? ` · ${sede}` : '') + ` · rol ${role}`;
+        document.getElementById('ccEmail').value = '';
+        document.getElementById('ccPassword').value = '';
+        document.getElementById('ccNombre').value = '';
+    } catch(e) {
+        msg.style.color = '#c62828';
+        msg.textContent = '⚠️ ' + e.message;
+    } finally {
+        btn.disabled = false; btn.textContent = '✅ Crear cuenta';
+    }
+}
+
 // 'admin' conserva su acceso actual; 'admin_sedes' entra con los mismos permisos de admin
 const esRolAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes';
 
@@ -863,6 +943,18 @@ async function showSedePicker() {
             cardsEl.appendChild(makeHandoffCard('📊','Reporte de Sedes','Facturación por sede','Totales y desglose por sede','#e8f4fd','#1565c0','/sedes'));
             cardsEl.appendChild(makeHandoffCard('🏷️','Rentabilidad Otros','Productos categoría Otros','Costo, margen y ganancia del mes','#eafaf1','#2e7d32','/otros'));
             cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar / ver gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
+            // Crear cuenta de acceso — abre modal (no navega)
+            const cc = document.createElement('div');
+            cc.style.cssText = `cursor:pointer;background:#eef7ee;border:2px dashed #2e7d3266;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;
+            cc.innerHTML = `
+                <div style="font-size:3em;margin-bottom:12px;">👤➕</div>
+                <div style="font-size:1.2em;font-weight:700;color:#2e7d32;">Crear cuenta</div>
+                <div style="font-size:0.85em;color:#666;margin-top:6px;">Recepción / colaborador</div>
+                <div style="font-size:0.8em;color:#999;margin-top:4px;">Asigna rol y sede</div>`;
+            cc.onmouseenter = () => { cc.style.transform='translateY(-4px)'; cc.style.boxShadow='0 12px 32px #2e7d3233'; };
+            cc.onmouseleave = () => { cc.style.transform=''; cc.style.boxShadow=''; };
+            cc.onclick = openCrearCuentaModal;
+            cardsEl.appendChild(cc);
         }
     } catch(e) {
         statusEl.textContent = '⚠️ Error al cargar sedes: ' + e.message;
