@@ -113,6 +113,8 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 .g-empty { padding: 16px; color: var(--muted); font-size: 12px; }
 .btn-del { background: #fdecea; border: 1px solid #f5c6c0; color: var(--warn); border-radius: 8px; padding: 4px 9px; font-size: 13px; cursor: pointer; line-height: 1; }
 .btn-del:hover { background: #f9d7d3; }
+.btn-edit { background: #eaf2fb; border: 1px solid #c3ddf5; color: var(--primary-light); border-radius: 8px; padding: 4px 9px; font-size: 13px; cursor: pointer; line-height: 1; }
+.btn-edit:hover { background: #d7e8f9; }
 .pill { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 11px; font-weight: 700; background: #eceff1; color: #607d8b; }
 
 /* ── Modal instructor ── */
@@ -198,8 +200,8 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
     </div>
   </div>
 
-  <!-- Formulario de nuevo gasto -->
-  <div class="section"><div class="section-title">➕ Registrar gasto <span class="section-note">— el mes se calcula automáticamente según la fecha de la clase</span></div></div>
+  <!-- Formulario de nuevo gasto / edición -->
+  <div class="section"><div class="section-title" id="formTitle">➕ Registrar gasto <span class="section-note">— el mes se calcula automáticamente según la fecha de la clase</span></div></div>
   <div class="form-card">
     <div class="form-grid">
       <div class="f-field">
@@ -255,6 +257,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
     </div>
     <div class="form-actions">
       <div class="form-msg" id="formMsg"></div>
+      <button class="btn-ghost" type="button" id="btnCancelarEdicion" onclick="cancelarEdicionGasto()" style="display:none;">✖ Cancelar edición</button>
       <button class="btn-ghost" type="button" onclick="resetForm()">Limpiar</button>
       <button class="btn-primary" id="btnGuardar" onclick="guardarGasto()">💾 Guardar gasto</button>
     </div>
@@ -501,7 +504,7 @@ function renderGastos() {
         <td>${g.numero_factura ? esc(g.numero_factura) : '—'}</td>
         <td>${g.banco_pago ? esc(g.banco_pago) : '—'}${g.cuenta_pago ? '<br><span style="font-size:11px;color:var(--muted);">'+esc(g.cuenta_pago)+'</span>' : ''}</td>
         <td class="num">${fmtCRC(g.monto)}</td>
-        ${adm ? `<td class="num"><button class="btn-del" title="Eliminar gasto" onclick="deleteGasto('${g.id}')">🗑</button></td>` : ''}
+        ${adm ? `<td class="num" style="white-space:nowrap;"><button class="btn-edit" title="Editar factura" onclick="editarGasto('${g.id}')">✏️</button> <button class="btn-del" title="Eliminar gasto" onclick="deleteGasto('${g.id}')">🗑</button></td>` : ''}
       </tr>`).join('')
       : `<tr><td colspan="${adm?7:6}" class="g-empty">Sin gastos de esta categoría en el mes.</td></tr>`;
     return `
@@ -576,9 +579,13 @@ function onMetodoChange() {
   if (m) box.innerHTML = `<b>${esc(m.banco)}</b> · ${esc(m.cuenta)}`;
 }
 
-// ── Guardar gasto ───────────────────────────────────────────────────────
+// ── Guardar gasto (crear / editar) ───────────────────────────────────────
+let editandoGastoId = null;   // null = crear; id = editar factura existente (solo admin)
+
 async function guardarGasto() {
   const msg = document.getElementById('formMsg');
+  const editar = !!editandoGastoId;
+  if (editar && !esAdmin()) { msg.className='form-msg err'; msg.textContent='Solo un administrador puede editar facturas.'; return; }
   const categoria = document.getElementById('fCategoria').value;
   const fecha     = document.getElementById('fFecha').value;
   const emisor    = document.getElementById('fEmisor').value.trim();
@@ -608,25 +615,68 @@ async function guardarGasto() {
     metodo_pago: metVal || null,
     banco_pago: esCaja ? 'Pago de caja' : (m ? m.banco : null),
     cuenta_pago: esCaja ? null : (m ? m.cuenta : null),
-    created_by: currentEmail || null
   };
+  if (!editar) payload.created_by = currentEmail || null;   // al editar se preserva quién lo registró
 
   const btn = document.getElementById('btnGuardar');
   btn.disabled = true; btn.textContent = 'Guardando...';
+  const okMsg = editar ? '✅ Factura actualizada.' : '✅ Gasto guardado.';
   try {
-    await supaFetch('/gastos', { method:'POST', body: payload });
-    msg.className='form-msg ok'; msg.textContent='✅ Gasto guardado.';
+    if (editar) {
+      await supaFetch(`/gastos?id=eq.${encodeURIComponent(editandoGastoId)}`, { method:'PATCH', body: payload });
+    } else {
+      await supaFetch('/gastos', { method:'POST', body: payload });
+    }
+    salirModoEdicion();
     resetForm();
-    // fijar el selector de mes al mes del gasto recién creado
+    msg.className='form-msg ok'; msg.textContent=okMsg;
     await loadGastos();
     const sel = document.getElementById('mesSelector');
     if ([...sel.options].some(o => o.value === payload.mes_orden)) { sel.value = payload.mes_orden; renderGastos(); }
-    setTimeout(() => { if (msg.textContent==='✅ Gasto guardado.') msg.textContent=''; }, 4000);
+    setTimeout(() => { if (msg.textContent===okMsg) msg.textContent=''; }, 4000);
   } catch(e) {
     msg.className='form-msg err'; msg.textContent='⚠️ ' + e.message;
   } finally {
-    btn.disabled = false; btn.textContent = '💾 Guardar gasto';
+    btn.disabled = false; btn.textContent = editandoGastoId ? '💾 Guardar cambios' : '💾 Guardar gasto';
   }
+}
+
+function editarGasto(id) {
+  if (!esAdmin()) return;
+  const g = gastos.find(x => x.id === id);
+  if (!g) return;
+  editandoGastoId = id;
+  document.getElementById('fCategoria').value = g.categoria;
+  document.getElementById('fFecha').value = g.fecha_clase;
+  document.getElementById('fEmisor').value = g.emisor || '';
+  document.getElementById('fDocumento').value = g.documento_cobro || '';
+  document.getElementById('fNumFactura').value = g.numero_factura || '';
+  document.getElementById('fMonto').value = g.monto;
+  document.getElementById('fInstructor').value = g.instructor_id || '';
+  onInstructorChange();   // reconstruye opciones de método (incluye "Pago de caja")
+  const metSel = document.getElementById('fMetodo');
+  if (g.metodo_pago && [...metSel.options].some(o => o.value === g.metodo_pago)) metSel.value = g.metodo_pago;
+  else if (g.banco_pago === 'Pago de caja') metSel.value = 'caja';
+  onMetodoChange();
+  document.getElementById('formTitle').innerHTML = '✏️ Editar factura <span class="section-note">— modificando un gasto ya registrado</span>';
+  document.getElementById('btnGuardar').textContent = '💾 Guardar cambios';
+  document.getElementById('btnCancelarEdicion').style.display = '';
+  document.getElementById('formMsg').textContent = '';
+  document.querySelector('.form-card').scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+function salirModoEdicion() {
+  editandoGastoId = null;
+  document.getElementById('formTitle').innerHTML = '➕ Registrar gasto <span class="section-note">— el mes se calcula automáticamente según la fecha de la clase</span>';
+  document.getElementById('btnGuardar').textContent = '💾 Guardar gasto';
+  document.getElementById('btnCancelarEdicion').style.display = 'none';
+}
+
+function cancelarEdicionGasto() {
+  salirModoEdicion();
+  resetForm();
+  document.getElementById('fFecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('formMsg').textContent = '';
 }
 
 function resetForm() {
@@ -637,6 +687,7 @@ function resetForm() {
   document.getElementById('fMonto').value = '';
   document.getElementById('fMetodo').innerHTML = '<option value="">— Seleccione —</option>' + OPT_CAJA;
   document.getElementById('payBox').textContent = 'Seleccione un instructor para autocompletar los datos de pago, o escríbalos manualmente.';
+  if (editandoGastoId) salirModoEdicion();
 }
 
 // ── Exportar Excel semanal (semanas terminan el sábado) ──────────────────

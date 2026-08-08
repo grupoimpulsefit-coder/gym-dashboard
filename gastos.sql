@@ -109,3 +109,16 @@ create policy gastos_delete on gastos
     exists (select 1 from user_roles ur where ur.id = auth.uid()
             and ur.role in ('admin','admin_sedes'))
   );
+
+-- Solo admin / admin_sedes pueden editar (modificar) gastos ya registrados
+drop policy if exists gastos_update on gastos;
+create policy gastos_update on gastos
+  for update to authenticated
+  using (
+    exists (select 1 from user_roles ur where ur.id = auth.uid()
+            and ur.role in ('admin','admin_sedes'))
+  )
+  with check (
+    exists (select 1 from user_roles ur where ur.id = auth.uid()
+            and ur.role in ('admin','admin_sedes'))
+  );
