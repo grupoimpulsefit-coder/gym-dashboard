@@ -475,6 +475,7 @@ function renderGastos() {
   const mesSel = document.getElementById('mesSelector').value;
   const delMes = gastos.filter(g => g.mes_orden === mesSel);
   const etiqueta = delMes[0]?.mes || document.getElementById('mesSelector').selectedOptions[0]?.textContent || '';
+  document.getElementById('sedeTitle').textContent = '· ' + currentSede;
   document.getElementById('dashPeriod').textContent = `${currentSede} · ${etiqueta}`;
 
   const total = delMes.reduce((s,g) => s + Number(g.monto||0), 0);
