@@ -67,9 +67,18 @@ drop policy if exists instructores_insert on instructores;
 create policy instructores_insert on instructores
   for insert to authenticated with check (true);
 
+-- Editar instructores: solo admin / admin_sedes
 drop policy if exists instructores_update on instructores;
 create policy instructores_update on instructores
-  for update to authenticated using (true) with check (true);
+  for update to authenticated
+  using (
+    exists (select 1 from user_roles ur where ur.id = auth.uid()
+            and ur.role in ('admin','admin_sedes'))
+  )
+  with check (
+    exists (select 1 from user_roles ur where ur.id = auth.uid()
+            and ur.role in ('admin','admin_sedes'))
+  );
 
 -- ── Gastos: admin ve/edita todo; recepción SOLO su sede ──
 alter table gastos enable row level security;

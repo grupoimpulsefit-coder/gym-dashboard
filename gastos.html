@@ -222,6 +222,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
             </select>
           </div>
           <button class="btn-ghost" type="button" onclick="openInstructorModal()" title="Nuevo instructor">＋</button>
+          <button id="btnEditInstr" class="btn-ghost" type="button" onclick="openInstructorModalEdit()" title="Editar instructor seleccionado (admin)" style="display:none;">✏️</button>
         </div>
       </div>
       <div class="f-field">
@@ -268,7 +269,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 <!-- ── Modal nuevo instructor ── -->
 <div class="modal-back" id="instructorModal">
   <div class="modal">
-    <div class="modal-head">➕ Nuevo instructor</div>
+    <div class="modal-head" id="instructorModalTitle">➕ Nuevo instructor</div>
     <div class="modal-body">
       <div class="f-field"><label>Nombre <span class="req">*</span></label><input type="text" id="iNombre" placeholder="Nombre completo"></div>
       <div class="f-field"><label>Número de cuenta BAC</label><input type="text" id="iCuentaBac" placeholder="Cuenta / IBAN BAC"></div>
@@ -418,6 +419,8 @@ async function initGastos() {
     ctrl.innerHTML = `<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
   }
   document.getElementById('sedeTitle').textContent = '· ' + currentSede;
+  // Editar instructores: solo administradores
+  document.getElementById('btnEditInstr').style.display = esAdmin() ? '' : 'none';
   // Fecha por defecto = hoy
   document.getElementById('fFecha').value = new Date().toISOString().slice(0,10);
   await cargarInstructores();
@@ -710,10 +713,33 @@ function exportExcel() {
   XLSX.writeFile(wb, `gastos_semanal_${sedeSlug}_${mesSel}.xlsx`);
 }
 
-// ── Instructor modal ────────────────────────────────────────────────────
-function openInstructorModal() {
-  ['iNombre','iCuentaBac','iOtroBanco','iCuentaOtro','iSinpe'].forEach(id => document.getElementById(id).value = '');
+// ── Instructor modal (crear / editar) ────────────────────────────────────
+let editandoInstructorId = null;   // null = crear; id = editar (solo admin)
+
+function setInstructorModalFields(inst) {
+  document.getElementById('iNombre').value     = inst?.nombre || '';
+  document.getElementById('iCuentaBac').value  = inst?.cuenta_bac || '';
+  document.getElementById('iOtroBanco').value  = inst?.otro_banco || '';
+  document.getElementById('iCuentaOtro').value = inst?.cuenta_otro || '';
+  document.getElementById('iSinpe').value      = inst?.sinpe_movil || '';
   document.getElementById('instructorErr').textContent = '';
+}
+function openInstructorModal() {
+  editandoInstructorId = null;
+  setInstructorModalFields(null);
+  document.getElementById('instructorModalTitle').textContent = '➕ Nuevo instructor';
+  document.getElementById('btnGuardarInstr').textContent = 'Guardar instructor';
+  document.getElementById('instructorModal').classList.add('open');
+}
+function openInstructorModalEdit() {
+  if (!esAdmin()) return;   // solo administradores
+  const id = document.getElementById('fInstructor').value;
+  const inst = instructores.find(i => i.id === id);
+  if (!inst) { alert('Seleccione primero un instructor para editar.'); return; }
+  editandoInstructorId = id;
+  setInstructorModalFields(inst);
+  document.getElementById('instructorModalTitle').textContent = '✏️ Editar instructor';
+  document.getElementById('btnGuardarInstr').textContent = 'Guardar cambios';
   document.getElementById('instructorModal').classList.add('open');
 }
 function closeInstructorModal() { document.getElementById('instructorModal').classList.remove('open'); }
@@ -722,6 +748,8 @@ async function guardarInstructor() {
   const err = document.getElementById('instructorErr');
   const nombre = document.getElementById('iNombre').value.trim();
   if (!nombre) { err.textContent = 'El nombre es obligatorio.'; return; }
+  const editar = !!editandoInstructorId;
+  if (editar && !esAdmin()) { err.textContent = 'Solo un administrador puede editar instructores.'; return; }
   const payload = {
     nombre,
     cuenta_bac:  document.getElementById('iCuentaBac').value.trim() || null,
@@ -732,15 +760,21 @@ async function guardarInstructor() {
   const btn = document.getElementById('btnGuardarInstr');
   btn.disabled = true; btn.textContent = 'Guardando...';
   try {
-    const nuevo = await supaFetch('/instructores', { method:'POST', body: payload, prefer:'return=representation' });
+    let id;
+    if (editar) {
+      const upd = await supaFetch(`/instructores?id=eq.${encodeURIComponent(editandoInstructorId)}`, { method:'PATCH', body: payload, prefer:'return=representation' });
+      id = editandoInstructorId;
+    } else {
+      const nuevo = await supaFetch('/instructores', { method:'POST', body: payload, prefer:'return=representation' });
+      id = Array.isArray(nuevo) ? nuevo[0]?.id : nuevo?.id;
+    }
     await cargarInstructores();
-    const id = Array.isArray(nuevo) ? nuevo[0]?.id : nuevo?.id;
     if (id) { document.getElementById('fInstructor').value = id; onInstructorChange(); }
     closeInstructorModal();
   } catch(e) {
     err.textContent = /duplicate|unique/i.test(e.message) ? 'Ya existe un instructor con ese nombre.' : e.message;
   } finally {
-    btn.disabled = false; btn.textContent = 'Guardar instructor';
+    btn.disabled = false; btn.textContent = editar ? 'Guardar cambios' : 'Guardar instructor';
   }
 }
 </script>
