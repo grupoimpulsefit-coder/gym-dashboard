@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Recursos Humanos</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root {
   --primary: #1a5276; --primary-light: #2e86c1; --accent: #148f77; --accent2: #e67e22;
@@ -148,6 +149,7 @@ table.tbl tr:last-child td { border-bottom: none; }
     </div>
     <div class="topbar-controls">
       <button class="btn-ghost" onclick="loadAdmin()">↻ Actualizar</button>
+      <button class="btn-primary" onclick="exportPlanilla()">⬇️ Planilla Excel</button>
     </div>
   </div>
 
@@ -241,6 +243,35 @@ table.tbl tr:last-child td { border-bottom: none; }
     <div class="modal-foot">
       <button class="btn-ghost" type="button" onclick="closeEmpModal()">Cancelar</button>
       <button class="btn-primary" id="empBtn" type="button" onclick="guardarEmpleado()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal liquidación (admin) -->
+<div class="modal-back" id="liqModal">
+  <div class="modal">
+    <div class="modal-head">💰 Cálculo de liquidación</div>
+    <div class="modal-body">
+      <div style="font-weight:700;color:var(--primary);margin-bottom:10px;" id="liqNombre">—</div>
+      <div class="form-grid">
+        <div class="f-field"><label>Fecha de salida</label><input type="date" id="lqFecha" onchange="calcLiquidacion()"></div>
+        <div class="f-field"><label>Tipo de terminación</label>
+          <select id="lqTipo" onchange="calcLiquidacion()">
+            <option value="patronal">Despido con responsabilidad patronal</option>
+            <option value="justa">Despido con causa justa</option>
+            <option value="renuncia">Renuncia</option>
+          </select></div>
+        <div class="f-field"><label>Salario mensual base (₡)</label><input type="number" id="lqSalario" min="0" step="1" oninput="calcLiquidacion()"></div>
+        <div class="f-field"><label>Saldo de vacaciones (días)</label><input type="number" id="lqVac" step="0.5" oninput="calcLiquidacion()"></div>
+      </div>
+      <div style="margin-top:16px;" id="liqDesglose"></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:14px;line-height:1.5;">
+        ⚠️ Cálculo estimado según el Código de Trabajo de Costa Rica (preaviso art. 28, cesantía art. 29 con tope de 8 años, aguinaldo proporcional y vacaciones no disfrutadas). Es una <b>referencia</b>; verifique el monto final con su contador o abogado laboral antes de pagar. Cesantía y preaviso solo aplican en despido con responsabilidad patronal.
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" type="button" onclick="document.getElementById('liqModal').classList.remove('open')">Cerrar</button>
+      <button class="btn-primary" type="button" onclick="exportLiquidacion()">⬇️ Excel</button>
     </div>
   </div>
 </div>
@@ -389,7 +420,7 @@ function renderEmpleados(){
       <td>${fmtFecha(e.fecha_ingreso)}</td>
       <td class="num saldo-badge" style="color:${saldo<0?'#c62828':'#2e7d32'};">${saldo.toFixed(1)}</td>
       <td>${e.user_id ? '<span class="pill apr">Activo</span>' : `<button class="btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="crearAcceso('${e.id}')">Crear acceso</button>`}</td>
-      <td><button class="btn-edit" title="Editar" onclick="openEmpleadoModal('${e.id}')">✏️</button></td>`;
+      <td style="white-space:nowrap;"><button class="btn-edit" title="Editar" onclick="openEmpleadoModal('${e.id}')">✏️</button> <button class="btn-edit" title="Calcular liquidación" onclick="openLiquidacion('${e.id}')">💰</button></td>`;
   });
 }
 
@@ -573,6 +604,131 @@ async function enviarSolicitud(){
     setTimeout(()=>{ if (msg.textContent.startsWith('✅')) msg.textContent=''; }, 4000);
   } catch(e){ msg.className='form-msg err'; msg.textContent='⚠️ ' + e.message; }
   finally { btn.disabled=false; btn.textContent='📨 Enviar solicitud'; }
+}
+
+// ══ Reporte de planilla (Excel) ══
+function exportPlanilla(){
+  const activos = empleados.filter(e=>e.activo!==false);
+  if (!activos.length){ alert('No hay empleados para exportar en esta sede.'); return; }
+  const aoa = [];
+  aoa.push([`Planilla — ${currentSede}`]);
+  aoa.push([`Generado: ${new Date().toLocaleString('es-CR')}`]);
+  aoa.push([]);
+  aoa.push(['Nombre','Cédula','Correo','Teléfono','Cuenta BAC','Salario mensual','Salario quincenal','Fecha ingreso','Saldo vacaciones']);
+  const numRows = [];
+  let totM=0, totQ=0;
+  activos.forEach(e=>{
+    const sm=Number(e.salario_mensual||0), sq=Number(e.salario_quincenal||0);
+    totM+=sm; totQ+=sq;
+    aoa.push([ e.nombre||'', e.cedula||'', e.correo||'', e.telefono||'', e.cuenta_bac||'', sm, sq, e.fecha_ingreso||'', Number(saldoVac(e).toFixed(1)) ]);
+    numRows.push(aoa.length-1);
+  });
+  aoa.push([]);
+  aoa.push(['','','','','TOTAL', totM, totQ, '', '']);
+  numRows.push(aoa.length-1);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:24},{wch:14},{wch:26},{wch:14},{wch:18},{wch:16},{wch:16},{wch:14},{wch:15}];
+  numRows.forEach(r=>{ [5,6].forEach(c=>{ const ref=XLSX.utils.encode_cell({r,c}); if(ws[ref]&&typeof ws[ref].v==='number') ws[ref].z='#,##0'; }); });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Planilla');
+  const slug = currentSede.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'_');
+  XLSX.writeFile(wb, `planilla_${slug}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ══ Liquidación laboral (Costa Rica) ══
+let liqEmp = null, liqResult = null;
+const TABLA_CESANTIA = [19.5, 20, 20.5, 21, 21.24, 21.5, 22, 22]; // días por año trabajado (años 1..8, tope 8)
+
+function saldoALaFecha(emp, hasta){
+  const fi = parseFecha(emp.fecha_ingreso); if(!fi) return 0;
+  return mesesTrabajados(fi, hasta) * Number(emp.vac_dias_por_mes||0) + Number(emp.vac_ajuste||0) - diasUsados(emp.id);
+}
+function mesesEntre(a, b){ let m=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth()); if(b.getDate()<a.getDate()) m--; return Math.max(0,m); }
+function diasPreaviso(meses){ if(meses<3) return 0; if(meses<6) return 7; if(meses<12) return 15; return 30; }
+function diasCesantia(meses){
+  if (meses < 3) return 0;
+  if (meses < 6) return 7;
+  if (meses < 12) return 14;
+  const anios = meses/12, full = Math.floor(anios), frac = anios - full, cap = 8;
+  let dias = 0;
+  for (let y=1; y<=Math.min(full,cap); y++) dias += TABLA_CESANTIA[y-1];
+  if (full < cap && frac > 0) dias += (TABLA_CESANTIA[full] || TABLA_CESANTIA[TABLA_CESANTIA.length-1]) * frac;
+  return dias;
+}
+
+function openLiquidacion(id){
+  liqEmp = empleados.find(e=>e.id===id); if(!liqEmp) return;
+  document.getElementById('liqNombre').textContent = liqEmp.nombre + ' · ' + liqEmp.sede;
+  document.getElementById('lqFecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('lqTipo').value = 'patronal';
+  document.getElementById('lqSalario').value = liqEmp.salario_mensual || '';
+  document.getElementById('lqVac').value = Number(saldoALaFecha(liqEmp, new Date()).toFixed(1));
+  calcLiquidacion();
+  document.getElementById('liqModal').classList.add('open');
+}
+
+function calcLiquidacion(){
+  if (!liqEmp) return;
+  const fi = parseFecha(liqEmp.fecha_ingreso);
+  const salida = parseFecha(document.getElementById('lqFecha').value) || new Date();
+  const tipo = document.getElementById('lqTipo').value;
+  const salMensual = Number(document.getElementById('lqSalario').value) || 0;
+  const salDiario = salMensual/30;
+  const vacDias = Number(document.getElementById('lqVac').value) || 0;
+  const meses = fi ? mesesEntre(fi, salida) : 0;
+  const anios = meses/12;
+  const conCesantia = tipo === 'patronal';
+  const preavDias = conCesantia ? diasPreaviso(meses) : 0;
+  const cesDias = conCesantia ? diasCesantia(meses) : 0;
+  const montoPreaviso = preavDias * salDiario;
+  const montoCesantia = cesDias * salDiario;
+  const periodStart = new Date(salida.getMonth()>=11 ? salida.getFullYear() : salida.getFullYear()-1, 11, 1);
+  const effStart = (fi && fi > periodStart) ? fi : periodStart;
+  const mesesAgui = Math.max(0, (salida - effStart)/(1000*60*60*24*30.4375));
+  const montoAgui = salMensual * mesesAgui / 12;
+  const montoVac = vacDias * salDiario;
+  const total = montoPreaviso + montoCesantia + montoAgui + montoVac;
+  liqResult = { salida: document.getElementById('lqFecha').value, tipo, salMensual, meses, anios, preavDias, cesDias, montoPreaviso, montoCesantia, mesesAgui, montoAgui, vacDias, montoVac, total };
+
+  const fmt = n => '₡'+Math.round(n).toLocaleString('es-CR');
+  const antig = fi ? `${Math.floor(anios)} año(s) ${meses%12} mes(es)` : '—';
+  const row = (label, detalle, monto) => `<tr><td>${label}</td><td style="color:var(--muted);font-size:12px;">${detalle}</td><td class="num" style="font-weight:700;">${fmt(monto)}</td></tr>`;
+  document.getElementById('liqDesglose').innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Antigüedad: <b>${antig}</b> · Salario diario: <b>${fmt(salDiario)}</b></div>
+    <table class="tbl" style="min-width:auto;">
+      <thead><tr><th>Concepto</th><th>Detalle</th><th class="num">Monto</th></tr></thead>
+      <tbody>
+        ${row('Preaviso', conCesantia ? `${preavDias} día(s)` : 'no aplica', montoPreaviso)}
+        ${row('Cesantía', conCesantia ? `${cesDias.toFixed(2)} día(s) (tope 8 años)` : 'no aplica', montoCesantia)}
+        ${row('Aguinaldo proporcional', `${mesesAgui.toFixed(1)} mes(es) del periodo`, montoAgui)}
+        ${row('Vacaciones no disfrutadas', `${vacDias.toFixed(1)} día(s)`, montoVac)}
+        <tr style="background:#eef3fa;font-weight:800;"><td colspan="2">TOTAL A PAGAR</td><td class="num">${fmt(total)}</td></tr>
+      </tbody>
+    </table>`;
+}
+
+function exportLiquidacion(){
+  if (!liqEmp || !liqResult) return;
+  const r = liqResult, n = x => Math.round(x);
+  const aoa = [
+    [`Liquidación — ${liqEmp.nombre}`],
+    [`Sede: ${liqEmp.sede} · Ingreso: ${liqEmp.fecha_ingreso||'—'} · Salida: ${r.salida}`],
+    [`Tipo: ${r.tipo} · Antigüedad: ${Math.floor(r.anios)} años ${r.meses%12} meses · Salario mensual: ${n(r.salMensual)}`],
+    [`Generado: ${new Date().toLocaleString('es-CR')} — ESTIMADO, verificar con contador/abogado laboral`],
+    [],
+    ['Concepto','Detalle','Monto (CRC)'],
+    ['Preaviso', r.preavDias+' días', n(r.montoPreaviso)],
+    ['Cesantía', r.cesDias.toFixed(2)+' días', n(r.montoCesantia)],
+    ['Aguinaldo proporcional', r.mesesAgui.toFixed(1)+' meses', n(r.montoAgui)],
+    ['Vacaciones no disfrutadas', r.vacDias.toFixed(1)+' días', n(r.montoVac)],
+    ['TOTAL A PAGAR', '', n(r.total)],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:26},{wch:22},{wch:16}];
+  [6,7,8,9,10].forEach(rr=>{ const ref=XLSX.utils.encode_cell({r:rr,c:2}); if(ws[ref]&&typeof ws[ref].v==='number') ws[ref].z='#,##0'; });
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Liquidacion');
+  const slug=(liqEmp.nombre||'empleado').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'_');
+  XLSX.writeFile(wb, `liquidacion_${slug}_${r.salida}.xlsx`);
 }
 </script>
 </body>
