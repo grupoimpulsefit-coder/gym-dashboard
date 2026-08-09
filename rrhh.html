@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recursos Humanos</title>
+<style>
+:root {
+  --primary: #1a5276; --primary-light: #2e86c1; --accent: #148f77; --accent2: #e67e22;
+  --bg: #f0f4f8; --border: #d5dce8; --text: #1c2833; --muted: #6c757d; --warn: #c0392b; --success: #27ae60;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+/* Login */
+#loginScreen { position: fixed; inset: 0; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+.login-card { background: white; border-radius: 24px; padding: 40px 44px; width: 100%; max-width: 420px; box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
+.login-logo { width: 64px; height: 64px; background: linear-gradient(135deg, #1a5276, #2e86c1); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 20px; }
+.login-card h2 { text-align: center; font-size: 1.4em; font-weight: 800; color: #2d2d5e; margin-bottom: 6px; }
+.login-card .login-sub { text-align: center; font-size: 0.85em; color: #888; margin-bottom: 28px; }
+.login-field { margin-bottom: 16px; }
+.login-field label { display: block; font-size: 0.8em; font-weight: 700; color: #444; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+.login-field input { width: 100%; padding: 11px 14px; border: 1.5px solid #dde1f0; border-radius: 10px; font-size: 14px; }
+.login-field input:focus { outline: none; border-color: #2e86c1; box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
+.login-btn { width: 100%; padding: 13px; background: linear-gradient(135deg, #1a5276, #2e86c1); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+.login-btn:disabled { opacity: .6; cursor: not-allowed; }
+#loginError { text-align: center; color: #c62828; font-size: 13px; margin-top: 12px; min-height: 18px; }
+
+/* Header */
+.header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: white; padding: 18px 32px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.25); flex-wrap: wrap; }
+.header-icon { font-size: 34px; }
+.header h1 { font-size: 21px; font-weight: 700; }
+.header p  { font-size: 13px; opacity: .85; margin-top: 2px; }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; color: white; font-size: 13px; }
+.logout-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35); color: white; border-radius: 16px; padding: 5px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+.loading, .empty-state { display: none; text-align: center; padding: 60px 32px; color: var(--muted); }
+.spinner { width: 44px; height: 44px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.topbar { padding: 12px 32px; background: white; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.topbar-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.topbar-controls label { font-size: 13px; font-weight: 600; color: #555; }
+.topbar-controls select { border: 1.5px solid #d0d7e8; border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; color: #333; background: white; cursor: pointer; }
+.btn-primary { padding: 8px 18px; border-radius: 10px; border: none; background: linear-gradient(135deg, #1a5276, #2e86c1); color: white; font-size: 13px; font-weight: 700; cursor: pointer; }
+.btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+.btn-ghost { padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 13px; cursor: pointer; color: var(--primary); font-weight: 600; }
+.btn-ghost:hover { background: var(--bg); }
+.btn-ok { background: #eaf7ee; border: 1px solid #b7e0c4; color: var(--success); border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.btn-no { background: #fdecea; border: 1px solid #f5c6c0; color: var(--warn); border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.btn-edit { background: #eaf2fb; border: 1px solid #c3ddf5; color: var(--primary-light); border-radius: 8px; padding: 4px 9px; font-size: 13px; cursor: pointer; }
+
+.tabs { display: flex; gap: 6px; padding: 12px 32px 0; background: white; }
+.tab { padding: 9px 18px; border-radius: 10px 10px 0 0; border: 1px solid transparent; border-bottom: none; font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; }
+.tab.active { color: var(--primary); background: var(--bg); border-color: var(--border); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; padding: 22px 32px 8px; }
+.kpi { background: white; border-radius: 12px; padding: 16px 18px; border-left: 4px solid var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+.kpi.green { border-color: var(--success); } .kpi.orange { border-color: var(--accent2); } .kpi.teal { border-color: var(--accent); }
+.kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+.kpi-value { font-size: 23px; font-weight: 700; color: var(--primary); margin-top: 4px; }
+.kpi.green .kpi-value { color: var(--success); } .kpi.orange .kpi-value { color: var(--accent2); }
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.section { padding: 8px 32px; }
+.section-title { font-size: 15px; font-weight: 700; color: var(--primary); margin: 8px 0 12px; border-left: 4px solid var(--primary-light); padding-left: 10px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.section-note { font-weight: 400; font-size: 12px; color: var(--muted); }
+
+.tbl-wrap { overflow-x: auto; background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.07); margin: 0 32px 16px; }
+table.tbl { width: 100%; border-collapse: collapse; min-width: 820px; }
+table.tbl th { background: #f8f9fb; font-size: 11px; font-weight: 700; color: var(--muted); padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: .3px; }
+table.tbl th.num, table.tbl td.num { text-align: right; }
+table.tbl td { padding: 9px 12px; font-size: 13px; border-bottom: 1px solid #f2f5f9; }
+table.tbl tr:last-child td { border-bottom: none; }
+.tbl-empty { padding: 16px; color: var(--muted); font-size: 12px; }
+.pill { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+.pill.pend { background: #fff3e0; color: #e65100; } .pill.apr { background: #e8f5e9; color: #2e7d32; } .pill.rec { background: #ffebee; color: #c62828; }
+.saldo-badge { font-weight: 800; }
+
+/* Portal */
+#portal { display: none; padding: 8px 0 24px; }
+.portal-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; padding: 22px 32px 8px; }
+.pcard { background: white; border-radius: 14px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); text-align: center; border-top: 4px solid var(--primary); }
+.pcard .pv { font-size: 30px; font-weight: 800; color: var(--primary); }
+.pcard.green .pv { color: var(--success); } .pcard.green { border-color: var(--success); }
+.pcard .pl { font-size: 12px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .4px; }
+
+/* Formularios */
+.form-card { background: white; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.07); padding: 20px 22px; margin: 0 32px 8px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px 18px; }
+.f-field { display: flex; flex-direction: column; gap: 5px; }
+.f-field.full { grid-column: 1 / -1; }
+.f-field label { font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .3px; }
+.f-field label .req { color: var(--warn); }
+.f-field input, .f-field select, .f-field textarea { padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 9px; font-size: 13px; font-family: inherit; color: var(--text); background: white; width: 100%; }
+.f-field input:focus, .f-field select:focus, .f-field textarea:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
+.form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; align-items: center; }
+.form-msg { font-size: 13px; margin-right: auto; }
+.form-msg.ok { color: var(--success); font-weight: 600; } .form-msg.err { color: var(--warn); font-weight: 600; }
+
+/* Modal */
+.modal-back { display: none; position: fixed; inset: 0; background: rgba(20,24,40,.55); z-index: 10000; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
+.modal-back.open { display: flex; }
+.modal { background: white; border-radius: 16px; width: 100%; max-width: 620px; box-shadow: 0 32px 80px rgba(0,0,0,.4); overflow: hidden; margin: auto; }
+.modal-head { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; padding: 16px 22px; font-size: 16px; font-weight: 700; }
+.modal-body { padding: 20px 22px; }
+.modal-foot { padding: 14px 22px; display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">👥</div>
+    <h2>Recursos Humanos</h2>
+    <p class="login-sub">Gestión de empleados y portal de vacaciones</p>
+    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
+    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-icon">👥</div>
+  <div>
+    <h1 id="hTitle">Recursos Humanos</h1>
+    <p id="hSub">Empleados, salarios y vacaciones</p>
+  </div>
+  <div class="header-right">
+    <span>👤 <span id="userNombre">—</span></span>
+    <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+  </div>
+</div>
+
+<div class="loading" id="loading"><div class="spinner"></div><div>Cargando…</div></div>
+<div class="empty-state" id="emptyState"></div>
+
+<!-- ══ VISTA ADMIN ══ -->
+<div id="adminView" style="display:none;">
+  <div class="topbar">
+    <div class="topbar-controls">
+      <label>🏢 Sede:</label>
+      <select id="sedeSelector"></select>
+    </div>
+    <div class="topbar-controls">
+      <button class="btn-ghost" onclick="loadAdmin()">↻ Actualizar</button>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-label">Empleados activos</div><div class="kpi-value" id="kpiEmpleados">—</div><div class="kpi-sub" id="kpiEmpleadosSub">—</div></div>
+    <div class="kpi green"><div class="kpi-label">Planilla mensual</div><div class="kpi-value" id="kpiPlanilla">—</div><div class="kpi-sub">suma de salarios</div></div>
+    <div class="kpi orange"><div class="kpi-label">Solicitudes pendientes</div><div class="kpi-value" id="kpiPend">—</div><div class="kpi-sub">por aprobar</div></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tabBtnEmp" onclick="switchTab('emp')">👤 Empleados</div>
+    <div class="tab" id="tabBtnVac" onclick="switchTab('vac')">🌴 Solicitudes de vacaciones</div>
+  </div>
+
+  <div class="tab-panel active" id="panelEmp">
+    <div class="section"><div class="section-title">👤 Empleados <span class="section-note" id="empSedeLabel"></span>
+      <button class="btn-primary" style="margin-left:auto;" onclick="openEmpleadoModal()">＋ Nuevo empleado</button></div></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr>
+        <th>Nombre</th><th>Cédula</th><th>Correo</th><th>Teléfono</th><th>Cuenta BAC</th>
+        <th class="num">Salario mensual</th><th class="num">Quincenal</th><th>Ingreso</th><th class="num">Saldo vac.</th><th>Portal</th><th></th>
+      </tr></thead>
+      <tbody id="empBody"></tbody>
+    </table></div>
+  </div>
+
+  <div class="tab-panel" id="panelVac">
+    <div class="section"><div class="section-title">🌴 Solicitudes de vacaciones / días libres
+      <select id="vacFiltro" onchange="renderSolicitudes()" style="margin-left:auto;border:1.5px solid var(--border);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;">
+        <option value="pendiente">Pendientes</option><option value="all">Todas</option>
+        <option value="aprobada">Aprobadas</option><option value="rechazada">Rechazadas</option>
+      </select></div></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Empleado</th><th>Desde</th><th>Hasta</th><th class="num">Días</th><th>Motivo</th><th>Estado</th><th>Solicitada</th><th></th></tr></thead>
+      <tbody id="vacBody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ══ PORTAL EMPLEADO ══ -->
+<div id="portal">
+  <div class="portal-cards">
+    <div class="pcard green"><div class="pv" id="pSaldo">—</div><div class="pl">Saldo de vacaciones (días)</div></div>
+    <div class="pcard"><div class="pv" id="pAcum">—</div><div class="pl">Días acumulados</div></div>
+    <div class="pcard"><div class="pv" id="pUsados">—</div><div class="pl">Días usados/aprobados</div></div>
+    <div class="pcard"><div class="pv" id="pIngreso" style="font-size:18px;">—</div><div class="pl">Fecha de ingreso</div></div>
+  </div>
+
+  <div class="section"><div class="section-title">🌴 Solicitar días libres</div></div>
+  <div class="form-card">
+    <div class="form-grid">
+      <div class="f-field"><label>Desde <span class="req">*</span></label><input type="date" id="sDesde" onchange="calcDias()"></div>
+      <div class="f-field"><label>Hasta <span class="req">*</span></label><input type="date" id="sHasta" onchange="calcDias()"></div>
+      <div class="f-field"><label>Días solicitados <span class="req">*</span></label><input type="number" id="sDias" min="1" step="0.5"></div>
+      <div class="f-field full"><label>Motivo (opcional)</label><input type="text" id="sMotivo" placeholder="Ej. vacaciones familiares"></div>
+    </div>
+    <div class="form-actions">
+      <div class="form-msg" id="sMsg"></div>
+      <button class="btn-primary" id="sBtn" onclick="enviarSolicitud()">📨 Enviar solicitud</button>
+    </div>
+  </div>
+
+  <div class="section"><div class="section-title">📋 Mis solicitudes</div></div>
+  <div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>Desde</th><th>Hasta</th><th class="num">Días</th><th>Motivo</th><th>Estado</th><th>Comentario</th><th>Solicitada</th></tr></thead>
+    <tbody id="misBody"></tbody>
+  </table></div>
+</div>
+
+<!-- Modal empleado (admin) -->
+<div class="modal-back" id="empModal">
+  <div class="modal">
+    <div class="modal-head" id="empModalTitle">＋ Nuevo empleado</div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="f-field"><label>Nombre completo <span class="req">*</span></label><input type="text" id="eNombre"></div>
+        <div class="f-field"><label>Cédula / ID</label><input type="text" id="eCedula"></div>
+        <div class="f-field"><label>Correo</label><input type="email" id="eCorreo" placeholder="para el acceso al portal"></div>
+        <div class="f-field"><label>Teléfono</label><input type="text" id="eTelefono"></div>
+        <div class="f-field full"><label>Dirección</label><input type="text" id="eDireccion"></div>
+        <div class="f-field"><label>Número de cuenta BAC</label><input type="text" id="eCuentaBac"></div>
+        <div class="f-field"><label>Sede <span class="req">*</span></label><select id="eSede"></select></div>
+        <div class="f-field"><label>Salario mensual (₡)</label><input type="number" id="eSalMensual" min="0" step="1" oninput="autoQuincena()"></div>
+        <div class="f-field"><label>Salario quincenal (₡)</label><input type="number" id="eSalQuincena" min="0" step="1"></div>
+        <div class="f-field"><label>Fecha de ingreso</label><input type="date" id="eIngreso"></div>
+        <div class="f-field"><label>Días de vac. por mes</label><input type="number" id="eVacTasa" min="0" step="0.01" value="1"></div>
+        <div class="f-field"><label>Ajuste de saldo (± días)</label><input type="number" id="eVacAjuste" step="0.5" value="0"></div>
+      </div>
+      <div id="empErr" style="color:var(--warn);font-size:13px;min-height:16px;margin-top:8px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" type="button" onclick="closeEmpModal()">Cancelar</button>
+      <button class="btn-primary" id="empBtn" type="button" onclick="guardarEmpleado()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Supabase ──
+const SUPA_URL = '__SUPA_URL__';
+const SUPA_KEY = '__SUPA_KEY__';
+let currentToken = null, currentRole = null, currentSede = null, currentEmail = '', currentUserId = null;
+
+async function supaFetch(path, opts = {}) {
+  const token = currentToken || SUPA_KEY;
+  const res = await fetch(SUPA_URL + '/rest/v1' + path, {
+    method: opts.method || 'GET',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json', 'Prefer': opts.prefer || 'return=minimal', ...(opts.headers||{}) },
+    body: opts.body != null ? JSON.stringify(opts.body) : undefined
+  });
+  if (!res.ok) { const t = await res.text(); throw new Error(t); }
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+const ROLES_PERMITIDOS = ['admin', 'admin_sedes', 'empleado'];
+const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
+const SEDE_META = { '3 Ríos':{icon:'🌊'}, 'Natación':{icon:'🏊'}, 'Pinares':{icon:'🌲'}, 'Sabanilla':{icon:'🏙️'} };
+
+let empleados = [], solicitudes = [];      // admin
+let miEmpleado = null, misSolicitudes = []; // portal
+
+const esAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes';
+const fmtCRC = n => n ? '₡' + Math.round(n).toLocaleString('es-CR') : '—';
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function parseFecha(s){ if(!s) return null; const [y,m,d]=String(s).split('-').map(Number); return new Date(y,m-1,d); }
+function fmtFecha(s){ const d=parseFecha(s); return d ? d.toLocaleDateString('es-CR') : '—'; }
+function mesesTrabajados(fi, hasta){ if(!fi) return 0; let m=(hasta.getFullYear()-fi.getFullYear())*12+(hasta.getMonth()-fi.getMonth()); if(hasta.getDate()<fi.getDate()) m--; return Math.max(0,m); }
+function diasAcumulados(emp){ const fi=parseFecha(emp.fecha_ingreso); if(!fi) return 0; return mesesTrabajados(fi,new Date())*Number(emp.vac_dias_por_mes||0) + Number(emp.vac_ajuste||0); }
+function diasUsados(empId){ return solicitudesDe(empId).filter(s=>s.estado==='aprobada').reduce((a,s)=>a+Number(s.dias||0),0); }
+function solicitudesDe(empId){ return solicitudes.filter(s=>s.empleado_id===empId); }
+function saldoVac(emp, usados){ return diasAcumulados(emp) - (usados!=null ? usados : diasUsados(emp.id)); }
+
+// ── Login ──
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pwd = document.getElementById('loginPassword').value;
+  const btn = document.getElementById('loginBtn'); const errEl = document.getElementById('loginError');
+  if (!email || !pwd) { errEl.textContent='Complete todos los campos.'; return; }
+  btn.textContent='Ingresando...'; btn.disabled=true; errEl.textContent='';
+  try {
+    const res = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, { method:'POST', headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'}, body: JSON.stringify({email,password:pwd}) });
+    const data = await res.json();
+    if (!data.access_token) throw new Error(data.error_description||data.msg||'Credenciales incorrectas');
+    currentToken = data.access_token; currentEmail = email; currentUserId = data.user?.id || null;
+    const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede`);
+    currentRole = roles?.[0]?.role || null; currentSede = roles?.[0]?.sede || null;
+    if (!ROLES_PERMITIDOS.includes(currentRole)) { errEl.textContent='Su cuenta no tiene acceso a este módulo.'; await doLogout(true); return; }
+    document.getElementById('userNombre').textContent = roles?.[0]?.nombre || email;
+    document.getElementById('loginScreen').style.display='none';
+    arrancar();
+  } catch(e){ errEl.textContent=e.message; } finally { btn.textContent='Entrar'; btn.disabled=false; }
+}
+document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+
+(function(){
+  try {
+    const auth = JSON.parse(sessionStorage.getItem('gymAuth')||'null');
+    if (auth?.token && ROLES_PERMITIDOS.includes(auth.role)) {
+      sessionStorage.removeItem('gymAuth');
+      currentToken=auth.token; currentRole=auth.role; currentSede=auth.sede||null; currentEmail=auth.email||''; currentUserId=auth.user_id||null;
+      document.getElementById('userNombre').textContent = auth.nombre||'—';
+      document.getElementById('loginScreen').style.display='none';
+      setTimeout(arrancar, 0);
+    }
+  } catch(_){}
+})();
+
+async function doLogout(silent){
+  try { await fetch(`${SUPA_URL}/auth/v1/logout`, {method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}}); } catch(_){}
+  currentToken=null; currentRole=null; currentSede=null; currentEmail=''; currentUserId=null;
+  document.getElementById('adminView').style.display='none';
+  document.getElementById('portal').style.display='none';
+  document.getElementById('emptyState').style.display='none';
+  if (!silent){ document.getElementById('loginEmail').value=''; document.getElementById('loginPassword').value=''; }
+  document.getElementById('loginScreen').style.display='flex';
+}
+
+// ── Arranque según rol ──
+function arrancar(){
+  // currentUserId puede faltar en SSO; recuperarlo del token si hace falta
+  if (!currentUserId && currentToken) { try { currentUserId = JSON.parse(atob(currentToken.split('.')[1])).sub; } catch(_){} }
+  if (esAdmin()) initAdmin(); else initPortal();
+}
+
+// ══ ADMIN ══
+function initAdmin(){
+  document.getElementById('hTitle').textContent = 'Recursos Humanos';
+  document.getElementById('hSub').textContent = 'Empleados, salarios y vacaciones';
+  document.getElementById('adminView').style.display='block';
+  if (!currentSede) currentSede = SEDES[0];
+  const sel = document.getElementById('sedeSelector');
+  sel.innerHTML = SEDES.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
+  sel.onchange = () => { currentSede = sel.value; loadAdmin(); };
+  // Poblar sede del modal
+  document.getElementById('eSede').innerHTML = SEDES.map(s=>`<option value="${esc(s)}">${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
+  loadAdmin();
+}
+
+async function loadAdmin(){
+  document.getElementById('emptyState').style.display='none';
+  document.getElementById('loading').style.display='block';
+  try {
+    empleados = (await supaFetch(`/empleados?sede=eq.${encodeURIComponent(currentSede)}&order=nombre.asc&select=*`)) || [];
+    solicitudes = (await supaFetch(`/vacaciones_solicitudes?sede=eq.${encodeURIComponent(currentSede)}&order=created_at.desc&select=*`)) || [];
+    document.getElementById('loading').style.display='none';
+    document.getElementById('empSedeLabel').textContent = `— ${currentSede}`;
+    renderKpis(); renderEmpleados(); renderSolicitudes();
+  } catch(e){
+    document.getElementById('loading').style.display='none';
+    document.getElementById('emptyState').style.display='block';
+    document.getElementById('emptyState').textContent = '⚠️ Error al cargar: ' + e.message;
+  }
+}
+
+function renderKpis(){
+  const activos = empleados.filter(e=>e.activo!==false);
+  document.getElementById('kpiEmpleados').textContent = activos.length;
+  document.getElementById('kpiEmpleadosSub').textContent = currentSede;
+  document.getElementById('kpiPlanilla').textContent = fmtCRC(activos.reduce((a,e)=>a+Number(e.salario_mensual||0),0));
+  document.getElementById('kpiPend').textContent = solicitudes.filter(s=>s.estado==='pendiente').length;
+}
+
+function renderEmpleados(){
+  const tb = document.getElementById('empBody'); tb.innerHTML='';
+  if (!empleados.length){ tb.innerHTML=`<tr><td colspan="11" class="tbl-empty">No hay empleados en esta sede. Agregue uno con “＋ Nuevo empleado”.</td></tr>`; return; }
+  empleados.forEach(e=>{
+    const saldo = saldoVac(e);
+    const tr = tb.insertRow();
+    tr.innerHTML = `
+      <td><strong>${esc(e.nombre)}</strong></td>
+      <td>${esc(e.cedula)||'—'}</td>
+      <td style="color:var(--primary-light);font-size:12px;">${esc(e.correo)||'—'}</td>
+      <td>${esc(e.telefono)||'—'}</td>
+      <td>${esc(e.cuenta_bac)||'—'}</td>
+      <td class="num">${fmtCRC(e.salario_mensual)}</td>
+      <td class="num">${fmtCRC(e.salario_quincenal)}</td>
+      <td>${fmtFecha(e.fecha_ingreso)}</td>
+      <td class="num saldo-badge" style="color:${saldo<0?'#c62828':'#2e7d32'};">${saldo.toFixed(1)}</td>
+      <td>${e.user_id ? '<span class="pill apr">Activo</span>' : `<button class="btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="crearAcceso('${e.id}')">Crear acceso</button>`}</td>
+      <td><button class="btn-edit" title="Editar" onclick="openEmpleadoModal('${e.id}')">✏️</button></td>`;
+  });
+}
+
+function renderSolicitudes(){
+  const filtro = document.getElementById('vacFiltro').value;
+  const rows = solicitudes.filter(s=> filtro==='all' ? true : s.estado===filtro);
+  const empName = id => (empleados.find(e=>e.id===id)?.nombre) || '—';
+  const tb = document.getElementById('vacBody'); tb.innerHTML='';
+  if (!rows.length){ tb.innerHTML=`<tr><td colspan="8" class="tbl-empty">Sin solicitudes ${filtro==='all'?'':'('+filtro+')'}.</td></tr>`; return; }
+  rows.forEach(s=>{
+    const badge = s.estado==='aprobada'?'<span class="pill apr">Aprobada</span>':s.estado==='rechazada'?'<span class="pill rec">Rechazada</span>':'<span class="pill pend">Pendiente</span>';
+    const acciones = s.estado==='pendiente'
+      ? `<button class="btn-ok" onclick="resolver('${s.id}','aprobada')">✓ Aprobar</button> <button class="btn-no" onclick="resolver('${s.id}','rechazada')">✕ Rechazar</button>`
+      : (s.comentario_admin ? esc(s.comentario_admin) : '—');
+    const tr = tb.insertRow();
+    tr.innerHTML = `
+      <td><strong>${esc(empName(s.empleado_id))}</strong></td>
+      <td>${fmtFecha(s.fecha_inicio)}</td><td>${fmtFecha(s.fecha_fin)}</td>
+      <td class="num">${Number(s.dias).toFixed(1)}</td>
+      <td>${esc(s.motivo)||'—'}</td>
+      <td>${badge}</td>
+      <td style="font-size:12px;color:var(--muted);">${new Date(s.created_at).toLocaleDateString('es-CR')}</td>
+      <td style="white-space:nowrap;">${acciones}</td>`;
+  });
+}
+
+async function resolver(id, estado){
+  const s = solicitudes.find(x=>x.id===id); if(!s) return;
+  let comentario = null;
+  if (estado==='rechazada'){ comentario = prompt('Motivo del rechazo (opcional):') || null; }
+  if (estado==='aprobada'){
+    const emp = empleados.find(e=>e.id===s.empleado_id);
+    const saldo = emp ? saldoVac(emp) : 0;
+    if (!confirm(`Aprobar ${Number(s.dias).toFixed(1)} día(s) de ${emp?.nombre||''}. Saldo actual: ${saldo.toFixed(1)}. ¿Continuar?`)) return;
+  }
+  try {
+    await supaFetch(`/vacaciones_solicitudes?id=eq.${encodeURIComponent(id)}`, { method:'PATCH', body:{ estado, comentario_admin: comentario, resuelto_por: currentEmail, resuelto_at: new Date().toISOString() } });
+    await loadAdmin();
+  } catch(e){ alert('No se pudo actualizar: ' + e.message); }
+}
+
+// Modal empleado
+let editandoEmpId = null;
+function openEmpleadoModal(id){
+  editandoEmpId = id || null;
+  const e = id ? empleados.find(x=>x.id===id) : null;
+  document.getElementById('empModalTitle').textContent = e ? '✏️ Editar empleado' : '＋ Nuevo empleado';
+  document.getElementById('eNombre').value = e?.nombre || '';
+  document.getElementById('eCedula').value = e?.cedula || '';
+  document.getElementById('eCorreo').value = e?.correo || '';
+  document.getElementById('eTelefono').value = e?.telefono || '';
+  document.getElementById('eDireccion').value = e?.direccion || '';
+  document.getElementById('eCuentaBac').value = e?.cuenta_bac || '';
+  document.getElementById('eSede').value = e?.sede || currentSede;
+  document.getElementById('eSalMensual').value = e?.salario_mensual ?? '';
+  document.getElementById('eSalQuincena').value = e?.salario_quincenal ?? '';
+  document.getElementById('eIngreso').value = e?.fecha_ingreso || '';
+  document.getElementById('eVacTasa').value = e?.vac_dias_por_mes ?? 1;
+  document.getElementById('eVacAjuste').value = e?.vac_ajuste ?? 0;
+  document.getElementById('empErr').textContent = '';
+  document.getElementById('empModal').classList.add('open');
+}
+function closeEmpModal(){ document.getElementById('empModal').classList.remove('open'); }
+function autoQuincena(){ const m=Number(document.getElementById('eSalMensual').value); const q=document.getElementById('eSalQuincena'); if(m>0 && !q.value) q.value = Math.round(m/2); }
+
+async function guardarEmpleado(){
+  const err = document.getElementById('empErr');
+  const nombre = document.getElementById('eNombre').value.trim();
+  if (!nombre){ err.textContent='El nombre es obligatorio.'; return; }
+  const payload = {
+    nombre,
+    cedula: document.getElementById('eCedula').value.trim() || null,
+    correo: document.getElementById('eCorreo').value.trim().toLowerCase() || null,
+    telefono: document.getElementById('eTelefono').value.trim() || null,
+    direccion: document.getElementById('eDireccion').value.trim() || null,
+    cuenta_bac: document.getElementById('eCuentaBac').value.trim() || null,
+    sede: document.getElementById('eSede').value,
+    salario_mensual: Number(document.getElementById('eSalMensual').value) || null,
+    salario_quincenal: Number(document.getElementById('eSalQuincena').value) || null,
+    fecha_ingreso: document.getElementById('eIngreso').value || null,
+    vac_dias_por_mes: Number(document.getElementById('eVacTasa').value) || 0,
+    vac_ajuste: Number(document.getElementById('eVacAjuste').value) || 0,
+  };
+  const btn = document.getElementById('empBtn'); btn.disabled=true; btn.textContent='Guardando...';
+  try {
+    if (editandoEmpId) await supaFetch(`/empleados?id=eq.${encodeURIComponent(editandoEmpId)}`, { method:'PATCH', body: payload });
+    else await supaFetch('/empleados', { method:'POST', body: payload });
+    closeEmpModal(); await loadAdmin();
+  } catch(e){ err.textContent = e.message; } finally { btn.disabled=false; btn.textContent='Guardar'; }
+}
+
+async function crearAcceso(id){
+  const e = empleados.find(x=>x.id===id); if(!e) return;
+  if (!e.correo){ alert('El empleado no tiene correo. Edítelo primero para poder crear el acceso.'); return; }
+  const pwd = prompt(`Contraseña temporal para el acceso de ${e.nombre} (${e.correo}):`);
+  if (pwd===null) return;
+  if (pwd.length < 6){ alert('La contraseña debe tener al menos 6 caracteres.'); return; }
+  try {
+    const res = await fetch(`${SUPA_URL}/functions/v1/crear-usuario`, { method:'POST',
+      headers:{'Authorization':'Bearer '+currentToken,'apikey':SUPA_KEY,'Content-Type':'application/json'},
+      body: JSON.stringify({ email:e.correo, password:pwd, nombre:e.nombre, role:'empleado', sede:e.sede }) });
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok) throw new Error(data.error || ('Error '+res.status));
+    alert(`Acceso creado para ${e.correo}. El empleado ya puede entrar con esa contraseña.`);
+    await loadAdmin();
+  } catch(err){ alert('No se pudo crear el acceso: ' + err.message); }
+}
+
+function switchTab(t){
+  document.getElementById('tabBtnEmp').classList.toggle('active', t==='emp');
+  document.getElementById('tabBtnVac').classList.toggle('active', t==='vac');
+  document.getElementById('panelEmp').classList.toggle('active', t==='emp');
+  document.getElementById('panelVac').classList.toggle('active', t==='vac');
+}
+
+// ══ PORTAL EMPLEADO ══
+async function initPortal(){
+  document.getElementById('hTitle').textContent = 'Mi Portal';
+  document.getElementById('hSub').textContent = 'Vacaciones y solicitudes';
+  document.getElementById('portal').style.display='block';
+  document.getElementById('loading').style.display='block';
+  try {
+    const emps = await supaFetch(`/empleados?user_id=eq.${encodeURIComponent(currentUserId)}&select=*`);
+    miEmpleado = emps?.[0] || null;
+    document.getElementById('loading').style.display='none';
+    if (!miEmpleado){
+      document.getElementById('portal').style.display='none';
+      document.getElementById('emptyState').style.display='block';
+      document.getElementById('emptyState').textContent = 'Su cuenta aún no está vinculada a una ficha de empleado. Contacte a administración.';
+      return;
+    }
+    misSolicitudes = (await supaFetch(`/vacaciones_solicitudes?empleado_id=eq.${miEmpleado.id}&order=created_at.desc&select=*`)) || [];
+    renderPortal();
+  } catch(e){
+    document.getElementById('loading').style.display='none';
+    document.getElementById('emptyState').style.display='block';
+    document.getElementById('emptyState').textContent = '⚠️ Error al cargar su portal: ' + e.message;
+  }
+}
+
+function renderPortal(){
+  const usados = misSolicitudes.filter(s=>s.estado==='aprobada').reduce((a,s)=>a+Number(s.dias||0),0);
+  const acum = diasAcumulados(miEmpleado);
+  document.getElementById('pAcum').textContent = acum.toFixed(1);
+  document.getElementById('pUsados').textContent = usados.toFixed(1);
+  document.getElementById('pSaldo').textContent = (acum - usados).toFixed(1);
+  document.getElementById('pIngreso').textContent = fmtFecha(miEmpleado.fecha_ingreso);
+  const tb = document.getElementById('misBody'); tb.innerHTML='';
+  if (!misSolicitudes.length){ tb.innerHTML=`<tr><td colspan="7" class="tbl-empty">Aún no ha hecho solicitudes.</td></tr>`; return; }
+  misSolicitudes.forEach(s=>{
+    const badge = s.estado==='aprobada'?'<span class="pill apr">Aprobada</span>':s.estado==='rechazada'?'<span class="pill rec">Rechazada</span>':'<span class="pill pend">Pendiente</span>';
+    const tr = tb.insertRow();
+    tr.innerHTML = `<td>${fmtFecha(s.fecha_inicio)}</td><td>${fmtFecha(s.fecha_fin)}</td><td class="num">${Number(s.dias).toFixed(1)}</td>
+      <td>${esc(s.motivo)||'—'}</td><td>${badge}</td><td>${esc(s.comentario_admin)||'—'}</td>
+      <td style="font-size:12px;color:var(--muted);">${new Date(s.created_at).toLocaleDateString('es-CR')}</td>`;
+  });
+}
+
+function calcDias(){
+  const a = parseFecha(document.getElementById('sDesde').value);
+  const b = parseFecha(document.getElementById('sHasta').value);
+  if (a && b && b >= a) document.getElementById('sDias').value = Math.round((b-a)/864e5)+1;
+}
+
+async function enviarSolicitud(){
+  const msg = document.getElementById('sMsg');
+  const desde = document.getElementById('sDesde').value, hasta = document.getElementById('sHasta').value;
+  const dias = Number(document.getElementById('sDias').value);
+  if (!desde || !hasta){ msg.className='form-msg err'; msg.textContent='Indique las fechas.'; return; }
+  if (parseFecha(hasta) < parseFecha(desde)){ msg.className='form-msg err'; msg.textContent='La fecha final no puede ser antes de la inicial.'; return; }
+  if (!dias || dias<=0){ msg.className='form-msg err'; msg.textContent='Indique los días solicitados.'; return; }
+  const payload = { empleado_id: miEmpleado.id, user_id: currentUserId, sede: miEmpleado.sede,
+    fecha_inicio: desde, fecha_fin: hasta, dias, motivo: document.getElementById('sMotivo').value.trim()||null, estado:'pendiente' };
+  const btn = document.getElementById('sBtn'); btn.disabled=true; btn.textContent='Enviando...';
+  try {
+    await supaFetch('/vacaciones_solicitudes', { method:'POST', body: payload });
+    msg.className='form-msg ok'; msg.textContent='✅ Solicitud enviada. Queda pendiente de aprobación.';
+    document.getElementById('sDesde').value=''; document.getElementById('sHasta').value=''; document.getElementById('sDias').value=''; document.getElementById('sMotivo').value='';
+    misSolicitudes = (await supaFetch(`/vacaciones_solicitudes?empleado_id=eq.${miEmpleado.id}&order=created_at.desc&select=*`)) || [];
+    renderPortal();
+    setTimeout(()=>{ if (msg.textContent.startsWith('✅')) msg.textContent=''; }, 4000);
+  } catch(e){ msg.className='form-msg err'; msg.textContent='⚠️ ' + e.message; }
+  finally { btn.disabled=false; btn.textContent='📨 Enviar solicitud'; }
+}
+</script>
+</body>
+</html>

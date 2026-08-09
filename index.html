@@ -753,7 +753,8 @@ async function doLogin() {
         document.getElementById('userRolBadge').textContent =
             currentRole === 'admin' ? '⚙ Admin' :
             currentRole === 'admin_sedes' ? '🏢 Admin Sedes' :
-            currentRole === 'recepcion' ? '🧾 Recepción' : '👁 Colaborador';
+            currentRole === 'recepcion' ? '🧾 Recepción' :
+            currentRole === 'empleado' ? '👤 Empleado' : '👁 Colaborador';
         applyRole();
         document.getElementById('loginScreen').style.display = 'none';
     } catch(e) {
@@ -907,6 +908,13 @@ async function showSedePicker() {
         return;
     }
 
+    // Empleado: solo su portal de RRHH (vacaciones)
+    if (currentRole === 'empleado') {
+        statusEl.textContent = 'Su portal:';
+        cardsEl.appendChild(makeHandoffCard('🌴','Mi Portal','Vacaciones y solicitudes','Ver saldo y solicitar días libres','#e8f7ee','#2e7d32','/rrhh'));
+        return;
+    }
+
     statusEl.textContent = '⏳ Cargando sedes disponibles...';
     try {
         // 'Calendario Natación' es el snapshot del calendario de reservaciones
@@ -943,6 +951,7 @@ async function showSedePicker() {
             cardsEl.appendChild(makeHandoffCard('📊','Reporte de Sedes','Facturación por sede','Totales y desglose por sede','#e8f4fd','#1565c0','/sedes'));
             cardsEl.appendChild(makeHandoffCard('🏷️','Rentabilidad Otros','Productos categoría Otros','Costo, margen y ganancia del mes','#eafaf1','#2e7d32','/otros'));
             cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar / ver gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
+            cardsEl.appendChild(makeHandoffCard('👥','Recursos Humanos','Empleados y vacaciones','Salarios, ingresos y solicitudes','#eef2fb','#1a5276','/rrhh'));
             // Crear cuenta de acceso — abre modal (no navega)
             const cc = document.createElement('div');
             cc.style.cssText = `cursor:pointer;background:#eef7ee;border:2px dashed #2e7d3266;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;

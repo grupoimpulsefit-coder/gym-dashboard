@@ -21,7 +21,8 @@ const CORS = {
 };
 
 const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
-const ROLES = ['recepcion', 'colaborador', 'admin_sedes', 'admin'];
+const ROLES = ['recepcion', 'colaborador', 'admin_sedes', 'admin', 'empleado'];
+const ROLES_CON_SEDE = ['recepcion', 'empleado'];
 
 function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), {
@@ -67,8 +68,8 @@ Deno.serve(async (req) => {
     if (!email || !password) return json({ error: 'Correo y contraseña son obligatorios' }, 400);
     if (password.length < 6) return json({ error: 'La contraseña debe tener al menos 6 caracteres' }, 400);
     if (!ROLES.includes(role)) return json({ error: 'Rol inválido' }, 400);
-    if (role === 'recepcion' && !SEDES.includes(sede || '')) {
-      return json({ error: 'Debe indicar una sede válida para el rol recepción' }, 400);
+    if (ROLES_CON_SEDE.includes(role) && !SEDES.includes(sede || '')) {
+      return json({ error: 'Debe indicar una sede válida para este rol' }, 400);
     }
 
     // 3) Crear el usuario (ya confirmado, sin correo de verificación) --------
@@ -91,6 +92,11 @@ Deno.serve(async (req) => {
       // Rollback: borrar el usuario auth para no dejar cuentas huérfanas
       await admin.auth.admin.deleteUser(uid);
       return json({ error: 'No se pudo asignar el rol: ' + insErr.message }, 400);
+    }
+
+    // Para empleados: ligar la ficha de empleado existente (por correo) a esta cuenta
+    if (role === 'empleado') {
+      await admin.from('empleados').update({ user_id: uid }).eq('correo', email).is('user_id', null);
     }
 
     return json({ ok: true, id: uid, email, role, sede });

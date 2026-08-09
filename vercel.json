@@ -7,6 +7,7 @@
     { "source": "/sedes", "destination": "/sedes.html" },
     { "source": "/comparativa", "destination": "/comparativa.html" },
     { "source": "/otros", "destination": "/otros.html" },
-    { "source": "/gastos", "destination": "/gastos.html" }
+    { "source": "/gastos", "destination": "/gastos.html" },
+    { "source": "/rrhh", "destination": "/rrhh.html" }
   ]
 }
