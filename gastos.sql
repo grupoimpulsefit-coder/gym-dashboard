@@ -80,6 +80,15 @@ create policy instructores_update on instructores
             and ur.role in ('admin','admin_sedes','admin_g'))
   );
 
+-- Eliminar instructores: solo admin / admin_sedes / admin_g
+drop policy if exists instructores_delete on instructores;
+create policy instructores_delete on instructores
+  for delete to authenticated
+  using (
+    exists (select 1 from user_roles ur where ur.id = auth.uid()
+            and ur.role in ('admin','admin_sedes','admin_g'))
+  );
+
 -- ── Gastos: admin ve/edita todo; recepción SOLO su sede ──
 alter table gastos enable row level security;
 

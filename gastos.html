@@ -225,6 +225,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
           </div>
           <button class="btn-ghost" type="button" onclick="openInstructorModal()" title="Nuevo instructor">＋</button>
           <button id="btnEditInstr" class="btn-ghost" type="button" onclick="openInstructorModalEdit()" title="Editar instructor seleccionado (admin)" style="display:none;">✏️</button>
+          <button id="btnDelInstr" class="btn-ghost" type="button" onclick="eliminarInstructor()" title="Eliminar instructor seleccionado (admin)" style="display:none;color:var(--warn);">🗑</button>
         </div>
       </div>
       <div class="f-field">
@@ -424,6 +425,7 @@ async function initGastos() {
   document.getElementById('sedeTitle').textContent = '· ' + currentSede;
   // Editar instructores: solo administradores
   document.getElementById('btnEditInstr').style.display = esAdmin() ? '' : 'none';
+  document.getElementById('btnDelInstr').style.display = esAdmin() ? '' : 'none';
   // Fecha por defecto = hoy
   document.getElementById('fFecha').value = new Date().toISOString().slice(0,10);
   await cargarInstructores();
@@ -795,6 +797,29 @@ function openInstructorModalEdit() {
   document.getElementById('instructorModal').classList.add('open');
 }
 function closeInstructorModal() { document.getElementById('instructorModal').classList.remove('open'); }
+
+async function eliminarInstructor() {
+  if (!esAdmin()) return;   // solo administradores
+  const id = document.getElementById('fInstructor').value;
+  const inst = instructores.find(i => i.id === id);
+  if (!inst) { alert('Seleccione primero un instructor para eliminar.'); return; }
+  if (!confirm(`¿Eliminar al instructor "${inst.nombre}"?\n\nSi ya tiene gastos registrados, se DESACTIVA (deja de aparecer en la lista) para conservar el historial. Si no tiene gastos, se elimina por completo.`)) return;
+  try {
+    const usados = await supaFetch(`/gastos?instructor_id=eq.${encodeURIComponent(id)}&select=id&limit=1`);
+    if (usados && usados.length) {
+      await supaFetch(`/instructores?id=eq.${encodeURIComponent(id)}`, { method:'PATCH', body:{ activo:false } });
+      alert(`"${inst.nombre}" tiene gastos registrados: se desactivó. Ya no aparece en la lista, pero su historial se conserva.`);
+    } else {
+      await supaFetch(`/instructores?id=eq.${encodeURIComponent(id)}`, { method:'DELETE' });
+      alert(`Instructor "${inst.nombre}" eliminado.`);
+    }
+    await cargarInstructores();
+    document.getElementById('fInstructor').value = '';
+    onInstructorChange();
+  } catch(e) {
+    alert('No se pudo eliminar: ' + e.message);
+  }
+}
 
 async function guardarInstructor() {
   const err = document.getElementById('instructorErr');
