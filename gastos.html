@@ -310,7 +310,7 @@ async function supaFetch(path, opts = {}) {
 }
 
 // ── Config ──────────────────────────────────────────────────────────────
-const ROLES_PERMITIDOS = ['recepcion', 'admin_sedes'];
+const ROLES_PERMITIDOS = ['recepcion', 'admin_sedes', 'admin_g'];
 const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
 const SEDE_META = {
   '3 Ríos':   { icon: '🌊', color: '#00838f' },
@@ -328,7 +328,7 @@ const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agos
 let instructores = [];   // directorio
 let gastos = [];         // gastos de la sede actual (todos los meses)
 
-const esAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes';
+const esAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes' || currentRole === 'admin_g';
 const fmtCRC  = n => '₡' + Math.round(n||0).toLocaleString('es-CR');
 function mesEtiqueta(d) { return MESES_ES[d.getMonth()] + ' ' + d.getFullYear(); }
 function mesOrden(d)    { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }

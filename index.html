@@ -754,6 +754,7 @@ async function doLogin() {
             currentRole === 'admin' ? '⚙ Admin' :
             currentRole === 'admin_sedes' ? '🏢 Admin Sedes' :
             currentRole === 'recepcion' ? '🧾 Recepción' :
+            currentRole === 'admin_g' ? '💰 Admin Gastos' :
             currentRole === 'empleado' ? '👤 Empleado' : '👁 Colaborador';
         applyRole();
         document.getElementById('loginScreen').style.display = 'none';
@@ -912,6 +913,13 @@ async function showSedePicker() {
     if (currentRole === 'empleado') {
         statusEl.textContent = 'Su portal:';
         cardsEl.appendChild(makeHandoffCard('🌴','Mi Portal','Vacaciones y solicitudes','Ver saldo y solicitar días libres','#e8f7ee','#2e7d32','/rrhh'));
+        return;
+    }
+
+    // Admin de Gastos: solo el módulo de Gastos (todas las sedes)
+    if (currentRole === 'admin_g') {
+        statusEl.textContent = 'Módulo disponible:';
+        cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar / ver gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
         return;
     }
 

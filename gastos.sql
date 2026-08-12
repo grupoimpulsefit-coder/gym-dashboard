@@ -73,11 +73,11 @@ create policy instructores_update on instructores
   for update to authenticated
   using (
     exists (select 1 from user_roles ur where ur.id = auth.uid()
-            and ur.role in ('admin','admin_sedes'))
+            and ur.role in ('admin','admin_sedes','admin_g'))
   )
   with check (
     exists (select 1 from user_roles ur where ur.id = auth.uid()
-            and ur.role in ('admin','admin_sedes'))
+            and ur.role in ('admin','admin_sedes','admin_g'))
   );
 
 -- ── Gastos: admin ve/edita todo; recepción SOLO su sede ──
@@ -88,7 +88,7 @@ create policy gastos_select on gastos
   for select to authenticated
   using (
     exists (select 1 from user_roles ur where ur.id = auth.uid()
-            and (ur.role in ('admin','admin_sedes')
+            and (ur.role in ('admin','admin_sedes','admin_g')
                  or (ur.role = 'recepcion' and ur.sede = gastos.sede)))
   );
 
@@ -97,7 +97,7 @@ create policy gastos_insert on gastos
   for insert to authenticated
   with check (
     exists (select 1 from user_roles ur where ur.id = auth.uid()
-            and (ur.role in ('admin','admin_sedes')
+            and (ur.role in ('admin','admin_sedes','admin_g')
                  or (ur.role = 'recepcion' and ur.sede = gastos.sede)))
   );
 
@@ -107,7 +107,7 @@ create policy gastos_delete on gastos
   for delete to authenticated
   using (
     exists (select 1 from user_roles ur where ur.id = auth.uid()
-            and ur.role in ('admin','admin_sedes'))
+            and ur.role in ('admin','admin_sedes','admin_g'))
   );
 
 -- Solo admin / admin_sedes pueden editar (modificar) gastos ya registrados
@@ -116,9 +116,9 @@ create policy gastos_update on gastos
   for update to authenticated
   using (
     exists (select 1 from user_roles ur where ur.id = auth.uid()
-            and ur.role in ('admin','admin_sedes'))
+            and ur.role in ('admin','admin_sedes','admin_g'))
   )
   with check (
     exists (select 1 from user_roles ur where ur.id = auth.uid()
-            and ur.role in ('admin','admin_sedes'))
+            and ur.role in ('admin','admin_sedes','admin_g'))
   );
