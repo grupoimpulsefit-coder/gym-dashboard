@@ -828,8 +828,8 @@ async function crearCuenta() {
     }
 }
 
-// 'admin' conserva su acceso actual; 'admin_sedes' entra con los mismos permisos de admin
-const esRolAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes';
+// 'admin' conserva su acceso actual; 'admin_sedes' y 'admin_g' entran con los mismos permisos de admin en index/nat
+const esRolAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes' || currentRole === 'admin_g';
 
 function applyRole() {
     const isAdmin = esRolAdmin();
@@ -916,12 +916,6 @@ async function showSedePicker() {
         return;
     }
 
-    // Admin de Gastos: solo el módulo de Gastos (todas las sedes)
-    if (currentRole === 'admin_g') {
-        statusEl.textContent = 'Módulo disponible:';
-        cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar / ver gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
-        return;
-    }
 
     statusEl.textContent = '⏳ Cargando sedes disponibles...';
     try {
@@ -972,6 +966,10 @@ async function showSedePicker() {
             cc.onmouseleave = () => { cc.style.transform=''; cc.style.boxShadow=''; };
             cc.onclick = openCrearCuentaModal;
             cardsEl.appendChild(cc);
+        }
+        // admin_g: además de index/natación (arriba), su card de Gastos
+        if (currentRole === 'admin_g') {
+            cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar / ver gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
         }
     } catch(e) {
         statusEl.textContent = '⚠️ Error al cargar sedes: ' + e.message;

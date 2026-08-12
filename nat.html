@@ -849,7 +849,7 @@ const SUPA_URL = '__SUPA_URL__';
 const SUPA_KEY = '__SUPA_KEY__';
 let currentToken = null, currentRole = null;
 // 'admin' conserva su acceso actual; 'admin_sedes' entra con los mismos permisos de admin
-const esRolAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes';
+const esRolAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes' || currentRole === 'admin_g';
 
 async function supaFetch(path, opts = {}) {
   const token = currentToken || SUPA_KEY;
@@ -887,7 +887,8 @@ async function doLogin() {
     document.getElementById('userNombre').textContent = nombre;
     document.getElementById('userRolBadge').textContent =
       currentRole === 'admin' ? '⚙ Admin' :
-      currentRole === 'admin_sedes' ? '🏢 Admin Sedes' : '👁 Colaborador';
+      currentRole === 'admin_sedes' ? '🏢 Admin Sedes' :
+      currentRole === 'admin_g' ? '💰 Admin Gastos' : '👁 Colaborador';
     // Ocultar sección de carga si es colaborador
     document.getElementById('uploadSection').style.display = esRolAdmin() ? '' : 'none';
     // El calendario de reservaciones solo es visible para admin_sedes
