@@ -295,7 +295,7 @@ async function supaFetch(path, opts = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
-const ROLES_PERMITIDOS = ['admin', 'admin_sedes', 'empleado'];
+const ROLES_PERMITIDOS = ['admin_sedes', 'empleado'];
 const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
 const SEDE_META = { '3 Ríos':{icon:'🌊'}, 'Natación':{icon:'🏊'}, 'Pinares':{icon:'🌲'}, 'Sabanilla':{icon:'🏙️'} };
 

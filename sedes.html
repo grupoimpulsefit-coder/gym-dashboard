@@ -249,7 +249,7 @@ async function supaFetch(path, opts = {}) {
 }
 
 // Roles permitidos en este reporte: 'admin_sedes' y 'admin' (no 'colaborador')
-const ROLES_PERMITIDOS = ['admin_sedes', 'admin'];
+const ROLES_PERMITIDOS = ['admin_sedes'];
 
 async function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();

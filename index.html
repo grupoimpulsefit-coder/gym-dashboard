@@ -945,8 +945,8 @@ async function showSedePicker() {
             card.onclick = () => selectMesForSede(snap.sede, snaps);
             cardsEl.appendChild(card);
         });
-        // Cards de reportes/módulos — visibles para admin y admin_sedes
-        if (esRolAdmin()) {
+        // Cards de reportes/módulos nuevos — solo admin_sedes (admin queda con index y natación)
+        if (currentRole === 'admin_sedes') {
             cardsEl.appendChild(makeHandoffCard('⚖️','Comparativa de Sedes','Proyección vs Cobro','Todas las sedes por rango de fechas','#f3eefc','#7030A0','/comparativa'));
             cardsEl.appendChild(makeHandoffCard('📊','Reporte de Sedes','Facturación por sede','Totales y desglose por sede','#e8f4fd','#1565c0','/sedes'));
             cardsEl.appendChild(makeHandoffCard('🏷️','Rentabilidad Otros','Productos categoría Otros','Costo, margen y ganancia del mes','#eafaf1','#2e7d32','/otros'));
