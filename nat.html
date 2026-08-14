@@ -340,9 +340,9 @@
       <div class="dash-file" id="fileNameLabel"></div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-      <label class="btn btn-accent" for="usuariosNatInput" style="cursor:pointer;">👤 Subir Informe Usuarios</label>
+      <label class="btn btn-accent" id="btnUsuariosNat" for="usuariosNatInput" style="cursor:pointer;display:none;">👤 Subir Informe Usuarios</label>
       <input type="file" id="usuariosNatInput" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) processUsuariosNat(this.files[0])">
-      <label class="btn btn-accent" for="ventasSoloInputDash" style="cursor:pointer;">📤 Actualizar solo Ventas</label>
+      <label class="btn btn-accent" id="btnVentasSolo" for="ventasSoloInputDash" style="cursor:pointer;display:none;">📤 Actualizar solo Ventas</label>
       <input type="file" id="ventasSoloInputDash" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) procesarVentasSolo(this.files[0])">
       <button class="btn btn-primary" onclick="cambiarArchivo()">📂 Cambiar archivo</button>
     </div>
@@ -891,8 +891,11 @@ async function doLogin() {
       currentRole === 'admin' ? '⚙ Admin' :
       currentRole === 'admin_sedes' ? '🏢 Admin Sedes' :
       currentRole === 'admin_g' ? '💰 Admin Gastos' : '👁 Colaborador';
-    // Subir archivo de usuarios: solo admin_sedes (admin y admin_g no)
+    // Carga inicial del archivo (proyecciones) y "Subir Informe Usuarios": solo admin_sedes.
+    // "Actualizar solo Ventas": admin / admin_g / admin_sedes (no colaborador).
     document.getElementById('uploadSection').style.display = esAdminSedes() ? '' : 'none';
+    document.getElementById('btnUsuariosNat').style.display = esAdminSedes() ? '' : 'none';
+    document.getElementById('btnVentasSolo').style.display = esRolAdmin() ? '' : 'none';
     // El calendario de reservaciones solo es visible para admin_sedes
     document.getElementById('tabCalendarioBtn').style.display = currentRole === 'admin_sedes' ? '' : 'none';
     if (currentRole !== 'admin_sedes' && document.getElementById('tabCalendario').classList.contains('active')) {
@@ -1132,7 +1135,9 @@ document.getElementById('loginPassword').addEventListener('keydown', e => { if (
 // usuariosLoaded=true cuando se subió el Excel completo (Hoja1 disponible).
 // soloUsuarios=true cuando solo se suben usuarios (informe separado) — no toca renov_data.
 async function autoSaveNat(mes, usuariosLoaded, soloUsuarios = false) {
-  if (!esAdminSedes()) return;   // solo admin_sedes guarda proyecciones/snapshots
+  // Proyecciones (Informe de Usuarios) solo las guarda admin_sedes.
+  // Ventas las pueden guardar admin/admin_g también (no colaborador).
+  if (usuariosLoaded ? !esAdminSedes() : !esRolAdmin()) return;
   const statusEl = document.getElementById('saveStatus');
   statusEl.textContent = '⏳ Guardando...';
   try {
@@ -1291,6 +1296,7 @@ function getPlanPriceNat(plan) {
 }
 
 async function processUsuariosNat(file) {
+  if (!esAdminSedes()) { alert('Solo admin_sedes puede subir el Informe de Usuarios (proyecciones).'); return; }
   try {
     document.getElementById('saveStatus').textContent = '⏳ Cargando usuarios...';
     await loadPricesForSede('Natación');
@@ -1852,6 +1858,7 @@ function procesarArchivo(file) {
 // (sin tener que volver a subir el Excel completo de nat.xlsx)
 // ─────────────────────────────────────────
 function procesarVentasSolo(file) {
+  if (!esRolAdmin()) { alert('No tiene permiso para subir ventas.'); return; }
   const reader = new FileReader();
   reader.onload = async e => {
     try {
@@ -1912,7 +1919,7 @@ function procesarVentasSolo(file) {
       document.querySelector(`.tab[onclick*="tabJunio"]`).classList.add('active');
       renderRenovaciones();
 
-      if (esAdminSedes()) await autoSaveNat(mes, false);
+      await autoSaveNat(mes, false); // ventas: el guard interno permite admin/admin_g
     } catch(err) {
       alert('Error al leer el archivo: ' + err.message);
     } finally {

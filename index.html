@@ -839,8 +839,10 @@ function applyRole() {
         el.style.display = isAdmin ? '' : 'none';
     });
     document.getElementById('uploadSection').style.display = 'none';
-    // Subir archivo de usuarios: solo admin_sedes (admin y admin_g no)
-    document.getElementById('btnCargarDatos').style.display = esAdminSedes() ? 'inline-block' : 'none';
+    // El panel de carga lo abren admin/admin_g/admin_sedes; pero el Informe de Usuarios
+    // (proyecciones) solo lo sube admin_sedes — las Ventas y Comprobantes sí los suben todos.
+    document.getElementById('btnCargarDatos').style.display = isAdmin ? 'inline-block' : 'none';
+    document.getElementById('uploadBoxU').parentElement.style.display = esAdminSedes() ? '' : 'none';
     // Ambos roles ven el selector de sede al entrar
     showSedePicker();
 }
@@ -1528,7 +1530,7 @@ function rebuildDashboard() {
     document.getElementById('uploadSection').style.display = 'none';
     document.getElementById('sedePicker').style.display = 'none';
     document.getElementById('btnCambiarSede').style.display = 'inline-block';
-    if (esAdminSedes()) {
+    if (esRolAdmin()) {
         document.getElementById('btnCargarDatos').style.display = 'inline-block';
     }
 
@@ -2395,7 +2397,9 @@ function detectMesFromData() {
 }
 
 async function autoSaveToSupabase() {
-    if (!esAdminSedes()) return;   // solo admin_sedes guarda proyecciones/snapshots
+    // Las proyecciones (Informe de Usuarios) solo las guarda admin_sedes.
+    // Ventas y Comprobantes los pueden guardar admin/admin_g también.
+    if (usuariosLoaded && !esAdminSedes()) return;
     const statusEl = usuariosLoaded
         ? document.getElementById('uploadStatusU')
         : document.getElementById('uploadStatusR');
