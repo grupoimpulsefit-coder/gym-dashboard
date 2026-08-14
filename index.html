@@ -830,6 +830,8 @@ async function crearCuenta() {
 
 // 'admin' conserva su acceso actual; 'admin_sedes' y 'admin_g' entran con los mismos permisos de admin en index/nat
 const esRolAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes' || currentRole === 'admin_g';
+// Solo admin_sedes puede SUBIR el archivo de usuarios para generar proyecciones
+const esAdminSedes = () => currentRole === 'admin_sedes';
 
 function applyRole() {
     const isAdmin = esRolAdmin();
@@ -837,7 +839,8 @@ function applyRole() {
         el.style.display = isAdmin ? '' : 'none';
     });
     document.getElementById('uploadSection').style.display = 'none';
-    document.getElementById('btnCargarDatos').style.display = isAdmin ? 'inline-block' : 'none';
+    // Subir archivo de usuarios: solo admin_sedes (admin y admin_g no)
+    document.getElementById('btnCargarDatos').style.display = esAdminSedes() ? 'inline-block' : 'none';
     // Ambos roles ven el selector de sede al entrar
     showSedePicker();
 }
@@ -1525,7 +1528,7 @@ function rebuildDashboard() {
     document.getElementById('uploadSection').style.display = 'none';
     document.getElementById('sedePicker').style.display = 'none';
     document.getElementById('btnCambiarSede').style.display = 'inline-block';
-    if (esRolAdmin()) {
+    if (esAdminSedes()) {
         document.getElementById('btnCargarDatos').style.display = 'inline-block';
     }
 
@@ -2392,6 +2395,7 @@ function detectMesFromData() {
 }
 
 async function autoSaveToSupabase() {
+    if (!esAdminSedes()) return;   // solo admin_sedes guarda proyecciones/snapshots
     const statusEl = usuariosLoaded
         ? document.getElementById('uploadStatusU')
         : document.getElementById('uploadStatusR');

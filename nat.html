@@ -850,6 +850,8 @@ const SUPA_KEY = '__SUPA_KEY__';
 let currentToken = null, currentRole = null;
 // 'admin' conserva su acceso actual; 'admin_sedes' entra con los mismos permisos de admin
 const esRolAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes' || currentRole === 'admin_g';
+// Solo admin_sedes puede SUBIR el archivo de usuarios y guardar proyecciones
+const esAdminSedes = () => currentRole === 'admin_sedes';
 
 async function supaFetch(path, opts = {}) {
   const token = currentToken || SUPA_KEY;
@@ -889,8 +891,8 @@ async function doLogin() {
       currentRole === 'admin' ? '⚙ Admin' :
       currentRole === 'admin_sedes' ? '🏢 Admin Sedes' :
       currentRole === 'admin_g' ? '💰 Admin Gastos' : '👁 Colaborador';
-    // Ocultar sección de carga si es colaborador
-    document.getElementById('uploadSection').style.display = esRolAdmin() ? '' : 'none';
+    // Subir archivo de usuarios: solo admin_sedes (admin y admin_g no)
+    document.getElementById('uploadSection').style.display = esAdminSedes() ? '' : 'none';
     // El calendario de reservaciones solo es visible para admin_sedes
     document.getElementById('tabCalendarioBtn').style.display = currentRole === 'admin_sedes' ? '' : 'none';
     if (currentRole !== 'admin_sedes' && document.getElementById('tabCalendario').classList.contains('active')) {
@@ -1130,6 +1132,7 @@ document.getElementById('loginPassword').addEventListener('keydown', e => { if (
 // usuariosLoaded=true cuando se subió el Excel completo (Hoja1 disponible).
 // soloUsuarios=true cuando solo se suben usuarios (informe separado) — no toca renov_data.
 async function autoSaveNat(mes, usuariosLoaded, soloUsuarios = false) {
+  if (!esAdminSedes()) return;   // solo admin_sedes guarda proyecciones/snapshots
   const statusEl = document.getElementById('saveStatus');
   statusEl.textContent = '⏳ Guardando...';
   try {
@@ -1909,7 +1912,7 @@ function procesarVentasSolo(file) {
       document.querySelector(`.tab[onclick*="tabJunio"]`).classList.add('active');
       renderRenovaciones();
 
-      if (esRolAdmin()) await autoSaveNat(mes, false);
+      if (esAdminSedes()) await autoSaveNat(mes, false);
     } catch(err) {
       alert('Error al leer el archivo: ' + err.message);
     } finally {
@@ -2557,9 +2560,9 @@ function analizar(wb) {
   const tabVentasBtn = document.querySelector(`.tab[onclick*="tabVentas"]`);
   if (tabVentasBtn) tabVentasBtn.style.display = '';
 
-  // Guardar en Supabase (solo admin)
+  // Guardar en Supabase (solo admin_sedes)
   G.totalJunio = Math.round(totalDescuento + totalCompleto);
-  if (esRolAdmin()) {
+  if (esAdminSedes()) {
     // Detectar mes desde la hoja más reciente (junio sheet o Hoja3)
     const allDates = [...G.ventas, ...G.junio]
       .map(r => r.fecha).filter(Boolean)
