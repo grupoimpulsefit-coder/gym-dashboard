@@ -19,6 +19,9 @@
   --success: #27ae60;
   --cat-grupales: #2e86c1;
   --cat-planta:   #148f77;
+  --cat-parqueo:  #8e44ad;
+  --cat-mantenimiento: #d35400;
+  --cat-otros:    #7f8c8d;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
@@ -209,6 +212,9 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
         <select id="fCategoria">
           <option value="clases_grupales">🧘 Clases grupales</option>
           <option value="instructores_planta">🏋️ Instructores de planta</option>
+          <option value="parqueo">🅿️ Parqueo</option>
+          <option value="mantenimiento">🔧 Mantenimiento</option>
+          <option value="otros">📦 Otros</option>
         </select>
       </div>
       <div class="f-field">
@@ -322,6 +328,9 @@ const SEDE_META = {
 const CATEGORIAS = [
   { id: 'clases_grupales',     label: 'Clases grupales',        icon: '🧘', color: 'var(--cat-grupales)' },
   { id: 'instructores_planta', label: 'Instructores de planta', icon: '🏋️', color: 'var(--cat-planta)' },
+  { id: 'parqueo',             label: 'Parqueo',                icon: '🅿️', color: 'var(--cat-parqueo)' },
+  { id: 'mantenimiento',       label: 'Mantenimiento',          icon: '🔧', color: 'var(--cat-mantenimiento)' },
+  { id: 'otros',               label: 'Otros',                  icon: '📦', color: 'var(--cat-otros)' },
 ];
 const CAT_LABEL = Object.fromEntries(CATEGORIAS.map(c => [c.id, c]));
 const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
