@@ -233,16 +233,17 @@ table.tbl tr:last-child td { border-bottom: none; }
         <div class="f-field full"><label>Dirección</label><input type="text" id="eDireccion"></div>
         <div class="f-field"><label>Número de cuenta BAC</label><input type="text" id="eCuentaBac"></div>
         <div class="f-field"><label>Sede <span class="req">*</span></label><select id="eSede"></select></div>
-        <div class="f-field"><label>Salario mensual (₡)</label><input type="number" id="eSalMensual" min="0" step="1" oninput="autoQuincena()"></div>
+        <div class="f-field"><label>Salario mensual (₡)</label><input type="number" id="eSalMensual" min="0" step="1" oninput="autoQuincena();renderCcssDesglose()"></div>
         <div class="f-field"><label>Salario quincenal (₡)</label><input type="number" id="eSalQuincena" min="0" step="1"></div>
         <div class="f-field"><label>Fecha de ingreso</label><input type="date" id="eIngreso"></div>
         <div class="f-field"><label>Días de vac. por mes</label><input type="number" id="eVacTasa" min="0" step="0.01" value="1"></div>
         <div class="f-field"><label>Ajuste de saldo (± días)</label><input type="number" id="eVacAjuste" step="0.5" value="0"></div>
         <div class="f-field full" style="flex-direction:row;align-items:center;gap:8px;">
-          <input type="checkbox" id="eAsegurado" style="width:auto;" checked>
+          <input type="checkbox" id="eAsegurado" style="width:auto;" checked onchange="renderCcssDesglose()">
           <label for="eAsegurado" style="margin:0;text-transform:none;font-size:13px;font-weight:600;cursor:pointer;">Asegurado por la CCSS (aplica deducción del ~10.67% y carga patronal del ~26.67%)</label>
         </div>
       </div>
+      <div id="ccssDesglose" style="margin-top:10px;"></div>
       <div id="empErr" style="color:var(--warn);font-size:13px;min-height:16px;margin-top:8px;"></div>
     </div>
     <div class="modal-foot">
@@ -310,9 +311,27 @@ let miEmpleado = null, misSolicitudes = []; // portal
 const esAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes';
 const fmtCRC = n => n ? '₡' + Math.round(n).toLocaleString('es-CR') : '—';
 
-// ── Cargas sociales CCSS (Costa Rica) ── tasas configurables; verificar con la CCSS/contador
-const CCSS_TRABAJADOR = 0.1067; // 10.67% deducción del empleado (SEM 5.50 + IVM 4.17 + Banco Popular 1.00)
-const CCSS_PATRONO    = 0.2667; // 26.67% aporte patronal — solo CCSS/cargas sociales (no incluye la póliza de Riesgos del Trabajo del INS)
+// ── Cargas sociales CCSS (Costa Rica) ── DESGLOSE por rubro; el total se calcula sumando.
+// Tasas configurables — verificar con la CCSS/contador (cambian con el tiempo).
+const RUBROS_TRABAJADOR = [
+  { n: 'SEM (Salud)',      p: 5.50 },
+  { n: 'IVM (Pensiones)',  p: 4.17 },
+  { n: 'Banco Popular',    p: 1.00 },
+];
+const RUBROS_PATRONO = [
+  { n: 'SEM (Salud)',                       p: 9.25 },
+  { n: 'IVM (Pensiones)',                   p: 5.42 },
+  { n: 'Asignaciones Familiares (FODESAF)', p: 5.00 },
+  { n: 'INA',                               p: 1.50 },
+  { n: 'IMAS',                              p: 0.50 },
+  { n: 'Banco Popular Patronal',            p: 0.50 },
+  { n: 'Fondo Capitalización Laboral (FCL)',p: 1.50 },
+  { n: 'Pensión Complementaria (ROP)',      p: 1.50 },
+  { n: 'Otros aportes patronales',          p: 1.50 },
+];
+const sumaRubros = arr => arr.reduce((a,r)=>a+r.p,0);
+const CCSS_TRABAJADOR = sumaRubros(RUBROS_TRABAJADOR) / 100; // 10.67%
+const CCSS_PATRONO    = sumaRubros(RUBROS_PATRONO) / 100;    // 26.67% (solo CCSS; sin póliza de Riesgos del INS)
 const aseguradoCCSS = e => e.asegurado_ccss !== false;   // por defecto asegurado
 function deduccionCCSS(e){ return aseguradoCCSS(e) ? Number(e.salario_mensual||0) * CCSS_TRABAJADOR : 0; }
 function cargaPatronalCCSS(e){ return aseguradoCCSS(e) ? Number(e.salario_mensual||0) * CCSS_PATRONO : 0; }
@@ -497,7 +516,36 @@ function openEmpleadoModal(id){
   document.getElementById('eVacAjuste').value = e?.vac_ajuste ?? 0;
   document.getElementById('eAsegurado').checked = e ? (e.asegurado_ccss !== false) : true;
   document.getElementById('empErr').textContent = '';
+  renderCcssDesglose();
   document.getElementById('empModal').classList.add('open');
+}
+
+function renderCcssDesglose(){
+  const cont = document.getElementById('ccssDesglose');
+  const sm = Number(document.getElementById('eSalMensual').value) || 0;
+  const aseg = document.getElementById('eAsegurado').checked;
+  if (!aseg) { cont.innerHTML = '<div style="font-size:12px;color:var(--muted);">Empleado no asegurado: sin deducción ni carga patronal.</div>'; return; }
+  if (!sm)   { cont.innerHTML = '<div style="font-size:12px;color:var(--muted);">Ingrese el salario mensual para ver el desglose CCSS.</div>'; return; }
+  const fila = r => `<tr><td>${r.n}</td><td class="num">${r.p.toFixed(2)}%</td><td class="num">${fmtCRC(sm*r.p/100)}</td></tr>`;
+  cont.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Desglose CCSS sobre ₡${Math.round(sm).toLocaleString('es-CR')} (referencial · verificar tasas vigentes):</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;">
+      <div>
+        <div style="font-weight:700;color:var(--primary);font-size:13px;margin-bottom:4px;">📉 Deducción del trabajador</div>
+        <table class="tbl" style="min-width:auto;font-size:12px;"><tbody>
+          ${RUBROS_TRABAJADOR.map(fila).join('')}
+          <tr style="font-weight:800;background:#eef3fa;"><td>Total ${sumaRubros(RUBROS_TRABAJADOR).toFixed(2)}%</td><td></td><td class="num">${fmtCRC(sm*CCSS_TRABAJADOR)}</td></tr>
+          <tr><td colspan="2">Salario neto</td><td class="num" style="font-weight:700;color:var(--success);">${fmtCRC(sm - sm*CCSS_TRABAJADOR)}</td></tr>
+        </tbody></table>
+      </div>
+      <div>
+        <div style="font-weight:700;color:var(--primary);font-size:13px;margin-bottom:4px;">🏢 Aporte patronal (lo que pagamos)</div>
+        <table class="tbl" style="min-width:auto;font-size:12px;"><tbody>
+          ${RUBROS_PATRONO.map(fila).join('')}
+          <tr style="font-weight:800;background:#eef3fa;"><td>Total ${sumaRubros(RUBROS_PATRONO).toFixed(2)}%</td><td></td><td class="num">${fmtCRC(sm*CCSS_PATRONO)}</td></tr>
+        </tbody></table>
+      </div>
+    </div>`;
 }
 function closeEmpModal(){ document.getElementById('empModal').classList.remove('open'); }
 function autoQuincena(){ const m=Number(document.getElementById('eSalMensual').value); const q=document.getElementById('eSalQuincena'); if(m>0 && !q.value) q.value = Math.round(m/2); }
