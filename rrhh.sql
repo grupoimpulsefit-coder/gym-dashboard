@@ -22,11 +22,14 @@ create table if not exists empleados (
   fecha_ingreso     date,
   vac_dias_por_mes  numeric default 1,       -- tasa de acumulación de vacaciones (días por mes trabajado)
   vac_ajuste        numeric default 0,       -- ajuste manual del saldo (+/- días)
+  asegurado_ccss    boolean default true,    -- si cotiza a la CCSS (aplica deducción y carga patronal)
   activo            boolean default true,
   created_at        timestamptz default now()
 );
 create index if not exists empleados_sede_idx on empleados (sede);
 create index if not exists empleados_user_idx on empleados (user_id);
+-- Para tablas ya creadas antes de agregar la columna:
+alter table empleados add column if not exists asegurado_ccss boolean default true;
 
 -- 2) Solicitudes de vacaciones / días libres --------------------------------
 create table if not exists vacaciones_solicitudes (

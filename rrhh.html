@@ -156,6 +156,7 @@ table.tbl tr:last-child td { border-bottom: none; }
   <div class="kpi-row">
     <div class="kpi"><div class="kpi-label">Empleados activos</div><div class="kpi-value" id="kpiEmpleados">—</div><div class="kpi-sub" id="kpiEmpleadosSub">—</div></div>
     <div class="kpi green"><div class="kpi-label">Planilla mensual</div><div class="kpi-value" id="kpiPlanilla">—</div><div class="kpi-sub">suma de salarios</div></div>
+    <div class="kpi teal"><div class="kpi-label">Carga patronal CCSS</div><div class="kpi-value" id="kpiCargaCCSS">—</div><div class="kpi-sub">aporte del mes (~26.67%)</div></div>
     <div class="kpi orange"><div class="kpi-label">Solicitudes pendientes</div><div class="kpi-value" id="kpiPend">—</div><div class="kpi-sub">por aprobar</div></div>
   </div>
 
@@ -170,7 +171,7 @@ table.tbl tr:last-child td { border-bottom: none; }
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr>
         <th>Nombre</th><th>Cédula</th><th>Correo</th><th>Teléfono</th><th>Cuenta BAC</th>
-        <th class="num">Salario mensual</th><th class="num">Quincenal</th><th>Ingreso</th><th class="num">Saldo vac.</th><th>Portal</th><th></th>
+        <th class="num">Salario mensual</th><th class="num">Quincenal</th><th class="num">Deduc. CCSS</th><th>Ingreso</th><th class="num">Saldo vac.</th><th>Portal</th><th></th>
       </tr></thead>
       <tbody id="empBody"></tbody>
     </table></div>
@@ -237,6 +238,10 @@ table.tbl tr:last-child td { border-bottom: none; }
         <div class="f-field"><label>Fecha de ingreso</label><input type="date" id="eIngreso"></div>
         <div class="f-field"><label>Días de vac. por mes</label><input type="number" id="eVacTasa" min="0" step="0.01" value="1"></div>
         <div class="f-field"><label>Ajuste de saldo (± días)</label><input type="number" id="eVacAjuste" step="0.5" value="0"></div>
+        <div class="f-field full" style="flex-direction:row;align-items:center;gap:8px;">
+          <input type="checkbox" id="eAsegurado" style="width:auto;" checked>
+          <label for="eAsegurado" style="margin:0;text-transform:none;font-size:13px;font-weight:600;cursor:pointer;">Asegurado por la CCSS (aplica deducción del ~10.67% y carga patronal del ~26.67%)</label>
+        </div>
       </div>
       <div id="empErr" style="color:var(--warn);font-size:13px;min-height:16px;margin-top:8px;"></div>
     </div>
@@ -304,6 +309,14 @@ let miEmpleado = null, misSolicitudes = []; // portal
 
 const esAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes';
 const fmtCRC = n => n ? '₡' + Math.round(n).toLocaleString('es-CR') : '—';
+
+// ── Cargas sociales CCSS (Costa Rica) ── tasas configurables; verificar con la CCSS/contador
+const CCSS_TRABAJADOR = 0.1067; // 10.67% deducción del empleado (SEM 5.50 + IVM 4.17 + Banco Popular 1.00)
+const CCSS_PATRONO    = 0.2667; // 26.67% aporte patronal — solo CCSS/cargas sociales (no incluye la póliza de Riesgos del Trabajo del INS)
+const aseguradoCCSS = e => e.asegurado_ccss !== false;   // por defecto asegurado
+function deduccionCCSS(e){ return aseguradoCCSS(e) ? Number(e.salario_mensual||0) * CCSS_TRABAJADOR : 0; }
+function cargaPatronalCCSS(e){ return aseguradoCCSS(e) ? Number(e.salario_mensual||0) * CCSS_PATRONO : 0; }
+function salarioNeto(e){ return Number(e.salario_mensual||0) - deduccionCCSS(e); }
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function parseFecha(s){ if(!s) return null; const [y,m,d]=String(s).split('-').map(Number); return new Date(y,m-1,d); }
 function fmtFecha(s){ const d=parseFecha(s); return d ? d.toLocaleDateString('es-CR') : '—'; }
@@ -400,12 +413,13 @@ function renderKpis(){
   document.getElementById('kpiEmpleados').textContent = activos.length;
   document.getElementById('kpiEmpleadosSub').textContent = currentSede;
   document.getElementById('kpiPlanilla').textContent = fmtCRC(activos.reduce((a,e)=>a+Number(e.salario_mensual||0),0));
+  document.getElementById('kpiCargaCCSS').textContent = fmtCRC(activos.reduce((a,e)=>a+cargaPatronalCCSS(e),0));
   document.getElementById('kpiPend').textContent = solicitudes.filter(s=>s.estado==='pendiente').length;
 }
 
 function renderEmpleados(){
   const tb = document.getElementById('empBody'); tb.innerHTML='';
-  if (!empleados.length){ tb.innerHTML=`<tr><td colspan="11" class="tbl-empty">No hay empleados en esta sede. Agregue uno con “＋ Nuevo empleado”.</td></tr>`; return; }
+  if (!empleados.length){ tb.innerHTML=`<tr><td colspan="12" class="tbl-empty">No hay empleados en esta sede. Agregue uno con “＋ Nuevo empleado”.</td></tr>`; return; }
   empleados.forEach(e=>{
     const saldo = saldoVac(e);
     const tr = tb.insertRow();
@@ -417,6 +431,7 @@ function renderEmpleados(){
       <td>${esc(e.cuenta_bac)||'—'}</td>
       <td class="num">${fmtCRC(e.salario_mensual)}</td>
       <td class="num">${fmtCRC(e.salario_quincenal)}</td>
+      <td class="num">${aseguradoCCSS(e) ? fmtCRC(deduccionCCSS(e)) : '<span style="color:#999;">No aseg.</span>'}</td>
       <td>${fmtFecha(e.fecha_ingreso)}</td>
       <td class="num saldo-badge" style="color:${saldo<0?'#c62828':'#2e7d32'};">${saldo.toFixed(1)}</td>
       <td>${e.user_id ? '<span class="pill apr">Activo</span>' : `<button class="btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="crearAcceso('${e.id}')">Crear acceso</button>`}</td>
@@ -480,6 +495,7 @@ function openEmpleadoModal(id){
   document.getElementById('eIngreso').value = e?.fecha_ingreso || '';
   document.getElementById('eVacTasa').value = e?.vac_dias_por_mes ?? 1;
   document.getElementById('eVacAjuste').value = e?.vac_ajuste ?? 0;
+  document.getElementById('eAsegurado').checked = e ? (e.asegurado_ccss !== false) : true;
   document.getElementById('empErr').textContent = '';
   document.getElementById('empModal').classList.add('open');
 }
@@ -503,6 +519,7 @@ async function guardarEmpleado(){
     fecha_ingreso: document.getElementById('eIngreso').value || null,
     vac_dias_por_mes: Number(document.getElementById('eVacTasa').value) || 0,
     vac_ajuste: Number(document.getElementById('eVacAjuste').value) || 0,
+    asegurado_ccss: document.getElementById('eAsegurado').checked,
   };
   const btn = document.getElementById('empBtn'); btn.disabled=true; btn.textContent='Guardando...';
   try {
@@ -614,21 +631,23 @@ function exportPlanilla(){
   aoa.push([`Planilla — ${currentSede}`]);
   aoa.push([`Generado: ${new Date().toLocaleString('es-CR')}`]);
   aoa.push([]);
-  aoa.push(['Nombre','Cédula','Correo','Teléfono','Cuenta BAC','Salario mensual','Salario quincenal','Fecha ingreso','Saldo vacaciones']);
+  aoa[1] = [`Generado: ${new Date().toLocaleString('es-CR')} · CCSS trabajador ${(CCSS_TRABAJADOR*100).toFixed(2)}% · patrono ${(CCSS_PATRONO*100).toFixed(2)}% (verificar tasas vigentes con la CCSS)`];
+  aoa.push(['Nombre','Cédula','Correo','Teléfono','Cuenta BAC','Salario mensual','Salario quincenal','Aseg. CCSS','Deducción CCSS','Salario neto','Carga patronal CCSS','Fecha ingreso','Saldo vacaciones']);
   const numRows = [];
-  let totM=0, totQ=0;
+  let totM=0, totQ=0, totDed=0, totNeto=0, totCarga=0;
   activos.forEach(e=>{
     const sm=Number(e.salario_mensual||0), sq=Number(e.salario_quincenal||0);
-    totM+=sm; totQ+=sq;
-    aoa.push([ e.nombre||'', e.cedula||'', e.correo||'', e.telefono||'', e.cuenta_bac||'', sm, sq, e.fecha_ingreso||'', Number(saldoVac(e).toFixed(1)) ]);
+    const ded=deduccionCCSS(e), neto=salarioNeto(e), carga=cargaPatronalCCSS(e);
+    totM+=sm; totQ+=sq; totDed+=ded; totNeto+=neto; totCarga+=carga;
+    aoa.push([ e.nombre||'', e.cedula||'', e.correo||'', e.telefono||'', e.cuenta_bac||'', sm, sq, aseguradoCCSS(e)?'Sí':'No', Math.round(ded), Math.round(neto), Math.round(carga), e.fecha_ingreso||'', Number(saldoVac(e).toFixed(1)) ]);
     numRows.push(aoa.length-1);
   });
   aoa.push([]);
-  aoa.push(['','','','','TOTAL', totM, totQ, '', '']);
+  aoa.push(['','','','','TOTAL', totM, totQ, '', Math.round(totDed), Math.round(totNeto), Math.round(totCarga), '', '']);
   numRows.push(aoa.length-1);
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:24},{wch:14},{wch:26},{wch:14},{wch:18},{wch:16},{wch:16},{wch:14},{wch:15}];
-  numRows.forEach(r=>{ [5,6].forEach(c=>{ const ref=XLSX.utils.encode_cell({r,c}); if(ws[ref]&&typeof ws[ref].v==='number') ws[ref].z='#,##0'; }); });
+  ws['!cols'] = [{wch:24},{wch:14},{wch:24},{wch:14},{wch:16},{wch:15},{wch:15},{wch:11},{wch:15},{wch:15},{wch:18},{wch:14},{wch:15}];
+  numRows.forEach(r=>{ [5,6,8,9,10].forEach(c=>{ const ref=XLSX.utils.encode_cell({r,c}); if(ws[ref]&&typeof ws[ref].v==='number') ws[ref].z='#,##0'; }); });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Planilla');
   const slug = currentSede.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'_');
