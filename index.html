@@ -2686,26 +2686,35 @@ async function processComprobantesFile(data) {
         const wb = XLSX.read(data, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-        // Buscar fila de headers (contiene "Tipo" en col 5)
-        let dataStart = -1;
+        // Buscar fila de encabezados (la que contiene "Tipo")
+        let hdr = -1;
         for (let i = 0; i < Math.min(rows.length, 15); i++) {
-            if (String(rows[i][4] || '').trim().toLowerCase() === 'tipo') { dataStart = i + 1; break; }
+            if ((rows[i] || []).some(c => String(c || '').trim().toLowerCase() === 'tipo')) { hdr = i; break; }
         }
-        if (dataStart < 0) throw new Error('No se encontró la fila de encabezados. Verifique que sea el Informe de Comprobantes Electrónicos.');
-        let totalFE = 0, totalNC = 0, countFE = 0;
+        if (hdr < 0) throw new Error('No se encontró la fila de encabezados. Verifique que sea el Informe de Comprobantes Electrónicos.');
+        // Localizar columnas por nombre de encabezado (robusto ante cambios de formato)
+        const findCol = (...names) => rows[hdr].findIndex(c => { const t = String(c || '').trim().toLowerCase(); return names.some(n => t === n || t.includes(n)); });
+        const colTipo   = findCol('tipo');
+        const colFecha  = findCol('fecha');
+        const colEstado = findCol('estado');
+        const colMonto  = findCol('subtotal', 'total crc', 'monto', 'total');
+        if (colMonto < 0) throw new Error('No se encontró la columna de monto (Subtotal CRC) en el archivo.');
+        let totalFE = 0, totalNC = 0, countFE = 0, rechazados = 0;
         const fechas = [];
-        for (let i = dataStart; i < rows.length; i++) {
-            const tipo = String(rows[i][4] || '').trim().toUpperCase();
-            const monto = Number(rows[i][13]) || 0;
+        for (let i = hdr + 1; i < rows.length; i++) {
+            const tipo = String(rows[i][colTipo] || '').trim().toUpperCase();
+            if (!tipo) continue;
+            // No contar comprobantes rechazados por Hacienda
+            const estado = String(colEstado >= 0 ? rows[i][colEstado] : '').trim().toLowerCase();
+            if (estado === 'rechazado') { rechazados++; continue; }
+            const monto = Number(rows[i][colMonto]) || 0;
             if (tipo === 'FE') { totalFE += monto; countFE++; }
-            if (tipo === 'NC') { totalNC += monto; }
-            // Recopilar fechas para detectar el mes del archivo (serial Excel o Date)
-            const fechaRaw = rows[i][3];
-            if (fechaRaw instanceof Date) { fechas.push(fechaRaw); }
-            else if (typeof fechaRaw === 'number' && fechaRaw > 40000) {
-                // Serial de Excel: días desde 1/1/1900
-                fechas.push(new Date((fechaRaw - 25569) * 86400000));
-            }
+            else if (tipo === 'NC') { totalNC += monto; }
+            // Recopilar fechas para detectar el mes del archivo (Date, serial Excel o texto)
+            const fechaRaw = colFecha >= 0 ? rows[i][colFecha] : null;
+            if (fechaRaw instanceof Date) fechas.push(fechaRaw);
+            else if (typeof fechaRaw === 'number' && fechaRaw > 40000) fechas.push(new Date((fechaRaw - 25569) * 86400000));
+            else if (typeof fechaRaw === 'string' && fechaRaw.trim()) { const d = new Date(fechaRaw.trim().replace(' ', 'T')); if (!isNaN(d)) fechas.push(d); }
         }
         feData = { total: Math.round(totalFE - totalNC), count: countFE, loaded: true };
         // Detectar mes desde las fechas del archivo (no desde today)
@@ -2714,7 +2723,7 @@ async function processComprobantesFile(data) {
             feData.mes = ref.toLocaleDateString('es-CR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
             feData.mesOrden = `${ref.getFullYear()}-${String(ref.getMonth()+1).padStart(2,'0')}`;
         }
-        statusEl.textContent = `✅ ${countFE} facturas — Total FE: ₡${feData.total.toLocaleString('es-CR')}${feData.mes ? ' (' + feData.mes + ')' : ''}`;
+        statusEl.textContent = `✅ ${countFE} facturas — Total FE: ₡${feData.total.toLocaleString('es-CR')}${feData.mes ? ' (' + feData.mes + ')' : ''}${rechazados ? ' · ' + rechazados + ' rechazado(s) omitido(s)' : ''}`;
         await autoSaveToSupabase();
     } catch(e) {
         statusEl.textContent = '⚠️ Error: ' + e.message;
