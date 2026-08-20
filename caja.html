@@ -76,7 +76,7 @@ table.denom tfoot td:last-child { border-radius:0 0 10px 0; }
 .badge-ok, .badge-dif { display:inline-flex; align-items:center; gap:8px; font-weight:800; font-size:16px; padding:11px 24px; border-radius:30px; box-shadow:0 8px 22px rgba(0,0,0,.22); }
 .badge-ok { background:linear-gradient(135deg,#34d399,#059669); color:white; }
 .badge-dif { background:linear-gradient(135deg,#fb7185,#e11d48); color:white; }
-.hero-tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; position:relative; }
+.hero-tiles { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:16px; position:relative; }
 .tile { background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.18); border-radius:15px; padding:14px 10px; text-align:center; }
 .tile .tl { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:rgba(255,255,255,.72); }
 .tile .tv { font-size:21px; font-weight:800; margin-top:5px; letter-spacing:-.5px; }
@@ -149,6 +149,7 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
         <div class="f-row"><label>Total Tarjeta (₡)</label><input type="number" id="cTarjeta" step="1" oninput="calc()"></div>
         <div class="f-row"><label>Total SINPE (₡)</label><input type="number" id="cSinpe" step="1" oninput="calc()"></div>
         <div class="f-row"><label>TOTAL ventas (₡)</label><input type="number" id="cTotalVentas" step="1" oninput="calc()"></div>
+        <div class="f-row"><label>Otros vendidos (₡)</label><input type="number" id="cOtros" step="1" placeholder="corrobora minita" oninput="calc()"></div>
         <div class="hint" id="ventasHint"></div>
       </div>
 
@@ -168,9 +169,10 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
         <h3>Resumen del cierre</h3>
         <div class="hero-status" id="rEstado">—</div>
         <div class="hero-tiles">
-          <div class="tile acc"><div class="tl">Efectivo contado</div><div class="tv" id="rEfectivo">₡0</div></div>
+          <div class="tile"><div class="tl">Efectivo contado</div><div class="tv" id="rEfectivo">₡0</div></div>
+          <div class="tile"><div class="tl">Minita (sobre)</div><div class="tv" id="rMinita">₡0</div></div>
           <div class="tile"><div class="tl">Total ventas</div><div class="tv" id="rTotalVentas">₡0</div></div>
-          <div class="tile"><div class="tl">Minita</div><div class="tv" id="rMinita">₡0</div></div>
+          <div class="tile acc"><div class="tl">💰 Efectivo final</div><div class="tv" id="rEfectivoFinal">₡0</div></div>
         </div>
         <div class="hero-break">
           <div class="hb"><span>Total Tarjeta</span><span id="rTarjeta">₡0</span></div>
@@ -179,6 +181,8 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
           <div class="hb"><span>− Ingresos extra</span><span id="rIngresos">₡0</span></div>
           <div class="hb"><span>− Caja inicial</span><span id="rCajaIni">₡0</span></div>
           <div class="hb strong"><span>Ventas conciliadas</span><span id="rConciliado">₡0</span></div>
+          <div class="hb"><span>Otros vendidos (corrobora)</span><span id="rOtros">₡0</span></div>
+          <div class="hb strong"><span>Minita vs Otros</span><span id="rCorrobora">—</span></div>
         </div>
       </div>
 
@@ -313,7 +317,17 @@ function calc(){
   document.getElementById('totIngresos').textContent=fmt(totIngresos);
   const ok=Math.round(diferencia)===0;
   document.getElementById('rEstado').innerHTML=ok?'<span class="badge-ok">✓ Caja cuadra</span>':`<span class="badge-dif">⚠ Diferencia ${fmt(diferencia)}</span>`;
-  return {efectivo,tarjeta,sinpe,totalVentas,cajaIni,membresias,totGastos,totIngresos,conciliado,diferencia,minita,ok};
+  // Minita se retira en sobres → efectivo final; corroborar minita contra otros vendidos
+  const otrosVendidos=Number(document.getElementById('cOtros').value)||0;
+  const efectivoFinal=efectivo-minita;
+  const difOtros=Math.round(minita-otrosVendidos);
+  document.getElementById('rEfectivoFinal').textContent=fmt(efectivoFinal);
+  document.getElementById('rOtros').textContent=fmt(otrosVendidos);
+  document.getElementById('rCorrobora').innerHTML = otrosVendidos>0
+    ? (difOtros===0 ? '<span class="badge-ok" style="font-size:12px;padding:5px 13px;box-shadow:none;">✓ Corrobora</span>'
+                    : `<span class="badge-dif" style="font-size:12px;padding:5px 13px;box-shadow:none;">⚠ ${fmt(Math.abs(difOtros))}</span>`)
+    : '<span style="color:rgba(255,255,255,.6);">—</span>';
+  return {efectivo,tarjeta,sinpe,totalVentas,cajaIni,membresias,totGastos,totIngresos,conciliado,diferencia,minita,ok,efectivoFinal,otrosVendidos,difOtros};
 }
 
 // ── Gastos / Ingresos dinámicos ──
@@ -336,7 +350,8 @@ function addIngreso(){ingresos.push({desc:'',monto:''});renderIngresos();}
 function nuevoCierre(){
   document.getElementById('cFecha').value=new Date().toISOString().slice(0,10);
   document.getElementById('cTurno').value='';
-  ['cMembresias','cTarjeta','cSinpe','cTotalVentas'].forEach(id=>document.getElementById(id).value='');
+  ['cMembresias','cTarjeta','cSinpe','cTotalVentas','cOtros'].forEach(id=>document.getElementById(id).value='');
+  window._informeVentas=null;
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=0;});
   gastos=[{desc:'',monto:''}]; ingresos=[{desc:'',monto:''}]; renderGastos(); renderIngresos();
   const ultimo=cierres[0];
@@ -391,6 +406,7 @@ async function guardarCierre(){
     total_tarjeta:c.tarjeta, total_sinpe:c.sinpe, efectivo:c.efectivo,
     denominaciones, gastos:gastosLimpios, ingresos:ingresosLimpios,
     total_gastos:c.totGastos, total_ingresos:c.totIngresos, minita:c.minita,
+    efectivo_final:c.efectivoFinal, otros_vendidos:c.otrosVendidos,
     diferencia:Math.round(c.diferencia), estado_dif:c.ok?'OK':'Diferencia',
     informe_ventas:window._informeVentas||null, created_by:currentEmail||null
   };
@@ -436,6 +452,7 @@ function cargarCierre(id){
   document.getElementById('cCajaInicial').value=c.caja_inicial||0; document.getElementById('cMembresias').value=c.membresias||0;
   document.getElementById('cTarjeta').value=c.total_tarjeta||0; document.getElementById('cSinpe').value=c.total_sinpe||0;
   document.getElementById('cTotalVentas').value=c.total_ventas||0;
+  document.getElementById('cOtros').value=c.otros_vendidos||'';
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=(c.denominaciones&&c.denominaciones[d])||0;});
   gastos=(c.gastos&&c.gastos.length?c.gastos:[{desc:'',monto:''}]).map(g=>({desc:g.desc,monto:g.monto}));
   ingresos=(c.ingresos&&c.ingresos.length?c.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc,monto:g.monto}));
@@ -468,7 +485,12 @@ function generarPDF(){
   doc.text('INGRESOS',L,y); y+=15; doc.setFont('helvetica','normal');
   ingresos.filter(g=>Number(g.monto)>0).forEach(g=>{doc.text(esc(g.desc||'Ingreso'),L,y); doc.text(money(g.monto),R+120,y,{align:'right'}); y+=14;});
   doc.setFont('helvetica','bold'); doc.text('TOTAL',L,y); doc.text(money(c.totIngresos),R+120,y,{align:'right'}); y+=22;
-  doc.setFontSize(12); doc.text('TOTAL MINITA',L,y); doc.text(money(c.minita),R+120,y,{align:'right'});
+  doc.setFontSize(12); doc.text('TOTAL MINITA (sobre)',L,y); doc.text(money(c.minita),R+120,y,{align:'right'}); y+=18;
+  if(c.otrosVendidos>0){ doc.setFontSize(10); doc.setFont('helvetica','normal');
+    doc.text('Otros vendidos (corrobora)',L,y); doc.text(money(c.otrosVendidos),R+120,y,{align:'right'});
+    doc.setTextColor(c.difOtros===0?39:198, c.difOtros===0?125:40, c.difOtros===0?50:40);
+    doc.text(c.difOtros===0?'OK':'Dif '+money(Math.abs(c.difOtros)),R+130,y); doc.setTextColor(0); y+=18; }
+  doc.setFontSize(12); doc.setFont('helvetica','bold'); doc.text('TOTAL EFECTIVO FINAL',L,y); doc.text(money(c.efectivoFinal),R+120,y,{align:'right'});
   doc.save(`cierre_${currentSede.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'_')}_${document.getElementById('cFecha').value}.pdf`);
 }
 </script>

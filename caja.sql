@@ -28,6 +28,10 @@ create table if not exists cierres_caja (
   created_at      timestamptz default now()
 );
 create index if not exists cierres_sede_fecha_idx on cierres_caja (sede, fecha desc, created_at desc);
+-- El minita (ventas de productos) se retira en sobres: efectivo_final = efectivo - minita.
+-- otros_vendidos: tally independiente de productos "Otros" para corroborar el minita.
+alter table cierres_caja add column if not exists efectivo_final numeric default 0;
+alter table cierres_caja add column if not exists otros_vendidos numeric default 0;
 
 -- 2) Inventario por sede ------------------------------------------------------
 create table if not exists inventario (
