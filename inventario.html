@@ -8,7 +8,7 @@
 <style>
 :root { --primary:#1a5276; --primary-light:#2e86c1; --accent:#148f77; --accent2:#e67e22; --bg:#f0f4f8; --border:#d5dce8; --text:#1c2833; --muted:#6c757d; --warn:#c0392b; --success:#27ae60; }
 * { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+body { font-family:'Segoe UI',Arial,sans-serif; background:radial-gradient(1100px 560px at 100% -10%, #fde7c9 0%, transparent 55%), radial-gradient(800px 460px at -10% 8%, #dbeafe 0%, transparent 50%), #eef2f8; color:var(--text); font-size:14px; min-height:100vh; }
 #loginScreen { position:fixed; inset:0; background:linear-gradient(135deg,#0f0c29,#302b63 50%,#24243e); display:flex; align-items:center; justify-content:center; z-index:9999; }
 .login-card { background:white; border-radius:24px; padding:40px 44px; width:100%; max-width:420px; box-shadow:0 32px 80px rgba(0,0,0,.5); }
 .login-logo { width:64px; height:64px; background:linear-gradient(135deg,#b9770e,#e67e22); border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:30px; margin:0 auto 20px; }
@@ -20,8 +20,8 @@ body { font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(
 .login-btn { width:100%; padding:13px; background:linear-gradient(135deg,#b9770e,#e67e22); color:white; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; margin-top:8px; }
 .login-btn:disabled { opacity:.6; }
 #loginError { text-align:center; color:#c62828; font-size:13px; margin-top:12px; min-height:18px; }
-.header { background:linear-gradient(135deg,#b9770e,#e67e22); color:white; padding:18px 32px; display:flex; align-items:center; gap:16px; box-shadow:0 2px 8px rgba(0,0,0,.25); flex-wrap:wrap; }
-.header-icon { font-size:34px; }
+.header { background:linear-gradient(115deg,#7c4a03 0%,#b9770e 45%,#e67e22 100%); color:white; padding:20px 32px; display:flex; align-items:center; gap:16px; box-shadow:0 6px 24px rgba(124,74,3,.32); flex-wrap:wrap; }
+.header-icon { font-size:36px; filter:drop-shadow(0 2px 4px rgba(0,0,0,.3)); }
 .header h1 { font-size:21px; font-weight:700; }
 .header p { font-size:13px; opacity:.85; margin-top:2px; }
 .header-right { margin-left:auto; display:flex; align-items:center; gap:14px; font-size:13px; }
@@ -35,7 +35,7 @@ body { font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(
 .btn-ghost:hover { background:var(--bg); }
 .btn-del { background:#fdecea; border:1px solid #f5c6c0; color:var(--warn); border-radius:8px; padding:4px 9px; font-size:13px; cursor:pointer; }
 .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; padding:22px 32px 8px; }
-.kpi { background:white; border-radius:12px; padding:16px 18px; border-left:4px solid var(--primary); box-shadow:0 1px 4px rgba(0,0,0,.07); }
+.kpi { background:rgba(255,255,255,.92); backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,.7); border-radius:16px; padding:16px 18px; border-left:5px solid var(--primary); box-shadow:0 8px 22px rgba(124,74,3,.08); }
 .kpi.orange { border-color:var(--accent2); } .kpi.red { border-color:var(--warn); } .kpi.green { border-color:var(--success); }
 .kpi-label { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
 .kpi-value { font-size:23px; font-weight:700; color:var(--primary); margin-top:4px; }
@@ -43,7 +43,7 @@ body { font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(
 .kpi-sub { font-size:11px; color:var(--muted); margin-top:2px; }
 .section { padding:8px 32px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
 .section-title { font-size:15px; font-weight:700; color:var(--primary); border-left:4px solid var(--primary-light); padding-left:10px; }
-.tbl-wrap { overflow-x:auto; background:white; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin:0 32px 16px; }
+.tbl-wrap { overflow-x:auto; background:rgba(255,255,255,.95); border-radius:16px; box-shadow:0 8px 22px rgba(124,74,3,.08); margin:0 32px 16px; }
 table.tbl { width:100%; border-collapse:collapse; min-width:820px; }
 table.tbl th { background:#f8f9fb; font-size:11px; font-weight:700; color:var(--muted); padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); text-transform:uppercase; }
 table.tbl th.num, table.tbl td.num { text-align:right; }

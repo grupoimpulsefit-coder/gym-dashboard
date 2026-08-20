@@ -7,9 +7,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <style>
-:root { --primary:#1a5276; --primary-light:#2e86c1; --accent:#148f77; --accent2:#e67e22; --bg:#f0f4f8; --border:#d5dce8; --text:#1c2833; --muted:#6c757d; --warn:#c0392b; --success:#27ae60; }
+:root { --primary:#12324f; --primary-light:#2e86c1; --accent:#0ea5a3; --accent2:#e67e22; --bg:#eef2f8; --border:#e0e6f0; --text:#1c2833; --muted:#7b8794; --warn:#e11d48; --success:#059669; }
 * { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+body { font-family:'Segoe UI',Arial,sans-serif; background:radial-gradient(1200px 600px at 100% -10%, #dbeafe 0%, transparent 55%), radial-gradient(900px 500px at -10% 10%, #ccfbf1 0%, transparent 50%), #eef2f8; color:var(--text); font-size:14px; min-height:100vh; }
 #loginScreen { position:fixed; inset:0; background:linear-gradient(135deg,#0f0c29,#302b63 50%,#24243e); display:flex; align-items:center; justify-content:center; z-index:9999; }
 .login-card { background:white; border-radius:24px; padding:40px 44px; width:100%; max-width:420px; box-shadow:0 32px 80px rgba(0,0,0,.5); }
 .login-logo { width:64px; height:64px; background:linear-gradient(135deg,#1a5276,#2e86c1); border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:30px; margin:0 auto 20px; }
@@ -21,8 +21,8 @@ body { font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(
 .login-btn { width:100%; padding:13px; background:linear-gradient(135deg,#1a5276,#2e86c1); color:white; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; margin-top:8px; }
 .login-btn:disabled { opacity:.6; }
 #loginError { text-align:center; color:#c62828; font-size:13px; margin-top:12px; min-height:18px; }
-.header { background:linear-gradient(135deg,var(--primary),var(--primary-light)); color:white; padding:18px 32px; display:flex; align-items:center; gap:16px; box-shadow:0 2px 8px rgba(0,0,0,.25); flex-wrap:wrap; }
-.header-icon { font-size:34px; }
+.header { background:linear-gradient(115deg,#0b2a45 0%,#12324f 40%,#0e7490 100%); color:white; padding:20px 32px; display:flex; align-items:center; gap:16px; box-shadow:0 6px 24px rgba(13,42,69,.35); flex-wrap:wrap; }
+.header-icon { font-size:36px; filter:drop-shadow(0 2px 4px rgba(0,0,0,.3)); }
 .header h1 { font-size:21px; font-weight:700; }
 .header p { font-size:13px; opacity:.85; margin-top:2px; }
 .header-right { margin-left:auto; display:flex; align-items:center; gap:14px; font-size:13px; }
@@ -32,42 +32,64 @@ body { font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(
 .topbar-controls label { font-size:13px; font-weight:600; color:#555; }
 .topbar-controls select, .topbar-controls input { border:1.5px solid #d0d7e8; border-radius:20px; padding:6px 14px; font-size:13px; font-weight:600; color:#333; background:white; }
 .sede-lock { background:#eef3fa; border:1.5px solid var(--border); border-radius:20px; padding:6px 14px; font-size:13px; font-weight:700; color:var(--primary); }
-.btn-primary { padding:8px 18px; border-radius:10px; border:none; background:linear-gradient(135deg,#1a5276,#2e86c1); color:white; font-size:13px; font-weight:700; cursor:pointer; }
-.btn-primary:disabled { opacity:.6; }
-.btn-ghost { padding:7px 16px; border-radius:8px; border:1px solid var(--border); background:white; font-size:13px; cursor:pointer; color:var(--primary); font-weight:600; }
-.btn-ghost:hover { background:var(--bg); }
+.btn-primary { padding:9px 20px; border-radius:12px; border:none; background:linear-gradient(135deg,#0e7490,#10b981); color:white; font-size:13px; font-weight:800; cursor:pointer; box-shadow:0 6px 16px rgba(14,116,144,.35); transition:transform .12s, box-shadow .12s; }
+.btn-primary:hover { transform:translateY(-1px); box-shadow:0 10px 22px rgba(14,116,144,.4); }
+.btn-primary:disabled { opacity:.6; box-shadow:none; }
+.btn-ghost { padding:8px 16px; border-radius:11px; border:1.5px solid var(--border); background:white; font-size:13px; cursor:pointer; color:var(--primary); font-weight:700; transition:border-color .12s, background .12s; }
+.btn-ghost:hover { background:#f4f8fc; border-color:var(--accent); }
 .btn-del { background:#fdecea; border:1px solid #f5c6c0; color:var(--warn); border-radius:8px; padding:4px 9px; font-size:13px; cursor:pointer; }
 
 .wrap { max-width:1100px; margin:0 auto; padding:20px 32px 40px; }
 .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
 @media (max-width:820px){ .grid { grid-template-columns:1fr; } }
-.card { background:white; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; margin-bottom:18px; }
-.card h3 { font-size:14px; font-weight:800; color:var(--primary); text-transform:uppercase; letter-spacing:.4px; margin-bottom:12px; border-left:4px solid var(--primary-light); padding-left:10px; }
-.f-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
-.f-row label { font-size:13px; font-weight:600; color:#555; }
-.f-row input { width:150px; padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; text-align:right; }
-.f-row input:focus { outline:none; border-color:var(--primary-light); box-shadow:0 0 0 3px rgba(46,134,193,.15); }
+.card { background:rgba(255,255,255,.92); backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,.7); border-radius:18px; box-shadow:0 8px 26px rgba(18,50,79,.09); padding:20px 22px; margin-bottom:18px; }
+.card h3 { font-size:13px; font-weight:800; color:var(--primary); text-transform:uppercase; letter-spacing:.6px; margin-bottom:14px; display:flex; align-items:center; gap:9px; }
+.card h3::before { content:''; width:5px; height:18px; border-radius:4px; background:linear-gradient(180deg,#0e7490,#10b981); }
+.f-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:11px; }
+.f-row label { font-size:13px; font-weight:600; color:#556; }
+.f-row input { width:160px; padding:10px 12px; border:1.5px solid var(--border); border-radius:11px; font-size:15px; font-weight:700; text-align:right; color:var(--primary); background:#fbfdff; transition:border-color .12s, box-shadow .12s; }
+.f-row input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 4px rgba(14,165,163,.16); background:white; }
 
 table.denom { width:100%; border-collapse:collapse; }
-table.denom th { font-size:10px; text-transform:uppercase; color:var(--muted); text-align:right; padding:4px 8px; border-bottom:1px solid var(--border); }
+table.denom th { font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); text-align:right; padding:6px 8px; border-bottom:2px solid var(--border); }
 table.denom th:first-child { text-align:left; }
-table.denom td { padding:4px 8px; font-size:13px; text-align:right; border-bottom:1px solid #f2f5f9; }
-table.denom td:first-child { text-align:left; font-weight:600; }
-table.denom input { width:70px; padding:5px 8px; border:1.5px solid var(--border); border-radius:6px; font-size:13px; text-align:right; }
-table.denom tr.tot td { font-weight:800; border-top:2px solid var(--primary); background:#eef3fa; }
+table.denom td { padding:6px 8px; font-size:13px; text-align:right; border-bottom:1px solid #f1f4f9; }
+table.denom td:first-child { text-align:left; }
+table.denom td:nth-child(2) { text-align:center; }
+table.denom .chip { display:inline-block; min-width:70px; text-align:center; font-weight:800; color:#0e7490; background:#e0f2fe; border:1px solid #bae6fd; border-radius:9px; padding:3px 9px; font-size:12px; }
+table.denom .sub { font-weight:700; color:var(--primary); }
+table.denom input { width:74px; padding:7px 9px; border:1.5px solid var(--border); border-radius:9px; font-size:13px; font-weight:700; text-align:right; background:#fbfdff; }
+table.denom input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(14,165,163,.15); background:white; }
+table.denom tfoot td { font-weight:800; border-top:2px solid var(--accent); background:linear-gradient(90deg,#ecfeff,#f0fdfa); color:#0e7490; padding:11px 8px; font-size:16px; }
+table.denom tfoot td:last-child { border-radius:0 0 10px 0; }
 
 .line { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
 .line input.desc { flex:1; padding:7px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; }
 .line input.monto { width:120px; padding:7px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; text-align:right; }
 .line-total { display:flex; justify-content:space-between; font-weight:800; border-top:2px solid var(--primary); padding-top:8px; margin-top:6px; }
 
-.resumen { background:linear-gradient(135deg,#f5f8ff,#eef3fa); border:1.5px solid #d7e3f5; }
-.r-line { display:flex; justify-content:space-between; padding:6px 0; font-size:14px; border-bottom:1px dashed #dfe6f0; }
-.r-line:last-child { border-bottom:none; }
-.r-line.big { font-size:17px; font-weight:800; color:var(--primary); }
-.badge-ok { background:#e8f5e9; color:#2e7d32; font-weight:800; padding:4px 14px; border-radius:20px; }
-.badge-dif { background:#ffebee; color:#c62828; font-weight:800; padding:4px 14px; border-radius:20px; }
+.hero { background:linear-gradient(155deg,#0b2a45 0%,#0e5f7a 55%,#0e7490 100%); color:white; border:none; box-shadow:0 16px 38px rgba(11,42,69,.34); position:relative; overflow:hidden; }
+.hero::after { content:''; position:absolute; width:220px; height:220px; right:-60px; top:-70px; background:radial-gradient(circle,rgba(16,185,129,.35),transparent 70%); }
+.hero h3 { color:rgba(255,255,255,.85); position:relative; }
+.hero h3::before { background:linear-gradient(180deg,#5eead4,#10b981); }
+.hero-status { display:flex; justify-content:center; margin:2px 0 16px; position:relative; }
+.badge-ok, .badge-dif { display:inline-flex; align-items:center; gap:8px; font-weight:800; font-size:16px; padding:11px 24px; border-radius:30px; box-shadow:0 8px 22px rgba(0,0,0,.22); }
+.badge-ok { background:linear-gradient(135deg,#34d399,#059669); color:white; }
+.badge-dif { background:linear-gradient(135deg,#fb7185,#e11d48); color:white; }
+.hero-tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; position:relative; }
+.tile { background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.18); border-radius:15px; padding:14px 10px; text-align:center; }
+.tile .tl { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:rgba(255,255,255,.72); }
+.tile .tv { font-size:21px; font-weight:800; margin-top:5px; letter-spacing:-.5px; }
+.tile.acc .tv { color:#5eead4; }
+.hero-break { background:rgba(255,255,255,.08); border-radius:14px; padding:8px 14px; position:relative; }
+.hb { display:flex; justify-content:space-between; padding:6px 0; font-size:13.5px; color:rgba(255,255,255,.9); border-bottom:1px dashed rgba(255,255,255,.14); }
+.hb:last-child { border-bottom:none; }
+.hb.strong { font-weight:800; font-size:15px; color:white; }
 
+.line-total { display:flex; justify-content:space-between; font-weight:800; color:var(--primary); border-top:2px dashed var(--accent); padding-top:10px; margin-top:8px; }
+.pill { display:inline-block; padding:3px 11px; border-radius:14px; font-size:11px; font-weight:800; }
+.pill.ok { background:#d1fae5; color:#047857; }
+.pill.dif { background:#ffe4e6; color:#be123c; }
 .hint { font-size:11px; color:var(--muted); }
 .msg { font-size:13px; min-height:18px; }
 .msg.ok { color:var(--success); font-weight:600; } .msg.err { color:var(--warn); font-weight:600; }
@@ -142,18 +164,22 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
 
     <!-- Columna derecha: gastos, ingresos, resumen -->
     <div>
-      <div class="card resumen">
+      <div class="card hero">
         <h3>Resumen del cierre</h3>
-        <div class="r-line"><span>Efectivo contado</span><span id="rEfectivo">₡0</span></div>
-        <div class="r-line"><span>Total Tarjeta</span><span id="rTarjeta">₡0</span></div>
-        <div class="r-line"><span>Total SINPE</span><span id="rSinpe">₡0</span></div>
-        <div class="r-line"><span>+ Gastos de caja</span><span id="rGastos">₡0</span></div>
-        <div class="r-line"><span>− Ingresos extra</span><span id="rIngresos">₡0</span></div>
-        <div class="r-line"><span>− Caja inicial</span><span id="rCajaIni">₡0</span></div>
-        <div class="r-line big"><span>Ventas conciliadas</span><span id="rConciliado">₡0</span></div>
-        <div class="r-line big"><span>TOTAL ventas (sistema)</span><span id="rTotalVentas">₡0</span></div>
-        <div class="r-line"><span>Estado</span><span id="rEstado">—</span></div>
-        <div class="r-line big"><span>TOTAL MINITA</span><span id="rMinita">₡0</span></div>
+        <div class="hero-status" id="rEstado">—</div>
+        <div class="hero-tiles">
+          <div class="tile acc"><div class="tl">Efectivo contado</div><div class="tv" id="rEfectivo">₡0</div></div>
+          <div class="tile"><div class="tl">Total ventas</div><div class="tv" id="rTotalVentas">₡0</div></div>
+          <div class="tile"><div class="tl">Minita</div><div class="tv" id="rMinita">₡0</div></div>
+        </div>
+        <div class="hero-break">
+          <div class="hb"><span>Total Tarjeta</span><span id="rTarjeta">₡0</span></div>
+          <div class="hb"><span>Total SINPE</span><span id="rSinpe">₡0</span></div>
+          <div class="hb"><span>+ Gastos de caja</span><span id="rGastos">₡0</span></div>
+          <div class="hb"><span>− Ingresos extra</span><span id="rIngresos">₡0</span></div>
+          <div class="hb"><span>− Caja inicial</span><span id="rCajaIni">₡0</span></div>
+          <div class="hb strong"><span>Ventas conciliadas</span><span id="rConciliado">₡0</span></div>
+        </div>
       </div>
 
       <div class="card">
@@ -255,7 +281,7 @@ async function init(){
 function renderDenoms(){
   document.getElementById('denomBody').innerHTML=DENOMS.map(d=>`
     <tr><td><input type="number" min="0" step="1" id="den_${d}" value="0" oninput="calc()"></td>
-    <td>₡${d.toLocaleString('es-CR')}</td><td id="sub_${d}">₡0</td></tr>`).join('');
+    <td><span class="chip">₡${d.toLocaleString('es-CR')}</span></td><td id="sub_${d}" class="sub">₡0</td></tr>`).join('');
 }
 
 // ── Cálculo ──
@@ -286,7 +312,7 @@ function calc(){
   document.getElementById('totGastos').textContent=fmt(totGastos);
   document.getElementById('totIngresos').textContent=fmt(totIngresos);
   const ok=Math.round(diferencia)===0;
-  document.getElementById('rEstado').innerHTML=ok?'<span class="badge-ok">OK ✓</span>':`<span class="badge-dif">Diferencia ${fmt(diferencia)}</span>`;
+  document.getElementById('rEstado').innerHTML=ok?'<span class="badge-ok">✓ Caja cuadra</span>':`<span class="badge-dif">⚠ Diferencia ${fmt(diferencia)}</span>`;
   return {efectivo,tarjeta,sinpe,totalVentas,cajaIni,membresias,totGastos,totIngresos,conciliado,diferencia,minita,ok};
 }
 
@@ -400,7 +426,7 @@ function renderHist(){
     <td class="num">${fmt(c.caja_inicial)}</td><td class="num">${fmt(c.efectivo)}</td>
     <td class="num">${fmt(c.total_ventas)}</td><td class="num">${fmt(c.minita)}</td>
     <td class="num" style="color:${Math.round(c.diferencia||0)===0?'#2e7d32':'#c62828'};">${fmt(c.diferencia)}</td>
-    <td>${c.estado_dif==='OK'?'<span class="badge-ok">OK</span>':'<span class="badge-dif">Dif.</span>'}</td>
+    <td>${c.estado_dif==='OK'?'<span class="pill ok">OK</span>':'<span class="pill dif">Dif.</span>'}</td>
     <td><button class="btn-ghost" onclick='cargarCierre(${JSON.stringify(c.id)})'>Ver</button></td>
   </tr>`).join('');
 }
