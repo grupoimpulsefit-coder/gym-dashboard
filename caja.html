@@ -132,7 +132,15 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
     <input type="file" id="fileVentas" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarInformeVentas(this.files[0])">
     <label class="btn-ghost" for="fileVentasProd" style="cursor:pointer;">📦 Ventas por Producto</label>
     <input type="file" id="fileVentasProd" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarVentasProducto(this.files[0])">
-    <button class="btn-ghost" onclick="nuevoCierre()">＋ Nuevo</button>
+    <button class="btn-ghost" onclick="loadCierres()">↻ Recargar</button>
+  </div>
+</div>
+
+<div id="turnoBar" style="padding:11px 32px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:linear-gradient(90deg,#eef7f4,#f4fbf9);border-bottom:1px solid var(--border);">
+  <span id="turnoEstado"></span>
+  <span id="turnoInfo" style="font-size:13px;color:var(--muted);"></span>
+  <div style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap;">
+    <button id="btnAbrirTurno" class="btn-primary" onclick="openAbrirModal()">🔓 Abrir turno</button>
   </div>
 </div>
 
@@ -210,7 +218,8 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
         <div class="msg" id="saveMsg"></div>
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap;">
           <button class="btn-ghost" onclick="generarPDF()">🖨️ PDF</button>
-          <button class="btn-primary" id="btnGuardar" onclick="guardarCierre()">💾 Guardar cierre</button>
+          <button class="btn-ghost" id="btnParcial" onclick="cerrarTurno('parcial')">⏸️ Cierre parcial</button>
+          <button class="btn-primary" id="btnFinal" onclick="cerrarTurno('final')">⏹️ Cierre final</button>
         </div>
       </div>
     </div>
@@ -221,6 +230,25 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
     <thead><tr><th>Fecha</th><th>Turno</th><th class="num">Caja inicial</th><th class="num">Efectivo</th><th class="num">Total ventas</th><th class="num">Minita</th><th class="num">Diferencia</th><th>Estado</th><th></th></tr></thead>
     <tbody id="histBody"></tbody>
   </table></div>
+</div>
+
+<!-- Modal: Abrir turno (efectivo inicial + inventario contado) -->
+<div id="abrirModal" style="display:none;position:fixed;inset:0;background:rgba(15,20,35,.55);z-index:10000;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
+  <div style="background:white;border-radius:16px;width:100%;max-width:560px;box-shadow:0 32px 80px rgba(0,0,0,.4);overflow:hidden;margin:auto;">
+    <div style="background:linear-gradient(135deg,#0e7490,#10b981);color:white;padding:16px 22px;font-size:16px;font-weight:800;">🔓 Abrir turno <span id="abrirTurnoNum" style="font-weight:600;opacity:.9;"></span></div>
+    <div style="padding:20px 22px;max-height:70vh;overflow-y:auto;">
+      <div class="f-row"><label style="font-weight:700;">Efectivo inicial en caja (₡)</label><input type="number" id="aEfectivo" step="1" style="width:160px;padding:9px 11px;border:1.5px solid var(--border);border-radius:10px;text-align:right;font-weight:700;"></div>
+      <div class="hint" id="aEfectivoHint" style="margin:-4px 0 12px;"></div>
+      <div style="font-size:13px;font-weight:800;color:var(--primary);margin:10px 0 8px;">📦 Inventario contado (obligatorio)</div>
+      <div class="hint" style="margin-bottom:8px;">Ingrese el conteo físico de cada producto. Se actualizará el stock con lo contado.</div>
+      <div id="aInvList" style="max-height:38vh;overflow-y:auto;border:1px solid var(--border);border-radius:10px;"></div>
+      <div id="abrirErr" style="color:var(--warn);font-size:13px;min-height:16px;margin-top:10px;"></div>
+    </div>
+    <div style="padding:14px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);">
+      <button class="btn-ghost" onclick="document.getElementById('abrirModal').style.display='none'">Cancelar</button>
+      <button class="btn-primary" id="btnConfirmarApertura" onclick="abrirTurno()">🔓 Abrir turno</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -243,7 +271,8 @@ function parseFecha(s){const[y,m,d]=String(s).split('-').map(Number);return new 
 function mesEt(d){return MESES_ES[d.getMonth()]+' '+d.getFullYear();}
 function mesOrd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
 
-let gastos=[{desc:'',monto:''}], ingresos=[{desc:'',monto:''}], cierres=[];
+let gastos=[{desc:'',monto:''}], ingresos=[{desc:'',monto:''}], cierres=[], turnoActual=null;
+const todayStr=()=>new Date().toISOString().slice(0,10);
 
 // ── Login ──
 async function doLogin(){
@@ -279,13 +308,85 @@ async function init(){
     ctrl.innerHTML=`<label>🏢 Sede:</label> <select id="sedeSel"></select>`;
     const sel=document.getElementById('sedeSel');
     sel.innerHTML=SEDES.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
-    sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;loadPricesForSede(currentSede);loadCierres();nuevoCierre();};
+    sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;loadPricesForSede(currentSede);loadCierres();};
   }else ctrl.innerHTML=`<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
   document.getElementById('sedeTitle').textContent='· '+currentSede;
   renderDenoms(); renderGastos(); renderIngresos();
   document.getElementById('app').style.display='block';
   loadPricesForSede(currentSede);
-  await loadCierres(); nuevoCierre();
+  await loadCierres();
+}
+
+// ── Ciclo de turno ──
+function updateTurnoUI(){
+  const est=document.getElementById('turnoEstado'), info=document.getElementById('turnoInfo');
+  const bA=document.getElementById('btnAbrirTurno'), bP=document.getElementById('btnParcial'), bF=document.getElementById('btnFinal');
+  if(turnoActual){
+    est.innerHTML=`<span class="pill ok" style="font-size:12px;padding:5px 12px;">🟢 Turno ${turnoActual.turno_num} ABIERTO</span>`;
+    info.textContent=`Apertura ${turnoActual.hora_apertura?new Date(turnoActual.hora_apertura).toLocaleString('es-CR'):'—'} · Caja inicial ${fmt(turnoActual.caja_inicial)}`;
+    bA.style.display='none';
+    [bP,bF].forEach(b=>{b.disabled=false;b.style.opacity=1;b.style.cursor='pointer';});
+  }else{
+    est.innerHTML=`<span class="pill dif" style="font-size:12px;padding:5px 12px;">⚪ SIN TURNO ABIERTO</span>`;
+    info.textContent='Abra el turno (efectivo + inventario) para poder registrar el cierre.';
+    bA.style.display='';
+    [bP,bF].forEach(b=>{b.disabled=true;b.style.opacity=.45;b.style.cursor='not-allowed';});
+  }
+}
+function cargarTurnoEnForm(t){
+  document.getElementById('cFecha').value=t.fecha||todayStr();
+  document.getElementById('cTurno').value='Turno '+(t.turno_num||'');
+  document.getElementById('cCajaInicial').value=t.caja_inicial||0;
+  document.getElementById('cCajaInicial').readOnly=true;
+  if(t.total_ventas){ document.getElementById('cMembresias').value=t.membresias||0; document.getElementById('cTarjeta').value=t.total_tarjeta||''; document.getElementById('cSinpe').value=t.total_sinpe||''; document.getElementById('cTotalVentas').value=t.total_ventas||0; document.getElementById('cSobreRetirado').checked=!!t.sobre_retirado; }
+  if(t.denominaciones) DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=t.denominaciones[d]||0;});
+  document.getElementById('cajaInicialHint').textContent='Fijado en la apertura del turno.';
+  calc();
+}
+function checkTurno(){
+  turnoActual=cierres.find(c=>c.estado==='abierto')||null;
+  updateTurnoUI();
+  if(turnoActual) cargarTurnoEnForm(turnoActual);
+  else { document.getElementById('cCajaInicial').readOnly=false; nuevoCierre(); }
+}
+
+async function openAbrirModal(){
+  const hoy=cierres.filter(c=>c.fecha===todayStr());
+  const num=hoy.reduce((m,c)=>Math.max(m,c.turno_num||0),0)+1;
+  window._turnoNum=num;
+  document.getElementById('abrirTurnoNum').textContent='· Turno '+num;
+  const aEf=document.getElementById('aEfectivo');
+  if(num===1){ aEf.value=''; aEf.readOnly=false; document.getElementById('aEfectivoHint').textContent='Primer turno del día: cuente el efectivo con que abre la caja.'; }
+  else{ const prev=hoy.filter(c=>c.estado!=='abierto').sort((a,b)=>(b.turno_num||0)-(a.turno_num||0))[0]; const ini=prev?Math.round(Number(prev.efectivo_final||prev.efectivo||0)):0; aEf.value=ini; aEf.readOnly=true; document.getElementById('aEfectivoHint').textContent=`Acumulado: efectivo final del turno anterior (${fmt(ini)}).`; }
+  document.getElementById('aInvList').innerHTML='<div style="padding:12px;color:var(--muted);">Cargando inventario…</div>';
+  try{ window._invAp=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(currentSede)}&order=producto.asc&select=*`))||[]; }catch(_){ window._invAp=[]; }
+  const inv=window._invAp;
+  document.getElementById('aInvList').innerHTML = inv.length ? inv.map((p,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid #f2f5f9;">
+      <span style="flex:1;font-size:13px;">${esc(p.producto)}</span>
+      <span style="font-size:11px;color:var(--muted);">sist. ${p.cantidad||0}</span>
+      <input type="number" step="1" id="ainv_${i}" value="${p.cantidad||0}" style="width:82px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:right;font-weight:700;">
+    </div>`).join('') : '<div style="padding:12px;color:var(--muted);">Esta sede no tiene productos en inventario. Puede abrir el turno igual.</div>';
+  document.getElementById('abrirErr').textContent='';
+  document.getElementById('abrirModal').style.display='flex';
+}
+
+async function abrirTurno(){
+  const err=document.getElementById('abrirErr');
+  const efStr=document.getElementById('aEfectivo').value;
+  if(efStr===''||!(Number(efStr)>=0)){ err.textContent='Indique el efectivo inicial en caja.'; return; }
+  const efectivo=Math.round(Number(efStr)); const inv=window._invAp||[]; const D=todayStr(); const conteo={};
+  const btn=document.getElementById('btnConfirmarApertura'); btn.disabled=true; btn.textContent='Abriendo...';
+  try{
+    for(let i=0;i<inv.length;i++){ const p=inv[i]; const cnt=Number(document.getElementById('ainv_'+i).value)||0; conteo[p.producto]=cnt;
+      if(Number(p.cantidad)!==cnt||p.desc_dia!==D){ await supaFetch(`/inventario?id=eq.${p.id}`,{method:'PATCH',body:{cantidad:cnt,desc_dia:D,desc_hoy:0,updated_at:new Date().toISOString()}}); } }
+    const rec={ sede:currentSede, fecha:D, turno:'Turno '+window._turnoNum, turno_num:window._turnoNum, estado:'abierto', hora_apertura:new Date().toISOString(), caja_inicial:efectivo, inventario_apertura:conteo, created_by:currentEmail||null };
+    await supaFetch('/cierres_caja',{method:'POST',body:rec});
+    document.getElementById('abrirModal').style.display='none';
+    await loadCierres();
+    document.getElementById('saveMsg').className='msg ok'; document.getElementById('saveMsg').textContent=`✅ Turno ${window._turnoNum} abierto. Ya puede registrar ventas y el cierre.`;
+  }catch(e){ err.textContent='No se pudo abrir: '+e.message; }
+  finally{ btn.disabled=false; btn.textContent='🔓 Abrir turno'; }
 }
 
 function renderDenoms(){
@@ -493,53 +594,51 @@ function cargarVentasProducto(file){
 }
 
 // ── Guardar ──
-async function guardarCierre(){
+async function cerrarTurno(estado){
   const msg=document.getElementById('saveMsg');
+  if(!turnoActual){ msg.className='msg err'; msg.textContent='Primero abra el turno.'; return; }
   const fecha=document.getElementById('cFecha').value;
-  if(!fecha){msg.className='msg err';msg.textContent='Indique la fecha.';return;}
+  if(document.getElementById('cTarjeta').value===''||document.getElementById('cSinpe').value===''){ msg.className='msg err'; msg.textContent='Incluya el monto de Tarjeta y SINPE (ponga 0 si no hubo).'; return; }
   const c=calc();
   const denominaciones={}; DENOMS.forEach(d=>denominaciones[d]=Number(document.getElementById('den_'+d).value)||0);
   const gastosLimpios=gastos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Gasto de caja',monto:Number(g.monto)||0}));
   const ingresosLimpios=ingresos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Ingreso',monto:Number(g.monto)||0}));
   const payload={
-    sede:currentSede, fecha, turno:document.getElementById('cTurno').value.trim()||null,
-    caja_inicial:c.cajaIni, membresias:c.membresias, total_ventas:c.totalVentas,
+    membresias:c.membresias, total_ventas:c.totalVentas,
     total_tarjeta:c.tarjeta, total_sinpe:c.sinpe, efectivo:c.efectivo,
     denominaciones, gastos:gastosLimpios, ingresos:ingresosLimpios,
     total_gastos:c.totGastos, total_ingresos:c.totIngresos, minita:c.minita,
     efectivo_final:c.efectivoFinal, otros_vendidos:c.otros, sobre_retirado:c.sobreRetirado,
     diferencia:Math.round(c.diferencia), estado_dif:c.ok?'OK':'Diferencia',
-    informe_ventas:window._informeVentas||null, created_by:currentEmail||null
+    informe_ventas:window._informeVentas||null, estado, hora_cierre:new Date().toISOString()
   };
-  const btn=document.getElementById('btnGuardar'); btn.disabled=true; btn.textContent='Guardando...';
+  const btn=estado==='final'?document.getElementById('btnFinal'):document.getElementById('btnParcial');
+  const bt0=btn.textContent; btn.disabled=true; btn.textContent='Guardando...';
   try{
-    await supaFetch('/cierres_caja',{method:'POST',body:payload});
-    // Enviar los gastos al módulo de Gastos como "Pago de caja" (categoría Otros)
+    await supaFetch(`/cierres_caja?id=eq.${turnoActual.id}`,{method:'PATCH',body:payload});
     if(gastosLimpios.length){
       const d=parseFecha(fecha);
-      const filas=gastosLimpios.map(g=>({
-        sede:currentSede, categoria:'otros', fecha_clase:fecha, mes:mesEt(d), mes_orden:mesOrd(d),
-        emisor:g.desc, documento_cobro:'Cierre de caja', numero_factura:null, monto:g.monto,
-        metodo_pago:'caja', banco_pago:'Pago de caja', cuenta_pago:null, created_by:currentEmail||null
-      }));
+      const filas=gastosLimpios.map(g=>({ sede:currentSede, categoria:'otros', fecha_clase:fecha, mes:mesEt(d), mes_orden:mesOrd(d),
+        emisor:g.desc, documento_cobro:'Cierre de caja', numero_factura:null, monto:g.monto, metodo_pago:'caja', banco_pago:'Pago de caja', cuenta_pago:null, created_by:currentEmail||null }));
       try{ await supaFetch('/gastos',{method:'POST',body:filas}); }catch(ge){ console.warn('gastos:',ge.message); }
     }
-    msg.className='msg ok'; msg.textContent='✅ Cierre guardado'+(gastosLimpios.length?` y ${gastosLimpios.length} gasto(s) enviados a Gastos.`:'.');
-    await loadCierres(); renderHist();
+    msg.className='msg ok'; msg.textContent=(estado==='final'?'⏹️ Turno cerrado (final).':'⏸️ Cierre parcial guardado. Puede abrir el siguiente turno.')+(gastosLimpios.length?` ${gastosLimpios.length} gasto(s) enviados a Gastos.`:'');
+    await loadCierres();
   }catch(e){ msg.className='msg err'; msg.textContent='⚠️ '+e.message; }
-  finally{ btn.disabled=false; btn.textContent='💾 Guardar cierre'; }
+  finally{ btn.disabled=false; btn.textContent=bt0; }
 }
 
 async function loadCierres(){
   try{ cierres=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(currentSede)}&order=fecha.desc,created_at.desc&limit=30&select=*`))||[]; }
   catch(_){ cierres=[]; }
-  renderHist();
+  renderHist(); checkTurno();
 }
 function renderHist(){
   const tb=document.getElementById('histBody');
   if(!cierres.length){tb.innerHTML='<tr><td colspan="9" style="padding:16px;color:var(--muted);">Sin cierres registrados.</td></tr>';return;}
+  const estBadge=e=> e==='abierto'?'<span class="pill" style="background:#dcfce7;color:#166534;">abierto</span>':e==='parcial'?'<span class="pill" style="background:#fff3e0;color:#e65100;">parcial</span>':e==='final'?'<span class="pill" style="background:#e0e7ff;color:#3730a3;">final</span>':'';
   tb.innerHTML=cierres.map(c=>`<tr>
-    <td>${esc(c.fecha)}</td><td>${esc(c.turno)||'—'}</td>
+    <td>${esc(c.fecha)}</td><td>${c.turno_num?('Turno '+c.turno_num):esc(c.turno)||'—'} ${estBadge(c.estado)}</td>
     <td class="num">${fmt(c.caja_inicial)}</td><td class="num">${fmt(c.efectivo)}</td>
     <td class="num">${fmt(c.total_ventas)}</td><td class="num">${fmt(c.minita)}</td>
     <td class="num" style="color:${Math.round(c.diferencia||0)===0?'#2e7d32':'#c62828'};">${fmt(c.diferencia)}</td>
