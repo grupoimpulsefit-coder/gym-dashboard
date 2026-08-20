@@ -128,8 +128,10 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
     <label>Turno:</label><input type="text" id="cTurno" placeholder="Mañana / Tarde" style="width:120px;text-align:left;">
   </div>
   <div class="topbar-controls">
-    <label class="btn-ghost" for="fileVentas" style="cursor:pointer;">📤 Cargar Informe de Ventas</label>
+    <label class="btn-ghost" for="fileVentas" style="cursor:pointer;">📤 Informe de Ventas</label>
     <input type="file" id="fileVentas" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarInformeVentas(this.files[0])">
+    <label class="btn-ghost" for="fileVentasProd" style="cursor:pointer;">📦 Ventas por Producto</label>
+    <input type="file" id="fileVentasProd" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarVentasProducto(this.files[0])">
     <button class="btn-ghost" onclick="nuevoCierre()">＋ Nuevo</button>
   </div>
 </div>
@@ -277,11 +279,12 @@ async function init(){
     ctrl.innerHTML=`<label>🏢 Sede:</label> <select id="sedeSel"></select>`;
     const sel=document.getElementById('sedeSel');
     sel.innerHTML=SEDES.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
-    sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;loadCierres();nuevoCierre();};
+    sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;loadPricesForSede(currentSede);loadCierres();nuevoCierre();};
   }else ctrl.innerHTML=`<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
   document.getElementById('sedeTitle').textContent='· '+currentSede;
   renderDenoms(); renderGastos(); renderIngresos();
   document.getElementById('app').style.display='block';
+  loadPricesForSede(currentSede);
   await loadCierres(); nuevoCierre();
 }
 
@@ -391,6 +394,65 @@ function cargarInformeVentas(file){
       document.getElementById('ventasHint').innerHTML=`📄 Informe: Efectivo ${fmt(efectivo)} · Tarjeta ${fmt(tarjeta)} · SINPE ${fmt(sinpe)} · <b>Total ${fmt(total)}</b>. Se autollenaron Tarjeta, SINPE y Total.`;
       calc();
     }catch(err){alert('Error al leer el archivo: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── Ventas por Producto → auto-llena el cierre y actualiza el snapshot de la sede ──
+let planPrices={};
+function parseCRC(v){ let s=String(v||'').replace(/[₡€\s]/g,'').replace(/\./g,'').replace(',','.'); let n=parseFloat(s); return isNaN(n)?0:n; }
+function parseDateCR(s){ if(!s)return null; s=String(s).trim(); if(s.includes('/')){const p=s.split('/'); if(p.length===3){let y=parseInt(p[2]); if(y<100)y+=2000; const d=new Date(y,parseInt(p[1])-1,parseInt(p[0])); if(!isNaN(d.getTime()))return d;}} return null; }
+function parseRenoDT(s){ if(!s)return null; return parseDateCR(String(s).trim().split(/\s+/)[0]); }
+function normP(n){ return String(n||'').toLowerCase().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n').replace(/\s+/g,' ').trim(); }
+function esPlanRecurrenteNat(pl){ return (pl.includes('natacion')||pl.includes('natación')||pl.includes('aquafitness')||pl.includes('estimulaci'))&&(pl.includes('vez por semana')||pl.includes('veces por semana')||pl.includes('x semana')); }
+function isMembershipPlan(product){ let p=String(product||'').trim(); if(/\(\d+\)/.test(p))return false; let pl=p.toLowerCase(); if(esPlanRecurrenteNat(pl))return true; if(pl.includes('sesion')||pl.includes('sesión')||pl.includes('clase'))return false; for(let k of Object.keys(planPrices)){ if(normP(k)===normP(p)||normP(p).includes(normP(k))||normP(k).includes(normP(p)))return true; } if(/\d+\s*x\s*\d+\s*mil/i.test(p))return true; return /plan|promo|flash|anual|lealtad|fidelidad|bloqueado|verano|exclusivo|platium|semestral|trimest|bimest|estudiante|renovaci[oó]n|black|ejecutivo|mensualidad|matr[ií]cula|nataci[oó]n|gym|aquafitness|estimulaci[oó]n|\bpng\b|\bcps\b/i.test(p); }
+function isClaseSuelta(product){ let pl=String(product||'').trim().toLowerCase(); if(!pl.includes('sesion')&&!pl.includes('sesión')&&!pl.includes('clase'))return false; if(/\d*\s*(vez|veces)\s*por\s*semana|x\s*semana/i.test(pl))return false; return true; }
+async function loadPricesForSede(sede){ try{ const rows=await supaFetch(`/plan_prices?sede=eq.${encodeURIComponent(sede)}&select=plan,precio`); planPrices={}; if(rows&&rows.length){ rows.forEach(r=>planPrices[r.plan]=r.precio); return; } const snaps=await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(sede)}&order=updated_at.desc&limit=1&select=users_data`); if(snaps?.length&&snaps[0].users_data?.length){ snaps[0].users_data.forEach(u=>{ if(u.ÚltimoProducto&&u.ValorPlan>0)planPrices[u.ÚltimoProducto]=u.ValorPlan; }); } }catch(_){ planPrices={}; } }
+
+function cargarVentasProducto(file){
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      let hdr=-1,col={};
+      for(let i=0;i<Math.min(raw.length,10);i++){ const r=raw[i]||[]; const nm=r.map(c=>String(c||'').trim().toLowerCase());
+        const fi=nm.findIndex(c=>c==='fecha'), pi=nm.findIndex(c=>c==='producto');
+        if(fi>=0&&pi>=0){ hdr=i; col.fecha=fi; col.producto=pi; col.cliente=nm.findIndex(c=>c==='cliente'); col.registrado=nm.findIndex(c=>c.includes('registrado')); col.total=nm.findIndex(c=>c.includes('total crc')); if(col.total<0)col.total=nm.findIndex(c=>c.includes('total')&&!c.includes('usd')); break; } }
+      if(hdr<0)throw new Error('No se encontró el encabezado (Fecha/Producto). ¿Es el reporte "Ventas por Producto"?');
+      const memb=[],clases=[],sinclasif=[]; const fechas=[];
+      for(let i=hdr+1;i<raw.length;i++){ const r=raw[i]; if(!r||!r[col.fecha])continue;
+        const fechaStr=String(r[col.fecha]||'').trim(); const cliente=String(r[col.cliente]||'').trim(); const regPor=String(r[col.registrado]||'').trim(); const producto=String(r[col.producto]||'').trim(); const total=parseCRC(r[col.total]);
+        if(!fechaStr||!cliente)continue; const txDate=parseRenoDT(fechaStr); if(txDate)fechas.push(txDate.getTime());
+        const base={FechaStr:fechaStr,Cliente:cliente,RegistradoPor:regPor,Producto:producto,Total:total};
+        if(/^invitado$/i.test(cliente)){ if(isClaseSuelta(producto))clases.push(base); else sinclasif.push(base); continue; }
+        if(isClaseSuelta(producto)){ clases.push(base); continue; }
+        if(!isMembershipPlan(producto)){ sinclasif.push(base); continue; }
+        memb.push(base);
+      }
+      const sum=a=>a.reduce((s,x)=>s+(Number(x.Total)||0),0);
+      const totMemb=Math.round(sum(memb)), totClases=Math.round(sum(clases)), totSinC=Math.round(sum(sinclasif));
+      const totalVentas=totMemb+totClases+totSinC;
+      document.getElementById('cTotalVentas').value=totalVentas;
+      document.getElementById('cMembresias').value=totMemb;
+      const ref=fechas.length?new Date(Math.max(...fechas)):new Date();
+      const mes=ref.toLocaleDateString('es-CR',{month:'long',year:'numeric'}).replace(/^\w/,c=>c.toUpperCase());
+      const mesOrden=`${ref.getFullYear()}-${String(ref.getMonth()+1).padStart(2,'0')}`;
+      const renov_data=[...memb.map(r=>({FechaStr:r.FechaStr,Cliente:r.Cliente,RegistradoPor:r.RegistradoPor,Producto:r.Producto,Total:r.Total})),
+        ...clases.map(c=>({FechaStr:c.FechaStr,Cliente:c.Cliente,RegistradoPor:c.RegistradoPor,Producto:c.Producto,Total:c.Total,EsClaseSuelta:true})),
+        ...sinclasif.map(c=>({FechaStr:c.FechaStr,Cliente:c.Cliente,RegistradoPor:c.RegistradoPor,Producto:c.Producto,Total:c.Total,EsSinClasificar:true}))];
+      const renovaciones={nuevos:0,renovaciones:memb.length,reingresos:0,total:totMemb,clasesSueltas:{count:clases.length,total:totClases},sinClasificar:{count:sinclasif.length,total:totSinC}};
+      const rec={sede:currentSede,mes,mes_orden:mesOrden,updated_at:new Date().toISOString(),renov_data,renovaciones};
+      try{
+        const ex=await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(currentSede)}&mes=eq.${encodeURIComponent(mes)}&select=id`);
+        if(ex&&ex.length){ await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(currentSede)}&mes=eq.${encodeURIComponent(mes)}`,{method:'PATCH',body:rec}); }
+        else { rec.activos=0; rec.total_usuarios=0; rec.proyecciones=[]; rec.users_data=[]; await supaFetch('/gym_snapshots',{method:'POST',body:rec}); }
+        let msg=`📦 ${memb.length} membresías (${fmt(totMemb)}) · minita ${fmt(totClases+totSinC)} · Total ${fmt(totalVentas)}. Snapshot de ${currentSede} (${mes}) actualizado.`;
+        if(window._informeVentas){ const dif=Math.round(totalVentas-window._informeVentas.total); msg+= (dif===0?' · ✓ corrobora con Informe de Ventas.':` · ⚠ difiere del Informe en ${fmt(Math.abs(dif))}.`); }
+        document.getElementById('ventasHint').innerHTML=msg;
+        calc();
+      }catch(se){ document.getElementById('ventasHint').innerHTML='⚠️ No se pudo guardar el snapshot: '+se.message+' (revisar permiso de gym_snapshots).'; }
+    }catch(err){ alert('Error al leer el archivo: '+err.message); }
   };
   reader.readAsArrayBuffer(file);
 }
