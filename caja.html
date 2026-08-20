@@ -237,11 +237,16 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
   <div style="background:white;border-radius:16px;width:100%;max-width:560px;box-shadow:0 32px 80px rgba(0,0,0,.4);overflow:hidden;margin:auto;">
     <div style="background:linear-gradient(135deg,#0e7490,#10b981);color:white;padding:16px 22px;font-size:16px;font-weight:800;">🔓 Abrir turno <span id="abrirTurnoNum" style="font-weight:600;opacity:.9;"></span></div>
     <div style="padding:20px 22px;max-height:70vh;overflow-y:auto;">
-      <div class="f-row"><label style="font-weight:700;">Efectivo inicial en caja (₡)</label><input type="number" id="aEfectivo" step="1" style="width:160px;padding:9px 11px;border:1.5px solid var(--border);border-radius:10px;text-align:right;font-weight:700;"></div>
-      <div class="hint" id="aEfectivoHint" style="margin:-4px 0 12px;"></div>
-      <div style="font-size:13px;font-weight:800;color:var(--primary);margin:10px 0 8px;">📦 Inventario contado (obligatorio)</div>
-      <div class="hint" style="margin-bottom:8px;">Ingrese el conteo físico de cada producto. Se actualizará el stock con lo contado.</div>
-      <div id="aInvList" style="max-height:38vh;overflow-y:auto;border:1px solid var(--border);border-radius:10px;"></div>
+      <div style="font-size:13px;font-weight:800;color:var(--primary);margin:2px 0 6px;">💵 Efectivo inicial — cuente por denominación</div>
+      <table class="denom" style="margin-bottom:2px;">
+        <thead><tr><th>Cant.</th><th>Denominación</th><th>Subtotal</th></tr></thead>
+        <tbody id="aDenomBody"></tbody>
+        <tfoot><tr class="tot"><td></td><td>Efectivo inicial</td><td id="aEfectivoCell">₡0</td></tr></tfoot>
+      </table>
+      <div class="hint" id="aEfectivoHint" style="margin:2px 0 14px;"></div>
+      <div style="font-size:13px;font-weight:800;color:var(--primary);margin:10px 0 6px;">📦 Inventario contado (obligatorio, a ciegas)</div>
+      <div class="hint" style="margin-bottom:8px;">Cuente físicamente cada producto y anote la cantidad. El sistema comparará con lo registrado (no se muestra para que el conteo sea real). No se modifica el stock, solo se verifica.</div>
+      <div id="aInvList" style="max-height:34vh;overflow-y:auto;border:1px solid var(--border);border-radius:10px;"></div>
       <div id="abrirErr" style="color:var(--warn);font-size:13px;min-height:16px;margin-top:10px;"></div>
     </div>
     <div style="padding:14px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);">
@@ -355,36 +360,50 @@ async function openAbrirModal(){
   const num=hoy.reduce((m,c)=>Math.max(m,c.turno_num||0),0)+1;
   window._turnoNum=num;
   document.getElementById('abrirTurnoNum').textContent='· Turno '+num;
-  const aEf=document.getElementById('aEfectivo');
-  if(num===1){ aEf.value=''; aEf.readOnly=false; document.getElementById('aEfectivoHint').textContent='Primer turno del día: cuente el efectivo con que abre la caja.'; }
-  else{ const prev=hoy.filter(c=>c.estado!=='abierto').sort((a,b)=>(b.turno_num||0)-(a.turno_num||0))[0]; const ini=prev?Math.round(Number(prev.efectivo_final||prev.efectivo||0)):0; aEf.value=ini; aEf.readOnly=true; document.getElementById('aEfectivoHint').textContent=`Acumulado: efectivo final del turno anterior (${fmt(ini)}).`; }
+  // Efectivo inicial por denominación
+  document.getElementById('aDenomBody').innerHTML=DENOMS.map(d=>`
+    <tr><td><input type="number" min="0" step="1" id="aden_${d}" value="0" oninput="calcAperturaEfectivo()"></td>
+    <td><span class="chip">₡${d.toLocaleString('es-CR')}</span></td><td id="asub_${d}" class="sub">₡0</td></tr>`).join('');
+  window._aExpected=null;
+  if(num>1){ const prev=hoy.filter(c=>c.estado!=='abierto').sort((a,b)=>(b.turno_num||0)-(a.turno_num||0))[0]; if(prev) window._aExpected=Math.round(Number(prev.efectivo_final||prev.efectivo||0)); }
+  calcAperturaEfectivo();
+  // Inventario a ciegas (no se muestra el sistema; no se actualiza el stock)
   document.getElementById('aInvList').innerHTML='<div style="padding:12px;color:var(--muted);">Cargando inventario…</div>';
   try{ window._invAp=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(currentSede)}&order=producto.asc&select=*`))||[]; }catch(_){ window._invAp=[]; }
   const inv=window._invAp;
   document.getElementById('aInvList').innerHTML = inv.length ? inv.map((p,i)=>`
     <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid #f2f5f9;">
       <span style="flex:1;font-size:13px;">${esc(p.producto)}</span>
-      <span style="font-size:11px;color:var(--muted);">sist. ${p.cantidad||0}</span>
-      <input type="number" step="1" id="ainv_${i}" value="${p.cantidad||0}" style="width:82px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:right;font-weight:700;">
+      <input type="number" step="1" id="ainv_${i}" placeholder="conteo" style="width:82px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:right;font-weight:700;">
     </div>`).join('') : '<div style="padding:12px;color:var(--muted);">Esta sede no tiene productos en inventario. Puede abrir el turno igual.</div>';
   document.getElementById('abrirErr').textContent='';
   document.getElementById('abrirModal').style.display='flex';
 }
+function calcAperturaEfectivo(){
+  let ef=0; DENOMS.forEach(d=>{ const c=Number(document.getElementById('aden_'+d).value)||0; const s=c*d; ef+=s; const el=document.getElementById('asub_'+d); if(el)el.textContent=fmt(s); });
+  document.getElementById('aEfectivoCell').textContent=fmt(ef);
+  const h=document.getElementById('aEfectivoHint');
+  if(window._aExpected!=null){ const dif=ef-window._aExpected; h.innerHTML=`Esperado (efectivo final del turno anterior): <b>${fmt(window._aExpected)}</b> — ${dif===0?'<span style="color:var(--success);font-weight:700;">✓ cuadra</span>':`<span style="color:var(--warn);font-weight:700;">diferencia ${fmt(Math.abs(dif))}</span>`}`; }
+  else h.textContent='Primer turno del día: cuente el efectivo con que abre la caja.';
+  return ef;
+}
 
 async function abrirTurno(){
   const err=document.getElementById('abrirErr');
-  const efStr=document.getElementById('aEfectivo').value;
-  if(efStr===''||!(Number(efStr)>=0)){ err.textContent='Indique el efectivo inicial en caja.'; return; }
-  const efectivo=Math.round(Number(efStr)); const inv=window._invAp||[]; const D=todayStr(); const conteo={};
+  const efectivo=calcAperturaEfectivo();
+  if(efectivo<=0){ err.textContent='Cuente el efectivo inicial por denominación.'; return; }
+  const inv=window._invAp||[]; const denom={}; DENOMS.forEach(d=>denom[d]=Number(document.getElementById('aden_'+d).value)||0);
+  const conteo={}, discrep=[];
   const btn=document.getElementById('btnConfirmarApertura'); btn.disabled=true; btn.textContent='Abriendo...';
   try{
-    for(let i=0;i<inv.length;i++){ const p=inv[i]; const cnt=Number(document.getElementById('ainv_'+i).value)||0; conteo[p.producto]=cnt;
-      if(Number(p.cantidad)!==cnt||p.desc_dia!==D){ await supaFetch(`/inventario?id=eq.${p.id}`,{method:'PATCH',body:{cantidad:cnt,desc_dia:D,desc_hoy:0,updated_at:new Date().toISOString()}}); } }
-    const rec={ sede:currentSede, fecha:D, turno:'Turno '+window._turnoNum, turno_num:window._turnoNum, estado:'abierto', hora_apertura:new Date().toISOString(), caja_inicial:efectivo, inventario_apertura:conteo, created_by:currentEmail||null };
+    inv.forEach((p,i)=>{ const raw=document.getElementById('ainv_'+i).value; const contado=raw===''?null:(Number(raw)||0); const sistema=Number(p.cantidad)||0;
+      conteo[p.producto]={contado,sistema}; if(contado!=null && contado!==sistema) discrep.push(`${p.producto}: contó ${contado} vs sistema ${sistema}`); });
+    const rec={ sede:currentSede, fecha:todayStr(), turno:'Turno '+window._turnoNum, turno_num:window._turnoNum, estado:'abierto', hora_apertura:new Date().toISOString(), caja_inicial:efectivo, denominaciones_apertura:denom, inventario_apertura:conteo, created_by:currentEmail||null };
     await supaFetch('/cierres_caja',{method:'POST',body:rec});
     document.getElementById('abrirModal').style.display='none';
     await loadCierres();
-    document.getElementById('saveMsg').className='msg ok'; document.getElementById('saveMsg').textContent=`✅ Turno ${window._turnoNum} abierto. Ya puede registrar ventas y el cierre.`;
+    const sm=document.getElementById('saveMsg'); sm.className='msg ok';
+    sm.innerHTML=`✅ Turno ${window._turnoNum} abierto (efectivo ${fmt(efectivo)}).`+(inv.length?(discrep.length?` <span style="color:var(--warn);">⚠ Inventario con ${discrep.length} diferencia(s): ${discrep.slice(0,5).map(esc).join('; ')}${discrep.length>5?'…':''}</span>`:' <span style="color:var(--success);">Inventario cuadra ✓</span>'):'');
   }catch(e){ err.textContent='No se pudo abrir: '+e.message; }
   finally{ btn.disabled=false; btn.textContent='🔓 Abrir turno'; }
 }

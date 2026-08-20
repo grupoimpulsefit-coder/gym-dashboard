@@ -39,7 +39,8 @@ alter table cierres_caja add column if not exists turno_num int;
 alter table cierres_caja add column if not exists estado text default 'final';   -- 'abierto' | 'parcial' | 'final'
 alter table cierres_caja add column if not exists hora_apertura timestamptz;
 alter table cierres_caja add column if not exists hora_cierre timestamptz;
-alter table cierres_caja add column if not exists inventario_apertura jsonb;      -- conteo físico al abrir { producto: cantidad }
+alter table cierres_caja add column if not exists inventario_apertura jsonb;      -- conteo físico a ciegas al abrir { producto: { contado, sistema } }
+alter table cierres_caja add column if not exists denominaciones_apertura jsonb;   -- desglose de billetes/monedas del efectivo inicial
 
 -- 2) Inventario por sede ------------------------------------------------------
 create table if not exists inventario (
