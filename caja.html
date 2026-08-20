@@ -409,6 +409,33 @@ function isMembershipPlan(product){ let p=String(product||'').trim(); if(/\(\d+\
 function isClaseSuelta(product){ let pl=String(product||'').trim().toLowerCase(); if(!pl.includes('sesion')&&!pl.includes('sesión')&&!pl.includes('clase'))return false; if(/\d*\s*(vez|veces)\s*por\s*semana|x\s*semana/i.test(pl))return false; return true; }
 async function loadPricesForSede(sede){ try{ const rows=await supaFetch(`/plan_prices?sede=eq.${encodeURIComponent(sede)}&select=plan,precio`); planPrices={}; if(rows&&rows.length){ rows.forEach(r=>planPrices[r.plan]=r.precio); return; } const snaps=await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(sede)}&order=updated_at.desc&limit=1&select=users_data`); if(snaps?.length&&snaps[0].users_data?.length){ snaps[0].users_data.forEach(u=>{ if(u.ÚltimoProducto&&u.ValorPlan>0)planPrices[u.ÚltimoProducto]=u.ValorPlan; }); } }catch(_){ planPrices={}; } }
 
+// nombre "Agua (3)" → { base:"Agua", qty:3 }
+function parseProdQty(name){ const s=String(name||'').trim(); const m=s.match(/\((\d+)\)\s*$/); return { base:s.replace(/\s*\(\d+\)\s*$/,'').trim(), qty:m?parseInt(m[1],10):1 }; }
+
+// Descuento idempotente de inventario a partir de las ventas de productos del día D.
+// El informe es acumulado del día → se descuenta solo el delta vs lo ya descontado hoy.
+async function descontarInventario(soldByBase, origName, D){
+  let inv;
+  try{ inv=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(currentSede)}&select=*`))||[]; }
+  catch(e){ return { error:e.message }; }
+  const invByName={}; inv.forEach(p=>{ invByName[normP(p.producto)]=p; });
+  let unidadesDesc=0, prodsTocados=0;
+  for(const p of inv){
+    const k=normP(p.producto);
+    const unidadesHoy=soldByBase[k]||0;
+    const mismaFecha=(p.desc_dia===D);
+    if(unidadesHoy===0 && !mismaFecha) continue;           // no vendido hoy y sin descuentos previos hoy
+    const yaDesc=mismaFecha?(Number(p.desc_hoy)||0):0;
+    const delta=unidadesHoy-yaDesc;
+    if(delta===0 && mismaFecha) continue;                   // ya está al día
+    const nuevoStock=(Number(p.cantidad)||0)-delta;
+    try{ await supaFetch(`/inventario?id=eq.${p.id}`,{method:'PATCH',body:{cantidad:nuevoStock,desc_dia:D,desc_hoy:unidadesHoy,updated_at:new Date().toISOString()}});
+      if(delta!==0){ unidadesDesc+=delta; prodsTocados++; } }catch(_){}
+  }
+  const noCalzan=Object.keys(soldByBase).filter(k=>!invByName[k]&&soldByBase[k]>0).map(k=>origName[k]||k);
+  return { unidadesDesc, prodsTocados, noCalzan };
+}
+
 function cargarVentasProducto(file){
   const reader=new FileReader();
   reader.onload=async e=>{
@@ -438,6 +465,10 @@ function cargarVentasProducto(file){
       const ref=fechas.length?new Date(Math.max(...fechas)):new Date();
       const mes=ref.toLocaleDateString('es-CR',{month:'long',year:'numeric'}).replace(/^\w/,c=>c.toUpperCase());
       const mesOrden=`${ref.getFullYear()}-${String(ref.getMonth()+1).padStart(2,'0')}`;
+      const D=ref.toISOString().slice(0,10);
+      // Unidades vendidas por producto (de la categoría productos/minita) para descontar inventario
+      const soldByBase={}, origName={};
+      sinclasif.forEach(it=>{ const {base,qty}=parseProdQty(it.Producto); if(base){ const k=normP(base); soldByBase[k]=(soldByBase[k]||0)+qty; origName[k]=base; } });
       const renov_data=[...memb.map(r=>({FechaStr:r.FechaStr,Cliente:r.Cliente,RegistradoPor:r.RegistradoPor,Producto:r.Producto,Total:r.Total})),
         ...clases.map(c=>({FechaStr:c.FechaStr,Cliente:c.Cliente,RegistradoPor:c.RegistradoPor,Producto:c.Producto,Total:c.Total,EsClaseSuelta:true})),
         ...sinclasif.map(c=>({FechaStr:c.FechaStr,Cliente:c.Cliente,RegistradoPor:c.RegistradoPor,Producto:c.Producto,Total:c.Total,EsSinClasificar:true}))];
@@ -449,6 +480,10 @@ function cargarVentasProducto(file){
         else { rec.activos=0; rec.total_usuarios=0; rec.proyecciones=[]; rec.users_data=[]; await supaFetch('/gym_snapshots',{method:'POST',body:rec}); }
         let msg=`📦 ${memb.length} membresías (${fmt(totMemb)}) · minita ${fmt(totClases+totSinC)} · Total ${fmt(totalVentas)}. Snapshot de ${currentSede} (${mes}) actualizado.`;
         if(window._informeVentas){ const dif=Math.round(totalVentas-window._informeVentas.total); msg+= (dif===0?' · ✓ corrobora con Informe de Ventas.':` · ⚠ difiere del Informe en ${fmt(Math.abs(dif))}.`); }
+        // Descuento idempotente de inventario (el informe es acumulado del día → solo el delta)
+        const desc=await descontarInventario(soldByBase, origName, D);
+        if(desc&&!desc.error){ msg+=`<br>📦 Inventario: ${desc.unidadesDesc||0} unidad(es) descontada(s)`; if(desc.noCalzan&&desc.noCalzan.length) msg+=`. ⚠ Sin calzar en inventario (${desc.noCalzan.length}): ${desc.noCalzan.slice(0,8).map(esc).join(', ')}${desc.noCalzan.length>8?'…':''}`; }
+        else if(desc&&desc.error){ msg+=`<br>⚠ Inventario no actualizado: ${esc(desc.error)}`; }
         document.getElementById('ventasHint').innerHTML=msg;
         calc();
       }catch(se){ document.getElementById('ventasHint').innerHTML='⚠️ No se pudo guardar el snapshot: '+se.message+' (revisar permiso de gym_snapshots).'; }

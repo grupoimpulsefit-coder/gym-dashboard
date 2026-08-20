@@ -48,6 +48,10 @@ create table if not exists inventario (
   updated_at      timestamptz default now()
 );
 create unique index if not exists inventario_sede_prod_idx on inventario (sede, lower(producto));
+-- Control de descuento idempotente por día (el informe de ventas es acumulado del día):
+-- desc_dia = día del último descuento; desc_hoy = unidades ya descontadas ese día.
+alter table inventario add column if not exists desc_dia date;
+alter table inventario add column if not exists desc_hoy numeric default 0;
 
 -- ══════════════════════════════════════════════════════════════════════════
 --  RLS
@@ -69,3 +73,14 @@ create policy inventario_rw on inventario
   for all to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('admin','admin_sedes','admin_g')))
   with check (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('admin','admin_sedes','admin_g')));
+
+-- Recepción: puede LEER y DESCONTAR (update) el inventario de SU sede, pero no crear/borrar productos.
+drop policy if exists inventario_recep_select on inventario;
+create policy inventario_recep_select on inventario
+  for select to authenticated
+  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = inventario.sede));
+drop policy if exists inventario_recep_update on inventario;
+create policy inventario_recep_update on inventario
+  for update to authenticated
+  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = inventario.sede))
+  with check (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = inventario.sede));
