@@ -530,31 +530,58 @@ function cargarCierre(id){
 function generarPDF(){
   const c=calc();
   const { jsPDF }=window.jspdf; const doc=new jsPDF({unit:'pt',format:'a4'});
-  const L=54; let y=54; const R=350;
   const money=n=>Math.round(Number(n)||0).toLocaleString('es-CR');
-  doc.setFont('helvetica','bold'); doc.setFontSize(15);
-  doc.text('CIERRE',L,y); doc.setFontSize(12); doc.text(document.getElementById('cFecha').value+(document.getElementById('cTurno').value?'  ·  '+document.getElementById('cTurno').value:''),R,y);
-  doc.setFontSize(10); doc.setTextColor(120); doc.text(currentSede,R,y+14); doc.setTextColor(0);
-  y+=34; doc.setFontSize(11);
-  const kv=(k,v,bold)=>{doc.setFont('helvetica',bold?'bold':'normal');doc.text(k,L,y);doc.text(money(v),R+120,y,{align:'right'});y+=18;};
-  kv('CAJA INICIAL',c.cajaIni,true); kv('MEMBRESIAS',c.membresias,true);
-  y+=6; doc.setFont('helvetica','bold'); doc.text('BILLETES Y MONEDAS',L,y); y+=16; doc.setFont('helvetica','normal');
-  DENOMS.forEach(d=>{const cant=Number(document.getElementById('den_'+d).value)||0; if(cant>0||true){
-    doc.text(String(cant),L,y); doc.text('x  '+d.toLocaleString('es-CR'),L+40,y); doc.text(money(cant*d),R+120,y,{align:'right'}); y+=15;}});
-  doc.setDrawColor(180); doc.line(L,y,R+120,y); y+=14;
-  kv('Efectivo',c.efectivo,true); kv('Total Tarjeta',c.tarjeta,false); kv('Total Sinpe',c.sinpe,false);
-  doc.setFont('helvetica','bold'); doc.text('TOTAL',L,y); doc.text(money(c.totalVentas),R+120,y,{align:'right'});
-  doc.setTextColor(c.ok?39:198, c.ok?125:40, c.ok?50:40); doc.text(c.ok?'OK':'Diferencia '+money(c.diferencia),R+130,y); doc.setTextColor(0); y+=22;
-  doc.setFont('helvetica','bold'); doc.text('GASTOS',L,y); y+=15; doc.setFont('helvetica','normal');
-  gastos.filter(g=>Number(g.monto)>0).forEach(g=>{doc.text(esc(g.desc||'Gasto'),L,y); doc.text(money(g.monto),R+120,y,{align:'right'}); y+=14;});
-  doc.setFont('helvetica','bold'); doc.text('TOTAL',L,y); doc.text(money(c.totGastos),R+120,y,{align:'right'}); y+=20;
-  doc.text('INGRESOS',L,y); y+=15; doc.setFont('helvetica','normal');
-  ingresos.filter(g=>Number(g.monto)>0).forEach(g=>{doc.text(esc(g.desc||'Ingreso'),L,y); doc.text(money(g.monto),R+120,y,{align:'right'}); y+=14;});
-  doc.setFont('helvetica','bold'); doc.text('TOTAL',L,y); doc.text(money(c.totIngresos),R+120,y,{align:'right'}); y+=22;
-  doc.setFontSize(12); doc.text('TOTAL MINITA / OTROS (sobre)',L,y); doc.text(money(c.minita),R+120,y,{align:'right'}); y+=16;
-  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(120);
-  doc.text(c.sobreRetirado?'Sobre ya retirado del efectivo contado':'Efectivo final descuenta el minita (sobre)',L,y); doc.setTextColor(0); y+=18;
-  doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.text('TOTAL EFECTIVO FINAL',L,y); doc.text(money(c.efectivoFinal),R+120,y,{align:'right'});
+  const hex=h=>[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];
+  const X=90, W=415, RH=21; let y=66;
+  const fill=h=>{const[r,g,b]=hex(h);doc.setFillColor(r,g,b);doc.rect(X,y-RH+6,W,RH,'F');};
+  const border=()=>{doc.setDrawColor(205,205,205);doc.setLineWidth(.5);doc.rect(X,y-RH+6,W,RH);};
+  function row(label,value,f,o={}){ if(f)fill(f); border();
+    doc.setFont('helvetica',o.bold===false?'normal':'bold');doc.setFontSize(o.sz||11);doc.setTextColor(35,35,35);
+    doc.text(label,X+11,y-4);
+    if(value!=null){doc.setFont('helvetica','bold');doc.text(money(value),X+W-11,y-4,{align:'right'});}
+    y+=RH; }
+  function head(label,f,sz){ fill(f); border(); doc.setFont('helvetica','bold');doc.setFontSize(sz||12.5);doc.setTextColor(45,45,45);
+    doc.text(label,X+W/2,y-4,{align:'center'}); y+=RH; }
+
+  head('CIERRE DE CAJA','F6C3FF',14);
+  fill('F6C3FF'); border(); doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(70,45,95);
+  doc.text(currentSede,X+11,y-4);
+  doc.text(document.getElementById('cFecha').value+(document.getElementById('cTurno').value?'   ·   '+document.getElementById('cTurno').value:''),X+W-11,y-4,{align:'right'}); y+=RH;
+  y+=6;
+  row('CAJA INICIAL',c.cajaIni,'ECECEC');
+  row('MEMBRESIAS',c.membresias,'FFFF99');
+  y+=6;
+  head('BILLETES Y MONEDAS','EBFFBF');
+  fill('F4FBEC'); border(); doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(120,120,120);
+  doc.text('CANT.',X+11,y-4); doc.text('DENOMINACION',X+W/2,y-4,{align:'center'}); doc.text('SUBTOTAL',X+W-11,y-4,{align:'right'}); y+=RH;
+  const rhD=16.5;
+  DENOMS.forEach((d,i)=>{ const cant=Number(document.getElementById('den_'+d).value)||0;
+    const[r,g,b]=i%2?[255,255,255]:[247,251,243]; doc.setFillColor(r,g,b); doc.rect(X,y-rhD+5,W,rhD,'F'); doc.setDrawColor(233);doc.setLineWidth(.4); doc.rect(X,y-rhD+5,W,rhD);
+    doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(40);
+    doc.text(String(cant),X+24,y-3); doc.text(money(d),X+W/2,y-3,{align:'center'}); doc.setFont('helvetica','bold'); doc.text(money(cant*d),X+W-11,y-3,{align:'right'}); y+=rhD; });
+  y+=6;
+  row('Efectivo contado',c.efectivo,'ECECEC');
+  row('Total Tarjeta',c.tarjeta,'FFE699');
+  row('Total Sinpe',c.sinpe,'9DC3E6');
+  row('TOTAL ventas',c.totalVentas,'F4B183');
+  y+=3; const bw=210, bx=X+(W-bw)/2; const[br,bg,bb]=hex(c.ok?'C6EFCE':'FFC7CE');
+  doc.setFillColor(br,bg,bb); doc.roundedRect(bx,y-RH+6,bw,RH,6,6,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(11.5); doc.setTextColor(c.ok?6:156, c.ok?100:0, c.ok?50:24);
+  doc.text(c.ok?'CAJA CUADRA':'DIFERENCIA  '+money(Math.abs(c.diferencia)), X+W/2, y-4, {align:'center'}); y+=RH+7;
+  head('GASTOS','FFC000');
+  const gs=gastos.filter(g=>Number(g.monto)>0);
+  (gs.length?gs:[{desc:'Sin gastos',monto:0}]).forEach(g=>{ border(); doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(40); doc.text(esc(g.desc||'Gasto'),X+11,y-4); doc.setFont('helvetica','bold'); doc.text(money(g.monto),X+W-11,y-4,{align:'right'}); y+=RH; });
+  row('TOTAL GASTOS',c.totGastos,'FF7474');
+  y+=6;
+  head('INGRESOS','F6C3FF');
+  const ing=ingresos.filter(g=>Number(g.monto)>0);
+  (ing.length?ing:[{desc:'Sin ingresos',monto:0}]).forEach(g=>{ border(); doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(40); doc.text(esc(g.desc||'Ingreso'),X+11,y-4); doc.setFont('helvetica','bold'); doc.text(money(g.monto),X+W-11,y-4,{align:'right'}); y+=RH; });
+  row('TOTAL INGRESOS',c.totIngresos,'ECEEF0');
+  y+=7;
+  row('TOTAL MINITA / OTROS (sobre)',c.minita,'92D050',{sz:12});
+  row('TOTAL EFECTIVO FINAL',c.efectivoFinal,'A9D08E',{sz:13});
+  y+=4; doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(130);
+  doc.text(c.sobreRetirado?'El efectivo contado ya tiene el sobre (minita) retirado.':'El efectivo final descuenta el minita (se retira en sobres).',X+11,y);
   doc.save(`cierre_${currentSede.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'_')}_${document.getElementById('cFecha').value}.pdf`);
 }
 </script>
