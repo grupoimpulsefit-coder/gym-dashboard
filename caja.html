@@ -177,11 +177,11 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
         <div class="hero-break">
           <div class="hb"><span>Total Tarjeta</span><span id="rTarjeta">₡0</span></div>
           <div class="hb"><span>Total SINPE</span><span id="rSinpe">₡0</span></div>
+          <div class="hb"><span>+ Otros / Minita (sobre)</span><span id="rOtros">₡0</span></div>
           <div class="hb"><span>+ Gastos de caja</span><span id="rGastos">₡0</span></div>
           <div class="hb"><span>− Ingresos extra</span><span id="rIngresos">₡0</span></div>
           <div class="hb"><span>− Caja inicial</span><span id="rCajaIni">₡0</span></div>
           <div class="hb strong"><span>Ventas conciliadas</span><span id="rConciliado">₡0</span></div>
-          <div class="hb"><span>Otros / Minita (ventas − membresías)</span><span id="rOtros">₡0</span></div>
         </div>
       </div>
 
@@ -299,10 +299,10 @@ function calc(){
   const membresias=Number(document.getElementById('cMembresias').value)||0;
   const totGastos=gastos.reduce((a,g)=>a+(Number(g.monto)||0),0);
   const totIngresos=ingresos.reduce((a,g)=>a+(Number(g.monto)||0),0);
-  // Fórmula del Excel: TOTAL == Efectivo+Tarjeta+SINPE+Gastos-Ingresos-CajaInicial
-  const conciliado=efectivo+tarjeta+sinpe+totGastos-totIngresos-cajaIni;
-  const diferencia=totalVentas-conciliado;
   const minita=totalVentas-membresias;
+  // El minita se retira en sobres (salida de efectivo), por eso se suma para reconciliar contra el TOTAL de ventas.
+  const conciliado=efectivo+tarjeta+sinpe+minita+totGastos-totIngresos-cajaIni;
+  const diferencia=totalVentas-conciliado;
   document.getElementById('rEfectivo').textContent=fmt(efectivo);
   document.getElementById('rTarjeta').textContent=fmt(tarjeta);
   document.getElementById('rSinpe').textContent=fmt(sinpe);
