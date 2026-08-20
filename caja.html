@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cierre de Caja</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<style>
+:root { --primary:#1a5276; --primary-light:#2e86c1; --accent:#148f77; --accent2:#e67e22; --bg:#f0f4f8; --border:#d5dce8; --text:#1c2833; --muted:#6c757d; --warn:#c0392b; --success:#27ae60; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+#loginScreen { position:fixed; inset:0; background:linear-gradient(135deg,#0f0c29,#302b63 50%,#24243e); display:flex; align-items:center; justify-content:center; z-index:9999; }
+.login-card { background:white; border-radius:24px; padding:40px 44px; width:100%; max-width:420px; box-shadow:0 32px 80px rgba(0,0,0,.5); }
+.login-logo { width:64px; height:64px; background:linear-gradient(135deg,#1a5276,#2e86c1); border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:30px; margin:0 auto 20px; }
+.login-card h2 { text-align:center; font-size:1.4em; font-weight:800; color:#2d2d5e; margin-bottom:6px; }
+.login-card .login-sub { text-align:center; font-size:.85em; color:#888; margin-bottom:28px; }
+.login-field { margin-bottom:16px; }
+.login-field label { display:block; font-size:.8em; font-weight:700; color:#444; text-transform:uppercase; margin-bottom:6px; }
+.login-field input { width:100%; padding:11px 14px; border:1.5px solid #dde1f0; border-radius:10px; font-size:14px; }
+.login-btn { width:100%; padding:13px; background:linear-gradient(135deg,#1a5276,#2e86c1); color:white; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; margin-top:8px; }
+.login-btn:disabled { opacity:.6; }
+#loginError { text-align:center; color:#c62828; font-size:13px; margin-top:12px; min-height:18px; }
+.header { background:linear-gradient(135deg,var(--primary),var(--primary-light)); color:white; padding:18px 32px; display:flex; align-items:center; gap:16px; box-shadow:0 2px 8px rgba(0,0,0,.25); flex-wrap:wrap; }
+.header-icon { font-size:34px; }
+.header h1 { font-size:21px; font-weight:700; }
+.header p { font-size:13px; opacity:.85; margin-top:2px; }
+.header-right { margin-left:auto; display:flex; align-items:center; gap:14px; font-size:13px; }
+.logout-btn { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.35); color:white; border-radius:16px; padding:5px 16px; font-size:12px; font-weight:600; cursor:pointer; }
+.topbar { padding:12px 32px; background:white; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+.topbar-controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.topbar-controls label { font-size:13px; font-weight:600; color:#555; }
+.topbar-controls select, .topbar-controls input { border:1.5px solid #d0d7e8; border-radius:20px; padding:6px 14px; font-size:13px; font-weight:600; color:#333; background:white; }
+.sede-lock { background:#eef3fa; border:1.5px solid var(--border); border-radius:20px; padding:6px 14px; font-size:13px; font-weight:700; color:var(--primary); }
+.btn-primary { padding:8px 18px; border-radius:10px; border:none; background:linear-gradient(135deg,#1a5276,#2e86c1); color:white; font-size:13px; font-weight:700; cursor:pointer; }
+.btn-primary:disabled { opacity:.6; }
+.btn-ghost { padding:7px 16px; border-radius:8px; border:1px solid var(--border); background:white; font-size:13px; cursor:pointer; color:var(--primary); font-weight:600; }
+.btn-ghost:hover { background:var(--bg); }
+.btn-del { background:#fdecea; border:1px solid #f5c6c0; color:var(--warn); border-radius:8px; padding:4px 9px; font-size:13px; cursor:pointer; }
+
+.wrap { max-width:1100px; margin:0 auto; padding:20px 32px 40px; }
+.grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+@media (max-width:820px){ .grid { grid-template-columns:1fr; } }
+.card { background:white; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; margin-bottom:18px; }
+.card h3 { font-size:14px; font-weight:800; color:var(--primary); text-transform:uppercase; letter-spacing:.4px; margin-bottom:12px; border-left:4px solid var(--primary-light); padding-left:10px; }
+.f-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+.f-row label { font-size:13px; font-weight:600; color:#555; }
+.f-row input { width:150px; padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; text-align:right; }
+.f-row input:focus { outline:none; border-color:var(--primary-light); box-shadow:0 0 0 3px rgba(46,134,193,.15); }
+
+table.denom { width:100%; border-collapse:collapse; }
+table.denom th { font-size:10px; text-transform:uppercase; color:var(--muted); text-align:right; padding:4px 8px; border-bottom:1px solid var(--border); }
+table.denom th:first-child { text-align:left; }
+table.denom td { padding:4px 8px; font-size:13px; text-align:right; border-bottom:1px solid #f2f5f9; }
+table.denom td:first-child { text-align:left; font-weight:600; }
+table.denom input { width:70px; padding:5px 8px; border:1.5px solid var(--border); border-radius:6px; font-size:13px; text-align:right; }
+table.denom tr.tot td { font-weight:800; border-top:2px solid var(--primary); background:#eef3fa; }
+
+.line { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+.line input.desc { flex:1; padding:7px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; }
+.line input.monto { width:120px; padding:7px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; text-align:right; }
+.line-total { display:flex; justify-content:space-between; font-weight:800; border-top:2px solid var(--primary); padding-top:8px; margin-top:6px; }
+
+.resumen { background:linear-gradient(135deg,#f5f8ff,#eef3fa); border:1.5px solid #d7e3f5; }
+.r-line { display:flex; justify-content:space-between; padding:6px 0; font-size:14px; border-bottom:1px dashed #dfe6f0; }
+.r-line:last-child { border-bottom:none; }
+.r-line.big { font-size:17px; font-weight:800; color:var(--primary); }
+.badge-ok { background:#e8f5e9; color:#2e7d32; font-weight:800; padding:4px 14px; border-radius:20px; }
+.badge-dif { background:#ffebee; color:#c62828; font-weight:800; padding:4px 14px; border-radius:20px; }
+
+.hint { font-size:11px; color:var(--muted); }
+.msg { font-size:13px; min-height:18px; }
+.msg.ok { color:var(--success); font-weight:600; } .msg.err { color:var(--warn); font-weight:600; }
+.tbl-wrap { overflow-x:auto; background:white; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); }
+table.hist { width:100%; border-collapse:collapse; min-width:720px; }
+table.hist th { background:#f8f9fb; font-size:11px; font-weight:700; color:var(--muted); padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); text-transform:uppercase; }
+table.hist th.num, table.hist td.num { text-align:right; }
+table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f9; }
+.loading, .empty { display:none; text-align:center; padding:50px; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">💵</div>
+    <h2>Cierre de Caja</h2>
+    <p class="login-sub">Conteo de caja, validación y control de efectivo</p>
+    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
+    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-icon">💵</div>
+  <div><h1>Cierre de Caja <span id="sedeTitle"></span></h1><p>Conteo, validación con ventas y registro del efectivo</p></div>
+  <div class="header-right"><span>👤 <span id="userNombre">—</span></span><button class="logout-btn" onclick="doLogout()">Cerrar sesión</button></div>
+</div>
+
+<div class="topbar">
+  <div class="topbar-controls">
+    <span id="sedeControl"></span>
+    <label>📅 Fecha:</label><input type="date" id="cFecha">
+    <label>Turno:</label><input type="text" id="cTurno" placeholder="Mañana / Tarde" style="width:120px;text-align:left;">
+  </div>
+  <div class="topbar-controls">
+    <label class="btn-ghost" for="fileVentas" style="cursor:pointer;">📤 Cargar Informe de Ventas</label>
+    <input type="file" id="fileVentas" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarInformeVentas(this.files[0])">
+    <button class="btn-ghost" onclick="nuevoCierre()">＋ Nuevo</button>
+  </div>
+</div>
+
+<div class="loading" id="loading">Cargando…</div>
+
+<div class="wrap" id="app">
+
+  <div class="grid">
+    <!-- Columna izquierda: datos + billetes -->
+    <div>
+      <div class="card">
+        <h3>Datos del cierre</h3>
+        <div class="f-row"><label>Caja inicial (₡)</label><input type="number" id="cCajaInicial" step="1" oninput="calc()"></div>
+        <div class="hint" id="cajaInicialHint" style="margin:-4px 0 10px;"></div>
+        <div class="f-row"><label>Membresías (₡)</label><input type="number" id="cMembresias" step="1" oninput="calc()"></div>
+        <div class="f-row"><label>Total Tarjeta (₡)</label><input type="number" id="cTarjeta" step="1" oninput="calc()"></div>
+        <div class="f-row"><label>Total SINPE (₡)</label><input type="number" id="cSinpe" step="1" oninput="calc()"></div>
+        <div class="f-row"><label>TOTAL ventas (₡)</label><input type="number" id="cTotalVentas" step="1" oninput="calc()"></div>
+        <div class="hint" id="ventasHint"></div>
+      </div>
+
+      <div class="card">
+        <h3>Billetes y monedas</h3>
+        <table class="denom">
+          <thead><tr><th>Cant.</th><th>Denominación</th><th>Subtotal</th></tr></thead>
+          <tbody id="denomBody"></tbody>
+          <tfoot><tr class="tot"><td></td><td>Efectivo contado</td><td id="efectivoCell">₡0</td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Columna derecha: gastos, ingresos, resumen -->
+    <div>
+      <div class="card resumen">
+        <h3>Resumen del cierre</h3>
+        <div class="r-line"><span>Efectivo contado</span><span id="rEfectivo">₡0</span></div>
+        <div class="r-line"><span>Total Tarjeta</span><span id="rTarjeta">₡0</span></div>
+        <div class="r-line"><span>Total SINPE</span><span id="rSinpe">₡0</span></div>
+        <div class="r-line"><span>+ Gastos de caja</span><span id="rGastos">₡0</span></div>
+        <div class="r-line"><span>− Ingresos extra</span><span id="rIngresos">₡0</span></div>
+        <div class="r-line"><span>− Caja inicial</span><span id="rCajaIni">₡0</span></div>
+        <div class="r-line big"><span>Ventas conciliadas</span><span id="rConciliado">₡0</span></div>
+        <div class="r-line big"><span>TOTAL ventas (sistema)</span><span id="rTotalVentas">₡0</span></div>
+        <div class="r-line"><span>Estado</span><span id="rEstado">—</span></div>
+        <div class="r-line big"><span>TOTAL MINITA</span><span id="rMinita">₡0</span></div>
+      </div>
+
+      <div class="card">
+        <h3>Gastos</h3>
+        <div id="gastosLines"></div>
+        <button class="btn-ghost" onclick="addGasto()">＋ Agregar gasto</button>
+        <div class="line-total"><span>Total gastos</span><span id="totGastos">₡0</span></div>
+        <div class="hint" style="margin-top:6px;">Al guardar, estos gastos se envían al módulo de Gastos como “Pago de caja”.</div>
+      </div>
+
+      <div class="card">
+        <h3>Ingresos extra</h3>
+        <div id="ingresosLines"></div>
+        <button class="btn-ghost" onclick="addIngreso()">＋ Agregar ingreso</button>
+        <div class="line-total"><span>Total ingresos</span><span id="totIngresos">₡0</span></div>
+      </div>
+
+      <div class="card">
+        <div class="msg" id="saveMsg"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap;">
+          <button class="btn-ghost" onclick="generarPDF()">🖨️ PDF</button>
+          <button class="btn-primary" id="btnGuardar" onclick="guardarCierre()">💾 Guardar cierre</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin:18px 0 12px;color:var(--primary);">📋 Cierres recientes</h3>
+  <div class="tbl-wrap"><table class="hist">
+    <thead><tr><th>Fecha</th><th>Turno</th><th class="num">Caja inicial</th><th class="num">Efectivo</th><th class="num">Total ventas</th><th class="num">Minita</th><th class="num">Diferencia</th><th>Estado</th><th></th></tr></thead>
+    <tbody id="histBody"></tbody>
+  </table></div>
+</div>
+
+<script>
+const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
+let currentToken=null,currentRole=null,currentSede=null,currentEmail='';
+async function supaFetch(path,opts={}){
+  const token=currentToken||SUPA_KEY;
+  const res=await fetch(SUPA_URL+'/rest/v1'+path,{method:opts.method||'GET',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':opts.prefer||'return=minimal',...(opts.headers||{})},body:opts.body!=null?JSON.stringify(opts.body):undefined});
+  if(!res.ok){const t=await res.text();throw new Error(t);} const txt=await res.text(); return txt?JSON.parse(txt):null;
+}
+const ROLES_PERMITIDOS=['recepcion','admin_sedes','admin_g','admin'];
+const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
+const SEDE_META={'3 Ríos':{icon:'🌊'},'Natación':{icon:'🏊'},'Pinares':{icon:'🌲'},'Sabanilla':{icon:'🏙️'}};
+const DENOMS=[20000,10000,5000,2000,1000,500,100,50,25,10,5];
+const MESES_ES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(currentRole);
+const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function parseFecha(s){const[y,m,d]=String(s).split('-').map(Number);return new Date(y,m-1,d);}
+function mesEt(d){return MESES_ES[d.getMonth()]+' '+d.getFullYear();}
+function mesOrd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+
+let gastos=[{desc:'',monto:''}], ingresos=[{desc:'',monto:''}], cierres=[];
+
+// ── Login ──
+async function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim(),pwd=document.getElementById('loginPassword').value;
+  const btn=document.getElementById('loginBtn'),errEl=document.getElementById('loginError');
+  if(!email||!pwd){errEl.textContent='Complete todos los campos.';return;}
+  btn.textContent='Ingresando...';btn.disabled=true;errEl.textContent='';
+  try{
+    const res=await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password:pwd})});
+    const data=await res.json(); if(!data.access_token)throw new Error(data.error_description||data.msg||'Credenciales incorrectas');
+    currentToken=data.access_token;currentEmail=email;
+    const roles=await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede`);
+    currentRole=roles?.[0]?.role||null;currentSede=roles?.[0]?.sede||null;
+    if(!ROLES_PERMITIDOS.includes(currentRole)){errEl.textContent='Su cuenta no tiene acceso a este módulo.';await doLogout(true);return;}
+    if(currentRole==='recepcion'&&!currentSede){errEl.textContent='Su cuenta de recepción no tiene sede asignada.';await doLogout(true);return;}
+    document.getElementById('userNombre').textContent=roles?.[0]?.nombre||email;
+    document.getElementById('loginScreen').style.display='none'; init();
+  }catch(e){errEl.textContent=e.message;}finally{btn.textContent='Entrar';btn.disabled=false;}
+}
+document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+(function(){try{const auth=JSON.parse(sessionStorage.getItem('gymAuth')||'null');
+  if(auth?.token&&ROLES_PERMITIDOS.includes(auth.role)){sessionStorage.removeItem('gymAuth');currentToken=auth.token;currentRole=auth.role;currentSede=auth.sede||null;currentEmail=auth.email||'';
+    document.getElementById('userNombre').textContent=auth.nombre||'—';document.getElementById('loginScreen').style.display='none';setTimeout(init,0);}}catch(_){}})();
+async function doLogout(silent){try{await fetch(`${SUPA_URL}/auth/v1/logout`,{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}});}catch(_){}
+  currentToken=null;currentRole=null;currentSede=null;currentEmail='';document.getElementById('app').style.display='none';
+  if(!silent){document.getElementById('loginEmail').value='';document.getElementById('loginPassword').value='';}document.getElementById('loginScreen').style.display='flex';}
+
+// ── Init ──
+async function init(){
+  const ctrl=document.getElementById('sedeControl');
+  if(esAdmin()){
+    if(!currentSede)currentSede=SEDES[0];
+    ctrl.innerHTML=`<label>🏢 Sede:</label> <select id="sedeSel"></select>`;
+    const sel=document.getElementById('sedeSel');
+    sel.innerHTML=SEDES.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
+    sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;loadCierres();nuevoCierre();};
+  }else ctrl.innerHTML=`<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
+  document.getElementById('sedeTitle').textContent='· '+currentSede;
+  renderDenoms(); renderGastos(); renderIngresos();
+  document.getElementById('app').style.display='block';
+  await loadCierres(); nuevoCierre();
+}
+
+function renderDenoms(){
+  document.getElementById('denomBody').innerHTML=DENOMS.map(d=>`
+    <tr><td><input type="number" min="0" step="1" id="den_${d}" value="0" oninput="calc()"></td>
+    <td>₡${d.toLocaleString('es-CR')}</td><td id="sub_${d}">₡0</td></tr>`).join('');
+}
+
+// ── Cálculo ──
+function calc(){
+  let efectivo=0;
+  DENOMS.forEach(d=>{const c=Number(document.getElementById('den_'+d).value)||0; const sub=c*d; efectivo+=sub; document.getElementById('sub_'+d).textContent=fmt(sub);});
+  document.getElementById('efectivoCell').textContent=fmt(efectivo);
+  const tarjeta=Number(document.getElementById('cTarjeta').value)||0;
+  const sinpe=Number(document.getElementById('cSinpe').value)||0;
+  const totalVentas=Number(document.getElementById('cTotalVentas').value)||0;
+  const cajaIni=Number(document.getElementById('cCajaInicial').value)||0;
+  const membresias=Number(document.getElementById('cMembresias').value)||0;
+  const totGastos=gastos.reduce((a,g)=>a+(Number(g.monto)||0),0);
+  const totIngresos=ingresos.reduce((a,g)=>a+(Number(g.monto)||0),0);
+  // Fórmula del Excel: TOTAL == Efectivo+Tarjeta+SINPE+Gastos-Ingresos-CajaInicial
+  const conciliado=efectivo+tarjeta+sinpe+totGastos-totIngresos-cajaIni;
+  const diferencia=totalVentas-conciliado;
+  const minita=totalVentas-membresias;
+  document.getElementById('rEfectivo').textContent=fmt(efectivo);
+  document.getElementById('rTarjeta').textContent=fmt(tarjeta);
+  document.getElementById('rSinpe').textContent=fmt(sinpe);
+  document.getElementById('rGastos').textContent=fmt(totGastos);
+  document.getElementById('rIngresos').textContent=fmt(totIngresos);
+  document.getElementById('rCajaIni').textContent=fmt(cajaIni);
+  document.getElementById('rConciliado').textContent=fmt(conciliado);
+  document.getElementById('rTotalVentas').textContent=fmt(totalVentas);
+  document.getElementById('rMinita').textContent=fmt(minita);
+  document.getElementById('totGastos').textContent=fmt(totGastos);
+  document.getElementById('totIngresos').textContent=fmt(totIngresos);
+  const ok=Math.round(diferencia)===0;
+  document.getElementById('rEstado').innerHTML=ok?'<span class="badge-ok">OK ✓</span>':`<span class="badge-dif">Diferencia ${fmt(diferencia)}</span>`;
+  return {efectivo,tarjeta,sinpe,totalVentas,cajaIni,membresias,totGastos,totIngresos,conciliado,diferencia,minita,ok};
+}
+
+// ── Gastos / Ingresos dinámicos ──
+function renderGastos(){
+  document.getElementById('gastosLines').innerHTML=gastos.map((g,i)=>`
+    <div class="line"><input class="desc" placeholder="Descripción" value="${esc(g.desc)}" oninput="gastos[${i}].desc=this.value">
+    <input class="monto" type="number" step="1" placeholder="0" value="${g.monto}" oninput="gastos[${i}].monto=this.value;calc()">
+    <button class="btn-del" onclick="gastos.splice(${i},1);renderGastos();calc()">🗑</button></div>`).join('');
+}
+function addGasto(){gastos.push({desc:'',monto:''});renderGastos();}
+function renderIngresos(){
+  document.getElementById('ingresosLines').innerHTML=ingresos.map((g,i)=>`
+    <div class="line"><input class="desc" placeholder="Descripción" value="${esc(g.desc)}" oninput="ingresos[${i}].desc=this.value">
+    <input class="monto" type="number" step="1" placeholder="0" value="${g.monto}" oninput="ingresos[${i}].monto=this.value;calc()">
+    <button class="btn-del" onclick="ingresos.splice(${i},1);renderIngresos();calc()">🗑</button></div>`).join('');
+}
+function addIngreso(){ingresos.push({desc:'',monto:''});renderIngresos();}
+
+// ── Nuevo cierre (con acumulado: caja inicial = efectivo del cierre anterior) ──
+function nuevoCierre(){
+  document.getElementById('cFecha').value=new Date().toISOString().slice(0,10);
+  document.getElementById('cTurno').value='';
+  ['cMembresias','cTarjeta','cSinpe','cTotalVentas'].forEach(id=>document.getElementById(id).value='');
+  DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=0;});
+  gastos=[{desc:'',monto:''}]; ingresos=[{desc:'',monto:''}]; renderGastos(); renderIngresos();
+  const ultimo=cierres[0];
+  const cajaIni=ultimo?Number(ultimo.efectivo)||0:0;
+  document.getElementById('cCajaInicial').value=cajaIni;
+  document.getElementById('cajaInicialHint').textContent=ultimo?`Acumulado: efectivo del cierre anterior (${ultimo.fecha}${ultimo.turno?' · '+ultimo.turno:''}).`:'Sin cierre previo — ingrese el fondo inicial.';
+  document.getElementById('ventasHint').textContent='';
+  document.getElementById('saveMsg').textContent='';
+  calc();
+}
+
+// ── Cargar Informe de Ventas (validación/autollenado) ──
+function cargarInformeVentas(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      let colTotal=-1;
+      for(let i=0;i<Math.min(rows.length,15);i++){const idx=rows[i].findIndex(c=>String(c||'').trim().toLowerCase()==='total crc'); if(idx>=0){colTotal=idx;break;}}
+      let efectivo=0,sinpe=0,tarjeta=0;
+      rows.forEach(r=>{
+        const label=(r||[]).map(c=>String(c||'').trim()).find(t=>/^total\s+(efectivo|sinpe|tarjeta)$/i.test(t));
+        if(label){const amt=colTotal>=0?(Number(r[colTotal])||0):(Number([...r].reverse().find(x=>typeof x==='number'))||0);
+          const m=label.toLowerCase(); if(m.includes('efectivo'))efectivo=amt; else if(m.includes('sinpe'))sinpe=amt; else if(m.includes('tarjeta'))tarjeta=amt;}
+      });
+      const total=efectivo+sinpe+tarjeta;
+      if(!total){alert('No se encontraron los totales por método en el archivo. Verifique que sea el Informe de Ventas.');return;}
+      document.getElementById('cTarjeta').value=Math.round(tarjeta);
+      document.getElementById('cSinpe').value=Math.round(sinpe);
+      document.getElementById('cTotalVentas').value=Math.round(total);
+      window._informeVentas={efectivo:Math.round(efectivo),sinpe:Math.round(sinpe),tarjeta:Math.round(tarjeta),total:Math.round(total)};
+      document.getElementById('ventasHint').innerHTML=`📄 Informe: Efectivo ${fmt(efectivo)} · Tarjeta ${fmt(tarjeta)} · SINPE ${fmt(sinpe)} · <b>Total ${fmt(total)}</b>. Se autollenaron Tarjeta, SINPE y Total.`;
+      calc();
+    }catch(err){alert('Error al leer el archivo: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── Guardar ──
+async function guardarCierre(){
+  const msg=document.getElementById('saveMsg');
+  const fecha=document.getElementById('cFecha').value;
+  if(!fecha){msg.className='msg err';msg.textContent='Indique la fecha.';return;}
+  const c=calc();
+  const denominaciones={}; DENOMS.forEach(d=>denominaciones[d]=Number(document.getElementById('den_'+d).value)||0);
+  const gastosLimpios=gastos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Gasto de caja',monto:Number(g.monto)||0}));
+  const ingresosLimpios=ingresos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Ingreso',monto:Number(g.monto)||0}));
+  const payload={
+    sede:currentSede, fecha, turno:document.getElementById('cTurno').value.trim()||null,
+    caja_inicial:c.cajaIni, membresias:c.membresias, total_ventas:c.totalVentas,
+    total_tarjeta:c.tarjeta, total_sinpe:c.sinpe, efectivo:c.efectivo,
+    denominaciones, gastos:gastosLimpios, ingresos:ingresosLimpios,
+    total_gastos:c.totGastos, total_ingresos:c.totIngresos, minita:c.minita,
+    diferencia:Math.round(c.diferencia), estado_dif:c.ok?'OK':'Diferencia',
+    informe_ventas:window._informeVentas||null, created_by:currentEmail||null
+  };
+  const btn=document.getElementById('btnGuardar'); btn.disabled=true; btn.textContent='Guardando...';
+  try{
+    await supaFetch('/cierres_caja',{method:'POST',body:payload});
+    // Enviar los gastos al módulo de Gastos como "Pago de caja" (categoría Otros)
+    if(gastosLimpios.length){
+      const d=parseFecha(fecha);
+      const filas=gastosLimpios.map(g=>({
+        sede:currentSede, categoria:'otros', fecha_clase:fecha, mes:mesEt(d), mes_orden:mesOrd(d),
+        emisor:g.desc, documento_cobro:'Cierre de caja', numero_factura:null, monto:g.monto,
+        metodo_pago:'caja', banco_pago:'Pago de caja', cuenta_pago:null, created_by:currentEmail||null
+      }));
+      try{ await supaFetch('/gastos',{method:'POST',body:filas}); }catch(ge){ console.warn('gastos:',ge.message); }
+    }
+    msg.className='msg ok'; msg.textContent='✅ Cierre guardado'+(gastosLimpios.length?` y ${gastosLimpios.length} gasto(s) enviados a Gastos.`:'.');
+    await loadCierres(); renderHist();
+  }catch(e){ msg.className='msg err'; msg.textContent='⚠️ '+e.message; }
+  finally{ btn.disabled=false; btn.textContent='💾 Guardar cierre'; }
+}
+
+async function loadCierres(){
+  try{ cierres=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(currentSede)}&order=fecha.desc,created_at.desc&limit=30&select=*`))||[]; }
+  catch(_){ cierres=[]; }
+  renderHist();
+}
+function renderHist(){
+  const tb=document.getElementById('histBody');
+  if(!cierres.length){tb.innerHTML='<tr><td colspan="9" style="padding:16px;color:var(--muted);">Sin cierres registrados.</td></tr>';return;}
+  tb.innerHTML=cierres.map(c=>`<tr>
+    <td>${esc(c.fecha)}</td><td>${esc(c.turno)||'—'}</td>
+    <td class="num">${fmt(c.caja_inicial)}</td><td class="num">${fmt(c.efectivo)}</td>
+    <td class="num">${fmt(c.total_ventas)}</td><td class="num">${fmt(c.minita)}</td>
+    <td class="num" style="color:${Math.round(c.diferencia||0)===0?'#2e7d32':'#c62828'};">${fmt(c.diferencia)}</td>
+    <td>${c.estado_dif==='OK'?'<span class="badge-ok">OK</span>':'<span class="badge-dif">Dif.</span>'}</td>
+    <td><button class="btn-ghost" onclick='cargarCierre(${JSON.stringify(c.id)})'>Ver</button></td>
+  </tr>`).join('');
+}
+function cargarCierre(id){
+  const c=cierres.find(x=>x.id===id); if(!c)return;
+  document.getElementById('cFecha').value=c.fecha; document.getElementById('cTurno').value=c.turno||'';
+  document.getElementById('cCajaInicial').value=c.caja_inicial||0; document.getElementById('cMembresias').value=c.membresias||0;
+  document.getElementById('cTarjeta').value=c.total_tarjeta||0; document.getElementById('cSinpe').value=c.total_sinpe||0;
+  document.getElementById('cTotalVentas').value=c.total_ventas||0;
+  DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=(c.denominaciones&&c.denominaciones[d])||0;});
+  gastos=(c.gastos&&c.gastos.length?c.gastos:[{desc:'',monto:''}]).map(g=>({desc:g.desc,monto:g.monto}));
+  ingresos=(c.ingresos&&c.ingresos.length?c.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc,monto:g.monto}));
+  renderGastos(); renderIngresos(); calc();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── PDF (réplica del Excel de cierre) ──
+function generarPDF(){
+  const c=calc();
+  const { jsPDF }=window.jspdf; const doc=new jsPDF({unit:'pt',format:'a4'});
+  const L=54; let y=54; const R=350;
+  const money=n=>Math.round(Number(n)||0).toLocaleString('es-CR');
+  doc.setFont('helvetica','bold'); doc.setFontSize(15);
+  doc.text('CIERRE',L,y); doc.setFontSize(12); doc.text(document.getElementById('cFecha').value+(document.getElementById('cTurno').value?'  ·  '+document.getElementById('cTurno').value:''),R,y);
+  doc.setFontSize(10); doc.setTextColor(120); doc.text(currentSede,R,y+14); doc.setTextColor(0);
+  y+=34; doc.setFontSize(11);
+  const kv=(k,v,bold)=>{doc.setFont('helvetica',bold?'bold':'normal');doc.text(k,L,y);doc.text(money(v),R+120,y,{align:'right'});y+=18;};
+  kv('CAJA INICIAL',c.cajaIni,true); kv('MEMBRESIAS',c.membresias,true);
+  y+=6; doc.setFont('helvetica','bold'); doc.text('BILLETES Y MONEDAS',L,y); y+=16; doc.setFont('helvetica','normal');
+  DENOMS.forEach(d=>{const cant=Number(document.getElementById('den_'+d).value)||0; if(cant>0||true){
+    doc.text(String(cant),L,y); doc.text('x  '+d.toLocaleString('es-CR'),L+40,y); doc.text(money(cant*d),R+120,y,{align:'right'}); y+=15;}});
+  doc.setDrawColor(180); doc.line(L,y,R+120,y); y+=14;
+  kv('Efectivo',c.efectivo,true); kv('Total Tarjeta',c.tarjeta,false); kv('Total Sinpe',c.sinpe,false);
+  doc.setFont('helvetica','bold'); doc.text('TOTAL',L,y); doc.text(money(c.totalVentas),R+120,y,{align:'right'});
+  doc.setTextColor(c.ok?39:198, c.ok?125:40, c.ok?50:40); doc.text(c.ok?'OK':'Diferencia '+money(c.diferencia),R+130,y); doc.setTextColor(0); y+=22;
+  doc.setFont('helvetica','bold'); doc.text('GASTOS',L,y); y+=15; doc.setFont('helvetica','normal');
+  gastos.filter(g=>Number(g.monto)>0).forEach(g=>{doc.text(esc(g.desc||'Gasto'),L,y); doc.text(money(g.monto),R+120,y,{align:'right'}); y+=14;});
+  doc.setFont('helvetica','bold'); doc.text('TOTAL',L,y); doc.text(money(c.totGastos),R+120,y,{align:'right'}); y+=20;
+  doc.text('INGRESOS',L,y); y+=15; doc.setFont('helvetica','normal');
+  ingresos.filter(g=>Number(g.monto)>0).forEach(g=>{doc.text(esc(g.desc||'Ingreso'),L,y); doc.text(money(g.monto),R+120,y,{align:'right'}); y+=14;});
+  doc.setFont('helvetica','bold'); doc.text('TOTAL',L,y); doc.text(money(c.totIngresos),R+120,y,{align:'right'}); y+=22;
+  doc.setFontSize(12); doc.text('TOTAL MINITA',L,y); doc.text(money(c.minita),R+120,y,{align:'right'});
+  doc.save(`cierre_${currentSede.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'_')}_${document.getElementById('cFecha').value}.pdf`);
+}
+</script>
+</body>
+</html>

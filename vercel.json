@@ -8,6 +8,8 @@
     { "source": "/comparativa", "destination": "/comparativa.html" },
     { "source": "/otros", "destination": "/otros.html" },
     { "source": "/gastos", "destination": "/gastos.html" },
-    { "source": "/rrhh", "destination": "/rrhh.html" }
+    { "source": "/rrhh", "destination": "/rrhh.html" },
+    { "source": "/caja", "destination": "/caja.html" },
+    { "source": "/inventario", "destination": "/inventario.html" }
   ]
 }

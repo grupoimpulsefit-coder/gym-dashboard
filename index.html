@@ -909,8 +909,9 @@ async function showSedePicker() {
 
     // Recepción: solo el módulo de Gastos de su sede (no ve datos de otras sedes)
     if (currentRole === 'recepcion') {
-        statusEl.textContent = 'Módulo disponible para su sede' + (currentSede ? ` (${currentSede})` : '') + ':';
+        statusEl.textContent = 'Módulos disponibles para su sede' + (currentSede ? ` (${currentSede})` : '') + ':';
         cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
+        cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
         return;
     }
 
@@ -959,6 +960,8 @@ async function showSedePicker() {
             cardsEl.appendChild(makeHandoffCard('🏷️','Rentabilidad Otros','Productos categoría Otros','Costo, margen y ganancia del mes','#eafaf1','#2e7d32','/otros'));
             cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar / ver gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
             cardsEl.appendChild(makeHandoffCard('👥','Recursos Humanos','Empleados y vacaciones','Salarios, ingresos y solicitudes','#eef2fb','#1a5276','/rrhh'));
+            cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre de caja','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
+            cardsEl.appendChild(makeHandoffCard('📦','Inventario','Productos por sede','Stock, precios y faltantes','#fff8e1','#b9770e','/inventario'));
             // Crear cuenta de acceso — abre modal (no navega)
             const cc = document.createElement('div');
             cc.style.cssText = `cursor:pointer;background:#eef7ee;border:2px dashed #2e7d3266;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;
@@ -972,9 +975,11 @@ async function showSedePicker() {
             cc.onclick = openCrearCuentaModal;
             cardsEl.appendChild(cc);
         }
-        // admin_g: además de index/natación (arriba), su card de Gastos
+        // admin_g: además de index/natación (arriba), sus cards de Gastos, Caja e Inventario
         if (currentRole === 'admin_g') {
             cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar / ver gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
+            cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre de caja','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
+            cardsEl.appendChild(makeHandoffCard('📦','Inventario','Productos por sede','Stock, precios y faltantes','#fff8e1','#b9770e','/inventario'));
         }
     } catch(e) {
         statusEl.textContent = '⚠️ Error al cargar sedes: ' + e.message;

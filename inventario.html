@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventario</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root { --primary:#1a5276; --primary-light:#2e86c1; --accent:#148f77; --accent2:#e67e22; --bg:#f0f4f8; --border:#d5dce8; --text:#1c2833; --muted:#6c757d; --warn:#c0392b; --success:#27ae60; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+#loginScreen { position:fixed; inset:0; background:linear-gradient(135deg,#0f0c29,#302b63 50%,#24243e); display:flex; align-items:center; justify-content:center; z-index:9999; }
+.login-card { background:white; border-radius:24px; padding:40px 44px; width:100%; max-width:420px; box-shadow:0 32px 80px rgba(0,0,0,.5); }
+.login-logo { width:64px; height:64px; background:linear-gradient(135deg,#b9770e,#e67e22); border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:30px; margin:0 auto 20px; }
+.login-card h2 { text-align:center; font-size:1.4em; font-weight:800; color:#2d2d5e; margin-bottom:6px; }
+.login-card .login-sub { text-align:center; font-size:.85em; color:#888; margin-bottom:28px; }
+.login-field { margin-bottom:16px; }
+.login-field label { display:block; font-size:.8em; font-weight:700; color:#444; text-transform:uppercase; margin-bottom:6px; }
+.login-field input { width:100%; padding:11px 14px; border:1.5px solid #dde1f0; border-radius:10px; font-size:14px; }
+.login-btn { width:100%; padding:13px; background:linear-gradient(135deg,#b9770e,#e67e22); color:white; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; margin-top:8px; }
+.login-btn:disabled { opacity:.6; }
+#loginError { text-align:center; color:#c62828; font-size:13px; margin-top:12px; min-height:18px; }
+.header { background:linear-gradient(135deg,#b9770e,#e67e22); color:white; padding:18px 32px; display:flex; align-items:center; gap:16px; box-shadow:0 2px 8px rgba(0,0,0,.25); flex-wrap:wrap; }
+.header-icon { font-size:34px; }
+.header h1 { font-size:21px; font-weight:700; }
+.header p { font-size:13px; opacity:.85; margin-top:2px; }
+.header-right { margin-left:auto; display:flex; align-items:center; gap:14px; font-size:13px; }
+.logout-btn { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.35); color:white; border-radius:16px; padding:5px 16px; font-size:12px; font-weight:600; cursor:pointer; }
+.topbar { padding:12px 32px; background:white; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+.topbar-controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.topbar-controls label { font-size:13px; font-weight:600; color:#555; }
+.topbar-controls select, .topbar-controls input.srch { border:1.5px solid #d0d7e8; border-radius:20px; padding:6px 14px; font-size:13px; font-weight:600; color:#333; background:white; }
+.btn-primary { padding:8px 18px; border-radius:10px; border:none; background:linear-gradient(135deg,#b9770e,#e67e22); color:white; font-size:13px; font-weight:700; cursor:pointer; }
+.btn-ghost { padding:7px 16px; border-radius:8px; border:1px solid var(--border); background:white; font-size:13px; cursor:pointer; color:var(--primary); font-weight:600; }
+.btn-ghost:hover { background:var(--bg); }
+.btn-del { background:#fdecea; border:1px solid #f5c6c0; color:var(--warn); border-radius:8px; padding:4px 9px; font-size:13px; cursor:pointer; }
+.kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; padding:22px 32px 8px; }
+.kpi { background:white; border-radius:12px; padding:16px 18px; border-left:4px solid var(--primary); box-shadow:0 1px 4px rgba(0,0,0,.07); }
+.kpi.orange { border-color:var(--accent2); } .kpi.red { border-color:var(--warn); } .kpi.green { border-color:var(--success); }
+.kpi-label { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
+.kpi-value { font-size:23px; font-weight:700; color:var(--primary); margin-top:4px; }
+.kpi.orange .kpi-value { color:var(--accent2); } .kpi.red .kpi-value { color:var(--warn); }
+.kpi-sub { font-size:11px; color:var(--muted); margin-top:2px; }
+.section { padding:8px 32px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.section-title { font-size:15px; font-weight:700; color:var(--primary); border-left:4px solid var(--primary-light); padding-left:10px; }
+.tbl-wrap { overflow-x:auto; background:white; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin:0 32px 16px; }
+table.tbl { width:100%; border-collapse:collapse; min-width:820px; }
+table.tbl th { background:#f8f9fb; font-size:11px; font-weight:700; color:var(--muted); padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); text-transform:uppercase; }
+table.tbl th.num, table.tbl td.num { text-align:right; }
+table.tbl td { padding:7px 12px; font-size:13px; border-bottom:1px solid #f2f5f9; }
+table.tbl input { width:88px; padding:5px 8px; border:1.5px solid var(--border); border-radius:7px; font-size:13px; text-align:right; }
+table.tbl input.prod { width:220px; text-align:left; }
+tr.bajo td { background:#fff8e1; } tr.faltante td { background:#fdecea; }
+.pill { display:inline-block; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:700; }
+.pill.ok { background:#e8f5e9; color:#2e7d32; } .pill.low { background:#fff3e0; color:#e65100; } .pill.falt { background:#ffebee; color:#c62828; } .pill.sob { background:#e3f2fd; color:#1565c0; }
+.loading, .empty { display:none; text-align:center; padding:50px; color:var(--muted); }
+.msg { font-size:13px; padding:0 32px; min-height:18px; }
+.msg.ok { color:var(--success); font-weight:600; } .msg.err { color:var(--warn); font-weight:600; }
+</style>
+</head>
+<body>
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">📦</div>
+    <h2>Inventario</h2>
+    <p class="login-sub">Productos por sede, stock y faltantes</p>
+    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
+    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+<div class="header">
+  <div class="header-icon">📦</div>
+  <div><h1>Inventario <span id="sedeTitle"></span></h1><p>Stock, precios, mínimos y conteo físico</p></div>
+  <div class="header-right"><span>👤 <span id="userNombre">—</span></span><button class="logout-btn" onclick="doLogout()">Cerrar sesión</button></div>
+</div>
+<div class="topbar">
+  <div class="topbar-controls">
+    <label>🏢 Sede:</label><select id="sedeSel"></select>
+    <input class="srch" id="buscar" placeholder="Buscar producto…" oninput="render()">
+  </div>
+  <div class="topbar-controls">
+    <label class="btn-ghost" for="fileInv" style="cursor:pointer;">📤 Cargar Excel</label>
+    <input type="file" id="fileInv" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarExcel(this.files[0])">
+    <button class="btn-ghost" onclick="addProducto()">＋ Producto</button>
+    <button class="btn-primary" onclick="guardarConteo()">💾 Guardar conteo/cambios</button>
+  </div>
+</div>
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-label">Productos</div><div class="kpi-value" id="kProd">—</div><div class="kpi-sub" id="kSede">—</div></div>
+  <div class="kpi green"><div class="kpi-label">Valor del inventario</div><div class="kpi-value" id="kValor">—</div><div class="kpi-sub">precio × cantidad</div></div>
+  <div class="kpi orange"><div class="kpi-label">Bajo mínimo</div><div class="kpi-value" id="kBajo">—</div><div class="kpi-sub">reordenar</div></div>
+  <div class="kpi red"><div class="kpi-label">Faltantes (conteo)</div><div class="kpi-value" id="kFalt">—</div><div class="kpi-sub">conteo &lt; esperado</div></div>
+</div>
+<div class="msg" id="msg"></div>
+<div class="loading" id="loading">Cargando…</div>
+<div class="tbl-wrap"><table class="tbl">
+  <thead><tr><th>Producto</th><th class="num">Precio</th><th class="num">Cantidad</th><th class="num">Mínima</th><th class="num">Conteo físico</th><th class="num">Diferencia</th><th>Estado</th><th></th></tr></thead>
+  <tbody id="body"></tbody>
+</table></div>
+<div style="padding:0 32px 30px;" class="msg">💡 “Cantidad” = stock esperado. Ingrese el <b>conteo físico</b> para detectar faltantes; al guardar, el conteo reemplaza la cantidad. Productos bajo el mínimo se marcan en naranja.</div>
+<script>
+const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
+let currentToken=null,currentRole=null,currentSede=null,currentEmail='';
+async function supaFetch(path,opts={}){
+  const token=currentToken||SUPA_KEY;
+  const res=await fetch(SUPA_URL+'/rest/v1'+path,{method:opts.method||'GET',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':opts.prefer||'return=minimal',...(opts.headers||{})},body:opts.body!=null?JSON.stringify(opts.body):undefined});
+  if(!res.ok){const t=await res.text();throw new Error(t);} const txt=await res.text(); return txt?JSON.parse(txt):null;
+}
+const ROLES_PERMITIDOS=['admin','admin_sedes','admin_g'];
+const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
+const SEDE_META={'3 Ríos':{icon:'🌊'},'Natación':{icon:'🏊'},'Pinares':{icon:'🌲'},'Sabanilla':{icon:'🏙️'}};
+const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let items=[];  // {id?, producto, precio, cantidad, cantidad_minima, moneda, conteo, _nuevo, _mod, _del}
+
+async function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim(),pwd=document.getElementById('loginPassword').value;
+  const btn=document.getElementById('loginBtn'),errEl=document.getElementById('loginError');
+  if(!email||!pwd){errEl.textContent='Complete todos los campos.';return;}
+  btn.textContent='Ingresando...';btn.disabled=true;errEl.textContent='';
+  try{
+    const res=await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password:pwd})});
+    const data=await res.json(); if(!data.access_token)throw new Error(data.error_description||data.msg||'Credenciales incorrectas');
+    currentToken=data.access_token;currentEmail=email;
+    const roles=await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede`);
+    currentRole=roles?.[0]?.role||null;currentSede=roles?.[0]?.sede||null;
+    if(!ROLES_PERMITIDOS.includes(currentRole)){errEl.textContent='Solo administradores tienen acceso al inventario.';await doLogout(true);return;}
+    document.getElementById('userNombre').textContent=roles?.[0]?.nombre||email;
+    document.getElementById('loginScreen').style.display='none'; init();
+  }catch(e){errEl.textContent=e.message;}finally{btn.textContent='Entrar';btn.disabled=false;}
+}
+document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+(function(){try{const auth=JSON.parse(sessionStorage.getItem('gymAuth')||'null');
+  if(auth?.token&&ROLES_PERMITIDOS.includes(auth.role)){sessionStorage.removeItem('gymAuth');currentToken=auth.token;currentRole=auth.role;currentSede=auth.sede||null;currentEmail=auth.email||'';
+    document.getElementById('userNombre').textContent=auth.nombre||'—';document.getElementById('loginScreen').style.display='none';setTimeout(init,0);}}catch(_){}})();
+async function doLogout(silent){try{await fetch(`${SUPA_URL}/auth/v1/logout`,{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}});}catch(_){}
+  currentToken=null;currentRole=null;currentSede=null;currentEmail='';
+  if(!silent){document.getElementById('loginEmail').value='';document.getElementById('loginPassword').value='';}document.getElementById('loginScreen').style.display='flex';}
+
+function init(){
+  if(!currentSede)currentSede=SEDES[0];
+  const sel=document.getElementById('sedeSel');
+  sel.innerHTML=SEDES.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
+  sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;load();};
+  document.getElementById('sedeTitle').textContent='· '+currentSede;
+  load();
+}
+async function load(){
+  document.getElementById('loading').style.display='block';
+  try{ const data=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(currentSede)}&order=producto.asc&select=*`))||[];
+    items=data.map(d=>({...d, conteo:'', _mod:false, _del:false})); }
+  catch(e){ document.getElementById('msg').className='msg err'; document.getElementById('msg').textContent='Error: '+e.message; items=[]; }
+  document.getElementById('loading').style.display='none';
+  render();
+}
+
+function estadoDe(it){
+  const cant=Number(it.cantidad)||0, min=Number(it.cantidad_minima)||0;
+  const conteo=it.conteo===''||it.conteo==null?null:Number(it.conteo);
+  if(conteo!=null){ const dif=conteo-cant;
+    if(dif<0) return {cls:'faltante',pill:'falt',txt:`Faltante ${Math.abs(dif)}`,dif};
+    if(dif>0) return {cls:'',pill:'sob',txt:`Sobrante ${dif}`,dif};
+    return {cls:'',pill:'ok',txt:'Cuadra',dif:0};
+  }
+  if(cant<min) return {cls:'bajo',pill:'low',txt:'Reordenar',dif:null};
+  return {cls:'',pill:'ok',txt:'OK',dif:null};
+}
+function render(){
+  const q=(document.getElementById('buscar').value||'').toLowerCase();
+  const vis=items.filter(it=>!it._del && (!q || (it.producto||'').toLowerCase().includes(q)));
+  const tb=document.getElementById('body');
+  tb.innerHTML = vis.length ? vis.map(it=>{ const i=items.indexOf(it); const e=estadoDe(it);
+    return `<tr class="${e.cls}">
+      <td><input class="prod" value="${esc(it.producto)}" oninput="items[${i}].producto=this.value;items[${i}]._mod=true"></td>
+      <td class="num"><input type="number" step="1" value="${it.precio??0}" oninput="items[${i}].precio=this.value;items[${i}]._mod=true;render()"></td>
+      <td class="num"><input type="number" step="1" value="${it.cantidad??0}" oninput="items[${i}].cantidad=this.value;items[${i}]._mod=true;render()"></td>
+      <td class="num"><input type="number" step="1" value="${it.cantidad_minima??0}" oninput="items[${i}].cantidad_minima=this.value;items[${i}]._mod=true;render()"></td>
+      <td class="num"><input type="number" step="1" placeholder="—" value="${it.conteo}" oninput="items[${i}].conteo=this.value;render()"></td>
+      <td class="num" style="font-weight:700;color:${e.dif==null?'#999':e.dif<0?'#c62828':e.dif>0?'#1565c0':'#2e7d32'};">${e.dif==null?'—':(e.dif>0?'+':'')+e.dif}</td>
+      <td><span class="pill ${e.pill}">${e.txt}</span></td>
+      <td><button class="btn-del" onclick="items[${i}]._del=true;render()">🗑</button></td>
+    </tr>`; }).join('')
+    : '<tr><td colspan="8" style="padding:16px;color:var(--muted);">Sin productos. Cargue un Excel o agregue con “＋ Producto”.</td></tr>';
+  // KPIs
+  const activos=items.filter(it=>!it._del);
+  document.getElementById('kProd').textContent=activos.length;
+  document.getElementById('kSede').textContent=currentSede;
+  document.getElementById('kValor').textContent=fmt(activos.reduce((a,it)=>a+(Number(it.precio)||0)*(Number(it.cantidad)||0),0));
+  document.getElementById('kBajo').textContent=activos.filter(it=>(Number(it.cantidad)||0)<(Number(it.cantidad_minima)||0)).length;
+  document.getElementById('kFalt').textContent=activos.filter(it=>{const c=it.conteo===''||it.conteo==null?null:Number(it.conteo);return c!=null&&c<(Number(it.cantidad)||0);}).length;
+}
+function addProducto(){ items.unshift({producto:'',precio:0,cantidad:0,cantidad_minima:0,moneda:'CRC',conteo:'',_nuevo:true,_mod:true,_del:false}); render(); }
+
+function cargarExcel(file){
+  const reader=new FileReader();
+  reader.onload=e=>{ try{
+    const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+    let hdr=-1; for(let i=0;i<Math.min(rows.length,10);i++){ if((rows[i]||[]).some(c=>String(c||'').trim().toLowerCase()==='precio')){hdr=i;break;} }
+    if(hdr<0)throw new Error('No se encontró el encabezado (Precio/Cantidad). Verifique el archivo de inventario.');
+    const findCol=(...n)=>rows[hdr].findIndex(c=>{const t=String(c||'').trim().toLowerCase();return n.some(x=>t===x||t.includes(x));});
+    const cProd=findCol('producto'), cPrecio=findCol('precio'), cMin=findCol('mínima','minima'), cMon=findCol('moneda');
+    const cCant=rows[hdr].findIndex(c=>String(c||'').trim().toLowerCase()==='cantidad');
+    let add=0,upd=0;
+    for(let i=hdr+1;i<rows.length;i++){
+      const r=rows[i]; const prod=String(r[cProd]||r[cProd+1]||'').trim();
+      if(!prod)continue;
+      const precio=Number(r[cPrecio])||0, cant=Number(r[cCant])||0, min=Number(cMin>=0?r[cMin]:0)||0, mon=String(cMon>=0?r[cMon]:'CRC').trim()||'CRC';
+      const ex=items.find(it=>(it.producto||'').trim().toLowerCase()===prod.toLowerCase() && !it._del);
+      if(ex){ ex.precio=precio; ex.cantidad=cant; ex.cantidad_minima=min; ex.moneda=mon; ex._mod=true; upd++; }
+      else { items.push({producto:prod,precio,cantidad:cant,cantidad_minima:min,moneda:mon,conteo:'',_nuevo:true,_mod:true,_del:false}); add++; }
+    }
+    document.getElementById('msg').className='msg ok'; document.getElementById('msg').textContent=`✅ Excel cargado: ${add} nuevos, ${upd} actualizados. Revise y presione “Guardar”.`;
+    render();
+  }catch(err){ document.getElementById('msg').className='msg err'; document.getElementById('msg').textContent='⚠️ '+err.message; } };
+  reader.readAsArrayBuffer(file);
+}
+
+async function guardarConteo(){
+  const msg=document.getElementById('msg');
+  // Aplicar conteo físico → cantidad
+  items.forEach(it=>{ if(it.conteo!==''&&it.conteo!=null){ if(Number(it.conteo)!==Number(it.cantidad)){ it.cantidad=Number(it.conteo); it._mod=true; } it.conteo=''; } });
+  try{
+    // Borrados
+    for(const it of items.filter(x=>x._del&&x.id)) await supaFetch(`/inventario?id=eq.${it.id}`,{method:'DELETE'});
+    // Nuevos
+    const nuevos=items.filter(it=>!it._del&&!it.id&&(it.producto||'').trim());
+    if(nuevos.length) await supaFetch('/inventario',{method:'POST',body:nuevos.map(it=>({sede:currentSede,producto:it.producto.trim(),precio:Number(it.precio)||0,cantidad:Number(it.cantidad)||0,cantidad_minima:Number(it.cantidad_minima)||0,moneda:it.moneda||'CRC'}))});
+    // Modificados existentes
+    for(const it of items.filter(x=>!x._del&&x.id&&x._mod)) await supaFetch(`/inventario?id=eq.${it.id}`,{method:'PATCH',body:{producto:(it.producto||'').trim(),precio:Number(it.precio)||0,cantidad:Number(it.cantidad)||0,cantidad_minima:Number(it.cantidad_minima)||0,moneda:it.moneda||'CRC',updated_at:new Date().toISOString()}});
+    msg.className='msg ok'; msg.textContent='✅ Inventario guardado.';
+    await load();
+  }catch(e){ msg.className='msg err'; msg.textContent='⚠️ '+e.message; }
+}
+</script>
+</body>
+</html>
