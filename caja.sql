@@ -32,6 +32,8 @@ create index if not exists cierres_sede_fecha_idx on cierres_caja (sede, fecha d
 -- efectivo_final = efectivo contado - minita. otros_vendidos guarda el minita.
 alter table cierres_caja add column if not exists efectivo_final numeric default 0;
 alter table cierres_caja add column if not exists otros_vendidos numeric default 0;
+-- sobre_retirado: true si el efectivo contado YA tiene el sobre (minita) retirado.
+alter table cierres_caja add column if not exists sobre_retirado boolean default false;
 
 -- 2) Inventario por sede ------------------------------------------------------
 create table if not exists inventario (
