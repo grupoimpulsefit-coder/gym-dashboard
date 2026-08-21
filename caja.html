@@ -65,7 +65,8 @@ table.denom tfoot td:last-child { border-radius:0 0 10px 0; }
 
 .line { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
 .line input.desc { flex:1; padding:7px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; }
-.line input.monto { width:120px; padding:7px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; text-align:right; }
+.line input.monto { width:110px; padding:7px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; text-align:right; }
+.line select.gcat { padding:7px 8px; border:1.5px solid var(--border); border-radius:8px; font-size:12px; font-weight:600; color:var(--primary); background:#fbfdff; max-width:160px; }
 .line-total { display:flex; justify-content:space-between; font-weight:800; border-top:2px solid var(--primary); padding-top:8px; margin-top:6px; }
 
 .hero { background:linear-gradient(155deg,#0b2a45 0%,#0e5f7a 55%,#0e7490 100%); color:white; border:none; box-shadow:0 16px 38px rgba(11,42,69,.34); position:relative; overflow:hidden; }
@@ -268,6 +269,7 @@ const ROLES_PERMITIDOS=['recepcion','admin_sedes','admin_g','admin'];
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_META={'3 Ríos':{icon:'🌊'},'Natación':{icon:'🏊'},'Pinares':{icon:'🌲'},'Sabanilla':{icon:'🏙️'}};
 const DENOMS=[20000,10000,5000,2000,1000,500,100,50,25,10,5];
+const CATS_GASTO=[{id:'clases_grupales',label:'🧘 Clases grupales'},{id:'instructores_planta',label:'🏋️ Instructores de planta'},{id:'parqueo',label:'🅿️ Parqueo'},{id:'mantenimiento',label:'🔧 Mantenimiento'},{id:'otros',label:'📦 Otros'}];
 const MESES_ES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(currentRole);
 const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
@@ -276,7 +278,7 @@ function parseFecha(s){const[y,m,d]=String(s).split('-').map(Number);return new 
 function mesEt(d){return MESES_ES[d.getMonth()]+' '+d.getFullYear();}
 function mesOrd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
 
-let gastos=[{desc:'',monto:''}], ingresos=[{desc:'',monto:''}], cierres=[], turnoActual=null;
+let gastos=[{desc:'',monto:'',cat:'otros'}], ingresos=[{desc:'',monto:''}], cierres=[], turnoActual=null;
 const todayStr=()=>new Date().toISOString().slice(0,10);
 
 // ── Login ──
@@ -459,11 +461,13 @@ function calc(){
 // ── Gastos / Ingresos dinámicos ──
 function renderGastos(){
   document.getElementById('gastosLines').innerHTML=gastos.map((g,i)=>`
-    <div class="line"><input class="desc" placeholder="Descripción" value="${esc(g.desc)}" oninput="gastos[${i}].desc=this.value">
+    <div class="line">
+    <select class="gcat" onchange="gastos[${i}].cat=this.value">${CATS_GASTO.map(c=>`<option value="${c.id}"${(g.cat||'otros')===c.id?' selected':''}>${c.label}</option>`).join('')}</select>
+    <input class="desc" placeholder="Descripción" value="${esc(g.desc)}" oninput="gastos[${i}].desc=this.value">
     <input class="monto" type="number" step="1" placeholder="0" value="${g.monto}" oninput="gastos[${i}].monto=this.value;calc()">
     <button class="btn-del" onclick="gastos.splice(${i},1);renderGastos();calc()">🗑</button></div>`).join('');
 }
-function addGasto(){gastos.push({desc:'',monto:''});renderGastos();}
+function addGasto(){gastos.push({desc:'',monto:'',cat:'otros'});renderGastos();}
 function renderIngresos(){
   document.getElementById('ingresosLines').innerHTML=ingresos.map((g,i)=>`
     <div class="line"><input class="desc" placeholder="Descripción" value="${esc(g.desc)}" oninput="ingresos[${i}].desc=this.value">
@@ -480,7 +484,7 @@ function nuevoCierre(){
   document.getElementById('cSobreRetirado').checked=false;
   window._informeVentas=null;
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=0;});
-  gastos=[{desc:'',monto:''}]; ingresos=[{desc:'',monto:''}]; renderGastos(); renderIngresos();
+  gastos=[{desc:'',monto:'',cat:'otros'}]; ingresos=[{desc:'',monto:''}]; renderGastos(); renderIngresos();
   const ultimo=cierres[0];
   const cajaIni=ultimo?Number(ultimo.efectivo)||0:0;
   document.getElementById('cCajaInicial').value=cajaIni;
@@ -620,7 +624,7 @@ async function cerrarTurno(estado){
   if(document.getElementById('cTarjeta').value===''||document.getElementById('cSinpe').value===''){ msg.className='msg err'; msg.textContent='Incluya el monto de Tarjeta y SINPE (ponga 0 si no hubo).'; return; }
   const c=calc();
   const denominaciones={}; DENOMS.forEach(d=>denominaciones[d]=Number(document.getElementById('den_'+d).value)||0);
-  const gastosLimpios=gastos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Gasto de caja',monto:Number(g.monto)||0}));
+  const gastosLimpios=gastos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Gasto de caja',monto:Number(g.monto)||0,cat:g.cat||'otros'}));
   const ingresosLimpios=ingresos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Ingreso',monto:Number(g.monto)||0}));
   const payload={
     membresias:c.membresias, total_ventas:c.totalVentas,
@@ -637,7 +641,7 @@ async function cerrarTurno(estado){
     await supaFetch(`/cierres_caja?id=eq.${turnoActual.id}`,{method:'PATCH',body:payload});
     if(gastosLimpios.length){
       const d=parseFecha(fecha);
-      const filas=gastosLimpios.map(g=>({ sede:currentSede, categoria:'otros', fecha_clase:fecha, mes:mesEt(d), mes_orden:mesOrd(d),
+      const filas=gastosLimpios.map(g=>({ sede:currentSede, categoria:g.cat||'otros', fecha_clase:fecha, mes:mesEt(d), mes_orden:mesOrd(d),
         emisor:g.desc, documento_cobro:'Cierre de caja', numero_factura:null, monto:g.monto, metodo_pago:'caja', banco_pago:'Pago de caja', cuenta_pago:null, created_by:currentEmail||null }));
       try{ await supaFetch('/gastos',{method:'POST',body:filas}); }catch(ge){ console.warn('gastos:',ge.message); }
     }
@@ -673,7 +677,7 @@ function cargarCierre(id){
   document.getElementById('cTotalVentas').value=c.total_ventas||0;
   document.getElementById('cSobreRetirado').checked=!!c.sobre_retirado;
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=(c.denominaciones&&c.denominaciones[d])||0;});
-  gastos=(c.gastos&&c.gastos.length?c.gastos:[{desc:'',monto:''}]).map(g=>({desc:g.desc,monto:g.monto}));
+  gastos=(c.gastos&&c.gastos.length?c.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc,monto:g.monto,cat:g.cat||'otros'}));
   ingresos=(c.ingresos&&c.ingresos.length?c.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc,monto:g.monto}));
   renderGastos(); renderIngresos(); calc();
   window.scrollTo({top:0,behavior:'smooth'});
