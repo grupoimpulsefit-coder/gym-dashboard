@@ -128,7 +128,7 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
     <label>📅 Fecha:</label><input type="date" id="cFecha">
     <label>Turno:</label><input type="text" id="cTurno" placeholder="Mañana / Tarde" style="width:120px;text-align:left;">
   </div>
-  <div class="topbar-controls">
+  <div class="topbar-controls" id="topUploads">
     <label class="btn-ghost" for="fileVentas" style="cursor:pointer;">📤 Informe de Ventas</label>
     <input type="file" id="fileVentas" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarInformeVentas(this.files[0])">
     <label class="btn-ghost" for="fileVentasProd" style="cursor:pointer;">📦 Ventas por Producto</label>
@@ -146,6 +146,13 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
 </div>
 
 <div class="loading" id="loading">Cargando…</div>
+
+<div id="gate" style="display:none;text-align:center;padding:70px 24px;">
+  <div style="font-size:64px;margin-bottom:10px;">🔒</div>
+  <div style="font-size:22px;font-weight:800;color:var(--primary);">La caja está cerrada</div>
+  <div style="color:var(--muted);margin:8px auto 24px;max-width:480px;line-height:1.5;">Para comenzar el día debes <b>abrir el turno</b>: contar el <b>efectivo inicial</b> y el <b>inventario</b>. Hasta que abras la caja no podrás registrar ventas ni el cierre.</div>
+  <button class="btn-primary" style="font-size:15px;padding:13px 30px;" onclick="openAbrirModal()">🔓 Abrir turno</button>
+</div>
 
 <div class="wrap" id="app">
 
@@ -353,6 +360,11 @@ function cargarTurnoEnForm(t){
 function checkTurno(){
   turnoActual=cierres.find(c=>c.estado==='abierto')||null;
   updateTurnoUI();
+  // Recepción no ve el módulo hasta abrir la caja
+  const gated = !turnoActual && currentRole==='recepcion';
+  document.getElementById('gate').style.display = gated?'block':'none';
+  document.getElementById('app').style.display = gated?'none':'block';
+  const up=document.getElementById('topUploads'); if(up) up.style.display = gated?'none':'flex';
   if(turnoActual) cargarTurnoEnForm(turnoActual);
   else { document.getElementById('cCajaInicial').readOnly=false; nuevoCierre(); }
 }
