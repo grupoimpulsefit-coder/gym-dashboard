@@ -91,3 +91,37 @@ create policy inventario_recep_update on inventario
   for update to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = inventario.sede))
   with check (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = inventario.sede));
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  Envíos de mercadería (admin envía → recepción acepta; suma stock al aceptar)
+-- ══════════════════════════════════════════════════════════════════════════
+create table if not exists envios_mercaderia (
+  id           uuid primary key default gen_random_uuid(),
+  sede         text not null,                 -- sede destino
+  estado       text default 'pendiente',      -- 'pendiente' | 'aceptado'
+  items        jsonb not null,                -- [ { producto, enviado, recibido } ]
+  nota         text,                          -- nota de recepción (faltantes, etc.)
+  created_by   text,
+  created_at   timestamptz default now(),
+  aceptado_por text,
+  aceptado_at  timestamptz
+);
+create index if not exists envios_sede_estado_idx on envios_mercaderia (sede, estado);
+
+alter table envios_mercaderia enable row level security;
+-- Admin: crea, lee y gestiona todo
+drop policy if exists envios_admin on envios_mercaderia;
+create policy envios_admin on envios_mercaderia
+  for all to authenticated
+  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('admin','admin_sedes','admin_g')))
+  with check (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('admin','admin_sedes','admin_g')));
+-- Recepción: ve y acepta (update) los envíos de SU sede; no puede crearlos
+drop policy if exists envios_recep_select on envios_mercaderia;
+create policy envios_recep_select on envios_mercaderia
+  for select to authenticated
+  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = envios_mercaderia.sede));
+drop policy if exists envios_recep_update on envios_mercaderia;
+create policy envios_recep_update on envios_mercaderia
+  for update to authenticated
+  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = envios_mercaderia.sede))
+  with check (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = envios_mercaderia.sede));

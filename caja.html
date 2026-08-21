@@ -145,6 +145,25 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
   </div>
 </div>
 
+<div id="enviosBanner" style="display:none;padding:12px 32px;background:#fff8e1;border-bottom:1px solid #f2e3b0;"></div>
+
+<!-- Modal recibir mercadería -->
+<div id="recibirModal" style="display:none;position:fixed;inset:0;background:rgba(15,20,35,.55);z-index:10000;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
+  <div style="background:white;border-radius:16px;width:100%;max-width:540px;box-shadow:0 32px 80px rgba(0,0,0,.4);overflow:hidden;margin:auto;">
+    <div style="background:linear-gradient(135deg,#b9770e,#e67e22);color:white;padding:16px 22px;font-size:16px;font-weight:800;">📥 Recibir mercadería</div>
+    <div style="padding:18px 22px;max-height:64vh;overflow-y:auto;">
+      <div class="hint" style="margin-bottom:8px;">Confirme lo que <b>realmente llegó</b>. No puede cambiar lo enviado; solo indica lo recibido. El stock se suma con lo recibido.</div>
+      <div id="recibirList"></div>
+      <div class="f-field" style="margin-top:10px;"><label style="font-size:11px;font-weight:700;color:#555;">Nota (opcional, ej. faltantes)</label><input type="text" id="recibirNota" style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:9px;"></div>
+      <div id="recibirErr" style="color:var(--warn);font-size:13px;min-height:16px;margin-top:8px;"></div>
+    </div>
+    <div style="padding:14px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);">
+      <button class="btn-ghost" onclick="document.getElementById('recibirModal').style.display='none'">Cancelar</button>
+      <button class="btn-primary" id="btnAceptarEnvio" onclick="aceptarEnvio()">📥 Aceptar y sumar al stock</button>
+    </div>
+  </div>
+</div>
+
 <div class="loading" id="loading">Cargando…</div>
 
 <div id="gate" style="display:none;text-align:center;padding:70px 24px;">
@@ -666,7 +685,53 @@ async function cerrarTurno(estado){
 async function loadCierres(){
   try{ cierres=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(currentSede)}&order=fecha.desc,created_at.desc&limit=30&select=*`))||[]; }
   catch(_){ cierres=[]; }
-  renderHist(); checkTurno();
+  renderHist(); checkTurno(); loadEnviosCaja();
+}
+
+// ── Envíos de mercadería por recibir ──
+async function loadEnviosCaja(){
+  try{ window._enviosPend=(await supaFetch(`/envios_mercaderia?sede=eq.${encodeURIComponent(currentSede)}&estado=eq.pendiente&order=created_at.desc&select=*`))||[]; }catch(_){ window._enviosPend=[]; }
+  renderEnviosBanner();
+}
+function renderEnviosBanner(){
+  const b=document.getElementById('enviosBanner'); const list=window._enviosPend||[];
+  if(!list.length){ b.style.display='none'; return; }
+  b.style.display='block';
+  b.innerHTML=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><span style="font-weight:800;color:#b9770e;">🚚 ${list.length} envío(s) de mercadería por recibir</span>`
+    + list.map(e=>`<button class="btn-primary" style="background:linear-gradient(135deg,#b9770e,#e67e22);" onclick="openRecibir('${e.id}')">📥 Recibir (${(e.items||[]).length} prod · ${new Date(e.created_at).toLocaleDateString('es-CR')})</button>`).join(' ')
+    + `</div>`;
+}
+function openRecibir(id){
+  const env=(window._enviosPend||[]).find(e=>e.id===id); if(!env)return; window._envioActual=env;
+  document.getElementById('recibirList').innerHTML=(env.items||[]).map((it,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid #f2f5f9;">
+      <span style="flex:1;font-size:13px;">${esc(it.producto)}</span>
+      <span style="font-size:12px;color:var(--muted);">enviado <b>${it.enviado}</b></span>
+      <input type="number" min="0" step="1" id="rec_${i}" value="${it.enviado}" style="width:82px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:right;font-weight:700;">
+    </div>`).join('');
+  document.getElementById('recibirNota').value=''; document.getElementById('recibirErr').textContent='';
+  document.getElementById('recibirModal').style.display='flex';
+}
+async function aceptarEnvio(){
+  const env=window._envioActual; if(!env)return;
+  const inputs=[...document.querySelectorAll('#recibirList input[id^="rec_"]')];
+  const items=(env.items||[]).map((it,i)=>({...it, recibido:Number(inputs[i].value)||0}));
+  const nota=document.getElementById('recibirNota').value.trim()||null;
+  const btn=document.getElementById('btnAceptarEnvio'); btn.disabled=true; btn.textContent='Procesando...';
+  try{
+    const inv=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(currentSede)}&select=id,producto,cantidad`))||[];
+    const byName={}; inv.forEach(p=>byName[normP(p.producto)]=p);
+    const noExiste=[];
+    for(const it of items){ if(!(it.recibido>0))continue; const p=byName[normP(it.producto)];
+      if(p) await supaFetch(`/inventario?id=eq.${p.id}`,{method:'PATCH',body:{cantidad:(Number(p.cantidad)||0)+it.recibido,updated_at:new Date().toISOString()}});
+      else noExiste.push(it.producto); }
+    await supaFetch(`/envios_mercaderia?id=eq.${env.id}`,{method:'PATCH',body:{estado:'aceptado',items,nota,aceptado_por:currentEmail||null,aceptado_at:new Date().toISOString()}});
+    document.getElementById('recibirModal').style.display='none';
+    const sm=document.getElementById('saveMsg'); sm.className='msg ok';
+    sm.textContent='📥 Envío recibido y sumado al stock.'+(noExiste.length?` ⚠ No estaban en inventario: ${noExiste.join(', ')}.`:'');
+    loadEnviosCaja();
+  }catch(e){ document.getElementById('recibirErr').textContent='No se pudo: '+e.message; }
+  finally{ btn.disabled=false; btn.textContent='📥 Aceptar y sumar al stock'; }
 }
 function renderHist(){
   const tb=document.getElementById('histBody');

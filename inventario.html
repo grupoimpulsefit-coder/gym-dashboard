@@ -84,6 +84,7 @@ tr.bajo td { background:#fff8e1; } tr.faltante td { background:#fdecea; }
     <label class="btn-ghost" for="fileInv" style="cursor:pointer;">📤 Cargar Excel</label>
     <input type="file" id="fileInv" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarExcel(this.files[0])">
     <button class="btn-ghost" onclick="addProducto()">＋ Producto</button>
+    <button class="btn-ghost" onclick="openEnvioModal()">🚚 Enviar mercadería</button>
     <button class="btn-primary" onclick="guardarConteo()">💾 Guardar conteo/cambios</button>
   </div>
 </div>
@@ -99,7 +100,31 @@ tr.bajo td { background:#fff8e1; } tr.faltante td { background:#fdecea; }
   <thead><tr><th>Producto</th><th class="num">Precio</th><th class="num">Cantidad</th><th class="num">Mínima</th><th class="num">Conteo físico</th><th class="num">Diferencia</th><th>Estado</th><th></th></tr></thead>
   <tbody id="body"></tbody>
 </table></div>
-<div style="padding:0 32px 30px;" class="msg">💡 “Cantidad” = stock esperado. Ingrese el <b>conteo físico</b> para detectar faltantes; al guardar, el conteo reemplaza la cantidad. Productos bajo el mínimo se marcan en naranja.</div>
+<div style="padding:0 32px 20px;" class="msg">💡 “Cantidad” = stock esperado. Ingrese el <b>conteo físico</b> para detectar faltantes; al guardar, el conteo reemplaza la cantidad. Productos bajo el mínimo se marcan en naranja.</div>
+
+<div class="section"><div class="section-title">🚚 Envíos de mercadería</div></div>
+<div class="tbl-wrap"><table class="tbl">
+  <thead><tr><th>Fecha</th><th>Productos</th><th>Estado</th><th>Recibido</th><th></th></tr></thead>
+  <tbody id="enviosBody"></tbody>
+</table></div>
+<div style="padding:0 32px 40px;" class="msg">El stock <b>no se suma</b> hasta que recepción acepte el envío en el módulo de Caja, indicando lo que realmente llegó.</div>
+
+<!-- Modal enviar mercadería -->
+<div id="envioModal" style="display:none;position:fixed;inset:0;background:rgba(15,20,35,.55);z-index:10000;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
+  <div style="background:white;border-radius:16px;width:100%;max-width:540px;box-shadow:0 32px 80px rgba(0,0,0,.4);overflow:hidden;margin:auto;">
+    <div style="background:linear-gradient(135deg,#b9770e,#e67e22);color:white;padding:16px 22px;font-size:16px;font-weight:800;">🚚 Enviar mercadería <span id="envioSedeLbl" style="font-weight:600;opacity:.9;"></span></div>
+    <div style="padding:18px 22px;max-height:64vh;overflow-y:auto;">
+      <div class="msg" style="margin-bottom:8px;">Indique cuánto se envía de cada producto. Recepción lo aceptará y confirmará lo que llegó.</div>
+      <div id="envioList"></div>
+      <div id="envioErr" style="color:var(--warn);font-size:13px;min-height:16px;margin-top:8px;"></div>
+    </div>
+    <div style="padding:14px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);">
+      <button class="btn-ghost" onclick="document.getElementById('envioModal').style.display='none'">Cancelar</button>
+      <button class="btn-primary" id="btnEnviar" onclick="crearEnvio()">🚚 Enviar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
 let currentToken=null,currentRole=null,currentSede=null,currentEmail='';
@@ -153,7 +178,50 @@ async function load(){
     items=data.map(d=>({...d, conteo:'', _mod:false, _del:false})); }
   catch(e){ document.getElementById('msg').className='msg err'; document.getElementById('msg').textContent='Error: '+e.message; items=[]; }
   document.getElementById('loading').style.display='none';
-  render();
+  render(); loadEnvios();
+}
+
+// ── Envíos de mercadería ──
+let envios=[];
+async function loadEnvios(){
+  try{ envios=(await supaFetch(`/envios_mercaderia?sede=eq.${encodeURIComponent(currentSede)}&order=created_at.desc&limit=25&select=*`))||[]; }catch(_){ envios=[]; }
+  renderEnvios();
+}
+function renderEnvios(){
+  const tb=document.getElementById('enviosBody'); if(!tb)return;
+  if(!envios.length){ tb.innerHTML='<tr><td colspan="5" style="padding:14px;color:var(--muted);">Sin envíos.</td></tr>'; return; }
+  tb.innerHTML=envios.map(e=>{
+    const prods=(e.items||[]).map(it=>`${esc(it.producto)} (${it.enviado})`).join(', ');
+    const recibido=e.estado==='aceptado'?(e.items||[]).map(it=>`${esc(it.producto)}: ${it.recibido==null?'—':it.recibido}`).join(', '):'—';
+    const badge=e.estado==='aceptado'?'<span class="pill ok">aceptado</span>':'<span class="pill low" style="background:#fff3e0;color:#e65100;">pendiente</span>';
+    return `<tr><td>${new Date(e.created_at).toLocaleDateString('es-CR')}</td><td style="font-size:12px;max-width:300px;">${prods}</td><td>${badge}</td><td style="font-size:12px;">${recibido}${e.nota?'<br><span style="color:var(--warn);">'+esc(e.nota)+'</span>':''}</td><td></td></tr>`;
+  }).join('');
+}
+function openEnvioModal(){
+  document.getElementById('envioSedeLbl').textContent='· '+currentSede;
+  const prods=items.filter(it=>!it._del&&(it.producto||'').trim());
+  document.getElementById('envioList').innerHTML = prods.length ? prods.map((p,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid #f2f5f9;">
+      <span style="flex:1;font-size:13px;">${esc(p.producto)}</span>
+      <span style="font-size:11px;color:var(--muted);">stock ${p.cantidad||0}</span>
+      <input type="number" min="0" step="1" id="env_${i}" value="0" data-prod="${esc(p.producto)}" style="width:80px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:right;font-weight:700;">
+    </div>`).join('') : '<div style="color:var(--muted);">Agregue productos al inventario primero.</div>';
+  document.getElementById('envioErr').textContent='';
+  document.getElementById('envioModal').style.display='flex';
+}
+async function crearEnvio(){
+  const err=document.getElementById('envioErr');
+  const inputs=[...document.querySelectorAll('#envioList input[id^="env_"]')];
+  const arr=inputs.map(inp=>({producto:inp.getAttribute('data-prod'),enviado:Number(inp.value)||0,recibido:null})).filter(x=>x.enviado>0);
+  if(!arr.length){ err.textContent='Indique la cantidad a enviar de al menos un producto.'; return; }
+  const btn=document.getElementById('btnEnviar'); btn.disabled=true; btn.textContent='Enviando...';
+  try{
+    await supaFetch('/envios_mercaderia',{method:'POST',body:{sede:currentSede,estado:'pendiente',items:arr,created_by:currentEmail||null}});
+    document.getElementById('envioModal').style.display='none';
+    document.getElementById('msg').className='msg ok'; document.getElementById('msg').textContent=`🚚 Envío creado (${arr.length} producto(s)). Pendiente de que recepción lo acepte.`;
+    loadEnvios();
+  }catch(e){ err.textContent='No se pudo enviar: '+e.message; }
+  finally{ btn.disabled=false; btn.textContent='🚚 Enviar'; }
 }
 
 function estadoDe(it){
