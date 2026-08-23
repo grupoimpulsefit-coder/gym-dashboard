@@ -42,7 +42,9 @@ alter table cierres_caja add column if not exists hora_cierre timestamptz;
 alter table cierres_caja add column if not exists inventario_apertura jsonb;      -- conteo físico a ciegas al abrir { producto: { contado, sistema } }
 alter table cierres_caja add column if not exists denominaciones_apertura jsonb;   -- desglose de billetes/monedas del efectivo inicial
 -- Reporte SINPE del cierre (obligatorio en cierre final): resumen enviado/registrado/comparación.
-alter table cierres_caja add column if not exists sinpe_reporte jsonb;             -- { fileName, totalN, totalMonto, yaRegN, yaRegMonto, nuevosN, nuevosMonto }
+alter table cierres_caja add column if not exists sinpe_reporte jsonb;             -- { fileName, totalN, totalMonto, yaRegN, yaRegMonto, nuevosN, nuevosMonto, facturado, pendPrev, pendAfter }
+-- Saldo SINPE pendiente por facturar (se arrastra al siguiente cierre): pendAfter = pendPrev + recibido_nuevo - facturado.
+alter table cierres_caja add column if not exists sinpe_pendiente numeric;
 
 -- 2) Inventario por sede ------------------------------------------------------
 create table if not exists inventario (

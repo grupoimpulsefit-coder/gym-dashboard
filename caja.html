@@ -198,7 +198,7 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
 
       <div class="card" id="sinpeCard">
         <h3>🔷 Reporte SINPE del día</h3>
-        <div class="hint" id="sinpeHint">Cargue el <b>Reporte SINPE</b> (obligatorio para el cierre final). Se comparan los montos con el SINPE del cierre y se guardan las <b>referencias</b> para no volver a contar un SINPE que aparezca en el archivo de otro día.</div>
+        <div class="hint" id="sinpeHint">Cargue el <b>Reporte SINPE</b> (obligatorio para el cierre final). Cada referencia se registra una sola vez; el saldo <b>pendiente por facturar</b> se arrastra al siguiente cierre, así que no importa si un SINPE se factura otro día o si el reporte se sube en el parcial.</div>
         <div id="sinpeResumen"></div>
       </div>
 
@@ -524,7 +524,7 @@ function nuevoCierre(){
   document.getElementById('cSobreRetirado').checked=false;
   window._informeVentas=null; window._sinpeReporte=null;
   document.getElementById('sinpeResumen').innerHTML='';
-  document.getElementById('sinpeHint').innerHTML='Cargue el <b>Reporte SINPE</b> (obligatorio para el cierre final). Se comparan los montos con el SINPE del cierre y se guardan las <b>referencias</b> para no volver a contar un SINPE que aparezca en el archivo de otro día.';
+  document.getElementById('sinpeHint').innerHTML='Cargue el <b>Reporte SINPE</b> (obligatorio para el cierre final). Cada referencia se registra una sola vez; el saldo <b>pendiente por facturar</b> se arrastra al siguiente cierre, así que no importa si un SINPE se factura otro día o si el reporte se sube en el parcial.';
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=0;});
   gastos=[{desc:'',monto:'',cat:'otros'}]; ingresos=[{desc:'',monto:''}]; renderGastos(); renderIngresos();
   const ultimo=cierres[0];
@@ -591,10 +591,17 @@ async function cargarReporteSinpe(file){
       catch(err){ hintEl.innerHTML='⚠ No se pudieron leer las referencias registradas: '+esc(err.message)+' (¿corrió el SQL de <code>sinpe_registrados</code>?).'; window._sinpeReporte=null; renderSinpeResumen(); return; }
       const nuevos=all.filter(x=>!yaSet.has(x.referencia));
       const yaReg=all.filter(x=>yaSet.has(x.referencia));
+      // Recibidos nuevos que traen fecha de transacción anterior al día del cierre (llegaron antes, se confirman ahora).
+      const cierreDate=document.getElementById('cFecha').value;
+      let nuevosPrev=0, nuevosPrevMonto=0;
+      nuevos.forEach(x=>{ const d=parseDateCR(String(x.fecha_tx||'').split(/\s+/)[0]); if(d && cierreDate){ const iso=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; if(iso<cierreDate){ nuevosPrev++; nuevosPrevMonto+=x.monto; } } });
+      // Saldo pendiente por facturar arrastrado del cierre anterior (excluye el turno actual, aún sin guardar).
+      let pendPrev=0;
+      try{ const prev=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(currentSede)}&sinpe_pendiente=not.is.null${turnoActual?`&id=neq.${turnoActual.id}`:''}&order=fecha.desc,created_at.desc&limit=1&select=sinpe_pendiente`))||[]; if(prev.length)pendPrev=Number(prev[0].sinpe_pendiente)||0; }catch(_){}
       window._sinpeReporte={ fileName:file.name, all, nuevos,
         nuevosMonto:nuevos.reduce((s,x)=>s+x.monto,0),
         yaRegN:yaReg.length, yaRegMonto:yaReg.reduce((s,x)=>s+x.monto,0),
-        totalN:all.length, totalMonto:all.reduce((s,x)=>s+x.monto,0) };
+        totalN:all.length, totalMonto:all.reduce((s,x)=>s+x.monto,0), pendPrev, nuevosPrev, nuevosPrevMonto };
       renderSinpeResumen();
     }catch(err){ hintEl.innerHTML='⚠ '+esc(err.message); window._sinpeReporte=null; renderSinpeResumen(); }
   };
@@ -603,14 +610,23 @@ async function cargarReporteSinpe(file){
 function renderSinpeResumen(){
   const box=document.getElementById('sinpeResumen'); const s=window._sinpeReporte;
   if(!s){ box.innerHTML=''; return; }
-  const sinpeCierre=Math.round(Number(document.getElementById('cSinpe').value)||0);
-  const dif=s.nuevosMonto-sinpeCierre, okDif=dif===0;
+  const facturado=Math.round(Number(document.getElementById('cSinpe').value)||0);
+  const pendPrev=Math.round(s.pendPrev||0);
+  const pendAfter=pendPrev+s.nuevosMonto-facturado;
+  // pendiente positivo = SINPE recibido aún sin facturar (normal); negativo = se facturó más de lo recibido (revisar).
+  let bg,cl,ic,txt;
+  if(pendAfter<0){ bg='#fdecec'; cl='#b91c1c'; ic='⚠'; txt='Se facturó más SINPE del recibido — revisar'; }
+  else if(pendAfter===0){ bg='#eafaf0'; cl='#166534'; ic='✓'; txt='Todo el SINPE recibido está facturado'; }
+  else { bg='#eef4ff'; cl='#1e40af'; ic='🕒'; txt='SINPE recibido pendiente de facturar (se factura después)'; }
   box.innerHTML=`
     <div style="margin-top:8px;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;">
       <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#f4fbf9;font-weight:700;"><span>📄 ${esc(s.fileName)}</span><span>${s.totalN} mov · ${fmt(s.totalMonto)}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:7px 12px;color:var(--muted);"><span>Ya registrados (otros días)</span><span>${s.yaRegN} · ${fmt(s.yaRegMonto)}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:8px 12px;font-weight:800;color:var(--primary);border-top:1px dashed var(--border);"><span>🆕 Nuevos SINPE a registrar</span><span>${s.nuevos.length} · ${fmt(s.nuevosMonto)}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:9px 12px;background:${okDif?'#eafaf0':'#fdecec'};color:${okDif?'#166534':'#b91c1c'};font-weight:800;border-top:1px solid var(--border);"><span>${okDif?'✓ Calza':'⚠ Difiere'} vs SINPE del cierre (${fmt(sinpeCierre)})</span><span>${okDif?'':'Dif '+fmt(Math.abs(dif))}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--muted);"><span>Ya registrados (no se recuentan)</span><span>${s.yaRegN} · ${fmt(s.yaRegMonto)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 12px;font-weight:700;color:var(--primary);border-top:1px dashed var(--border);"><span>🆕 SINPE recibidos nuevos</span><span>${s.nuevos.length} · ${fmt(s.nuevosMonto)}</span></div>
+      ${s.nuevosPrev?`<div style="display:flex;justify-content:space-between;padding:4px 12px 6px;font-size:11px;color:#b45309;"><span>🔁 incluye ${s.nuevosPrev} de días anteriores (confirmados ahora)</span><span>${fmt(s.nuevosPrevMonto)}</span></div>`:''}
+      <div style="display:flex;justify-content:space-between;padding:6px 12px;"><span>Facturado hoy (cierre)</span><span>${fmt(facturado)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--muted);"><span>Pendiente arrastrado</span><span>${fmt(pendPrev)}</span></div>
+      <div style="padding:9px 12px;background:${bg};color:${cl};font-weight:800;border-top:1px solid var(--border);"><div style="display:flex;justify-content:space-between;"><span>${ic} Pendiente por facturar</span><span>${fmt(pendAfter)}</span></div><div style="font-weight:600;font-size:11px;margin-top:2px;opacity:.9;">${txt}</div></div>
     </div>`;
 }
 
@@ -729,7 +745,11 @@ async function cerrarTurno(estado){
     informe_ventas:window._informeVentas||null, estado, hora_cierre:new Date().toISOString()
   };
   const sr=window._sinpeReporte;
-  if(sr) payload.sinpe_reporte={ fileName:sr.fileName, totalN:sr.totalN, totalMonto:sr.totalMonto, yaRegN:sr.yaRegN, yaRegMonto:sr.yaRegMonto, nuevosN:sr.nuevos.length, nuevosMonto:sr.nuevosMonto };
+  if(sr){
+    const pendAfter=Math.round((sr.pendPrev||0)+sr.nuevosMonto-c.sinpe);
+    payload.sinpe_pendiente=pendAfter;
+    payload.sinpe_reporte={ fileName:sr.fileName, totalN:sr.totalN, totalMonto:sr.totalMonto, yaRegN:sr.yaRegN, yaRegMonto:sr.yaRegMonto, nuevosN:sr.nuevos.length, nuevosMonto:sr.nuevosMonto, facturado:Math.round(c.sinpe), pendPrev:Math.round(sr.pendPrev||0), pendAfter };
+  }
   const btn=estado==='final'?document.getElementById('btnFinal'):document.getElementById('btnParcial');
   const bt0=btn.textContent; btn.disabled=true; btn.textContent='Guardando...';
   try{
