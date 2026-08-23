@@ -34,6 +34,8 @@ alter table cierres_caja add column if not exists efectivo_final numeric default
 alter table cierres_caja add column if not exists otros_vendidos numeric default 0;
 -- sobre_retirado: true si el efectivo contado YA tiene el sobre (minita) retirado.
 alter table cierres_caja add column if not exists sobre_retirado boolean default false;
+-- sobre_modo: 'retira' (se saca hoy, aún en el efectivo) | 'ya' (ya retirado del conteo) | 'no' (no se sacaron sobres, queda en caja).
+alter table cierres_caja add column if not exists sobre_modo text default 'retira';
 -- Ciclo de turno: apertura obligatoria (efectivo + inventario contado) y cierre parcial/final con horas.
 alter table cierres_caja add column if not exists turno_num int;
 alter table cierres_caja add column if not exists estado text default 'final';   -- 'abierto' | 'parcial' | 'final'

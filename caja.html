@@ -189,9 +189,12 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
         <div class="f-row"><label>Total SINPE (₡)</label><input type="number" id="cSinpe" step="1" oninput="calc()"></div>
         <div class="f-row"><label>TOTAL ventas (₡)</label><input type="number" id="cTotalVentas" step="1" oninput="calc()"></div>
         <div class="hint" id="ventasHint"></div>
-        <div class="f-row" style="justify-content:flex-start;gap:9px;margin-top:8px;">
-          <input type="checkbox" id="cSobreRetirado" style="width:auto;transform:scale(1.15);" onchange="calc()">
-          <label for="cSobreRetirado" style="cursor:pointer;font-weight:600;">El sobre (minita) ya se retiró del efectivo contado</label>
+        <div class="f-row"><label>Sobre (minita)</label>
+          <select id="cSobreModo" onchange="calc()" style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:9px;">
+            <option value="retira">Se retira hoy (aún está en el efectivo contado)</option>
+            <option value="ya">Ya se retiró del efectivo contado</option>
+            <option value="no">No se sacaron sobres (queda en caja)</option>
+          </select>
         </div>
         <div class="hint" id="sobreHint" style="margin-top:2px;"></div>
       </div>
@@ -379,7 +382,7 @@ function cargarTurnoEnForm(t){
   document.getElementById('cTurno').value='Turno '+(t.turno_num||'');
   document.getElementById('cCajaInicial').value=t.caja_inicial||0;
   document.getElementById('cCajaInicial').readOnly=true;
-  if(t.total_ventas){ document.getElementById('cMembresias').value=t.membresias||0; document.getElementById('cTarjeta').value=t.total_tarjeta||''; document.getElementById('cSinpe').value=t.total_sinpe||''; document.getElementById('cTotalVentas').value=t.total_ventas||0; document.getElementById('cSobreRetirado').checked=!!t.sobre_retirado; }
+  if(t.total_ventas){ document.getElementById('cMembresias').value=t.membresias||0; document.getElementById('cTarjeta').value=t.total_tarjeta||''; document.getElementById('cSinpe').value=t.total_sinpe||''; document.getElementById('cTotalVentas').value=t.total_ventas||0; document.getElementById('cSobreModo').value=t.sobre_modo||(t.sobre_retirado?'ya':'retira'); }
   if(t.denominaciones) DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=t.denominaciones[d]||0;});
   document.getElementById('cajaInicialHint').textContent='Fijado en la apertura del turno.';
   calc();
@@ -468,10 +471,12 @@ function calc(){
   const totGastos=gastos.reduce((a,g)=>a+(Number(g.monto)||0),0);
   const totIngresos=ingresos.reduce((a,g)=>a+(Number(g.monto)||0),0);
   const minita=totalVentas-membresias;
-  const sobreRetirado=document.getElementById('cSobreRetirado').checked;
-  // Si el sobre YA se retiró, el efectivo contado no incluye el minita → se suma para reconciliar.
-  // Si no, el efectivo contado aún incluye el minita (no se suma) y el efectivo final lo descuenta.
-  const sobreOut=sobreRetirado?minita:0;
+  const sobreModo=document.getElementById('cSobreModo').value;   // 'retira' | 'ya' | 'no'
+  const sobreRetirado=sobreModo==='ya';                          // compat con datos previos
+  // 'ya': el conteo NO incluye el minita → se suma para reconciliar; efectivo final = efectivo.
+  // 'retira': el conteo incluye el minita (se saca en sobres) → efectivo final lo descuenta.
+  // 'no': no se sacaron sobres → la minita queda en caja; no se descuenta ni se suma aparte.
+  const sobreOut=sobreModo==='ya'?minita:0;
   const conciliado=efectivo+tarjeta+sinpe+sobreOut+totGastos-totIngresos-cajaIni;
   const diferencia=totalVentas-conciliado;
   document.getElementById('rEfectivo').textContent=fmt(efectivo);
@@ -487,15 +492,16 @@ function calc(){
   document.getElementById('totIngresos').textContent=fmt(totIngresos);
   const ok=Math.round(diferencia)===0;
   document.getElementById('rEstado').innerHTML=ok?'<span class="badge-ok">✓ Caja cuadra</span>':`<span class="badge-dif">⚠ Diferencia ${fmt(diferencia)}</span>`;
-  // Efectivo final: si el sobre ya se retiró, es el efectivo tal cual; si no, se descuenta el minita.
-  const efectivoFinal=sobreRetirado?efectivo:(efectivo-minita);
+  // Efectivo final: solo se descuenta la minita cuando el sobre se retira hoy ('retira').
+  const efectivoFinal=(sobreModo==='retira')?(efectivo-minita):efectivo;
   document.getElementById('rEfectivoFinal').textContent=fmt(efectivoFinal);
   document.getElementById('rOtros').textContent=fmt(sobreOut);
   if(window._sinpeReporte)renderSinpeResumen();
-  document.getElementById('sobreHint').textContent = sobreRetirado
-    ? 'El conteo no incluye el minita (ya en sobres). Efectivo final = efectivo contado.'
+  document.getElementById('sobreHint').textContent =
+    sobreModo==='ya' ? 'El conteo no incluye el minita (ya en sobres). Efectivo final = efectivo contado.'
+    : sobreModo==='no' ? 'No se sacaron sobres: la minita queda en caja. No se descuenta; el efectivo final es el efectivo contado.'
     : 'El conteo incluye el minita; el efectivo final le descuenta ese monto (se retira en sobres).';
-  return {efectivo,tarjeta,sinpe,totalVentas,cajaIni,membresias,totGastos,totIngresos,conciliado,diferencia,minita,ok,efectivoFinal,otros:minita,sobreRetirado};
+  return {efectivo,tarjeta,sinpe,totalVentas,cajaIni,membresias,totGastos,totIngresos,conciliado,diferencia,minita,ok,efectivoFinal,otros:minita,sobreOut,sobreRetirado,sobreModo};
 }
 
 // ── Gastos / Ingresos dinámicos ──
@@ -521,7 +527,7 @@ function nuevoCierre(){
   document.getElementById('cFecha').value=new Date().toISOString().slice(0,10);
   document.getElementById('cTurno').value='';
   ['cMembresias','cTarjeta','cSinpe','cTotalVentas'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('cSobreRetirado').checked=false;
+  document.getElementById('cSobreModo').value='retira';
   window._informeVentas=null; window._sinpeReporte=null;
   document.getElementById('sinpeResumen').innerHTML='';
   document.getElementById('sinpeHint').innerHTML='Cargue el <b>Reporte SINPE</b> (obligatorio para el cierre final). Cada referencia se registra una sola vez; el saldo <b>pendiente por facturar</b> se arrastra al siguiente cierre, así que no importa si un SINPE se factura otro día o si el reporte se sube en el parcial.';
@@ -740,7 +746,7 @@ async function cerrarTurno(estado){
     total_tarjeta:c.tarjeta, total_sinpe:c.sinpe, efectivo:c.efectivo,
     denominaciones, gastos:gastosLimpios, ingresos:ingresosLimpios,
     total_gastos:c.totGastos, total_ingresos:c.totIngresos, minita:c.minita,
-    efectivo_final:c.efectivoFinal, otros_vendidos:c.otros, sobre_retirado:c.sobreRetirado,
+    efectivo_final:c.efectivoFinal, otros_vendidos:c.otros, sobre_retirado:c.sobreRetirado, sobre_modo:c.sobreModo,
     diferencia:Math.round(c.diferencia), estado_dif:c.ok?'OK':'Diferencia',
     informe_ventas:window._informeVentas||null, estado, hora_cierre:new Date().toISOString()
   };
@@ -843,7 +849,7 @@ function cargarCierre(id){
   document.getElementById('cCajaInicial').value=c.caja_inicial||0; document.getElementById('cMembresias').value=c.membresias||0;
   document.getElementById('cTarjeta').value=c.total_tarjeta||0; document.getElementById('cSinpe').value=c.total_sinpe||0;
   document.getElementById('cTotalVentas').value=c.total_ventas||0;
-  document.getElementById('cSobreRetirado').checked=!!c.sobre_retirado;
+  document.getElementById('cSobreModo').value=c.sobre_modo||(c.sobre_retirado?'ya':'retira');
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=(c.denominaciones&&c.denominaciones[d])||0;});
   gastos=(c.gastos&&c.gastos.length?c.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc,monto:g.monto,cat:g.cat||'otros'}));
   ingresos=(c.ingresos&&c.ingresos.length?c.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc,monto:g.monto}));
@@ -906,7 +912,7 @@ function generarPDF(){
   row('TOTAL MINITA / OTROS (sobre)',c.minita,'92D050',{sz:12});
   row('TOTAL EFECTIVO FINAL',c.efectivoFinal,'A9D08E',{sz:13});
   y+=4; doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(130);
-  doc.text(c.sobreRetirado?'El efectivo contado ya tiene el sobre (minita) retirado.':'El efectivo final descuenta el minita (se retira en sobres).',X+11,y);
+  doc.text(c.sobreModo==='ya'?'El efectivo contado ya tiene el sobre (minita) retirado.':c.sobreModo==='no'?'No se sacaron sobres: la minita queda en caja (no se descuenta).':'El efectivo final descuenta el minita (se retira en sobres).',X+11,y);
   doc.save(`cierre_${currentSede.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'_')}_${document.getElementById('cFecha').value}.pdf`);
 }
 </script>
