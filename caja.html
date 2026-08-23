@@ -133,6 +133,8 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
     <input type="file" id="fileVentas" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarInformeVentas(this.files[0])">
     <label class="btn-ghost" for="fileVentasProd" style="cursor:pointer;">📦 Ventas por Producto</label>
     <input type="file" id="fileVentasProd" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarVentasProducto(this.files[0])">
+    <label class="btn-ghost" for="fileSinpe" style="cursor:pointer;">🔷 Reporte SINPE</label>
+    <input type="file" id="fileSinpe" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarReporteSinpe(this.files[0])">
     <button class="btn-ghost" onclick="loadCierres()">↻ Recargar</button>
   </div>
 </div>
@@ -192,6 +194,12 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
           <label for="cSobreRetirado" style="cursor:pointer;font-weight:600;">El sobre (minita) ya se retiró del efectivo contado</label>
         </div>
         <div class="hint" id="sobreHint" style="margin-top:2px;"></div>
+      </div>
+
+      <div class="card" id="sinpeCard">
+        <h3>🔷 Reporte SINPE del día</h3>
+        <div class="hint" id="sinpeHint">Cargue el <b>Reporte SINPE</b> (obligatorio para el cierre final). Se comparan los montos con el SINPE del cierre y se guardan las <b>referencias</b> para no volver a contar un SINPE que aparezca en el archivo de otro día.</div>
+        <div id="sinpeResumen"></div>
       </div>
 
       <div class="card">
@@ -483,6 +491,7 @@ function calc(){
   const efectivoFinal=sobreRetirado?efectivo:(efectivo-minita);
   document.getElementById('rEfectivoFinal').textContent=fmt(efectivoFinal);
   document.getElementById('rOtros').textContent=fmt(sobreOut);
+  if(window._sinpeReporte)renderSinpeResumen();
   document.getElementById('sobreHint').textContent = sobreRetirado
     ? 'El conteo no incluye el minita (ya en sobres). Efectivo final = efectivo contado.'
     : 'El conteo incluye el minita; el efectivo final le descuenta ese monto (se retira en sobres).';
@@ -513,7 +522,9 @@ function nuevoCierre(){
   document.getElementById('cTurno').value='';
   ['cMembresias','cTarjeta','cSinpe','cTotalVentas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('cSobreRetirado').checked=false;
-  window._informeVentas=null;
+  window._informeVentas=null; window._sinpeReporte=null;
+  document.getElementById('sinpeResumen').innerHTML='';
+  document.getElementById('sinpeHint').innerHTML='Cargue el <b>Reporte SINPE</b> (obligatorio para el cierre final). Se comparan los montos con el SINPE del cierre y se guardan las <b>referencias</b> para no volver a contar un SINPE que aparezca en el archivo de otro día.';
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=0;});
   gastos=[{desc:'',monto:'',cat:'otros'}]; ingresos=[{desc:'',monto:''}]; renderGastos(); renderIngresos();
   const ultimo=cierres[0];
@@ -551,6 +562,56 @@ function cargarInformeVentas(file){
     }catch(err){alert('Error al leer el archivo: '+err.message);}
   };
   reader.readAsArrayBuffer(file);
+}
+
+// ── Reporte SINPE (obligatorio en cierre final): dedup por ReferenciaSinpe + comparación ──
+function normHdr(s){ return String(s||'').toLowerCase().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n').replace(/\s+/g,' ').trim(); }
+async function cargarReporteSinpe(file){
+  const hintEl=document.getElementById('sinpeHint');
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      let hdr=-1,cRef=-1,cMonto=-1,cFecha=-1,cDet=-1;
+      for(let i=0;i<Math.min(rows.length,15);i++){ const nm=(rows[i]||[]).map(normHdr);
+        const ri=nm.findIndex(c=>c.includes('referencia')); const mi=nm.findIndex(c=>c==='monto');
+        if(ri>=0&&mi>=0){ hdr=i; cRef=ri; cMonto=mi; cFecha=nm.findIndex(c=>c.includes('fecha')&&c.includes('transacc')); if(cFecha<0)cFecha=nm.findIndex(c=>c.includes('fecha')); cDet=nm.findIndex(c=>c==='detalle'); break; } }
+      if(hdr<0)throw new Error('No se encontró el encabezado con "ReferenciaSinpe" y "Monto". ¿Es el reporte SINPE?');
+      const seen=new Set(); const all=[];
+      for(let i=hdr+1;i<rows.length;i++){ const r=rows[i]; if(!r)continue;
+        const ref=String(r[cRef]==null?'':r[cRef]).trim(); if(!ref)continue;
+        if(seen.has(ref))continue; seen.add(ref);                     // dedup dentro del mismo archivo
+        all.push({ referencia:ref, monto:Math.round(Number(r[cMonto])||0),
+          fecha_tx:cFecha>=0?String(r[cFecha]||'').trim():'', detalle:cDet>=0?String(r[cDet]||'').trim():'' });
+      }
+      if(!all.length)throw new Error('El reporte no tiene filas de SINPE.');
+      let yaSet=new Set();
+      try{ const reg=(await supaFetch(`/sinpe_registrados?sede=eq.${encodeURIComponent(currentSede)}&select=referencia`))||[]; reg.forEach(x=>yaSet.add(String(x.referencia))); }
+      catch(err){ hintEl.innerHTML='⚠ No se pudieron leer las referencias registradas: '+esc(err.message)+' (¿corrió el SQL de <code>sinpe_registrados</code>?).'; window._sinpeReporte=null; renderSinpeResumen(); return; }
+      const nuevos=all.filter(x=>!yaSet.has(x.referencia));
+      const yaReg=all.filter(x=>yaSet.has(x.referencia));
+      window._sinpeReporte={ fileName:file.name, all, nuevos,
+        nuevosMonto:nuevos.reduce((s,x)=>s+x.monto,0),
+        yaRegN:yaReg.length, yaRegMonto:yaReg.reduce((s,x)=>s+x.monto,0),
+        totalN:all.length, totalMonto:all.reduce((s,x)=>s+x.monto,0) };
+      renderSinpeResumen();
+    }catch(err){ hintEl.innerHTML='⚠ '+esc(err.message); window._sinpeReporte=null; renderSinpeResumen(); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function renderSinpeResumen(){
+  const box=document.getElementById('sinpeResumen'); const s=window._sinpeReporte;
+  if(!s){ box.innerHTML=''; return; }
+  const sinpeCierre=Math.round(Number(document.getElementById('cSinpe').value)||0);
+  const dif=s.nuevosMonto-sinpeCierre, okDif=dif===0;
+  box.innerHTML=`
+    <div style="margin-top:8px;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#f4fbf9;font-weight:700;"><span>📄 ${esc(s.fileName)}</span><span>${s.totalN} mov · ${fmt(s.totalMonto)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:7px 12px;color:var(--muted);"><span>Ya registrados (otros días)</span><span>${s.yaRegN} · ${fmt(s.yaRegMonto)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;font-weight:800;color:var(--primary);border-top:1px dashed var(--border);"><span>🆕 Nuevos SINPE a registrar</span><span>${s.nuevos.length} · ${fmt(s.nuevosMonto)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:9px 12px;background:${okDif?'#eafaf0':'#fdecec'};color:${okDif?'#166534':'#b91c1c'};font-weight:800;border-top:1px solid var(--border);"><span>${okDif?'✓ Calza':'⚠ Difiere'} vs SINPE del cierre (${fmt(sinpeCierre)})</span><span>${okDif?'':'Dif '+fmt(Math.abs(dif))}</span></div>
+    </div>`;
 }
 
 // ── Ventas por Producto → auto-llena el cierre y actualiza el snapshot de la sede ──
@@ -653,6 +714,7 @@ async function cerrarTurno(estado){
   if(!turnoActual){ msg.className='msg err'; msg.textContent='Primero abra el turno.'; return; }
   const fecha=document.getElementById('cFecha').value;
   if(document.getElementById('cTarjeta').value===''||document.getElementById('cSinpe').value===''){ msg.className='msg err'; msg.textContent='Incluya el monto de Tarjeta y SINPE (ponga 0 si no hubo).'; return; }
+  if(estado==='final'&&!window._sinpeReporte){ msg.className='msg err'; msg.textContent='Para el cierre final debe cargar el 🔷 Reporte SINPE del día.'; return; }
   const c=calc();
   const denominaciones={}; DENOMS.forEach(d=>denominaciones[d]=Number(document.getElementById('den_'+d).value)||0);
   const gastosLimpios=gastos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Gasto de caja',monto:Number(g.monto)||0,cat:g.cat||'otros'}));
@@ -666,6 +728,8 @@ async function cerrarTurno(estado){
     diferencia:Math.round(c.diferencia), estado_dif:c.ok?'OK':'Diferencia',
     informe_ventas:window._informeVentas||null, estado, hora_cierre:new Date().toISOString()
   };
+  const sr=window._sinpeReporte;
+  if(sr) payload.sinpe_reporte={ fileName:sr.fileName, totalN:sr.totalN, totalMonto:sr.totalMonto, yaRegN:sr.yaRegN, yaRegMonto:sr.yaRegMonto, nuevosN:sr.nuevos.length, nuevosMonto:sr.nuevosMonto };
   const btn=estado==='final'?document.getElementById('btnFinal'):document.getElementById('btnParcial');
   const bt0=btn.textContent; btn.disabled=true; btn.textContent='Guardando...';
   try{
@@ -676,7 +740,14 @@ async function cerrarTurno(estado){
         emisor:g.desc, documento_cobro:'Cierre de caja', numero_factura:null, monto:g.monto, metodo_pago:'caja', banco_pago:'Pago de caja', cuenta_pago:null, created_by:currentEmail||null }));
       try{ await supaFetch('/gastos',{method:'POST',body:filas}); }catch(ge){ console.warn('gastos:',ge.message); }
     }
-    msg.className='msg ok'; msg.textContent=(estado==='final'?'⏹️ Turno cerrado (final).':'⏸️ Cierre parcial guardado. Puede abrir el siguiente turno.')+(gastosLimpios.length?` ${gastosLimpios.length} gasto(s) enviados a Gastos.`:'');
+    let sinpeMsg='';
+    if(sr&&sr.nuevos.length){
+      const filas=sr.nuevos.map(x=>({ sede:currentSede, referencia:x.referencia, monto:x.monto, fecha_tx:x.fecha_tx||null, detalle:x.detalle||null, cierre_id:turnoActual.id, created_by:currentEmail||null }));
+      try{ await supaFetch('/sinpe_registrados?on_conflict=sede,referencia',{method:'POST',prefer:'resolution=ignore-duplicates,return=minimal',body:filas});
+        sinpeMsg=` 🔷 ${filas.length} SINPE registrados.`; }
+      catch(se){ sinpeMsg=' ⚠ No se pudieron registrar los SINPE: '+se.message; }
+    }
+    msg.className='msg ok'; msg.textContent=(estado==='final'?'⏹️ Turno cerrado (final).':'⏸️ Cierre parcial guardado. Puede abrir el siguiente turno.')+(gastosLimpios.length?` ${gastosLimpios.length} gasto(s) enviados a Gastos.`:'')+sinpeMsg;
     await loadCierres();
   }catch(e){ msg.className='msg err'; msg.textContent='⚠️ '+e.message; }
   finally{ btn.disabled=false; btn.textContent=bt0; }

@@ -41,6 +41,8 @@ alter table cierres_caja add column if not exists hora_apertura timestamptz;
 alter table cierres_caja add column if not exists hora_cierre timestamptz;
 alter table cierres_caja add column if not exists inventario_apertura jsonb;      -- conteo físico a ciegas al abrir { producto: { contado, sistema } }
 alter table cierres_caja add column if not exists denominaciones_apertura jsonb;   -- desglose de billetes/monedas del efectivo inicial
+-- Reporte SINPE del cierre (obligatorio en cierre final): resumen enviado/registrado/comparación.
+alter table cierres_caja add column if not exists sinpe_reporte jsonb;             -- { fileName, totalN, totalMonto, yaRegN, yaRegMonto, nuevosN, nuevosMonto }
 
 -- 2) Inventario por sede ------------------------------------------------------
 create table if not exists inventario (
@@ -125,3 +127,30 @@ create policy envios_recep_update on envios_mercaderia
   for update to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = envios_mercaderia.sede))
   with check (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = envios_mercaderia.sede));
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  Registro de SINPE (reporte SINPE Móvil): dedup por ReferenciaSinpe.
+--  El reporte es un rango de fechas acumulado; se guardan las referencias ya
+--  contadas para que al recargarlo otro día solo se tomen los SINPE nuevos.
+-- ══════════════════════════════════════════════════════════════════════════
+create table if not exists sinpe_registrados (
+  id          uuid primary key default gen_random_uuid(),
+  sede        text not null,
+  referencia  text not null,               -- ReferenciaSinpe (único por sede)
+  monto       numeric default 0,
+  fecha_tx    text,                         -- fecha de transacción del reporte
+  detalle     text,
+  cierre_id   uuid,                         -- cierre en el que se registró
+  created_by  text,
+  created_at  timestamptz default now()
+);
+create unique index if not exists sinpe_reg_sede_ref_idx on sinpe_registrados (sede, referencia);
+
+alter table sinpe_registrados enable row level security;
+drop policy if exists sinpe_rw on sinpe_registrados;
+create policy sinpe_rw on sinpe_registrados
+  for all to authenticated
+  using (exists (select 1 from user_roles ur where ur.id = auth.uid()
+          and (ur.role in ('admin','admin_sedes','admin_g') or (ur.role='recepcion' and ur.sede = sinpe_registrados.sede))))
+  with check (exists (select 1 from user_roles ur where ur.id = auth.uid()
+          and (ur.role in ('admin','admin_sedes','admin_g') or (ur.role='recepcion' and ur.sede = sinpe_registrados.sede))));
