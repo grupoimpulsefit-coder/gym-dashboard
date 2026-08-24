@@ -698,7 +698,12 @@ async function verFoto(path){
 
 // ── Ventas por Producto → auto-llena el cierre y actualiza el snapshot de la sede ──
 let planPrices={};
-function parseCRC(v){ let s=String(v||'').replace(/[₡€\s]/g,'').replace(/\./g,'').replace(',','.'); let n=parseFloat(s); return isNaN(n)?0:n; }
+function parseCRC(v){
+  if(typeof v==='number') return isFinite(v)?v:0;      // XLSX ya lo entrega como número (con decimales) → no tocar
+  let s=String(v||'').trim().replace(/[₡€\s]/g,'');
+  if(/^\d+\.\d{1,2}$/.test(s)) return parseFloat(s);    // texto tipo "28642.5" → punto es decimal, no miles
+  s=s.replace(/\./g,'').replace(',','.'); let n=parseFloat(s); return isNaN(n)?0:n;
+}
 function parseDateCR(s){ if(!s)return null; s=String(s).trim(); if(s.includes('/')){const p=s.split('/'); if(p.length===3){let y=parseInt(p[2]); if(y<100)y+=2000; const d=new Date(y,parseInt(p[1])-1,parseInt(p[0])); if(!isNaN(d.getTime()))return d;}} return null; }
 function parseRenoDT(s){ if(!s)return null; return parseDateCR(String(s).trim().split(/\s+/)[0]); }
 function normP(n){ return String(n||'').toLowerCase().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n').replace(/\s+/g,' ').trim(); }
