@@ -51,6 +51,8 @@ alter table cierres_caja add column if not exists sinpe_pendiente numeric;
 alter table cierres_caja add column if not exists foto_datafono text;   -- path en Storage (cierre parcial)
 alter table cierres_caja add column if not exists foto_cierre   text;   -- path en Storage (cierre final)
 alter table cierres_caja add column if not exists foto_analisis jsonb;  -- { total_leido, tarjeta, calza, confianza, tipo }
+-- Total de ventas por transferencia (sección "Transferencia" del Informe de Ventas).
+alter table cierres_caja add column if not exists total_transferencia numeric default 0;
 
 -- 2) Inventario por sede ------------------------------------------------------
 create table if not exists inventario (

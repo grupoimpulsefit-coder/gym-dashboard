@@ -187,6 +187,7 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
         <div class="f-row"><label>Membresías (₡)</label><input type="number" id="cMembresias" step="1" oninput="calc()"></div>
         <div class="f-row"><label>Total Tarjeta (₡)</label><input type="number" id="cTarjeta" step="1" oninput="calc()"></div>
         <div class="f-row"><label>Total SINPE (₡)</label><input type="number" id="cSinpe" step="1" oninput="calc()"></div>
+        <div class="f-row"><label>Total Transferencia (₡)</label><input type="number" id="cTransfer" step="1" oninput="calc()"></div>
         <div class="f-row"><label>TOTAL ventas (₡)</label><input type="number" id="cTotalVentas" step="1" oninput="calc()"></div>
         <div class="hint" id="ventasHint"></div>
         <div class="f-row"><label>Sobre (minita)</label>
@@ -237,6 +238,7 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
         <div class="hero-break">
           <div class="hb"><span>Total Tarjeta</span><span id="rTarjeta">₡0</span></div>
           <div class="hb"><span>Total SINPE</span><span id="rSinpe">₡0</span></div>
+          <div class="hb"><span>Total Transferencia</span><span id="rTransfer">₡0</span></div>
           <div class="hb"><span>+ Otros / Minita (sobre)</span><span id="rOtros">₡0</span></div>
           <div class="hb"><span>+ Gastos de caja</span><span id="rGastos">₡0</span></div>
           <div class="hb"><span>− Ingresos extra</span><span id="rIngresos">₡0</span></div>
@@ -390,7 +392,7 @@ function cargarTurnoEnForm(t){
   document.getElementById('cTurno').value='Turno '+(t.turno_num||'');
   document.getElementById('cCajaInicial').value=t.caja_inicial||0;
   document.getElementById('cCajaInicial').readOnly=true;
-  if(t.total_ventas){ document.getElementById('cMembresias').value=t.membresias||0; document.getElementById('cTarjeta').value=t.total_tarjeta||''; document.getElementById('cSinpe').value=t.total_sinpe||''; document.getElementById('cTotalVentas').value=t.total_ventas||0; document.getElementById('cSobreModo').value=t.sobre_modo||(t.sobre_retirado?'ya':'retira'); }
+  if(t.total_ventas){ document.getElementById('cMembresias').value=t.membresias||0; document.getElementById('cTarjeta').value=t.total_tarjeta||''; document.getElementById('cSinpe').value=t.total_sinpe||''; document.getElementById('cTransfer').value=t.total_transferencia||''; document.getElementById('cTotalVentas').value=t.total_ventas||0; document.getElementById('cSobreModo').value=t.sobre_modo||(t.sobre_retirado?'ya':'retira'); }
   if(t.denominaciones) DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=t.denominaciones[d]||0;});
   document.getElementById('cajaInicialHint').textContent='Fijado en la apertura del turno.';
   calc();
@@ -473,6 +475,7 @@ function calc(){
   document.getElementById('efectivoCell').textContent=fmt(efectivo);
   const tarjeta=Number(document.getElementById('cTarjeta').value)||0;
   const sinpe=Number(document.getElementById('cSinpe').value)||0;
+  const transfer=Number(document.getElementById('cTransfer').value)||0;
   const totalVentas=Number(document.getElementById('cTotalVentas').value)||0;
   const cajaIni=Number(document.getElementById('cCajaInicial').value)||0;
   const membresias=Number(document.getElementById('cMembresias').value)||0;
@@ -485,11 +488,12 @@ function calc(){
   // 'retira': el conteo incluye el minita (se saca en sobres) → efectivo final lo descuenta.
   // 'no': no se sacaron sobres → la minita queda en caja; no se descuenta ni se suma aparte.
   const sobreOut=sobreModo==='ya'?minita:0;
-  const conciliado=efectivo+tarjeta+sinpe+sobreOut+totGastos-totIngresos-cajaIni;
+  const conciliado=efectivo+tarjeta+sinpe+transfer+sobreOut+totGastos-totIngresos-cajaIni;
   const diferencia=totalVentas-conciliado;
   document.getElementById('rEfectivo').textContent=fmt(efectivo);
   document.getElementById('rTarjeta').textContent=fmt(tarjeta);
   document.getElementById('rSinpe').textContent=fmt(sinpe);
+  document.getElementById('rTransfer').textContent=fmt(transfer);
   document.getElementById('rGastos').textContent=fmt(totGastos);
   document.getElementById('rIngresos').textContent=fmt(totIngresos);
   document.getElementById('rCajaIni').textContent=fmt(cajaIni);
@@ -510,7 +514,7 @@ function calc(){
     sobreModo==='ya' ? 'El conteo no incluye el minita (ya en sobres). Efectivo final = efectivo contado.'
     : sobreModo==='no' ? 'No se sacaron sobres: la minita queda en caja. No se descuenta; el efectivo final es el efectivo contado.'
     : 'El conteo incluye el minita; el efectivo final le descuenta ese monto (se retira en sobres).';
-  return {efectivo,tarjeta,sinpe,totalVentas,cajaIni,membresias,totGastos,totIngresos,conciliado,diferencia,minita,ok,efectivoFinal,otros:minita,sobreOut,sobreRetirado,sobreModo};
+  return {efectivo,tarjeta,sinpe,transfer,totalVentas,cajaIni,membresias,totGastos,totIngresos,conciliado,diferencia,minita,ok,efectivoFinal,otros:minita,sobreOut,sobreRetirado,sobreModo};
 }
 
 // ── Gastos / Ingresos dinámicos ──
@@ -535,7 +539,7 @@ function addIngreso(){ingresos.push({desc:'',monto:''});renderIngresos();}
 function nuevoCierre(){
   document.getElementById('cFecha').value=new Date().toISOString().slice(0,10);
   document.getElementById('cTurno').value='';
-  ['cMembresias','cTarjeta','cSinpe','cTotalVentas'].forEach(id=>document.getElementById(id).value='');
+  ['cMembresias','cTarjeta','cSinpe','cTransfer','cTotalVentas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('cSobreModo').value='retira';
   window._informeVentas=null; window._sinpeReporte=null; fotoDatafono=null;
   document.getElementById('fotoResumen').innerHTML=''; document.getElementById('fileFoto').value='';
@@ -561,19 +565,20 @@ function cargarInformeVentas(file){
       const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
       let colTotal=-1;
       for(let i=0;i<Math.min(rows.length,15);i++){const idx=rows[i].findIndex(c=>String(c||'').trim().toLowerCase()==='total crc'); if(idx>=0){colTotal=idx;break;}}
-      let efectivo=0,sinpe=0,tarjeta=0;
+      let efectivo=0,sinpe=0,tarjeta=0,transfer=0;
       rows.forEach(r=>{
-        const label=(r||[]).map(c=>String(c||'').trim()).find(t=>/^total\s+(efectivo|sinpe|tarjeta)$/i.test(t));
+        const label=(r||[]).map(c=>String(c||'').trim()).find(t=>/^total\s+(efectivo|sinpe|tarjeta|transferencia)$/i.test(t));
         if(label){const amt=colTotal>=0?(Number(r[colTotal])||0):(Number([...r].reverse().find(x=>typeof x==='number'))||0);
-          const m=label.toLowerCase(); if(m.includes('efectivo'))efectivo=amt; else if(m.includes('sinpe'))sinpe=amt; else if(m.includes('tarjeta'))tarjeta=amt;}
+          const m=label.toLowerCase(); if(m.includes('efectivo'))efectivo=amt; else if(m.includes('sinpe'))sinpe=amt; else if(m.includes('transferencia'))transfer=amt; else if(m.includes('tarjeta'))tarjeta=amt;}
       });
-      const total=efectivo+sinpe+tarjeta;
+      const total=efectivo+sinpe+tarjeta+transfer;
       if(!total){alert('No se encontraron los totales por método en el archivo. Verifique que sea el Informe de Ventas.');return;}
       document.getElementById('cTarjeta').value=Math.round(tarjeta);
       document.getElementById('cSinpe').value=Math.round(sinpe);
+      document.getElementById('cTransfer').value=Math.round(transfer);
       document.getElementById('cTotalVentas').value=Math.round(total);
-      window._informeVentas={efectivo:Math.round(efectivo),sinpe:Math.round(sinpe),tarjeta:Math.round(tarjeta),total:Math.round(total)};
-      document.getElementById('ventasHint').innerHTML=`📄 Informe: Efectivo ${fmt(efectivo)} · Tarjeta ${fmt(tarjeta)} · SINPE ${fmt(sinpe)} · <b>Total ${fmt(total)}</b>. Se autollenaron Tarjeta, SINPE y Total.`;
+      window._informeVentas={efectivo:Math.round(efectivo),sinpe:Math.round(sinpe),tarjeta:Math.round(tarjeta),transfer:Math.round(transfer),total:Math.round(total)};
+      document.getElementById('ventasHint').innerHTML=`📄 Informe: Efectivo ${fmt(efectivo)} · Tarjeta ${fmt(tarjeta)} · SINPE ${fmt(sinpe)} · Transferencia ${fmt(transfer)} · <b>Total ${fmt(total)}</b>. Se autollenaron Tarjeta, SINPE, Transferencia y Total.`;
       calc();
     }catch(err){alert('Error al leer el archivo: '+err.message);}
   };
@@ -799,7 +804,7 @@ async function cerrarTurno(estado){
   const ingresosLimpios=ingresos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Ingreso',monto:Number(g.monto)||0}));
   const payload={
     membresias:c.membresias, total_ventas:c.totalVentas,
-    total_tarjeta:c.tarjeta, total_sinpe:c.sinpe, efectivo:c.efectivo,
+    total_tarjeta:c.tarjeta, total_sinpe:c.sinpe, total_transferencia:c.transfer, efectivo:c.efectivo,
     denominaciones, gastos:gastosLimpios, ingresos:ingresosLimpios,
     total_gastos:c.totGastos, total_ingresos:c.totIngresos, minita:c.minita,
     efectivo_final:c.efectivoFinal, otros_vendidos:c.otros, sobre_retirado:c.sobreRetirado, sobre_modo:c.sobreModo,
@@ -908,7 +913,7 @@ function cargarCierre(id){
   const c=cierres.find(x=>x.id===id); if(!c)return;
   document.getElementById('cFecha').value=c.fecha; document.getElementById('cTurno').value=c.turno||'';
   document.getElementById('cCajaInicial').value=c.caja_inicial||0; document.getElementById('cMembresias').value=c.membresias||0;
-  document.getElementById('cTarjeta').value=c.total_tarjeta||0; document.getElementById('cSinpe').value=c.total_sinpe||0;
+  document.getElementById('cTarjeta').value=c.total_tarjeta||0; document.getElementById('cSinpe').value=c.total_sinpe||0; document.getElementById('cTransfer').value=c.total_transferencia||0;
   document.getElementById('cTotalVentas').value=c.total_ventas||0;
   document.getElementById('cSobreModo').value=c.sobre_modo||(c.sobre_retirado?'ya':'retira');
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=(c.denominaciones&&c.denominaciones[d])||0;});
@@ -962,6 +967,7 @@ function generarPDF(){
   row('Efectivo contado',c.efectivo,'ECECEC');
   row('Total Tarjeta',c.tarjeta,'FFE699');
   row('Total Sinpe',c.sinpe,'9DC3E6');
+  row('Total Transferencia',c.transfer,'B4C7E7');
   row('TOTAL ventas',c.totalVentas,'F4B183');
   y+=3; const bw=210, bx=X+(W-bw)/2; const[br,bg,bb]=hex(c.ok?'C6EFCE':'FFC7CE');
   doc.setFillColor(br,bg,bb); doc.roundedRect(bx,y-RH+6,bw,RH,6,6,'F');
