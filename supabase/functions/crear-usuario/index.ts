@@ -21,8 +21,8 @@ const CORS = {
 };
 
 const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
-const ROLES = ['recepcion', 'colaborador', 'admin_sedes', 'admin', 'empleado'];
-const ROLES_CON_SEDE = ['recepcion', 'empleado'];
+const ROLES = ['recepcion', 'admin_sucursal', 'colaborador', 'admin_sedes', 'admin', 'empleado'];
+const ROLES_CON_SEDE = ['recepcion', 'admin_sucursal', 'empleado'];
 
 function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), {
@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
       id: uid,
       role,
       nombre: nombre || email,
-      sede: role === 'recepcion' ? sede : null,
+      sede: ['recepcion', 'admin_sucursal'].includes(role) ? sede : null,
     });
     if (insErr) {
       // Rollback: borrar el usuario auth para no dejar cuentas huérfanas
@@ -94,8 +94,9 @@ Deno.serve(async (req) => {
       return json({ error: 'No se pudo asignar el rol: ' + insErr.message }, 400);
     }
 
-    // Para empleados: ligar la ficha de empleado existente (por correo) a esta cuenta
-    if (role === 'empleado') {
+    // Para empleados (y admin de sucursal): ligar la ficha de empleado existente
+    // (por correo) a esta cuenta, para que el portal de vacaciones lo encuentre.
+    if (role === 'empleado' || role === 'admin_sucursal') {
       await admin.from('empleados').update({ user_id: uid }).eq('correo', email).is('user_id', null);
     }
 

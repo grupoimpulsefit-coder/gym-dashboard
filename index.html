@@ -603,6 +603,7 @@
             <div><label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Rol *</label>
                 <select id="ccRole" onchange="ccToggleSede()" style="width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:14px;background:white;">
                     <option value="recepcion">🧾 Recepción (una sede)</option>
+                    <option value="admin_sucursal">🏪 Admin de sucursal (una sede)</option>
                     <option value="colaborador">👁 Colaborador</option>
                     <option value="admin_sedes">🏢 Admin Sedes</option>
                     <option value="admin">⚙ Admin</option>
@@ -722,7 +723,7 @@ async function supaFetch(path, opts = {}) {
 // ══════════════════════════════════════════════════════
 //  AUTH
 // ══════════════════════════════════════════════════════
-let currentToken = null, currentRole = null, currentUserEmail = '', currentSede = null;
+let currentToken = null, currentRole = null, currentUserEmail = '', currentSede = null, currentUserId = null;
 
 async function doLogin() {
     const email = document.getElementById('loginEmail').value.trim();
@@ -741,6 +742,7 @@ async function doLogin() {
         if (!data.access_token) throw new Error(data.error_description || data.msg || 'Credenciales incorrectas');
         currentToken     = data.access_token;
         currentUserEmail = data.user?.email || email;
+        currentUserId    = data.user?.id || null;
         sessionStorage.setItem('supa_token', currentToken);
 
         // Obtener rol
@@ -755,6 +757,7 @@ async function doLogin() {
             currentRole === 'admin_sedes' ? '🏢 Admin Sedes' :
             currentRole === 'recepcion' ? '🧾 Recepción' :
             currentRole === 'admin_g' ? '💰 Admin Gastos' :
+            currentRole === 'admin_sucursal' ? '🏪 Admin Sucursal' :
             currentRole === 'empleado' ? '👤 Empleado' : '👁 Colaborador';
         applyRole();
         document.getElementById('loginScreen').style.display = 'none';
@@ -793,7 +796,7 @@ function openCrearCuentaModal() {
 }
 function ccToggleSede() {
     document.getElementById('ccSedeWrap').style.display =
-        document.getElementById('ccRole').value === 'recepcion' ? '' : 'none';
+        ['recepcion','admin_sucursal'].includes(document.getElementById('ccRole').value) ? '' : 'none';
 }
 async function crearCuenta() {
     const msg = document.getElementById('ccMsg');
@@ -801,7 +804,7 @@ async function crearCuenta() {
     const email = document.getElementById('ccEmail').value.trim();
     const password = document.getElementById('ccPassword').value;
     const role = document.getElementById('ccRole').value;
-    const sede = role === 'recepcion' ? document.getElementById('ccSede').value : null;
+    const sede = ['recepcion','admin_sucursal'].includes(role) ? document.getElementById('ccSede').value : null;
     if (!email || !password) { msg.style.color='#c62828'; msg.textContent='Correo y contraseña son obligatorios.'; return; }
     if (password.length < 6) { msg.style.color='#c62828'; msg.textContent='La contraseña debe tener al menos 6 caracteres.'; return; }
     const btn = document.getElementById('ccBtn');
@@ -900,7 +903,7 @@ async function showSedePicker() {
             sessionStorage.setItem('gymAuth', JSON.stringify({
                 token: currentToken, role: currentRole,
                 nombre: document.getElementById('userNombre').textContent,
-                email: currentUserEmail, sede: currentSede
+                email: currentUserEmail, sede: currentSede, user_id: currentUserId
             }));
             window.location.href = path;
         };
@@ -912,6 +915,15 @@ async function showSedePicker() {
         statusEl.textContent = 'Módulos disponibles para su sede' + (currentSede ? ` (${currentSede})` : '') + ':';
         cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
         cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
+        return;
+    }
+
+    // Admin de sucursal: solo Caja y Gastos de su sede (sin proyecciones ni otras sedes)
+    if (currentRole === 'admin_sucursal') {
+        statusEl.textContent = 'Módulos de su sucursal' + (currentSede ? ` (${currentSede})` : '') + ':';
+        cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
+        cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar / ver gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
+        cardsEl.appendChild(makeHandoffCard('🌴','Mi Portal','Mis vacaciones','Ver saldo y solicitar días libres','#e8f7ee','#2e7d32','/rrhh'));
         return;
     }
 

@@ -98,7 +98,7 @@ create policy gastos_select on gastos
   using (
     exists (select 1 from user_roles ur where ur.id = auth.uid()
             and (ur.role in ('admin','admin_sedes','admin_g')
-                 or (ur.role = 'recepcion' and ur.sede = gastos.sede)))
+                 or (ur.role in ('recepcion','admin_sucursal') and ur.sede = gastos.sede)))
   );
 
 drop policy if exists gastos_insert on gastos;
@@ -107,7 +107,7 @@ create policy gastos_insert on gastos
   with check (
     exists (select 1 from user_roles ur where ur.id = auth.uid()
             and (ur.role in ('admin','admin_sedes','admin_g')
-                 or (ur.role = 'recepcion' and ur.sede = gastos.sede)))
+                 or (ur.role in ('recepcion','admin_sucursal') and ur.sede = gastos.sede)))
   );
 
 -- Solo admin / admin_sedes pueden eliminar gastos (recepción no)

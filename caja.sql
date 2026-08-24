@@ -47,6 +47,10 @@ alter table cierres_caja add column if not exists denominaciones_apertura jsonb;
 alter table cierres_caja add column if not exists sinpe_reporte jsonb;             -- { fileName, totalN, totalMonto, yaRegN, yaRegMonto, nuevosN, nuevosMonto, facturado, pendPrev, pendAfter }
 -- Saldo SINPE pendiente por facturar (se arrastra al siguiente cierre): pendAfter = pendPrev + recibido_nuevo - facturado.
 alter table cierres_caja add column if not exists sinpe_pendiente numeric;
+-- Foto de auditoría del datáfono (parcial) y del cierre (final) + resultado del análisis con IA.
+alter table cierres_caja add column if not exists foto_datafono text;   -- path en Storage (cierre parcial)
+alter table cierres_caja add column if not exists foto_cierre   text;   -- path en Storage (cierre final)
+alter table cierres_caja add column if not exists foto_analisis jsonb;  -- { total_leido, tarjeta, calza, confianza, tipo }
 
 -- 2) Inventario por sede ------------------------------------------------------
 create table if not exists inventario (
@@ -76,9 +80,9 @@ drop policy if exists cierres_rw on cierres_caja;
 create policy cierres_rw on cierres_caja
   for all to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid()
-          and (ur.role in ('admin','admin_sedes','admin_g') or (ur.role='recepcion' and ur.sede = cierres_caja.sede))))
+          and (ur.role in ('admin','admin_sedes','admin_g') or (ur.role in ('recepcion','admin_sucursal') and ur.sede = cierres_caja.sede))))
   with check (exists (select 1 from user_roles ur where ur.id = auth.uid()
-          and (ur.role in ('admin','admin_sedes','admin_g') or (ur.role='recepcion' and ur.sede = cierres_caja.sede))));
+          and (ur.role in ('admin','admin_sedes','admin_g') or (ur.role in ('recepcion','admin_sucursal') and ur.sede = cierres_caja.sede))));
 
 alter table inventario enable row level security;
 drop policy if exists inventario_rw on inventario;
@@ -91,12 +95,12 @@ create policy inventario_rw on inventario
 drop policy if exists inventario_recep_select on inventario;
 create policy inventario_recep_select on inventario
   for select to authenticated
-  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = inventario.sede));
+  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('recepcion','admin_sucursal') and ur.sede = inventario.sede));
 drop policy if exists inventario_recep_update on inventario;
 create policy inventario_recep_update on inventario
   for update to authenticated
-  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = inventario.sede))
-  with check (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = inventario.sede));
+  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('recepcion','admin_sucursal') and ur.sede = inventario.sede))
+  with check (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('recepcion','admin_sucursal') and ur.sede = inventario.sede));
 
 -- ══════════════════════════════════════════════════════════════════════════
 --  Envíos de mercadería (admin envía → recepción acepta; suma stock al aceptar)
@@ -125,12 +129,12 @@ create policy envios_admin on envios_mercaderia
 drop policy if exists envios_recep_select on envios_mercaderia;
 create policy envios_recep_select on envios_mercaderia
   for select to authenticated
-  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = envios_mercaderia.sede));
+  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('recepcion','admin_sucursal') and ur.sede = envios_mercaderia.sede));
 drop policy if exists envios_recep_update on envios_mercaderia;
 create policy envios_recep_update on envios_mercaderia
   for update to authenticated
-  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = envios_mercaderia.sede))
-  with check (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role = 'recepcion' and ur.sede = envios_mercaderia.sede));
+  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('recepcion','admin_sucursal') and ur.sede = envios_mercaderia.sede))
+  with check (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('recepcion','admin_sucursal') and ur.sede = envios_mercaderia.sede));
 
 -- ══════════════════════════════════════════════════════════════════════════
 --  Registro de SINPE (reporte SINPE Móvil): dedup por ReferenciaSinpe.
@@ -155,6 +159,20 @@ drop policy if exists sinpe_rw on sinpe_registrados;
 create policy sinpe_rw on sinpe_registrados
   for all to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid()
-          and (ur.role in ('admin','admin_sedes','admin_g') or (ur.role='recepcion' and ur.sede = sinpe_registrados.sede))))
+          and (ur.role in ('admin','admin_sedes','admin_g') or (ur.role in ('recepcion','admin_sucursal') and ur.sede = sinpe_registrados.sede))))
   with check (exists (select 1 from user_roles ur where ur.id = auth.uid()
-          and (ur.role in ('admin','admin_sedes','admin_g') or (ur.role='recepcion' and ur.sede = sinpe_registrados.sede))));
+          and (ur.role in ('admin','admin_sedes','admin_g') or (ur.role in ('recepcion','admin_sucursal') and ur.sede = sinpe_registrados.sede))));
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  Storage: fotos de auditoría/cierre del datáfono (bucket privado 'cierres-caja')
+-- ══════════════════════════════════════════════════════════════════════════
+insert into storage.buckets (id, name, public) values ('cierres-caja', 'cierres-caja', false)
+  on conflict (id) do nothing;
+
+drop policy if exists cierres_fotos_rw on storage.objects;
+create policy cierres_fotos_rw on storage.objects
+  for all to authenticated
+  using (bucket_id = 'cierres-caja' and exists (select 1 from user_roles ur where ur.id = auth.uid()
+          and ur.role in ('recepcion','admin_sucursal','admin_sedes','admin_g','admin')))
+  with check (bucket_id = 'cierres-caja' and exists (select 1 from user_roles ur where ur.id = auth.uid()
+          and ur.role in ('recepcion','admin_sucursal','admin_sedes','admin_g','admin')));

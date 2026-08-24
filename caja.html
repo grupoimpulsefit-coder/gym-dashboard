@@ -205,6 +205,14 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
         <div id="sinpeResumen"></div>
       </div>
 
+      <div class="card" id="fotoCard">
+        <h3>📸 Foto del datáfono</h3>
+        <div class="hint" id="fotoHint">Obligatoria para cerrar (parcial: <b>auditoría</b> del datáfono · final: <b>cierre de lote</b>). Se sube y la IA lee el total para compararlo con Total Tarjeta.</div>
+        <label class="btn-ghost" for="fileFoto" style="cursor:pointer;display:inline-block;margin-top:6px;">📷 Tomar / subir foto</label>
+        <input type="file" id="fileFoto" accept="image/*" capture="environment" style="display:none;" onchange="if(this.files[0])onFotoDatafono(this.files[0])">
+        <div id="fotoResumen"></div>
+      </div>
+
       <div class="card">
         <h3>Billetes y monedas</h3>
         <table class="denom">
@@ -302,7 +310,7 @@ async function supaFetch(path,opts={}){
   const res=await fetch(SUPA_URL+'/rest/v1'+path,{method:opts.method||'GET',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':opts.prefer||'return=minimal',...(opts.headers||{})},body:opts.body!=null?JSON.stringify(opts.body):undefined});
   if(!res.ok){const t=await res.text();throw new Error(t);} const txt=await res.text(); return txt?JSON.parse(txt):null;
 }
-const ROLES_PERMITIDOS=['recepcion','admin_sedes','admin_g','admin'];
+const ROLES_PERMITIDOS=['recepcion','admin_sucursal','admin_sedes','admin_g','admin'];
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_META={'3 Ríos':{icon:'🌊'},'Natación':{icon:'🏊'},'Pinares':{icon:'🌲'},'Sabanilla':{icon:'🏙️'}};
 const DENOMS=[20000,10000,5000,2000,1000,500,100,50,25,10,5];
@@ -315,7 +323,7 @@ function parseFecha(s){const[y,m,d]=String(s).split('-').map(Number);return new 
 function mesEt(d){return MESES_ES[d.getMonth()]+' '+d.getFullYear();}
 function mesOrd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
 
-let gastos=[{desc:'',monto:'',cat:'otros'}], ingresos=[{desc:'',monto:''}], cierres=[], turnoActual=null;
+let gastos=[{desc:'',monto:'',cat:'otros'}], ingresos=[{desc:'',monto:''}], cierres=[], turnoActual=null, fotoDatafono=null;
 const todayStr=()=>new Date().toISOString().slice(0,10);
 
 // ── Login ──
@@ -331,7 +339,7 @@ async function doLogin(){
     const roles=await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede`);
     currentRole=roles?.[0]?.role||null;currentSede=roles?.[0]?.sede||null;
     if(!ROLES_PERMITIDOS.includes(currentRole)){errEl.textContent='Su cuenta no tiene acceso a este módulo.';await doLogout(true);return;}
-    if(currentRole==='recepcion'&&!currentSede){errEl.textContent='Su cuenta de recepción no tiene sede asignada.';await doLogout(true);return;}
+    if((currentRole==='recepcion'||currentRole==='admin_sucursal')&&!currentSede){errEl.textContent='Su cuenta no tiene sede asignada.';await doLogout(true);return;}
     document.getElementById('userNombre').textContent=roles?.[0]?.nombre||email;
     document.getElementById('loginScreen').style.display='none'; init();
   }catch(e){errEl.textContent=e.message;}finally{btn.textContent='Entrar';btn.disabled=false;}
@@ -497,6 +505,7 @@ function calc(){
   document.getElementById('rEfectivoFinal').textContent=fmt(efectivoFinal);
   document.getElementById('rOtros').textContent=fmt(sobreOut);
   if(window._sinpeReporte)renderSinpeResumen();
+  if(fotoDatafono)renderFotoResumen();
   document.getElementById('sobreHint').textContent =
     sobreModo==='ya' ? 'El conteo no incluye el minita (ya en sobres). Efectivo final = efectivo contado.'
     : sobreModo==='no' ? 'No se sacaron sobres: la minita queda en caja. No se descuenta; el efectivo final es el efectivo contado.'
@@ -528,7 +537,8 @@ function nuevoCierre(){
   document.getElementById('cTurno').value='';
   ['cMembresias','cTarjeta','cSinpe','cTotalVentas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('cSobreModo').value='retira';
-  window._informeVentas=null; window._sinpeReporte=null;
+  window._informeVentas=null; window._sinpeReporte=null; fotoDatafono=null;
+  document.getElementById('fotoResumen').innerHTML=''; document.getElementById('fileFoto').value='';
   document.getElementById('sinpeResumen').innerHTML='';
   document.getElementById('sinpeHint').innerHTML='Cargue el <b>Reporte SINPE</b> (obligatorio para el cierre final). Cada referencia se registra una sola vez; el saldo <b>pendiente por facturar</b> se arrastra al siguiente cierre, así que no importa si un SINPE se factura otro día o si el reporte se sube en el parcial.';
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=0;});
@@ -636,6 +646,51 @@ function renderSinpeResumen(){
     </div>`;
 }
 
+// ── Foto del datáfono (obligatoria en parcial/final) + análisis con IA (Claude Vision) ──
+async function onFotoDatafono(file){
+  const box=document.getElementById('fotoResumen');
+  if(!turnoActual){ box.innerHTML='<div style="color:var(--warn);font-size:13px;margin-top:8px;">Abra el turno antes de subir la foto.</div>'; document.getElementById('fileFoto').value=''; return; }
+  const url=URL.createObjectURL(file);
+  box.innerHTML=`<div style="margin-top:10px;"><img src="${url}" style="max-width:100%;max-height:180px;border-radius:10px;border:1px solid var(--border);"><div id="fotoEstado" style="font-size:13px;margin-top:6px;color:var(--muted);">⏳ Subiendo…</div></div>`;
+  try{
+    const path=await subirFoto(file);
+    fotoDatafono={ path, mediaType:file.type||'image/jpeg', previewUrl:url, analisis:null };
+    const est=document.getElementById('fotoEstado'); if(est)est.textContent='⏳ Analizando con IA…';
+    try{ const d=await analizarFoto(path,fotoDatafono.mediaType); fotoDatafono.analisis={ total:(d.total==null?null:d.total), confianza:d.confianza||'media' }; }
+    catch(ae){ fotoDatafono.analisis={ error:ae.message }; }
+    renderFotoResumen();
+  }catch(ue){ fotoDatafono=null; const est=document.getElementById('fotoEstado'); if(est)est.innerHTML='⚠ No se pudo subir la foto: '+esc(ue.message); }
+}
+function renderFotoResumen(){
+  const box=document.getElementById('fotoResumen'); const f=fotoDatafono; if(!f){ box.innerHTML=''; return; }
+  const tarjeta=Math.round(Number(document.getElementById('cTarjeta').value)||0); const a=f.analisis; let res='';
+  if(a&&a.error){ res=`<div style="margin-top:6px;font-size:12px;color:#b45309;">🔍 Foto guardada. No se pudo analizar (${esc(a.error)}). Validación manual.</div>`; }
+  else if(a&&a.total!=null){ const dif=a.total-tarjeta, ok=dif===0;
+    res=`<div style="margin-top:8px;padding:9px 12px;border-radius:9px;background:${ok?'#eafaf0':'#fdecec'};color:${ok?'#166534':'#b91c1c'};font-weight:800;font-size:13px;">${ok?'✓ Calza':'⚠ Difiere'}: datáfono ${fmt(a.total)} vs Tarjeta ${fmt(tarjeta)}${ok?'':' · Dif '+fmt(Math.abs(dif))}<div style="font-weight:600;font-size:11px;margin-top:2px;opacity:.85;">Lectura IA (confianza ${esc(a.confianza||'media')}). Verifique si difiere.</div></div>`; }
+  else if(a){ res=`<div style="margin-top:6px;font-size:12px;color:#b45309;">🔍 Foto guardada. La IA no leyó el total; validación manual.</div>`; }
+  box.innerHTML=`<div style="margin-top:10px;"><img src="${f.previewUrl}" style="max-width:100%;max-height:180px;border-radius:10px;border:1px solid var(--border);">${res}</div>`;
+}
+async function subirFoto(file){
+  const slug=currentSede.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'_');
+  const ext=(file.type&&file.type.includes('png'))?'png':'jpg';
+  const path=`${slug}/${turnoActual.id}_${Date.now()}.${ext}`;
+  const res=await fetch(`${SUPA_URL}/storage/v1/object/cierres-caja/${path}`,{ method:'POST',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+(currentToken||SUPA_KEY),'Content-Type':file.type||'image/jpeg','x-upsert':'true'}, body:file });
+  if(!res.ok) throw new Error(await res.text()); return path;
+}
+async function analizarFoto(path,mediaType){
+  const res=await fetch(`${SUPA_URL}/functions/v1/analizar-datafono`,{ method:'POST',
+    headers:{'Authorization':'Bearer '+currentToken,'apikey':SUPA_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({bucket:'cierres-caja',path,media_type:mediaType}) });
+  const d=await res.json().catch(()=>({})); if(!res.ok) throw new Error(d.error||('Error '+res.status)); return d;
+}
+async function verFoto(path){
+  try{ const res=await fetch(`${SUPA_URL}/storage/v1/object/sign/cierres-caja/${path}`,{ method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken,'Content-Type':'application/json'}, body:JSON.stringify({expiresIn:3600}) });
+    const d=await res.json().catch(()=>({})); if(d.signedURL) window.open(`${SUPA_URL}/storage/v1${d.signedURL}`,'_blank'); else alert('No se pudo abrir la foto.'); }
+  catch(e){ alert('No se pudo abrir la foto: '+e.message); }
+}
+
 // ── Ventas por Producto → auto-llena el cierre y actualiza el snapshot de la sede ──
 let planPrices={};
 function parseCRC(v){ let s=String(v||'').replace(/[₡€\s]/g,'').replace(/\./g,'').replace(',','.'); let n=parseFloat(s); return isNaN(n)?0:n; }
@@ -737,6 +792,7 @@ async function cerrarTurno(estado){
   const fecha=document.getElementById('cFecha').value;
   if(document.getElementById('cTarjeta').value===''||document.getElementById('cSinpe').value===''){ msg.className='msg err'; msg.textContent='Incluya el monto de Tarjeta y SINPE (ponga 0 si no hubo).'; return; }
   if(estado==='final'&&!window._sinpeReporte){ msg.className='msg err'; msg.textContent='Para el cierre final debe cargar el 🔷 Reporte SINPE del día.'; return; }
+  if(!fotoDatafono){ msg.className='msg err'; msg.textContent=`Suba la foto del datáfono (${estado==='final'?'cierre de lote':'auditoría'}) — es obligatoria para el cierre.`; return; }
   const c=calc();
   const denominaciones={}; DENOMS.forEach(d=>denominaciones[d]=Number(document.getElementById('den_'+d).value)||0);
   const gastosLimpios=gastos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Gasto de caja',monto:Number(g.monto)||0,cat:g.cat||'otros'}));
@@ -750,6 +806,11 @@ async function cerrarTurno(estado){
     diferencia:Math.round(c.diferencia), estado_dif:c.ok?'OK':'Diferencia',
     informe_ventas:window._informeVentas||null, estado, hora_cierre:new Date().toISOString()
   };
+  if(fotoDatafono){
+    if(estado==='final') payload.foto_cierre=fotoDatafono.path; else payload.foto_datafono=fotoDatafono.path;
+    const a=fotoDatafono.analisis||{}; const tj=Math.round(c.tarjeta);
+    payload.foto_analisis={ tipo:estado, total_leido:(a.total==null?null:a.total), tarjeta:tj, calza:(a.total!=null?(a.total===tj):null), confianza:a.confianza||null };
+  }
   const sr=window._sinpeReporte;
   if(sr){
     const pendAfter=Math.round((sr.pendPrev||0)+sr.nuevosMonto-c.sinpe);
@@ -853,7 +914,14 @@ function cargarCierre(id){
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=(c.denominaciones&&c.denominaciones[d])||0;});
   gastos=(c.gastos&&c.gastos.length?c.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc,monto:g.monto,cat:g.cat||'otros'}));
   ingresos=(c.ingresos&&c.ingresos.length?c.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc,monto:g.monto}));
-  renderGastos(); renderIngresos(); calc();
+  renderGastos(); renderIngresos();
+  fotoDatafono=null; document.getElementById('fileFoto').value='';
+  const links=[];
+  if(c.foto_datafono)links.push(`<button class="btn-ghost" onclick="verFoto('${esc(c.foto_datafono)}')">📷 Ver foto datáfono (parcial)</button>`);
+  if(c.foto_cierre)links.push(`<button class="btn-ghost" onclick="verFoto('${esc(c.foto_cierre)}')">📷 Ver foto cierre (final)</button>`);
+  if(c.foto_analisis&&c.foto_analisis.total_leido!=null){ const a=c.foto_analisis; links.push(`<div style="font-size:12px;margin-top:4px;color:${a.calza?'#166534':'#b91c1c'};">IA: datáfono ${fmt(a.total_leido)} vs tarjeta ${fmt(a.tarjeta)} ${a.calza?'✓':'⚠'}</div>`); }
+  document.getElementById('fotoResumen').innerHTML=links.length?`<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">${links.join('')}</div>`:'';
+  calc();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 

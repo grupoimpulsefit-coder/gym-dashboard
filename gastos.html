@@ -317,7 +317,7 @@ async function supaFetch(path, opts = {}) {
 }
 
 // ── Config ──────────────────────────────────────────────────────────────
-const ROLES_PERMITIDOS = ['recepcion', 'admin_sedes', 'admin_g'];
+const ROLES_PERMITIDOS = ['recepcion', 'admin_sucursal', 'admin_sedes', 'admin_g'];
 const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
 const SEDE_META = {
   '3 Ríos':   { icon: '🌊', color: '#00838f' },
@@ -372,8 +372,8 @@ async function doLogin() {
       await doLogout(true);
       return;
     }
-    if (currentRole === 'recepcion' && !currentSede) {
-      errEl.textContent = 'Su cuenta de recepción no tiene una sede asignada. Contacte al administrador.';
+    if ((currentRole === 'recepcion' || currentRole === 'admin_sucursal') && !currentSede) {
+      errEl.textContent = 'Su cuenta no tiene una sede asignada. Contacte al administrador.';
       await doLogout(true);
       return;
     }
