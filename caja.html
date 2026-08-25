@@ -185,6 +185,8 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
         <div class="f-row"><label>Caja inicial (₡)</label><input type="number" id="cCajaInicial" step="1" oninput="calc()"></div>
         <div class="hint" id="cajaInicialHint" style="margin:-4px 0 10px;"></div>
         <div class="f-row"><label>Membresías (₡)</label><input type="number" id="cMembresias" step="1" oninput="calc()"></div>
+        <div class="f-row"><label>Otros vendidos (₡)</label><input type="number" id="cOtros" step="1" oninput="calc()"></div>
+        <div class="hint" id="otrosHint" style="margin:-4px 0 8px;">Solo productos “Otros” (sin sesiones ni membresías). Es el monto del sobre/minita.</div>
         <div class="f-row"><label>Total Tarjeta (₡)</label><input type="number" id="cTarjeta" step="1" oninput="calc()"></div>
         <div class="f-row"><label>Total SINPE (₡)</label><input type="number" id="cSinpe" step="1" oninput="calc()"></div>
         <div class="f-row"><label>Total Transferencia (₡)</label><input type="number" id="cTransfer" step="1" oninput="calc()"></div>
@@ -198,6 +200,18 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
           </select>
         </div>
         <div class="hint" id="sobreHint" style="margin-top:2px;"></div>
+      </div>
+
+      <div class="card" id="aperturaInvCard" style="display:none;">
+        <h3>📦 Mi conteo de apertura</h3>
+        <div class="hint">Lo que contaste al abrir el turno. Se marca si NO coincide con el sistema (sin mostrar la cantidad real).</div>
+        <div id="aperturaInvBody"></div>
+      </div>
+
+      <div class="card" id="otrosCard" style="display:none;">
+        <h3>🧃 Desglose de Otros (minita)</h3>
+        <div class="hint">Categorías de productos vendidos (Aguas, Energéticos, Galletas…). Los subtotales suman la minita.</div>
+        <div id="otrosResumen"></div>
       </div>
 
       <div class="card" id="sinpeCard">
@@ -240,9 +254,9 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
           <div class="hb"><span>Total SINPE</span><span id="rSinpe">₡0</span></div>
           <div class="hb"><span>Total Transferencia</span><span id="rTransfer">₡0</span></div>
           <div class="hb"><span>+ Otros / Minita (sobre)</span><span id="rOtros">₡0</span></div>
-          <div class="hb"><span>+ Gastos de caja</span><span id="rGastos">₡0</span></div>
-          <div class="hb"><span>− Ingresos extra</span><span id="rIngresos">₡0</span></div>
-          <div class="hb"><span>− Caja inicial</span><span id="rCajaIni">₡0</span></div>
+          <div class="hb"><span>+ Gastos de caja (día)</span><span id="rGastos">₡0</span></div>
+          <div class="hb"><span>− Ingresos extra (día)</span><span id="rIngresos">₡0</span></div>
+          <div class="hb"><span>− Caja inicial (fondo del día)</span><span id="rCajaIni">₡0</span></div>
           <div class="hb strong"><span>Ventas conciliadas</span><span id="rConciliado">₡0</span></div>
         </div>
       </div>
@@ -317,6 +331,14 @@ const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_META={'3 Ríos':{icon:'🌊'},'Natación':{icon:'🏊'},'Pinares':{icon:'🌲'},'Sabanilla':{icon:'🏙️'}};
 const DENOMS=[20000,10000,5000,2000,1000,500,100,50,25,10,5];
 const CATS_GASTO=[{id:'clases_grupales',label:'🧘 Clases grupales'},{id:'instructores_planta',label:'🏋️ Instructores de planta'},{id:'parqueo',label:'🅿️ Parqueo'},{id:'mantenimiento',label:'🔧 Mantenimiento'},{id:'otros',label:'📦 Otros'}];
+// Categorías para el desglose de la minita (productos "Otros"). Se clasifica por palabras clave del nombre.
+const CAT_OTROS=[
+  {cat:'💧 Aguas', kw:['agua']},
+  {cat:'⚡ Energéticos/Bebidas', kw:['powerade','gatorade','monster','red bull','redbull','suero','electrolit','hidrata','energiz','energet','bebida','jugo','soda','gaseosa','coca','fresca','fanta','sprite','te frio','té frio']},
+  {cat:'🍪 Galletas/Snacks', kw:['galleta','gricket','cookie','granola','barra','snack','chocolate','mani','maní','nuez','chip','dona','queque']},
+  {cat:'🧢 Accesorios', kw:['gorra','google','goggle','gafa','lente','tapon','tapón','toalla','licra','traje','malla','arete','candado','sandalia']},
+];
+const catDeOtro=base=>{ const n=normP(base); for(const c of CAT_OTROS){ if(c.kw.some(k=>n.includes(normP(k)))) return c.cat; } return '📦 Otros varios'; };
 const MESES_ES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(currentRole);
 const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
@@ -392,9 +414,10 @@ function cargarTurnoEnForm(t){
   document.getElementById('cTurno').value='Turno '+(t.turno_num||'');
   document.getElementById('cCajaInicial').value=t.caja_inicial||0;
   document.getElementById('cCajaInicial').readOnly=true;
-  if(t.total_ventas){ document.getElementById('cMembresias').value=t.membresias||0; document.getElementById('cTarjeta').value=t.total_tarjeta||''; document.getElementById('cSinpe').value=t.total_sinpe||''; document.getElementById('cTransfer').value=t.total_transferencia||''; document.getElementById('cTotalVentas').value=t.total_ventas||0; document.getElementById('cSobreModo').value=t.sobre_modo||(t.sobre_retirado?'ya':'retira'); }
+  if(t.total_ventas){ document.getElementById('cMembresias').value=t.membresias||0; document.getElementById('cOtros').value=t.otros_vendidos||0; document.getElementById('cTarjeta').value=t.total_tarjeta||''; document.getElementById('cSinpe').value=t.total_sinpe||''; document.getElementById('cTransfer').value=t.total_transferencia||''; document.getElementById('cTotalVentas').value=t.total_ventas||0; document.getElementById('cSobreModo').value=t.sobre_modo||(t.sobre_retirado?'ya':'retira'); }
   if(t.denominaciones) DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=t.denominaciones[d]||0;});
-  document.getElementById('cajaInicialHint').textContent='Fijado en la apertura del turno.';
+  document.getElementById('cajaInicialHint').textContent='Fondo del primer turno del día (base del cuadre del día completo).';
+  renderAperturaInv(t);
   calc();
 }
 function checkTurno(){
@@ -451,7 +474,7 @@ async function abrirTurno(){
   const btn=document.getElementById('btnConfirmarApertura'); btn.disabled=true; btn.textContent='Abriendo...';
   try{
     inv.forEach((p,i)=>{ const raw=document.getElementById('ainv_'+i).value; const contado=raw===''?null:(Number(raw)||0); const sistema=Number(p.cantidad)||0;
-      conteo[p.producto]={contado,sistema}; if(contado!=null && contado!==sistema) discrep.push(`${p.producto}: contó ${contado} vs sistema ${sistema}`); });
+      conteo[p.producto]={contado,sistema}; if(contado!=null && contado!==sistema) discrep.push(esAdmin()?`${p.producto}: contó ${contado} vs sistema ${sistema}`:`${p.producto} (contaste ${contado})`); });
     const rec={ sede:currentSede, fecha:todayStr(), turno:'Turno '+window._turnoNum, turno_num:window._turnoNum, estado:'abierto', hora_apertura:new Date().toISOString(), caja_inicial:efectivo, denominaciones_apertura:denom, inventario_apertura:conteo, created_by:currentEmail||null };
     await supaFetch('/cierres_caja',{method:'POST',body:rec});
     document.getElementById('abrirModal').style.display='none';
@@ -476,32 +499,33 @@ function calc(){
   const tarjeta=Number(document.getElementById('cTarjeta').value)||0;
   const sinpe=Number(document.getElementById('cSinpe').value)||0;
   const transfer=Number(document.getElementById('cTransfer').value)||0;
-  const totalVentas=Number(document.getElementById('cTotalVentas').value)||0;
-  const cajaIni=Number(document.getElementById('cCajaInicial').value)||0;
+  const totalVentas=Number(document.getElementById('cTotalVentas').value)||0;   // acumulado del día
+  const cajaIni=fondoInicialDia();                                              // fondo del primer turno del día
   const membresias=Number(document.getElementById('cMembresias').value)||0;
-  const totGastos=gastos.reduce((a,g)=>a+(Number(g.monto)||0),0);
+  const totGastos=gastos.reduce((a,g)=>a+(Number(g.monto)||0),0);               // gastos de ESTE turno
   const totIngresos=ingresos.reduce((a,g)=>a+(Number(g.monto)||0),0);
-  const minita=totalVentas-membresias;
+  const pg=prevGIDia();                                                         // gastos/ingresos de turnos previos de hoy
+  const totGastosDia=totGastos+pg.gastos, totIngresosDia=totIngresos+pg.ingresos;
+  const minita=Number(document.getElementById('cOtros').value)||0;   // productos "Otros" del día (sin sesiones ni membresías)
   const sobreModo=document.getElementById('cSobreModo').value;   // 'retira' | 'ya' | 'no'
   const sobreRetirado=sobreModo==='ya';                          // compat con datos previos
-  // 'ya': el conteo NO incluye el minita → se suma para reconciliar; efectivo final = efectivo.
-  // 'retira': el conteo incluye el minita (se saca en sobres) → efectivo final lo descuenta.
-  // 'no': no se sacaron sobres → la minita queda en caja; no se descuenta ni se suma aparte.
+  // El sobre solo sale en el cierre FINAL (= minita total del día). En parciales la minita queda en caja.
   const sobreOut=sobreModo==='ya'?minita:0;
-  const conciliado=efectivo+tarjeta+sinpe+transfer+sobreOut+totGastos-totIngresos-cajaIni;
+  const conciliado=efectivo+tarjeta+sinpe+transfer+sobreOut+totGastosDia-totIngresosDia-cajaIni;
   const diferencia=totalVentas-conciliado;
+  document.getElementById('cCajaInicial').value=Math.round(cajaIni);
   document.getElementById('rEfectivo').textContent=fmt(efectivo);
   document.getElementById('rTarjeta').textContent=fmt(tarjeta);
   document.getElementById('rSinpe').textContent=fmt(sinpe);
   document.getElementById('rTransfer').textContent=fmt(transfer);
-  document.getElementById('rGastos').textContent=fmt(totGastos);
-  document.getElementById('rIngresos').textContent=fmt(totIngresos);
+  document.getElementById('rGastos').textContent=fmt(totGastosDia);
+  document.getElementById('rIngresos').textContent=fmt(totIngresosDia);
   document.getElementById('rCajaIni').textContent=fmt(cajaIni);
   document.getElementById('rConciliado').textContent=fmt(conciliado);
   document.getElementById('rTotalVentas').textContent=fmt(totalVentas);
   document.getElementById('rMinita').textContent=fmt(minita);
-  document.getElementById('totGastos').textContent=fmt(totGastos);
-  document.getElementById('totIngresos').textContent=fmt(totIngresos);
+  document.getElementById('totGastos').textContent=fmt(totGastos)+(pg.gastos?` (+${fmt(pg.gastos)} turnos previos)`:'');
+  document.getElementById('totIngresos').textContent=fmt(totIngresos)+(pg.ingresos?` (+${fmt(pg.ingresos)} turnos previos)`:'');
   const ok=Math.round(diferencia)===0;
   document.getElementById('rEstado').innerHTML=ok?'<span class="badge-ok">✓ Caja cuadra</span>':`<span class="badge-dif">⚠ Diferencia ${fmt(diferencia)}</span>`;
   // Efectivo final: solo se descuenta la minita cuando el sobre se retira hoy ('retira').
@@ -511,10 +535,10 @@ function calc(){
   if(window._sinpeReporte)renderSinpeResumen();
   if(fotoDatafono)renderFotoResumen();
   document.getElementById('sobreHint').textContent =
-    sobreModo==='ya' ? 'El conteo no incluye el minita (ya en sobres). Efectivo final = efectivo contado.'
-    : sobreModo==='no' ? 'No se sacaron sobres: la minita queda en caja. No se descuenta; el efectivo final es el efectivo contado.'
-    : 'El conteo incluye el minita; el efectivo final le descuenta ese monto (se retira en sobres).';
-  return {efectivo,tarjeta,sinpe,transfer,totalVentas,cajaIni,membresias,totGastos,totIngresos,conciliado,diferencia,minita,ok,efectivoFinal,otros:minita,sobreOut,sobreRetirado,sobreModo};
+    sobreModo==='ya' ? 'Sobre ya retirado del efectivo contado (solo cierre final). Efectivo final = efectivo contado.'
+    : sobreModo==='no' ? 'No se sacaron sobres: la minita queda en caja. Úselo en parciales (el sobre sale solo en el final).'
+    : 'El conteo incluye la minita; en el cierre final se retira ese monto en sobres (efectivo final lo descuenta).';
+  return {efectivo,tarjeta,sinpe,transfer,totalVentas,cajaIni,membresias,totGastos,totIngresos,totGastosDia,totIngresosDia,conciliado,diferencia,minita,ok,efectivoFinal,otros:minita,sobreOut,sobreRetirado,sobreModo};
 }
 
 // ── Gastos / Ingresos dinámicos ──
@@ -539,11 +563,12 @@ function addIngreso(){ingresos.push({desc:'',monto:''});renderIngresos();}
 function nuevoCierre(){
   document.getElementById('cFecha').value=new Date().toISOString().slice(0,10);
   document.getElementById('cTurno').value='';
-  ['cMembresias','cTarjeta','cSinpe','cTransfer','cTotalVentas'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('cSobreModo').value='retira';
-  window._informeVentas=null; window._sinpeReporte=null; fotoDatafono=null;
+  ['cMembresias','cOtros','cTarjeta','cSinpe','cTransfer','cTotalVentas'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('cSobreModo').value='no';
+  window._informeVentas=null; window._sinpeReporte=null; fotoDatafono=null; window._otrosResumen=null;
   document.getElementById('fotoResumen').innerHTML=''; document.getElementById('fileFoto').value='';
-  document.getElementById('sinpeResumen').innerHTML='';
+  document.getElementById('sinpeResumen').innerHTML=''; renderOtrosResumen(null);
+  document.getElementById('aperturaInvCard').style.display='none'; document.getElementById('aperturaInvBody').innerHTML='';
   document.getElementById('sinpeHint').innerHTML='Cargue el <b>Reporte SINPE</b> (obligatorio para el cierre final). Cada referencia se registra una sola vez; el saldo <b>pendiente por facturar</b> se arrastra al siguiente cierre, así que no importa si un SINPE se factura otro día o si el reporte se sube en el parcial.';
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=0;});
   gastos=[{desc:'',monto:'',cat:'otros'}]; ingresos=[{desc:'',monto:''}]; renderGastos(); renderIngresos();
@@ -554,6 +579,26 @@ function nuevoCierre(){
   document.getElementById('ventasHint').textContent='';
   document.getElementById('saveMsg').textContent='';
   calc();
+}
+
+// ── Modelo "día completo" (los informes son acumulados del día) ──
+// El cuadre siempre es contra el FONDO del primer turno del día y los totales
+// acumulados del informe. Los gastos/ingresos también se acumulan entre turnos.
+function turnosDelDia(){
+  const f=document.getElementById('cFecha').value;
+  return (cierres||[]).filter(c=>c.fecha===f);
+}
+function fondoInicialDia(){
+  const dia=turnosDelDia();
+  if(!dia.length) return Number(document.getElementById('cCajaInicial').value)||0;   // modo manual (admin): respeta lo digitado
+  const primero=[...dia].sort((a,b)=>(a.turno_num||0)-(b.turno_num||0))[0];
+  return Number(primero.caja_inicial)||0;
+}
+function prevGIDia(){   // gastos/ingresos ya cerrados por turnos previos de hoy
+  const curId=turnoActual&&turnoActual.id;
+  const prev=turnosDelDia().filter(c=> c.id!==curId && (c.estado==='parcial'||c.estado==='final'));
+  return { gastos:prev.reduce((s,c)=>s+(Number(c.total_gastos)||0),0),
+           ingresos:prev.reduce((s,c)=>s+(Number(c.total_ingresos)||0),0) };
 }
 
 // ── Cargar Informe de Ventas (validación/autollenado) ──
@@ -578,7 +623,7 @@ function cargarInformeVentas(file){
       document.getElementById('cTransfer').value=Math.round(transfer);
       document.getElementById('cTotalVentas').value=Math.round(total);
       window._informeVentas={efectivo:Math.round(efectivo),sinpe:Math.round(sinpe),tarjeta:Math.round(tarjeta),transfer:Math.round(transfer),total:Math.round(total)};
-      document.getElementById('ventasHint').innerHTML=`📄 Informe: Efectivo ${fmt(efectivo)} · Tarjeta ${fmt(tarjeta)} · SINPE ${fmt(sinpe)} · Transferencia ${fmt(transfer)} · <b>Total ${fmt(total)}</b>. Se autollenaron Tarjeta, SINPE, Transferencia y Total.`;
+      document.getElementById('ventasHint').innerHTML=`📄 Informe del día (acumulado): Efectivo ${fmt(efectivo)} · Tarjeta ${fmt(tarjeta)} · SINPE ${fmt(sinpe)} · Transferencia ${fmt(transfer)} · <b>Total ${fmt(total)}</b>. El cuadre es contra el fondo del primer turno del día.`;
       calc();
     }catch(err){alert('Error al leer el archivo: '+err.message);}
   };
@@ -696,6 +741,45 @@ async function verFoto(path){
   catch(e){ alert('No se pudo abrir la foto: '+e.message); }
 }
 
+// ── Conteo de inventario de apertura (recepción ve su conteo y si hay diferencia, NUNCA el real) ──
+function renderAperturaInv(t){
+  const card=document.getElementById('aperturaInvCard'), box=document.getElementById('aperturaInvBody');
+  const inv=t&&t.inventario_apertura; const keys=inv?Object.keys(inv):[];
+  if(!keys.length){ card.style.display='none'; box.innerHTML=''; return; }
+  const showReal=esAdmin();   // solo admin/admin_sedes/admin_g ven la cantidad del sistema
+  let difs=0;
+  const rows=keys.map(prod=>{ const o=inv[prod]||{}; const contado=o.contado;
+    const dif=(contado!=null && Number(contado)!==Number(o.sistema)); if(dif)difs++;
+    const right = showReal
+      ? `contó <b>${contado==null?'—':contado}</b> · sistema <b>${o.sistema}</b>${dif?` <span style="color:#b91c1c;">(dif ${Math.abs(Number(contado)-Number(o.sistema))})</span>`:''}`
+      : `contaste <b>${contado==null?'—':contado}</b>${dif?' <span style="color:#b91c1c;font-weight:700;">⚠ no coincide</span>':''}`;
+    return `<div style="display:flex;justify-content:space-between;padding:5px 12px;font-size:12px;${dif?'background:#fdecec;':''}"><span>${esc(prod)}</span><span>${right}</span></div>`;
+  }).join('');
+  box.innerHTML=`<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:6px;">${rows}</div>`+
+    (difs? `<div class="hint" style="margin-top:6px;color:#b45309;">⚠ ${difs} producto(s) no coinciden con el sistema. ${showReal?'':'No se muestra la cantidad real; verificá tu conteo o avisá al administrador.'}</div>`
+         : `<div class="hint" style="margin-top:6px;color:#166534;">✓ Tu conteo coincide con el sistema.</div>`);
+  card.style.display='block';
+}
+
+// ── Desglose de la minita (productos "Otros") por categoría ──
+function renderOtrosResumen(map){
+  const card=document.getElementById('otrosCard'), box=document.getElementById('otrosResumen');
+  const keys=Object.keys(map||{}); if(!keys.length){ card.style.display='none'; box.innerHTML=''; return; }
+  const groups={}; let gtotal=0, gqty=0;
+  keys.forEach(k=>{ const it=map[k]; const cat=catDeOtro(it.base||k); (groups[cat]=groups[cat]||[]).push(it); gtotal+=Number(it.total)||0; gqty+=Number(it.qty)||0; });
+  let html='';
+  Object.keys(groups).sort().forEach(cat=>{
+    const items=groups[cat].sort((a,b)=>b.total-a.total);
+    const sub=items.reduce((s,x)=>s+(Number(x.total)||0),0), qty=items.reduce((s,x)=>s+(Number(x.qty)||0),0);
+    html+=`<div style="margin-top:8px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+      <div style="display:flex;justify-content:space-between;padding:7px 12px;background:#f4fbf9;font-weight:800;font-size:13px;"><span>${cat}</span><span>${qty} u · ${fmt(sub)}</span></div>`
+      + items.map(it=>`<div style="display:flex;justify-content:space-between;padding:5px 12px;font-size:12px;"><span>${esc(it.base||'—')} ×${it.qty}</span><span>${fmt(it.total)}</span></div>`).join('')
+      + `</div>`;
+  });
+  html+=`<div style="display:flex;justify-content:space-between;padding:9px 12px;margin-top:10px;background:#eafaf0;color:#166534;border-radius:9px;font-weight:800;"><span>Total minita (Otros) · ${gqty} u</span><span>${fmt(gtotal)}</span></div>`;
+  box.innerHTML=html; card.style.display='block';
+}
+
 // ── Ventas por Producto → auto-llena el cierre y actualiza el snapshot de la sede ──
 let planPrices={};
 function parseCRC(v){
@@ -765,13 +849,16 @@ function cargarVentasProducto(file){
       const totalVentas=totMemb+totClases+totSinC;
       document.getElementById('cTotalVentas').value=totalVentas;
       document.getElementById('cMembresias').value=totMemb;
+      document.getElementById('cOtros').value=totSinC;   // minita = solo productos "Otros" (sin sesiones ni membresías), acumulado del día
       const ref=fechas.length?new Date(Math.max(...fechas)):new Date();
       const mes=ref.toLocaleDateString('es-CR',{month:'long',year:'numeric'}).replace(/^\w/,c=>c.toUpperCase());
       const mesOrden=`${ref.getFullYear()}-${String(ref.getMonth()+1).padStart(2,'0')}`;
       const D=ref.toISOString().slice(0,10);
       // Unidades vendidas por producto (de la categoría productos/minita) para descontar inventario
-      const soldByBase={}, origName={};
-      sinclasif.forEach(it=>{ const {base,qty}=parseProdQty(it.Producto); if(base){ const k=normP(base); soldByBase[k]=(soldByBase[k]||0)+qty; origName[k]=base; } });
+      const soldByBase={}, origName={}, otrosResumen={};
+      sinclasif.forEach(it=>{ const {base,qty}=parseProdQty(it.Producto); if(base){ const k=normP(base); soldByBase[k]=(soldByBase[k]||0)+qty; origName[k]=base;
+        if(!otrosResumen[k])otrosResumen[k]={base,qty:0,total:0}; otrosResumen[k].qty+=qty; otrosResumen[k].total+=Number(it.Total)||0; } });
+      window._otrosResumen=otrosResumen; renderOtrosResumen(otrosResumen);
       const renov_data=[...memb.map(r=>({FechaStr:r.FechaStr,Cliente:r.Cliente,RegistradoPor:r.RegistradoPor,Producto:r.Producto,Total:r.Total})),
         ...clases.map(c=>({FechaStr:c.FechaStr,Cliente:c.Cliente,RegistradoPor:c.RegistradoPor,Producto:c.Producto,Total:c.Total,EsClaseSuelta:true})),
         ...sinclasif.map(c=>({FechaStr:c.FechaStr,Cliente:c.Cliente,RegistradoPor:c.RegistradoPor,Producto:c.Producto,Total:c.Total,EsSinClasificar:true}))];
@@ -781,7 +868,7 @@ function cargarVentasProducto(file){
         const ex=await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(currentSede)}&mes=eq.${encodeURIComponent(mes)}&select=id`);
         if(ex&&ex.length){ await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(currentSede)}&mes=eq.${encodeURIComponent(mes)}`,{method:'PATCH',body:rec}); }
         else { rec.activos=0; rec.total_usuarios=0; rec.proyecciones=[]; rec.users_data=[]; await supaFetch('/gym_snapshots',{method:'POST',body:rec}); }
-        let msg=`📦 ${memb.length} membresías (${fmt(totMemb)}) · minita ${fmt(totClases+totSinC)} · Total ${fmt(totalVentas)}. Snapshot de ${currentSede} (${mes}) actualizado.`;
+        let msg=`📦 Día: ${memb.length} membresías (${fmt(totMemb)}) · sesiones ${fmt(totClases)} · otros/minita ${fmt(totSinC)} · Total ${fmt(totalVentas)}. Snapshot de ${currentSede} (${mes}) actualizado.`;
         if(window._informeVentas){ const dif=Math.round(totalVentas-window._informeVentas.total); msg+= (dif===0?' · ✓ corrobora con Informe de Ventas.':` · ⚠ difiere del Informe en ${fmt(Math.abs(dif))}.`); }
         // Descuento idempotente de inventario (el informe es acumulado del día → solo el delta)
         const desc=await descontarInventario(soldByBase, origName, D);
@@ -804,6 +891,12 @@ async function cerrarTurno(estado){
   if(estado==='final'&&!window._sinpeReporte){ msg.className='msg err'; msg.textContent='Para el cierre final debe cargar el 🔷 Reporte SINPE del día.'; return; }
   if(!fotoDatafono){ msg.className='msg err'; msg.textContent=`Suba la foto del datáfono (${estado==='final'?'cierre de lote':'auditoría'}) — es obligatoria para el cierre.`; return; }
   const c=calc();
+  // El sobre solo sale en el cierre FINAL. En parciales la minita queda en caja (no se descuenta ni se suma).
+  const esFinal=estado==='final';
+  const sobreOut=esFinal?c.sobreOut:0;
+  const efectivoFinal=esFinal?c.efectivoFinal:c.efectivo;
+  const conciliado=c.efectivo+c.tarjeta+c.sinpe+c.transfer+sobreOut+c.totGastosDia-c.totIngresosDia-c.cajaIni;
+  const diferencia=Math.round(c.totalVentas-conciliado);
   const denominaciones={}; DENOMS.forEach(d=>denominaciones[d]=Number(document.getElementById('den_'+d).value)||0);
   const gastosLimpios=gastos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Gasto de caja',monto:Number(g.monto)||0,cat:g.cat||'otros'}));
   const ingresosLimpios=ingresos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Ingreso',monto:Number(g.monto)||0}));
@@ -812,8 +905,8 @@ async function cerrarTurno(estado){
     total_tarjeta:c.tarjeta, total_sinpe:c.sinpe, total_transferencia:c.transfer, efectivo:c.efectivo,
     denominaciones, gastos:gastosLimpios, ingresos:ingresosLimpios,
     total_gastos:c.totGastos, total_ingresos:c.totIngresos, minita:c.minita,
-    efectivo_final:c.efectivoFinal, otros_vendidos:c.otros, sobre_retirado:c.sobreRetirado, sobre_modo:c.sobreModo,
-    diferencia:Math.round(c.diferencia), estado_dif:c.ok?'OK':'Diferencia',
+    efectivo_final:efectivoFinal, otros_vendidos:c.otros, otros_desglose:window._otrosResumen||null, sobre_retirado:esFinal&&c.sobreRetirado, sobre_modo:esFinal?c.sobreModo:'no',
+    diferencia, estado_dif:diferencia===0?'OK':'Diferencia',
     informe_ventas:window._informeVentas||null, estado, hora_cierre:new Date().toISOString()
   };
   if(fotoDatafono){
@@ -917,7 +1010,9 @@ function renderHist(){
 function cargarCierre(id){
   const c=cierres.find(x=>x.id===id); if(!c)return;
   document.getElementById('cFecha').value=c.fecha; document.getElementById('cTurno').value=c.turno||'';
-  document.getElementById('cCajaInicial').value=c.caja_inicial||0; document.getElementById('cMembresias').value=c.membresias||0;
+  document.getElementById('cCajaInicial').value=c.caja_inicial||0; document.getElementById('cMembresias').value=c.membresias||0; document.getElementById('cOtros').value=c.otros_vendidos||0;
+  window._otrosResumen=c.otros_desglose||null; renderOtrosResumen(window._otrosResumen);
+  renderAperturaInv(c);
   document.getElementById('cTarjeta').value=c.total_tarjeta||0; document.getElementById('cSinpe').value=c.total_sinpe||0; document.getElementById('cTransfer').value=c.total_transferencia||0;
   document.getElementById('cTotalVentas').value=c.total_ventas||0;
   document.getElementById('cSobreModo').value=c.sobre_modo||(c.sobre_retirado?'ya':'retira');

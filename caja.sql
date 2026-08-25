@@ -53,6 +53,8 @@ alter table cierres_caja add column if not exists foto_cierre   text;   -- path 
 alter table cierres_caja add column if not exists foto_analisis jsonb;  -- { total_leido, tarjeta, calza, confianza, tipo }
 -- Total de ventas por transferencia (sección "Transferencia" del Informe de Ventas).
 alter table cierres_caja add column if not exists total_transferencia numeric default 0;
+-- Desglose de la minita (productos "Otros") por producto: { normProd: { base, qty, total } }.
+alter table cierres_caja add column if not exists otros_desglose jsonb;
 
 -- 2) Inventario por sede ------------------------------------------------------
 create table if not exists inventario (
