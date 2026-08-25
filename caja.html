@@ -376,7 +376,8 @@ function mesEt(d){return MESES_ES[d.getMonth()]+' '+d.getFullYear();}
 function mesOrd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
 
 let gastos=[{desc:'',monto:'',cat:'otros'}], ingresos=[{desc:'',monto:''}], cierres=[], turnoActual=null, fotoDatafono=null;
-const todayStr=()=>new Date().toISOString().slice(0,10);
+const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;   // fecha LOCAL (no UTC)
+const todayStr=()=>ymd(new Date());
 
 // ── Login ──
 async function doLogin(){
@@ -589,7 +590,7 @@ function addIngreso(){ingresos.push({desc:'',monto:''});renderIngresos();}
 
 // ── Nuevo cierre (con acumulado: caja inicial = efectivo del cierre anterior) ──
 function nuevoCierre(){
-  document.getElementById('cFecha').value=new Date().toISOString().slice(0,10);
+  document.getElementById('cFecha').value=todayStr();
   document.getElementById('cTurno').value='';
   ['cMembresias','cOtros','cTarjeta','cSinpe','cTransfer','cTotalVentas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('cSobreModo').value='no';
@@ -882,7 +883,7 @@ function cargarVentasProducto(file){
       const ref=fechas.length?new Date(Math.max(...fechas)):new Date();
       const mes=ref.toLocaleDateString('es-CR',{month:'long',year:'numeric'}).replace(/^\w/,c=>c.toUpperCase());
       const mesOrden=`${ref.getFullYear()}-${String(ref.getMonth()+1).padStart(2,'0')}`;
-      const D=ref.toISOString().slice(0,10);
+      const D=ymd(ref);
       // Unidades vendidas por producto (de la categoría productos/minita) para descontar inventario
       const soldByBase={}, origName={}, otrosResumen={};
       sinclasif.forEach(it=>{ const {base,qty}=parseProdQty(it.Producto); if(!base)return;
