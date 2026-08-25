@@ -187,9 +187,10 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
         <div class="f-row"><label>Membresías (₡)</label><input type="number" id="cMembresias" step="1" oninput="calc()"></div>
         <div class="f-row"><label>Otros vendidos (₡)</label><input type="number" id="cOtros" step="1" oninput="calc()"></div>
         <div class="hint" id="otrosHint" style="margin:-4px 0 8px;">Solo productos “Otros” (sin sesiones ni membresías). Es el monto del sobre/minita.</div>
-        <div class="f-row"><label>Total Tarjeta (₡)</label><input type="number" id="cTarjeta" step="1" oninput="calc()"></div>
-        <div class="f-row"><label>Total SINPE (₡)</label><input type="number" id="cSinpe" step="1" oninput="calc()"></div>
-        <div class="f-row"><label>Total Transferencia (₡)</label><input type="number" id="cTransfer" step="1" oninput="calc()"></div>
+        <div class="f-row"><label>Total Tarjeta (₡)</label><input type="number" id="cTarjeta" step="1" readonly title="Se carga desde el Informe de Ventas" style="background:#eef2f7;color:#475569;"></div>
+        <div class="f-row"><label>Total SINPE (₡)</label><input type="number" id="cSinpe" step="1" readonly title="Se carga desde el Informe de Ventas" style="background:#eef2f7;color:#475569;"></div>
+        <div class="f-row"><label>Total Transferencia (₡)</label><input type="number" id="cTransfer" step="1" readonly title="Se carga desde el Informe de Ventas" style="background:#eef2f7;color:#475569;"></div>
+        <div class="hint">🔒 Tarjeta, SINPE y Transferencia se cargan solo desde el <b>Informe de Ventas</b> (no se editan a mano).</div>
         <div class="f-row"><label>TOTAL ventas (₡)</label><input type="number" id="cTotalVentas" step="1" oninput="calc()"></div>
         <div class="hint" id="ventasHint"></div>
         <div class="f-row"><label>Sobre (minita)</label>
@@ -331,14 +332,41 @@ const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_META={'3 Ríos':{icon:'🌊'},'Natación':{icon:'🏊'},'Pinares':{icon:'🌲'},'Sabanilla':{icon:'🏙️'}};
 const DENOMS=[20000,10000,5000,2000,1000,500,100,50,25,10,5];
 const CATS_GASTO=[{id:'clases_grupales',label:'🧘 Clases grupales'},{id:'instructores_planta',label:'🏋️ Instructores de planta'},{id:'parqueo',label:'🅿️ Parqueo'},{id:'mantenimiento',label:'🔧 Mantenimiento'},{id:'otros',label:'📦 Otros'}];
-// Categorías para el desglose de la minita (productos "Otros"). Se clasifica por palabras clave del nombre.
-const CAT_OTROS=[
-  {cat:'💧 Aguas', kw:['agua']},
-  {cat:'⚡ Energéticos/Bebidas', kw:['powerade','gatorade','monster','red bull','redbull','suero','electrolit','hidrata','energiz','energet','bebida','jugo','soda','gaseosa','coca','fresca','fanta','sprite','te frio','té frio']},
-  {cat:'🍪 Galletas/Snacks', kw:['galleta','gricket','cookie','granola','barra','snack','chocolate','mani','maní','nuez','chip','dona','queque']},
-  {cat:'🧢 Accesorios', kw:['gorra','google','goggle','gafa','lente','tapon','tapón','toalla','licra','traje','malla','arete','candado','sandalia']},
+// Clasificación de productos "Otros" — MISMO esquema que otros.html (mantener sincronizados).
+const CAT_META=[
+  {id:'everlast',    label:'Everlast / Mercadería Natación', icon:'🏊'},
+  {id:'galletas',    label:'Galletas',                        icon:'🍪'},
+  {id:'energeticos', label:'Energéticos / Suplementos',       icon:'⚡'},
+  {id:'minita',      label:'Minita (bebidas y snacks)',       icon:'🥤'},
+  {id:'gorras',      label:'Gorras (Natación)',               icon:'🧢'},
+  {id:'otros',       label:'Otros sin categoría',             icon:'❓'},
 ];
-const catDeOtro=base=>{ const n=normP(base); for(const c of CAT_OTROS){ if(c.kw.some(k=>n.includes(normP(k)))) return c.cat; } return '📦 Otros varios'; };
+const CAT_ORDER=CAT_META.map(c=>c.id);
+const CAT_LABEL={}; CAT_META.forEach(c=>CAT_LABEL[c.id]=`${c.icon} ${c.label}`);
+// El orden importa: gana la PRIMERA regla que coincida (substring sobre el nombre normalizado).
+const REGLAS_OTROS=[
+  { kw:['alquiler','oficina'], excluir:true }, { kw:['aqua camp'], excluir:true }, { kw:['taller'], excluir:true },
+  { kw:['semestre'], excluir:true }, { kw:['trimestre'], excluir:true },
+  { kw:['everl','everlast','goggle','lente natacion','lente nat','tapon','pantaloneta','bolsito','traje de bano','traje de b','vestido bano','pano microfibra','2 piezas','bolso'], cat:'everlast' },
+  { kw:['pancake'], cat:'galletas', canonical:'Pancakes Gricket' },
+  { kw:['gricket'], cat:'galletas', canonical:'Gricket' },
+  { kw:['come strong','become strong'], cat:'galletas', canonical:'Be come Strong' },
+  { kw:['gym bite','gymbite'], cat:'galletas', canonical:'Gym bite' },
+  { kw:['pre entreno','pre-entreno','preentreno'], cat:'energeticos', canonical:'Scoop de pre entreno' },
+  { kw:['rooster'], cat:'energeticos', canonical:'Rooster' }, { kw:['bucked up'], cat:'energeticos', canonical:'Bucked up' },
+  { kw:['glu'], cat:'energeticos', canonical:'GLU' }, { kw:['amino'], cat:'energeticos', canonical:'Scoop de Amino' },
+  { kw:['proteina'], cat:'energeticos', canonical:'Scoop de Proteína' }, { kw:['creatina'], cat:'energeticos' }, { kw:['scoop'], cat:'energeticos' },
+  { kw:['gatorade','gatorage'], cat:'minita', canonical:'Gatorage' }, { kw:['powerade'], cat:'minita', canonical:'Powerade' },
+  { kw:['agua'], cat:'minita', canonical:'Agua' }, { kw:['pano','paño'], cat:'minita', canonical:'Paños' },
+  { kw:['lentes nino'], cat:'gorras', canonical:'Lentes niños' }, { kw:['gorra'], cat:'gorras', canonical:'Gorra' },
+];
+function resolverOtro(raw){
+  const p=normP(raw); const base=parseProdQty(raw).base;
+  if(!p) return {cat:'otros', canonical:base};
+  for(const r of REGLAS_OTROS){ if(r.kw.some(k=>p.includes(k))){ if(r.not&&r.not.some(k=>p.includes(k)))continue;
+    if(r.excluir) return {cat:'otros', canonical:base}; return {cat:r.cat, canonical:r.canonical||base}; } }
+  return {cat:'otros', canonical:base};
+}
 const MESES_ES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(currentRole);
 const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
@@ -766,13 +794,14 @@ function renderOtrosResumen(map){
   const card=document.getElementById('otrosCard'), box=document.getElementById('otrosResumen');
   const keys=Object.keys(map||{}); if(!keys.length){ card.style.display='none'; box.innerHTML=''; return; }
   const groups={}; let gtotal=0, gqty=0;
-  keys.forEach(k=>{ const it=map[k]; const cat=catDeOtro(it.base||k); (groups[cat]=groups[cat]||[]).push(it); gtotal+=Number(it.total)||0; gqty+=Number(it.qty)||0; });
+  keys.forEach(k=>{ const it=map[k]; const cat=it.cat||resolverOtro(it.base||k).cat;   // compat con cierres viejos sin cat
+    (groups[cat]=groups[cat]||[]).push(it); gtotal+=Number(it.total)||0; gqty+=Number(it.qty)||0; });
   let html='';
-  Object.keys(groups).sort().forEach(cat=>{
-    const items=groups[cat].sort((a,b)=>b.total-a.total);
+  CAT_ORDER.forEach(cid=>{
+    const items=(groups[cid]||[]).sort((a,b)=>b.total-a.total); if(!items.length)return;
     const sub=items.reduce((s,x)=>s+(Number(x.total)||0),0), qty=items.reduce((s,x)=>s+(Number(x.qty)||0),0);
     html+=`<div style="margin-top:8px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
-      <div style="display:flex;justify-content:space-between;padding:7px 12px;background:#f4fbf9;font-weight:800;font-size:13px;"><span>${cat}</span><span>${qty} u · ${fmt(sub)}</span></div>`
+      <div style="display:flex;justify-content:space-between;padding:7px 12px;background:#f4fbf9;font-weight:800;font-size:13px;"><span>${CAT_LABEL[cid]}</span><span>${qty} u · ${fmt(sub)}</span></div>`
       + items.map(it=>`<div style="display:flex;justify-content:space-between;padding:5px 12px;font-size:12px;"><span>${esc(it.base||'—')} ×${it.qty}</span><span>${fmt(it.total)}</span></div>`).join('')
       + `</div>`;
   });
@@ -806,21 +835,21 @@ async function descontarInventario(soldByBase, origName, D){
   try{ inv=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(currentSede)}&select=*`))||[]; }
   catch(e){ return { error:e.message }; }
   const invByName={}; inv.forEach(p=>{ invByName[normP(p.producto)]=p; });
-  let unidadesDesc=0, prodsTocados=0;
+  let unidadesDesc=0, prodsTocados=0; const detalle=[];
   for(const p of inv){
     const k=normP(p.producto);
     const unidadesHoy=soldByBase[k]||0;
     const mismaFecha=(p.desc_dia===D);
     if(unidadesHoy===0 && !mismaFecha) continue;           // no vendido hoy y sin descuentos previos hoy
-    const yaDesc=mismaFecha?(Number(p.desc_hoy)||0):0;
-    const delta=unidadesHoy-yaDesc;
-    if(delta===0 && mismaFecha) continue;                   // ya está al día
+    const yaDesc=mismaFecha?(Number(p.desc_hoy)||0):0;     // unidades ya descontadas HOY (turnos previos)
+    const delta=unidadesHoy-yaDesc;                        // solo lo nuevo de esta carga
+    if(delta===0 && mismaFecha) continue;                   // ya está al día → no re-descuenta
     const nuevoStock=(Number(p.cantidad)||0)-delta;
     try{ await supaFetch(`/inventario?id=eq.${p.id}`,{method:'PATCH',body:{cantidad:nuevoStock,desc_dia:D,desc_hoy:unidadesHoy,updated_at:new Date().toISOString()}});
-      if(delta!==0){ unidadesDesc+=delta; prodsTocados++; } }catch(_){}
+      if(delta!==0){ unidadesDesc+=delta; prodsTocados++; detalle.push({producto:p.producto,delta,hoy:unidadesHoy,stock:nuevoStock}); } }catch(_){}
   }
   const noCalzan=Object.keys(soldByBase).filter(k=>!invByName[k]&&soldByBase[k]>0).map(k=>origName[k]||k);
-  return { unidadesDesc, prodsTocados, noCalzan };
+  return { unidadesDesc, prodsTocados, noCalzan, detalle };
 }
 
 function cargarVentasProducto(file){
@@ -856,27 +885,25 @@ function cargarVentasProducto(file){
       const D=ref.toISOString().slice(0,10);
       // Unidades vendidas por producto (de la categoría productos/minita) para descontar inventario
       const soldByBase={}, origName={}, otrosResumen={};
-      sinclasif.forEach(it=>{ const {base,qty}=parseProdQty(it.Producto); if(base){ const k=normP(base); soldByBase[k]=(soldByBase[k]||0)+qty; origName[k]=base;
-        if(!otrosResumen[k])otrosResumen[k]={base,qty:0,total:0}; otrosResumen[k].qty+=qty; otrosResumen[k].total+=Number(it.Total)||0; } });
+      sinclasif.forEach(it=>{ const {base,qty}=parseProdQty(it.Producto); if(!base)return;
+        const bk=normP(base); soldByBase[bk]=(soldByBase[bk]||0)+qty; origName[bk]=base;   // inventario: por nombre real
+        const {cat,canonical}=resolverOtro(it.Producto); const k=normP(canonical);          // desglose: unificado + categoría (como otros.html)
+        if(!otrosResumen[k])otrosResumen[k]={base:canonical,cat,qty:0,total:0}; otrosResumen[k].qty+=qty; otrosResumen[k].total+=Number(it.Total)||0; });
       window._otrosResumen=otrosResumen; renderOtrosResumen(otrosResumen);
-      const renov_data=[...memb.map(r=>({FechaStr:r.FechaStr,Cliente:r.Cliente,RegistradoPor:r.RegistradoPor,Producto:r.Producto,Total:r.Total})),
-        ...clases.map(c=>({FechaStr:c.FechaStr,Cliente:c.Cliente,RegistradoPor:c.RegistradoPor,Producto:c.Producto,Total:c.Total,EsClaseSuelta:true})),
-        ...sinclasif.map(c=>({FechaStr:c.FechaStr,Cliente:c.Cliente,RegistradoPor:c.RegistradoPor,Producto:c.Producto,Total:c.Total,EsSinClasificar:true}))];
-      const renovaciones={nuevos:0,renovaciones:memb.length,reingresos:0,total:totMemb,clasesSueltas:{count:clases.length,total:totClases},sinClasificar:{count:sinclasif.length,total:totSinC}};
-      const rec={sede:currentSede,mes,mes_orden:mesOrden,updated_at:new Date().toISOString(),renov_data,renovaciones};
+      // IMPORTANTE: recepción NO toca gym_snapshots (comparativa/sedes). El histórico del mes
+      // lo carga el admin desde index; subir solo el día borraría los días anteriores. Aquí
+      // la carga afecta únicamente el CIERRE DE CAJA (y el descuento de inventario).
+      let msg=`📦 Día: ${memb.length} membresías (${fmt(totMemb)}) · sesiones ${fmt(totClases)} · otros/minita ${fmt(totSinC)} · Total ${fmt(totalVentas)}.`;
+      if(window._informeVentas){ const dif=Math.round(totalVentas-window._informeVentas.total); msg+= (dif===0?' · ✓ corrobora con Informe de Ventas.':` · ⚠ difiere del Informe en ${fmt(Math.abs(dif))}.`); }
       try{
-        const ex=await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(currentSede)}&mes=eq.${encodeURIComponent(mes)}&select=id`);
-        if(ex&&ex.length){ await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(currentSede)}&mes=eq.${encodeURIComponent(mes)}`,{method:'PATCH',body:rec}); }
-        else { rec.activos=0; rec.total_usuarios=0; rec.proyecciones=[]; rec.users_data=[]; await supaFetch('/gym_snapshots',{method:'POST',body:rec}); }
-        let msg=`📦 Día: ${memb.length} membresías (${fmt(totMemb)}) · sesiones ${fmt(totClases)} · otros/minita ${fmt(totSinC)} · Total ${fmt(totalVentas)}. Snapshot de ${currentSede} (${mes}) actualizado.`;
-        if(window._informeVentas){ const dif=Math.round(totalVentas-window._informeVentas.total); msg+= (dif===0?' · ✓ corrobora con Informe de Ventas.':` · ⚠ difiere del Informe en ${fmt(Math.abs(dif))}.`); }
-        // Descuento idempotente de inventario (el informe es acumulado del día → solo el delta)
-        const desc=await descontarInventario(soldByBase, origName, D);
-        if(desc&&!desc.error){ msg+=`<br>📦 Inventario: ${desc.unidadesDesc||0} unidad(es) descontada(s)`; if(desc.noCalzan&&desc.noCalzan.length) msg+=`. ⚠ Sin calzar en inventario (${desc.noCalzan.length}): ${desc.noCalzan.slice(0,8).map(esc).join(', ')}${desc.noCalzan.length>8?'…':''}`; }
+        const desc=await descontarInventario(soldByBase, origName, D);   // idempotente por día
+        if(desc&&!desc.error){ msg+=`<br>📦 Inventario: ${desc.unidadesDesc||0} unidad(es) descontadas en esta carga`;
+          if(desc.detalle&&desc.detalle.length) msg+=` — ${desc.detalle.slice(0,10).map(d=>`${esc(d.producto)} −${d.delta} (${d.hoy} hoy, quedan ${d.stock})`).join(', ')}${desc.detalle.length>10?'…':''}`;
+          if(desc.noCalzan&&desc.noCalzan.length) msg+=`. ⚠ Sin calzar en inventario (${desc.noCalzan.length}): ${desc.noCalzan.slice(0,8).map(esc).join(', ')}${desc.noCalzan.length>8?'…':''}`; }
         else if(desc&&desc.error){ msg+=`<br>⚠ Inventario no actualizado: ${esc(desc.error)}`; }
-        document.getElementById('ventasHint').innerHTML=msg;
-        calc();
-      }catch(se){ document.getElementById('ventasHint').innerHTML='⚠️ No se pudo guardar el snapshot: '+se.message+' (revisar permiso de gym_snapshots).'; }
+      }catch(_){}
+      document.getElementById('ventasHint').innerHTML=msg;
+      calc();
     }catch(err){ alert('Error al leer el archivo: '+err.message); }
   };
   reader.readAsArrayBuffer(file);
@@ -887,7 +914,7 @@ async function cerrarTurno(estado){
   const msg=document.getElementById('saveMsg');
   if(!turnoActual){ msg.className='msg err'; msg.textContent='Primero abra el turno.'; return; }
   const fecha=document.getElementById('cFecha').value;
-  if(document.getElementById('cTarjeta').value===''||document.getElementById('cSinpe').value===''){ msg.className='msg err'; msg.textContent='Incluya el monto de Tarjeta y SINPE (ponga 0 si no hubo).'; return; }
+  if(document.getElementById('cTarjeta').value===''||document.getElementById('cSinpe').value===''){ msg.className='msg err'; msg.textContent='Cargue el 📤 Informe de Ventas (llena Tarjeta y SINPE automáticamente).'; return; }
   if(estado==='final'&&!window._sinpeReporte){ msg.className='msg err'; msg.textContent='Para el cierre final debe cargar el 🔷 Reporte SINPE del día.'; return; }
   if(!fotoDatafono){ msg.className='msg err'; msg.textContent=`Suba la foto del datáfono (${estado==='final'?'cierre de lote':'auditoría'}) — es obligatoria para el cierre.`; return; }
   const c=calc();
