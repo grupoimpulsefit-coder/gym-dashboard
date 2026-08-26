@@ -307,8 +307,11 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
         <tfoot><tr class="tot"><td></td><td>Efectivo inicial</td><td id="aEfectivoCell">₡0</td></tr></tfoot>
       </table>
       <div class="hint" id="aEfectivoHint" style="margin:2px 0 14px;"></div>
-      <div style="font-size:13px;font-weight:800;color:var(--primary);margin:10px 0 6px;">📦 Inventario contado (obligatorio, a ciegas)</div>
-      <div class="hint" style="margin-bottom:8px;">Cuente físicamente cada producto y anote la cantidad. El sistema comparará con lo registrado (no se muestra para que el conteo sea real). No se modifica el stock, solo se verifica.</div>
+      <div style="display:flex;align-items:center;gap:10px;margin:10px 0 6px;">
+        <div style="font-size:13px;font-weight:800;color:var(--primary);">📦 Inventario contado (obligatorio, a ciegas)</div>
+        <button type="button" class="btn-ghost" style="margin-left:auto;font-size:12px;padding:5px 10px;" onclick="imprimirListaInventario()">🖨️ Imprimir hoja de conteo</button>
+      </div>
+      <div class="hint" style="margin-bottom:8px;">Cuente físicamente cada producto y anote la cantidad. El sistema comparará con lo registrado (no se muestra para que el conteo sea real). No se modifica el stock, solo se verifica. Podés imprimir la hoja para anotar a mano y luego digitar.</div>
       <div id="aInvList" style="max-height:34vh;overflow-y:auto;border:1px solid var(--border);border-radius:10px;"></div>
       <div id="abrirErr" style="color:var(--warn);font-size:13px;min-height:16px;margin-top:10px;"></div>
     </div>
@@ -439,12 +442,25 @@ function updateTurnoUI(){
   }
 }
 function cargarTurnoEnForm(t){
+  window._formCierreId=t.id;
   document.getElementById('cFecha').value=t.fecha||todayStr();
   document.getElementById('cTurno').value='Turno '+(t.turno_num||'');
   document.getElementById('cCajaInicial').value=t.caja_inicial||0;
   document.getElementById('cCajaInicial').readOnly=true;
   if(t.total_ventas){ document.getElementById('cMembresias').value=t.membresias||0; document.getElementById('cOtros').value=t.otros_vendidos||0; document.getElementById('cTarjeta').value=t.total_tarjeta||''; document.getElementById('cSinpe').value=t.total_sinpe||''; document.getElementById('cTransfer').value=t.total_transferencia||''; document.getElementById('cTotalVentas').value=t.total_ventas||0; document.getElementById('cSobreModo').value=t.sobre_modo||(t.sobre_retirado?'ya':'retira'); }
   if(t.denominaciones) DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=t.denominaciones[d]||0;});
+  // Restaurar el borrador local (conteo en curso) si existe — sobrevive a logout/recarga.
+  const dr=loadDraft();
+  if(dr){
+    if(dr.denoms) DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=dr.denoms[d]||0;});
+    if(Array.isArray(dr.gastos)&&dr.gastos.length) gastos=dr.gastos.map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros'}));
+    if(Array.isArray(dr.ingresos)&&dr.ingresos.length) ingresos=dr.ingresos.map(g=>({desc:g.desc||'',monto:g.monto??''}));
+    if(dr.sobreModo) document.getElementById('cSobreModo').value=dr.sobreModo;
+    [['membresias','cMembresias'],['otros','cOtros'],['tarjeta','cTarjeta'],['sinpe','cSinpe'],['transfer','cTransfer'],['totalVentas','cTotalVentas']].forEach(([k,id])=>{ if(dr[k]!==undefined&&dr[k]!=='') document.getElementById(id).value=dr[k]; });
+    renderGastos(); renderIngresos();
+    const hayConteo=Object.values(dr.denoms||{}).some(v=>Number(v)>0)||(dr.gastos||[]).some(g=>Number(g.monto)>0)||(dr.ingresos||[]).some(g=>Number(g.monto)>0);
+    if(hayConteo){ const sm=document.getElementById('saveMsg'); sm.className='msg ok'; sm.innerHTML='↩ Se restauró tu conteo guardado en este dispositivo (podés modificarlo).'; }
+  }
   document.getElementById('cajaInicialHint').textContent='Fondo del primer turno del día (base del cuadre del día completo).';
   renderAperturaInv(t);
   calc();
@@ -485,6 +501,29 @@ async function openAbrirModal(){
   document.getElementById('abrirErr').textContent='';
   document.getElementById('abrirModal').style.display='flex';
 }
+// Hoja imprimible para contar el inventario a mano (todas las cantidades en 0).
+function imprimirListaInventario(){
+  const inv=window._invAp||[];
+  if(!inv.length){ alert('Esta sede no tiene productos en inventario para imprimir.'); return; }
+  const fecha=todayStr(), turno=window._turnoNum||'';
+  const rows=inv.map((p,i)=>`<tr><td class="n">${i+1}</td><td>${esc(p.producto)}</td><td class="c">0</td></tr>`).join('');
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Conteo inventario ${esc(currentSede)} ${fecha}</title>
+  <style>*{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;} body{margin:22px;color:#111;}
+  h1{font-size:18px;margin:0 0 2px;} .sub{font-size:12px;color:#555;margin:0 0 14px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;} th,td{border:1px solid #999;padding:9px 8px;text-align:left;}
+  th{background:#eee;} td.n{width:34px;text-align:center;color:#777;} td.c{width:150px;text-align:center;color:#bbb;font-weight:700;}
+  tr{page-break-inside:avoid;} .foot{margin-top:16px;font-size:11px;color:#555;}
+  @media print{.noprint{display:none;}}</style></head><body>
+  <h1>Hoja de conteo de inventario</h1>
+  <div class="sub">Sede: <b>${esc(currentSede)}</b> · Fecha: ${fecha}${turno?` · Turno ${turno}`:''} · ${inv.length} productos</div>
+  <table><thead><tr><th class="n">#</th><th>Producto</th><th class="c">Cantidad contada</th></tr></thead><tbody>${rows}</tbody></table>
+  <div class="foot">Anote la cantidad física sobre el 0 y luego digítela en el sistema. &nbsp; Contado por: ______________________ &nbsp; Firma: __________________</div>
+  <button class="noprint" onclick="window.print()" style="margin-top:16px;padding:8px 16px;font-size:14px;cursor:pointer;">🖨️ Imprimir</button>
+  </body></html>`;
+  const w=window.open('','_blank');
+  if(!w){ alert('Permití las ventanas emergentes para imprimir la hoja.'); return; }
+  w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch(_){} },350);
+}
 function calcAperturaEfectivo(){
   let ef=0; DENOMS.forEach(d=>{ const c=Number(document.getElementById('aden_'+d).value)||0; const s=c*d; ef+=s; const el=document.getElementById('asub_'+d); if(el)el.textContent=fmt(s); });
   document.getElementById('aEfectivoCell').textContent=fmt(ef);
@@ -519,6 +558,23 @@ function renderDenoms(){
     <tr><td><input type="number" min="0" step="1" id="den_${d}" value="0" oninput="calc()"></td>
     <td><span class="chip">₡${d.toLocaleString('es-CR')}</span></td><td id="sub_${d}" class="sub">₡0</td></tr>`).join('');
 }
+
+// ── Autoguardado del conteo en el navegador (sobrevive logout/recarga) ──
+function draftKey(){ return `gymCajaDraft:${currentSede||''}:${turnoActual?turnoActual.id:'noturno'}`; }
+function saveDraft(){
+  // Solo si el formulario refleja el turno ABIERTO actual (no al ver un cierre del historial).
+  if(!turnoActual || window._formCierreId!==turnoActual.id) return;
+  try{
+    const denoms={}; DENOMS.forEach(d=>denoms[d]=Number(document.getElementById('den_'+d).value)||0);
+    const draft={ denoms, gastos, ingresos, sobreModo:document.getElementById('cSobreModo').value,
+      membresias:document.getElementById('cMembresias').value, otros:document.getElementById('cOtros').value,
+      tarjeta:document.getElementById('cTarjeta').value, sinpe:document.getElementById('cSinpe').value,
+      transfer:document.getElementById('cTransfer').value, totalVentas:document.getElementById('cTotalVentas').value, ts:Date.now() };
+    localStorage.setItem(draftKey(), JSON.stringify(draft));
+  }catch(_){}
+}
+function loadDraft(){ try{ const s=localStorage.getItem(draftKey()); return s?JSON.parse(s):null; }catch(_){ return null; } }
+function clearDraft(){ try{ localStorage.removeItem(draftKey()); }catch(_){} }
 
 // ── Cálculo ──
 function calc(){
@@ -561,6 +617,7 @@ function calc(){
   const efectivoFinal=(sobreModo==='retira')?(efectivo-minita):efectivo;
   document.getElementById('rEfectivoFinal').textContent=fmt(efectivoFinal);
   document.getElementById('rOtros').textContent=fmt(sobreOut);
+  saveDraft();
   if(window._sinpeReporte)renderSinpeResumen();
   if(fotoDatafono)renderFotoResumen();
   document.getElementById('sobreHint').textContent =
@@ -574,15 +631,15 @@ function calc(){
 function renderGastos(){
   document.getElementById('gastosLines').innerHTML=gastos.map((g,i)=>`
     <div class="line">
-    <select class="gcat" onchange="gastos[${i}].cat=this.value">${CATS_GASTO.map(c=>`<option value="${c.id}"${(g.cat||'otros')===c.id?' selected':''}>${c.label}</option>`).join('')}</select>
-    <input class="desc" placeholder="Descripción" value="${esc(g.desc)}" oninput="gastos[${i}].desc=this.value">
+    <select class="gcat" onchange="gastos[${i}].cat=this.value;saveDraft()">${CATS_GASTO.map(c=>`<option value="${c.id}"${(g.cat||'otros')===c.id?' selected':''}>${c.label}</option>`).join('')}</select>
+    <input class="desc" placeholder="Descripción" value="${esc(g.desc)}" oninput="gastos[${i}].desc=this.value;saveDraft()">
     <input class="monto" type="number" step="1" placeholder="0" value="${g.monto}" oninput="gastos[${i}].monto=this.value;calc()">
     <button class="btn-del" onclick="gastos.splice(${i},1);renderGastos();calc()">🗑</button></div>`).join('');
 }
 function addGasto(){gastos.push({desc:'',monto:'',cat:'otros'});renderGastos();}
 function renderIngresos(){
   document.getElementById('ingresosLines').innerHTML=ingresos.map((g,i)=>`
-    <div class="line"><input class="desc" placeholder="Descripción" value="${esc(g.desc)}" oninput="ingresos[${i}].desc=this.value">
+    <div class="line"><input class="desc" placeholder="Descripción" value="${esc(g.desc)}" oninput="ingresos[${i}].desc=this.value;saveDraft()">
     <input class="monto" type="number" step="1" placeholder="0" value="${g.monto}" oninput="ingresos[${i}].monto=this.value;calc()">
     <button class="btn-del" onclick="ingresos.splice(${i},1);renderIngresos();calc()">🗑</button></div>`).join('');
 }
@@ -590,6 +647,7 @@ function addIngreso(){ingresos.push({desc:'',monto:''});renderIngresos();}
 
 // ── Nuevo cierre (con acumulado: caja inicial = efectivo del cierre anterior) ──
 function nuevoCierre(){
+  window._formCierreId=null;
   document.getElementById('cFecha').value=todayStr();
   document.getElementById('cTurno').value='';
   ['cMembresias','cOtros','cTarjeta','cSinpe','cTransfer','cTotalVentas'].forEach(id=>document.getElementById(id).value='');
@@ -965,6 +1023,7 @@ async function cerrarTurno(estado){
         sinpeMsg=` 🔷 ${filas.length} SINPE registrados.`; }
       catch(se){ sinpeMsg=' ⚠ No se pudieron registrar los SINPE: '+se.message; }
     }
+    clearDraft();   // conteo confirmado → limpiar borrador local
     msg.className='msg ok'; msg.textContent=(estado==='final'?'⏹️ Turno cerrado (final).':'⏸️ Cierre parcial guardado. Puede abrir el siguiente turno.')+(gastosLimpios.length?` ${gastosLimpios.length} gasto(s) enviados a Gastos.`:'')+sinpeMsg;
     await loadCierres();
   }catch(e){ msg.className='msg err'; msg.textContent='⚠️ '+e.message; }
@@ -1037,6 +1096,7 @@ function renderHist(){
 }
 function cargarCierre(id){
   const c=cierres.find(x=>x.id===id); if(!c)return;
+  window._formCierreId=c.id;   // viendo historial → no dispara autoguardado del turno abierto
   document.getElementById('cFecha').value=c.fecha; document.getElementById('cTurno').value=c.turno||'';
   document.getElementById('cCajaInicial').value=c.caja_inicial||0; document.getElementById('cMembresias').value=c.membresias||0; document.getElementById('cOtros').value=c.otros_vendidos||0;
   window._otrosResumen=c.otros_desglose||null; renderOtrosResumen(window._otrosResumen);
