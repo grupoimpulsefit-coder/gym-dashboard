@@ -47,6 +47,8 @@ alter table cierres_caja add column if not exists denominaciones_apertura jsonb;
 alter table cierres_caja add column if not exists sinpe_reporte jsonb;             -- { fileName, totalN, totalMonto, yaRegN, yaRegMonto, nuevosN, nuevosMonto, facturado, pendPrev, pendAfter }
 -- Saldo SINPE pendiente por facturar (se arrastra al siguiente cierre): pendAfter = pendPrev + recibido_nuevo - facturado.
 alter table cierres_caja add column if not exists sinpe_pendiente numeric;
+-- Marca de última modificación (autoguardado en vivo del turno abierto → los admin lo ven en tiempo real).
+alter table cierres_caja add column if not exists updated_at timestamptz;
 -- Foto de auditoría del datáfono (parcial) y del cierre (final) + resultado del análisis con IA.
 alter table cierres_caja add column if not exists foto_datafono text;   -- path en Storage (cierre parcial)
 alter table cierres_caja add column if not exists foto_cierre   text;   -- path en Storage (cierre final)
