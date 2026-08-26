@@ -233,6 +233,7 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
 
       <div class="card">
         <h3>Billetes y monedas</h3>
+        <div class="hint" style="margin:-4px 0 8px;">Arranca con el conteo de la <b>apertura</b>; ajústalo al contar el efectivo para el cierre.</div>
         <table class="denom">
           <thead><tr><th>Cant.</th><th>Denominación</th><th>Subtotal</th></tr></thead>
           <tbody id="denomBody"></tbody>
@@ -451,7 +452,9 @@ function cargarTurnoEnForm(t){
   document.getElementById('cCajaInicial').value=t.caja_inicial||0;
   document.getElementById('cCajaInicial').readOnly=true;
   if(t.total_ventas){ document.getElementById('cMembresias').value=t.membresias||0; document.getElementById('cOtros').value=t.otros_vendidos||0; document.getElementById('cTarjeta').value=t.total_tarjeta||''; document.getElementById('cSinpe').value=t.total_sinpe||''; document.getElementById('cTransfer').value=t.total_transferencia||''; document.getElementById('cTotalVentas').value=t.total_ventas||0; document.getElementById('cSobreModo').value=t.sobre_modo||(t.sobre_retirado?'ya':'retira'); }
-  if(t.denominaciones) DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=t.denominaciones[d]||0;});
+  // Billetes/monedas del cierre: usa el conteo de cierre si existe; si no, arranca con el CONTEO DE APERTURA.
+  const baseDen=(t.denominaciones&&Object.keys(t.denominaciones).length)?t.denominaciones:(t.denominaciones_apertura||null);
+  if(baseDen) DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=baseDen[d]||0;});
   // Restaurar el borrador local (conteo en curso) si existe — sobrevive a logout/recarga.
   const dr=loadDraft();
   if(dr){
