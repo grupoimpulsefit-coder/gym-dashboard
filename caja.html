@@ -135,6 +135,8 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
     <input type="file" id="fileVentasProd" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarVentasProducto(this.files[0])">
     <label class="btn-ghost" for="fileSinpe" style="cursor:pointer;">🔷 Reporte SINPE</label>
     <input type="file" id="fileSinpe" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarReporteSinpe(this.files[0])">
+    <label class="btn-ghost" id="btnSinpeHist" for="fileSinpeHist" style="cursor:pointer;display:none;" title="Carga ÚNICA de SINPE históricos (para que no se recuenten)">🗄️ SINPE históricos</label>
+    <input type="file" id="fileSinpeHist" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]){cargarSinpeHistorico(this.files[0]);this.value='';}">
     <button class="btn-ghost" onclick="loadCierres()">↻ Recargar</button>
   </div>
 </div>
@@ -419,6 +421,7 @@ async function init(){
     sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;loadPricesForSede(currentSede);loadCierres();};
   }else ctrl.innerHTML=`<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
   document.getElementById('sedeTitle').textContent='· '+currentSede;
+  const bh=document.getElementById('btnSinpeHist'); if(bh)bh.style.display=esAdmin()?'':'none';   // carga única: solo admins
   renderDenoms(); renderGastos(); renderIngresos();
   document.getElementById('app').style.display='block';
   loadPricesForSede(currentSede);
@@ -686,6 +689,42 @@ function prevGIDia(){   // gastos/ingresos ya cerrados por turnos previos de hoy
   const prev=turnosDelDia().filter(c=> c.id!==curId && (c.estado==='parcial'||c.estado==='final'));
   return { gastos:prev.reduce((s,c)=>s+(Number(c.total_gastos)||0),0),
            ingresos:prev.reduce((s,c)=>s+(Number(c.total_ingresos)||0),0) };
+}
+
+// ── Carga ÚNICA de SINPE históricos: registra referencias para que no se recuenten (no toca cierres) ──
+async function cargarSinpeHistorico(file){
+  if(!esAdmin()){ alert('Solo un administrador puede hacer la carga de SINPE históricos.'); return; }
+  if(!confirm(`Carga ÚNICA de SINPE históricos para la sede "${currentSede}".\n\nRegistra TODAS las referencias del archivo para que a futuro no se recuenten (no modifica ningún cierre). ¿Continuar?`)) return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      let hdr=-1,cRef=-1,cMonto=-1,cFecha=-1,cDet=-1;
+      for(let i=0;i<Math.min(rows.length,15);i++){ const nm=(rows[i]||[]).map(normHdr);
+        const ri=nm.findIndex(c=>c.includes('referencia')); const mi=nm.findIndex(c=>c==='monto');
+        if(ri>=0&&mi>=0){ hdr=i; cRef=ri; cMonto=mi; cFecha=nm.findIndex(c=>c.includes('fecha')&&c.includes('transacc')); if(cFecha<0)cFecha=nm.findIndex(c=>c.includes('fecha')); cDet=nm.findIndex(c=>c==='detalle'); break; } }
+      if(hdr<0)throw new Error('No se encontró el encabezado con "ReferenciaSinpe" y "Monto". ¿Es un reporte SINPE?');
+      const seen=new Set(); const all=[];
+      for(let i=hdr+1;i<rows.length;i++){ const r=rows[i]; if(!r)continue;
+        const ref=String(r[cRef]==null?'':r[cRef]).trim(); if(!ref||seen.has(ref))continue; seen.add(ref);
+        all.push({ referencia:ref, monto:Math.round(Number(r[cMonto])||0), fecha_tx:cFecha>=0?String(r[cFecha]||'').trim():'', detalle:cDet>=0?String(r[cDet]||'').trim():'' }); }
+      if(!all.length)throw new Error('El archivo no tiene filas de SINPE.');
+      // Referencias ya registradas de la sede
+      const reg=(await supaFetch(`/sinpe_registrados?sede=eq.${encodeURIComponent(currentSede)}&select=referencia`))||[];
+      const ya=new Set(reg.map(x=>String(x.referencia)));
+      const nuevos=all.filter(x=>!ya.has(x.referencia));
+      if(!nuevos.length){ alert(`Todas las referencias del archivo (${all.length}) ya estaban registradas. No hay nada nuevo que cargar.`); return; }
+      const filas=nuevos.map(x=>({ sede:currentSede, referencia:x.referencia, monto:x.monto, fecha_tx:x.fecha_tx||null, detalle:(x.detalle?x.detalle+' ':'')+'[histórico]', cierre_id:null, created_by:currentEmail||null }));
+      // Insertar por lotes (por si son muchos)
+      let ok=0; const CH=500;
+      for(let i=0;i<filas.length;i+=CH){ const lote=filas.slice(i,i+CH);
+        await supaFetch('/sinpe_registrados?on_conflict=sede,referencia',{method:'POST',prefer:'resolution=ignore-duplicates,return=minimal',body:lote}); ok+=lote.length; }
+      const montoNuevos=nuevos.reduce((s,x)=>s+x.monto,0);
+      alert(`✅ SINPE históricos registrados en ${currentSede}:\n\n• ${nuevos.length} referencias nuevas (${fmt(montoNuevos)})\n• ${all.length-nuevos.length} ya estaban\n• ${all.length} en el archivo\n\nA futuro estas no se volverán a contar.`);
+    }catch(err){ alert('Error al cargar SINPE históricos: '+err.message); }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 // ── Cargar Informe de Ventas (validación/autollenado) ──
