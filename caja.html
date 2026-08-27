@@ -808,7 +808,7 @@ function cargarInformeVentas(file){
       for(let i=0;i<Math.min(rows.length,15);i++){const idx=rows[i].findIndex(c=>String(c||'').trim().toLowerCase()==='total crc'); if(idx>=0){colTotal=idx;break;}}
       let efectivo=0,sinpe=0,tarjeta=0,transfer=0;
       rows.forEach(r=>{
-        const label=(r||[]).map(c=>String(c||'').trim()).find(t=>/^total\s+(efectivo|sinpe|tarjeta|transferencia)$/i.test(t));
+        const label=(r||[]).map(c=>String(c||'').trim()).find(t=>/^total\s+(efectivo|sinpe|tarjeta|transferencia)\b/i.test(t));
         if(label){const amt=colTotal>=0?(Number(r[colTotal])||0):(Number([...r].reverse().find(x=>typeof x==='number'))||0);
           const m=label.toLowerCase(); if(m.includes('efectivo'))efectivo=amt; else if(m.includes('sinpe'))sinpe=amt; else if(m.includes('transferencia'))transfer=amt; else if(m.includes('tarjeta'))tarjeta=amt;}
       });
