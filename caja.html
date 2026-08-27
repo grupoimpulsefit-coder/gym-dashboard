@@ -284,6 +284,7 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
       <div class="card">
         <div class="msg" id="saveMsg"></div>
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap;">
+          <button class="btn-ghost" id="btnGuardar" onclick="guardarManual()">💾 Guardar</button>
           <button class="btn-ghost" onclick="generarPDF()">🖨️ PDF</button>
           <button class="btn-ghost" id="btnParcial" onclick="cerrarTurno('parcial')">⏸️ Cierre parcial</button>
           <button class="btn-primary" id="btnFinal" onclick="cerrarTurno('final')">⏹️ Cierre final</button>
@@ -423,6 +424,7 @@ async function init(){
     sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;loadPricesForSede(currentSede);loadCierres();};
   }else ctrl.innerHTML=`<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
   document.getElementById('sedeTitle').textContent='· '+currentSede;
+  limpiarCacheVieja();   // borra borradores viejos en localStorage (ya no se usan)
   const bh=document.getElementById('btnSinpeHist'); if(bh)bh.style.display=esAdmin()?'':'none';   // carga única: solo admins
   renderDenoms(); renderGastos(); renderIngresos();
   document.getElementById('app').style.display='block';
@@ -467,17 +469,9 @@ function cargarTurnoEnForm(t){
   window._informeVentas=t.informe_ventas||null;
   gastos=(Array.isArray(t.gastos)&&t.gastos.length?t.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros'}));
   ingresos=(Array.isArray(t.ingresos)&&t.ingresos.length?t.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc||'',monto:g.monto??''}));
-  // Billetes/monedas: conteo de cierre en curso si existe; si no, arranca con el CONTEO DE APERTURA.
+  // Billetes/monedas: conteo de cierre en curso (del servidor) si existe; si no, arranca con el CONTEO DE APERTURA.
   const baseDen=(t.denominaciones&&Object.keys(t.denominaciones).length)?t.denominaciones:(t.denominaciones_apertura||null);
   if(baseDen) DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=baseDen[d]||0;});
-  // Respaldo local del MISMO dispositivo más nuevo que el servidor (ediciones offline sin sincronizar)
-  const bk=loadLocalBackup();
-  if(bk && (!t.updated_at || (bk.ts||0) > new Date(t.updated_at).getTime()+1500)){
-    if(bk.denoms) DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=bk.denoms[d]||0;});
-    if(Array.isArray(bk.gastos)&&bk.gastos.length) gastos=bk.gastos.map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros'}));
-    if(Array.isArray(bk.ingresos)&&bk.ingresos.length) ingresos=bk.ingresos.map(g=>({desc:g.desc||'',monto:g.monto??''}));
-    if(bk.sobreModo) document.getElementById('cSobreModo').value=bk.sobreModo;
-  }
   _lastServerUpd=t.updated_at||null; _lastEditTs=0;
   document.getElementById('cajaInicialHint').textContent='Fondo del primer turno del día (base del cuadre del día completo).';
   renderOtrosResumen(window._otrosResumen);
@@ -581,25 +575,22 @@ function renderDenoms(){
     <td><span class="chip">₡${d.toLocaleString('es-CR')}</span></td><td id="sub_${d}" class="sub">₡0</td></tr>`).join('');
 }
 
-// ── Autoguardado del turno abierto en el SERVIDOR (caja compartida + tiempo real) ──
-// El conteo en curso se guarda en la fila del turno; los admin lo ven en vivo (poll cada 15s).
-// localStorage queda como respaldo offline del mismo dispositivo.
+// ── Guardado del turno abierto en el SERVIDOR (caja compartida + tiempo real) ──
+// El conteo en curso se guarda en la fila del turno (NO en el navegador → sin problemas de caché).
+// Autoguardado debounced + botón "Guardar" manual. Los admin lo ven en vivo (poll cada 15s).
 let _saveTimer=null, _lastEditTs=0, _lastServerUpd=null, _pollTimer=null, _noSave=false;
-function draftKey(){ return `gymCajaDraft:${currentSede||''}:${turnoActual?turnoActual.id:'noturno'}`; }
-function localBackup(){ try{ const denoms={}; DENOMS.forEach(d=>denoms[d]=Number(document.getElementById('den_'+d).value)||0);
-  localStorage.setItem(draftKey(), JSON.stringify({denoms,gastos,ingresos,sobreModo:document.getElementById('cSobreModo').value,ts:Date.now()})); }catch(_){}
-}
-function loadLocalBackup(){ try{ const s=localStorage.getItem(draftKey()); return s?JSON.parse(s):null; }catch(_){ return null; } }
-function clearLocalBackup(){ try{ localStorage.removeItem(draftKey()); }catch(_){} }
-// Llamado en cada cambio del usuario (desde calc): respaldo local inmediato + guardado al servidor (debounced).
+// Limpia borradores viejos de versiones anteriores (ya no se usa localStorage para la caja).
+function limpiarCacheVieja(){ try{ Object.keys(localStorage).filter(k=>k.indexOf('gymCajaDraft:')===0).forEach(k=>localStorage.removeItem(k)); }catch(_){} }
+// Llamado en cada cambio del usuario (desde calc): programa el guardado al servidor (debounced).
 function saveDraft(){
   if(_noSave) return;
   if(!turnoActual || window._formCierreId!==turnoActual.id || turnoActual.estado!=='abierto') return;
-  _lastEditTs=Date.now(); localBackup();
-  clearTimeout(_saveTimer); _saveTimer=setTimeout(serverSave, 2500);
+  _lastEditTs=Date.now();
+  const li=document.getElementById('liveInfo'); if(li) li.textContent='✏️ Sin guardar…';
+  clearTimeout(_saveTimer); _saveTimer=setTimeout(()=>serverSave(false), 2500);
 }
-async function serverSave(){
-  if(!turnoActual || window._formCierreId!==turnoActual.id || turnoActual.estado!=='abierto') return;
+async function serverSave(showErr){
+  if(!turnoActual || window._formCierreId!==turnoActual.id || turnoActual.estado!=='abierto'){ if(showErr){const m=document.getElementById('saveMsg');m.className='msg err';m.textContent='No hay turno abierto para guardar.';} return; }
   try{
     _noSave=true; const c=calc(); _noSave=false;
     const denominaciones={}; DENOMS.forEach(d=>denominaciones[d]=Number(document.getElementById('den_'+d).value)||0);
@@ -611,9 +602,16 @@ async function serverSave(){
       minita:c.minita, otros_vendidos:c.otros, otros_desglose:window._otrosResumen||null, sobre_modo:c.sobreModo,
       informe_ventas:window._informeVentas||null, updated_at:upd };
     await supaFetch(`/cierres_caja?id=eq.${turnoActual.id}`,{method:'PATCH',body:payload});
-    turnoActual.updated_at=upd; _lastServerUpd=upd; clearLocalBackup();
+    turnoActual.updated_at=upd; _lastServerUpd=upd;
     const li=document.getElementById('liveInfo'); if(li) li.textContent='💾 Guardado '+new Date(upd).toLocaleTimeString('es-CR');
-  }catch(_){ /* offline: queda el respaldo local */ }
+    if(showErr){ const m=document.getElementById('saveMsg'); m.className='msg ok'; m.textContent='💾 Guardado en el servidor.'; }
+  }catch(e){ const li=document.getElementById('liveInfo'); if(li) li.textContent='⚠️ Sin guardar';
+    if(showErr){ const m=document.getElementById('saveMsg'); m.className='msg err'; m.textContent='⚠️ No se pudo guardar: '+e.message; } }
+}
+async function guardarManual(){
+  const btn=document.getElementById('btnGuardar'); if(!btn)return; const t0=btn.textContent; btn.disabled=true; btn.textContent='Guardando...';
+  clearTimeout(_saveTimer); await serverSave(true);
+  btn.disabled=false; btn.textContent=t0;
 }
 function stopLivePoll(){ if(_pollTimer){ clearInterval(_pollTimer); _pollTimer=null; } }
 function startLivePoll(){ stopLivePoll(); _pollTimer=setInterval(liveRefresh, 15000); }
@@ -1132,7 +1130,7 @@ async function cerrarTurno(estado){
         sinpeMsg=` 🔷 ${filas.length} SINPE registrados.`; }
       catch(se){ sinpeMsg=' ⚠ No se pudieron registrar los SINPE: '+se.message; }
     }
-    stopLivePoll(); clearLocalBackup();   // turno cerrado → detener refresco y limpiar respaldo local
+    stopLivePoll();   // turno cerrado → detener refresco en vivo
     msg.className='msg ok'; msg.textContent=(estado==='final'?'⏹️ Turno cerrado (final).':'⏸️ Cierre parcial guardado. Puede abrir el siguiente turno.')+(gastosLimpios.length?` ${gastosLimpios.length} gasto(s) enviados a Gastos.`:'')+sinpeMsg;
     await loadCierres();
   }catch(e){ msg.className='msg err'; msg.textContent='⚠️ '+e.message; }
