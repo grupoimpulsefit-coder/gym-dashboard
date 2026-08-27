@@ -758,6 +758,20 @@ function prevGIDia(){   // gastos/ingresos ya cerrados por turnos previos de hoy
   return { gastos:prev.reduce((s,c)=>s+(Number(c.total_gastos)||0),0),
            ingresos:prev.reduce((s,c)=>s+(Number(c.total_ingresos)||0),0) };
 }
+// Detalle de gastos/ingresos de TODO el día (turnos previos + el que está en el formulario) para el PDF.
+function _movsDelDia(campo){
+  const arr=[]; const formId=window._formCierreId;
+  // turnos cerrados del día, EXCEPTO el que está en el formulario (ese se toma del array vivo, más actualizado)
+  turnosDelDia().filter(c=>(c.estado==='parcial'||c.estado==='final') && c.id!==formId)
+    .sort((a,b)=>(a.turno_num||0)-(b.turno_num||0))
+    .forEach(c=>(Array.isArray(c[campo])?c[campo]:[]).forEach(g=>{ if(Number(g.monto)>0) arr.push({desc:g.desc,monto:Number(g.monto)||0,turno:c.turno_num}); }));
+  const curNum=(cierres.find(c=>c.id===formId)||{}).turno_num || (turnoActual&&turnoActual.turno_num);
+  const liveArr=campo==='gastos'?gastos:ingresos;
+  liveArr.forEach(g=>{ if(Number(g.monto)>0) arr.push({desc:g.desc,monto:Number(g.monto)||0,turno:curNum}); });
+  return arr;
+}
+function gastosDelDia(){ return _movsDelDia('gastos'); }
+function ingresosDelDia(){ return _movsDelDia('ingresos'); }
 
 // ── Carga ÚNICA de SINPE históricos: registra referencias para que no se recuenten (no toca cierres) ──
 async function cargarSinpeHistorico(file){
@@ -1269,15 +1283,15 @@ function generarPDF(){
   doc.setFillColor(br,bg,bb); doc.roundedRect(bx,y-RH+6,bw,RH,6,6,'F');
   doc.setFont('helvetica','bold');doc.setFontSize(11.5); doc.setTextColor(c.ok?6:156, c.ok?100:0, c.ok?50:24);
   doc.text(c.ok?'CAJA CUADRA':'DIFERENCIA  '+money(Math.abs(c.diferencia)), X+W/2, y-4, {align:'center'}); y+=RH+7;
-  head('GASTOS','FFC000');
-  const gs=gastos.filter(g=>Number(g.monto)>0);
-  (gs.length?gs:[{desc:'Sin gastos',monto:0}]).forEach(g=>{ border(); doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(40); doc.text(esc(g.desc||'Gasto'),X+11,y-4); doc.setFont('helvetica','bold'); doc.text(money(g.monto),X+W-11,y-4,{align:'right'}); y+=RH; });
-  row('TOTAL GASTOS',c.totGastos,'FF7474');
+  head('GASTOS (día)','FFC000');
+  const gs=gastosDelDia(); const totGD=gs.reduce((s,g)=>s+g.monto,0);
+  (gs.length?gs:[{desc:'Sin gastos',monto:0}]).forEach(g=>{ border(); doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(40); doc.text((g.turno?`T${g.turno} · `:'')+esc(g.desc||'Gasto'),X+11,y-4); doc.setFont('helvetica','bold'); doc.text(money(g.monto),X+W-11,y-4,{align:'right'}); y+=RH; });
+  row('TOTAL GASTOS',totGD,'FF7474');
   y+=6;
-  head('INGRESOS','F6C3FF');
-  const ing=ingresos.filter(g=>Number(g.monto)>0);
-  (ing.length?ing:[{desc:'Sin ingresos',monto:0}]).forEach(g=>{ border(); doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(40); doc.text(esc(g.desc||'Ingreso'),X+11,y-4); doc.setFont('helvetica','bold'); doc.text(money(g.monto),X+W-11,y-4,{align:'right'}); y+=RH; });
-  row('TOTAL INGRESOS',c.totIngresos,'ECEEF0');
+  head('INGRESOS (día)','F6C3FF');
+  const ing=ingresosDelDia(); const totID=ing.reduce((s,g)=>s+g.monto,0);
+  (ing.length?ing:[{desc:'Sin ingresos',monto:0}]).forEach(g=>{ border(); doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(40); doc.text((g.turno?`T${g.turno} · `:'')+esc(g.desc||'Ingreso'),X+11,y-4); doc.setFont('helvetica','bold'); doc.text(money(g.monto),X+W-11,y-4,{align:'right'}); y+=RH; });
+  row('TOTAL INGRESOS',totID,'ECEEF0');
   y+=7;
   row('TOTAL MINITA / OTROS (sobre)',c.minita,'92D050',{sz:12});
   row('TOTAL EFECTIVO FINAL',c.efectivoFinal,'A9D08E',{sz:13});
