@@ -752,20 +752,24 @@ function fondoInicialDia(){
   const primero=[...dia].sort((a,b)=>(a.turno_num||0)-(b.turno_num||0))[0];
   return Number(primero.caja_inicial)||0;
 }
-function prevGIDia(){   // gastos/ingresos ya cerrados por turnos previos de hoy
-  const curId=turnoActual&&turnoActual.id;
-  const prev=turnosDelDia().filter(c=> c.id!==curId && (c.estado==='parcial'||c.estado==='final'));
+// Cierre que está en el formulario (turno abierto o uno del historial que se está viendo).
+function _formCierre(){ const id=window._formCierreId; return (cierres||[]).find(c=>c.id===id) || turnoActual || null; }
+// Turnos del día ESTRICTAMENTE ANTERIORES al del formulario (turno_num menor). Excluye el propio.
+function prevTurnosCerrados(){
+  const fc=_formCierre(); const num=fc?(Number(fc.turno_num)||0):Infinity; const id=fc?fc.id:null;
+  return turnosDelDia().filter(c=> c.id!==id && (c.estado==='parcial'||c.estado==='final') && (Number(c.turno_num)||0)<num);
+}
+function prevGIDia(){   // gastos/ingresos ya cerrados por turnos ANTERIORES del día
+  const prev=prevTurnosCerrados();
   return { gastos:prev.reduce((s,c)=>s+(Number(c.total_gastos)||0),0),
            ingresos:prev.reduce((s,c)=>s+(Number(c.total_ingresos)||0),0) };
 }
-// Detalle de gastos/ingresos de TODO el día (turnos previos + el que está en el formulario) para el PDF.
+// Detalle de gastos/ingresos del día (turnos anteriores + el del formulario) para el PDF.
 function _movsDelDia(campo){
-  const arr=[]; const formId=window._formCierreId;
-  // turnos cerrados del día, EXCEPTO el que está en el formulario (ese se toma del array vivo, más actualizado)
-  turnosDelDia().filter(c=>(c.estado==='parcial'||c.estado==='final') && c.id!==formId)
-    .sort((a,b)=>(a.turno_num||0)-(b.turno_num||0))
+  const arr=[]; const fc=_formCierre();
+  prevTurnosCerrados().sort((a,b)=>(a.turno_num||0)-(b.turno_num||0))
     .forEach(c=>(Array.isArray(c[campo])?c[campo]:[]).forEach(g=>{ if(Number(g.monto)>0) arr.push({desc:g.desc,monto:Number(g.monto)||0,turno:c.turno_num}); }));
-  const curNum=(cierres.find(c=>c.id===formId)||{}).turno_num || (turnoActual&&turnoActual.turno_num);
+  const curNum=fc?fc.turno_num:(turnoActual&&turnoActual.turno_num);
   const liveArr=campo==='gastos'?gastos:ingresos;
   liveArr.forEach(g=>{ if(Number(g.monto)>0) arr.push({desc:g.desc,monto:Number(g.monto)||0,turno:curNum}); });
   return arr;
