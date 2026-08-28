@@ -213,8 +213,11 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
       </div>
 
       <div class="card" id="otrosCard" style="display:none;">
-        <h3>🧃 Desglose de Otros (minita)</h3>
-        <div class="hint">Categorías de productos vendidos (Aguas, Energéticos, Galletas…). Los subtotales suman la minita.</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <h3 style="margin:0;">🧃 Desglose de Otros (minita)</h3>
+          <button type="button" class="btn-ghost" style="margin-left:auto;font-size:12px;padding:5px 10px;" onclick="imprimirDesgloseOtros()">🖨️ Imprimir</button>
+        </div>
+        <div class="hint" style="margin-top:6px;">Categorías de productos vendidos (Aguas, Energéticos, Galletas…). Los subtotales suman la minita.</div>
         <div id="otrosResumen"></div>
       </div>
 
@@ -991,6 +994,38 @@ function renderOtrosResumen(map){
   });
   html+=`<div style="display:flex;justify-content:space-between;padding:9px 12px;margin-top:10px;background:#eafaf0;color:#166534;border-radius:9px;font-weight:800;"><span>Total minita (Otros) · ${gqty} u</span><span>${fmt(gtotal)}</span></div>`;
   box.innerHTML=html; card.style.display='block';
+}
+// Imprime el desglose de "Otros/minita" tal como se ve en pantalla (por categoría).
+function imprimirDesgloseOtros(){
+  const map=window._otrosResumen; const keys=map?Object.keys(map):[];
+  if(!keys.length){ alert('Primero cargá "Ventas por Producto" para ver el desglose.'); return; }
+  const groups={}; let gtotal=0, gqty=0;
+  keys.forEach(k=>{ const it=map[k]; const cat=it.cat||resolverOtro(it.base||k).cat; (groups[cat]=groups[cat]||[]).push(it); gtotal+=Number(it.total)||0; gqty+=Number(it.qty)||0; });
+  let body='';
+  CAT_ORDER.forEach(cid=>{
+    const items=(groups[cid]||[]).sort((a,b)=>b.total-a.total); if(!items.length)return;
+    const sub=items.reduce((s,x)=>s+(Number(x.total)||0),0), qty=items.reduce((s,x)=>s+(Number(x.qty)||0),0);
+    body+=`<tr class="cat"><td>${esc(CAT_LABEL[cid])}</td><td class="c">${qty}</td><td class="m">${fmt(sub)}</td></tr>`;
+    items.forEach(it=>{ body+=`<tr><td class="p">${esc(it.base||'—')}</td><td class="c">${it.qty}</td><td class="m">${fmt(it.total)}</td></tr>`; });
+  });
+  const fecha=document.getElementById('cFecha').value||todayStr(); const turno=(document.getElementById('cTurno').value||'').trim();
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Desglose Otros ${esc(currentSede)} ${fecha}</title>
+  <style>*{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;} body{margin:22px;color:#111;}
+  h1{font-size:18px;margin:0 0 2px;} .sub{font-size:12px;color:#555;margin:0 0 14px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;} th,td{border:1px solid #bbb;padding:7px 9px;text-align:left;}
+  th{background:#eee;} td.c{width:60px;text-align:center;} td.m{width:120px;text-align:right;}
+  tr.cat td{background:#f0f7f4;font-weight:800;} td.p{padding-left:22px;color:#333;}
+  tfoot td{background:#eafaf0;color:#166534;font-weight:800;font-size:14px;}
+  @media print{.noprint{display:none;}}</style></head><body>
+  <h1>🧃 Desglose de Otros (minita)</h1>
+  <div class="sub">Sede: <b>${esc(currentSede)}</b> · Fecha: ${fecha}${turno?` · ${esc(turno)}`:''}</div>
+  <table><thead><tr><th>Categoría / Producto</th><th class="c">Cant.</th><th class="m">Total</th></tr></thead>
+  <tbody>${body}</tbody>
+  <tfoot><tr><td>Total minita (Otros) · ${gqty} u</td><td class="c">${gqty}</td><td class="m">${fmt(gtotal)}</td></tr></tfoot></table>
+  <button class="noprint" onclick="window.print()" style="margin-top:16px;padding:8px 16px;font-size:14px;cursor:pointer;">🖨️ Imprimir</button>
+  </body></html>`;
+  const w=window.open('','_blank'); if(!w){ alert('Permití las ventanas emergentes para imprimir.'); return; }
+  w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch(_){} },350);
 }
 
 // ── Ventas por Producto → auto-llena el cierre y actualiza el snapshot de la sede ──
