@@ -212,6 +212,13 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
         <div id="aperturaInvBody"></div>
       </div>
 
+      <div class="card" id="conteoCierreCard">
+        <h3>📦 Conteo de inventario (cierre) <span style="color:#b91c1c;font-size:12px;font-weight:700;">*obligatorio</span></h3>
+        <div class="hint">Contá <b>todos</b> los productos antes de cerrar para detectar diferencias del turno (ventas no registradas, faltantes). Se compara con el sistema; no se muestra la cantidad real. Solo verifica, <b>no cambia el stock</b>. Sin este conteo no se puede cerrar el turno.</div>
+        <button class="btn-ghost" style="margin-top:6px;" onclick="openConteoCierre()">📝 Contar / verificar inventario</button>
+        <div id="conteoCierreResumen"></div>
+      </div>
+
       <div class="card" id="otrosCard" style="display:none;">
         <div style="display:flex;align-items:center;gap:10px;">
           <h3 style="margin:0;">🧃 Desglose de Otros (minita)</h3>
@@ -303,6 +310,25 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
   </table></div>
 </div>
 
+<!-- Modal: Conteo de inventario al cierre -->
+<div id="conteoCierreModal" style="display:none;position:fixed;inset:0;background:rgba(15,20,35,.55);z-index:10000;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
+  <div style="background:white;border-radius:16px;width:100%;max-width:560px;box-shadow:0 32px 80px rgba(0,0,0,.4);overflow:hidden;margin:auto;">
+    <div style="background:linear-gradient(135deg,#0e7490,#10b981);color:white;padding:16px 22px;font-size:16px;font-weight:800;">📦 Conteo de inventario (cierre)</div>
+    <div style="padding:18px 22px;max-height:70vh;overflow-y:auto;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <div class="hint" style="margin:0;">Cuente físicamente cada producto. Se compara con el sistema para detectar diferencias del turno. No cambia el stock.</div>
+        <button type="button" class="btn-ghost" style="margin-left:auto;font-size:12px;padding:5px 10px;white-space:nowrap;" onclick="imprimirListaInventario()">🖨️ Hoja</button>
+      </div>
+      <div id="ccInvList" style="max-height:46vh;overflow-y:auto;border:1px solid var(--border);border-radius:10px;"></div>
+      <div id="ccErr" style="color:var(--warn);font-size:13px;min-height:16px;margin-top:10px;"></div>
+    </div>
+    <div style="padding:14px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);">
+      <button class="btn-ghost" onclick="document.getElementById('conteoCierreModal').style.display='none'">Cancelar</button>
+      <button class="btn-primary" onclick="guardarConteoCierre()">✔️ Guardar y comparar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Abrir turno (efectivo inicial + inventario contado) -->
 <div id="abrirModal" style="display:none;position:fixed;inset:0;background:rgba(15,20,35,.55);z-index:10000;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
   <div style="background:white;border-radius:16px;width:100%;max-width:560px;box-shadow:0 32px 80px rgba(0,0,0,.4);overflow:hidden;margin:auto;">
@@ -386,7 +412,7 @@ function parseFecha(s){const[y,m,d]=String(s).split('-').map(Number);return new 
 function mesEt(d){return MESES_ES[d.getMonth()]+' '+d.getFullYear();}
 function mesOrd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
 
-let gastos=[{desc:'',monto:'',cat:'otros'}], ingresos=[{desc:'',monto:''}], cierres=[], turnoActual=null, fotoDatafono=null;
+let gastos=[{desc:'',monto:'',cat:'otros'}], ingresos=[{desc:'',monto:''}], cierres=[], turnoActual=null, fotoDatafono=null, inventarioCierre=null;
 const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;   // fecha LOCAL (no UTC)
 const todayStr=()=>ymd(new Date());
 
@@ -475,9 +501,11 @@ function cargarTurnoEnForm(t){
   // Billetes/monedas: conteo de cierre en curso (del servidor) si existe; si no, arranca con el CONTEO DE APERTURA.
   const baseDen=(t.denominaciones&&Object.keys(t.denominaciones).length)?t.denominaciones:(t.denominaciones_apertura||null);
   if(baseDen) DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=baseDen[d]||0;});
+  inventarioCierre=t.inventario_cierre||null;
   _lastServerUpd=t.updated_at||null; _lastEditTs=0;
   document.getElementById('cajaInicialHint').textContent='Fondo del primer turno del día (base del cuadre del día completo).';
   renderOtrosResumen(window._otrosResumen);
+  renderConteoCierreResumen();
   renderAperturaInv(t);
   renderGastos(); renderIngresos();
   calc();
@@ -603,6 +631,7 @@ async function serverSave(showErr){
       total_tarjeta:blank('cTarjeta')?null:c.tarjeta, total_sinpe:blank('cSinpe')?null:c.sinpe, total_transferencia:blank('cTransfer')?null:c.transfer,
       efectivo:c.efectivo, denominaciones, gastos, ingresos, total_gastos:c.totGastos, total_ingresos:c.totIngresos,
       minita:c.minita, otros_vendidos:c.otros, otros_desglose:window._otrosResumen||null, sobre_modo:c.sobreModo,
+      inventario_cierre:inventarioCierre||null,
       informe_ventas:window._informeVentas||null, updated_at:upd };
     await supaFetch(`/cierres_caja?id=eq.${turnoActual.id}`,{method:'PATCH',body:payload});
     turnoActual.updated_at=upd; _lastServerUpd=upd;
@@ -645,6 +674,7 @@ function applyRowToForm(row){
     gastos=(Array.isArray(row.gastos)&&row.gastos.length?row.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros'}));
     ingresos=(Array.isArray(row.ingresos)&&row.ingresos.length?row.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc||'',monto:g.monto??''}));
     window._otrosResumen=row.otros_desglose||null; renderOtrosResumen(window._otrosResumen);
+    inventarioCierre=row.inventario_cierre||null; renderConteoCierreResumen();
     window._informeVentas=row.informe_ventas||null;
     renderGastos(); renderIngresos(); calc();
   } finally { _noSave=false; }
@@ -730,6 +760,7 @@ function nuevoCierre(){
   document.getElementById('fotoResumen').innerHTML=''; document.getElementById('fileFoto').value='';
   document.getElementById('sinpeResumen').innerHTML=''; renderOtrosResumen(null);
   document.getElementById('aperturaInvCard').style.display='none'; document.getElementById('aperturaInvBody').innerHTML='';
+  inventarioCierre=null; document.getElementById('conteoCierreResumen').innerHTML='';
   document.getElementById('sinpeHint').innerHTML='Cargue el <b>Reporte SINPE</b> (obligatorio para el cierre final). Cada referencia se registra una sola vez; el saldo <b>pendiente por facturar</b> se arrastra al siguiente cierre, así que no importa si un SINPE se factura otro día o si el reporte se sube en el parcial.';
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=0;});
   gastos=[{desc:'',monto:'',cat:'otros'}]; ingresos=[{desc:'',monto:''}]; renderGastos(); renderIngresos();
@@ -976,6 +1007,51 @@ function renderAperturaInv(t){
   card.style.display='block';
 }
 
+// ── Conteo de inventario AL CIERRE (verifica contra el sistema; detecta diferencias del turno) ──
+async function openConteoCierre(){
+  const list=document.getElementById('ccInvList'), err=document.getElementById('ccErr'); err.textContent='';
+  list.innerHTML='<div style="padding:12px;color:var(--muted);">Cargando inventario…</div>';
+  document.getElementById('conteoCierreModal').style.display='flex';
+  let inv=[];
+  try{ inv=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(currentSede)}&order=producto.asc&select=id,producto,cantidad`))||[]; }
+  catch(e){ err.textContent='No se pudo cargar el inventario: '+e.message; }
+  window._ccInv=inv;
+  list.innerHTML = inv.length ? inv.map((p,i)=>{
+    const prev=inventarioCierre&&inventarioCierre[p.producto]; const val=(prev&&prev.contado!=null)?prev.contado:'';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid #f2f5f9;">
+      <span style="flex:1;font-size:13px;">${esc(p.producto)}</span>
+      <input type="number" step="1" id="cc_${i}" value="${val}" placeholder="conteo" style="width:82px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:right;font-weight:700;"></div>`;
+  }).join('') : '<div style="padding:12px;color:var(--muted);">Esta sede no tiene productos en inventario.</div>';
+}
+function guardarConteoCierre(){
+  const inv=window._ccInv||[]; const err=document.getElementById('ccErr'); err.textContent='';
+  // Sede sin productos: queda verificado (objeto vacío) para no bloquear el cierre.
+  if(!inv.length){ inventarioCierre={}; renderConteoCierreResumen(); document.getElementById('conteoCierreModal').style.display='none'; saveDraft(); return; }
+  const conteo={}; const faltan=[];
+  inv.forEach((p,i)=>{ const raw=document.getElementById('cc_'+i).value; const contado=raw===''?null:(Number(raw)||0);
+    if(contado==null)faltan.push(p.producto); conteo[p.producto]={contado,sistema:Number(p.cantidad)||0}; });
+  if(faltan.length){ err.textContent=`Debe contar TODOS los productos antes de guardar (${faltan.length} sin contar). Anote 0 si no hay unidades.`; return; }
+  inventarioCierre = conteo;
+  renderConteoCierreResumen();
+  document.getElementById('conteoCierreModal').style.display='none';
+  saveDraft();
+}
+function renderConteoCierreResumen(){
+  const box=document.getElementById('conteoCierreResumen'); const inv=inventarioCierre; const keys=inv?Object.keys(inv):[];
+  const conCont=keys.filter(k=>inv[k].contado!=null);
+  if(!conCont.length){ box.innerHTML=''; return; }
+  const showReal=esAdmin(); let difs=0;
+  const rows=conCont.map(prod=>{ const o=inv[prod]||{}; const dif=(o.contado!=null && Number(o.contado)!==Number(o.sistema)); if(dif)difs++;
+    const right = showReal
+      ? `contó <b>${o.contado}</b> · sistema <b>${o.sistema}</b>${dif?` <span style="color:#b91c1c;">(dif ${Math.abs(Number(o.contado)-Number(o.sistema))})</span>`:''}`
+      : `contaste <b>${o.contado}</b>${dif?' <span style="color:#b91c1c;font-weight:700;">⚠ no coincide</span>':''}`;
+    return `<div style="display:flex;justify-content:space-between;padding:5px 12px;font-size:12px;${dif?'background:#fdecec;':''}"><span>${esc(prod)}</span><span>${right}</span></div>`;
+  }).join('');
+  box.innerHTML=`<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:8px;">${rows}</div>`+
+    (difs? `<div class="hint" style="margin-top:6px;color:#b45309;font-weight:600;">⚠ ${difs} producto(s) con diferencia respecto al sistema. Revisá antes de cerrar (ventas no registradas o faltantes).</div>`
+         : `<div class="hint" style="margin-top:6px;color:#166534;">✓ El conteo del cierre coincide con el sistema.</div>`);
+}
+
 // ── Desglose de la minita (productos "Otros") por categoría ──
 function renderOtrosResumen(map){
   const card=document.getElementById('otrosCard'), box=document.getElementById('otrosResumen');
@@ -996,32 +1072,43 @@ function renderOtrosResumen(map){
   box.innerHTML=html; card.style.display='block';
 }
 // Imprime el desglose de "Otros/minita" tal como se ve en pantalla (por categoría).
-function imprimirDesgloseOtros(){
+// Costos unitarios de productos (tabla product_costs, misma clave que otros.html: nombre canónico).
+let otrosCostMap={};
+async function loadCostosOtros(){ try{ const rows=await supaFetch('/product_costs?select=producto,costo')||[]; otrosCostMap={}; rows.forEach(r=>{ otrosCostMap[normP(r.producto)]=Number(r.costo)||0; }); }catch(_){ } }
+async function imprimirDesgloseOtros(){
   const map=window._otrosResumen; const keys=map?Object.keys(map):[];
   if(!keys.length){ alert('Primero cargá "Ventas por Producto" para ver el desglose.'); return; }
-  const groups={}; let gtotal=0, gqty=0;
+  await loadCostosOtros();
+  const cu=base=>{ const c=otrosCostMap[normP(base||'')]; return (c!=null&&c>0)?c:null; };   // costo unitario o null si no está asignado
+  const groups={}; let gtotal=0, gqty=0, gcosto=0; let algunSinCosto=false;
   keys.forEach(k=>{ const it=map[k]; const cat=it.cat||resolverOtro(it.base||k).cat; (groups[cat]=groups[cat]||[]).push(it); gtotal+=Number(it.total)||0; gqty+=Number(it.qty)||0; });
   let body='';
   CAT_ORDER.forEach(cid=>{
     const items=(groups[cid]||[]).sort((a,b)=>b.total-a.total); if(!items.length)return;
     const sub=items.reduce((s,x)=>s+(Number(x.total)||0),0), qty=items.reduce((s,x)=>s+(Number(x.qty)||0),0);
-    body+=`<tr class="cat"><td>${esc(CAT_LABEL[cid])}</td><td class="c">${qty}</td><td class="m">${fmt(sub)}</td></tr>`;
-    items.forEach(it=>{ body+=`<tr><td class="p">${esc(it.base||'—')}</td><td class="c">${it.qty}</td><td class="m">${fmt(it.total)}</td></tr>`; });
+    let subCosto=0, subTieneCosto=false;
+    items.forEach(it=>{ const u=cu(it.base); if(u!=null){ subCosto+=u*(Number(it.qty)||0); subTieneCosto=true; } });
+    gcosto+=subCosto;
+    body+=`<tr class="cat"><td>${esc(CAT_LABEL[cid])}</td><td class="c">${qty}</td><td class="m"></td><td class="m">${subTieneCosto?fmt(subCosto):'—'}</td><td class="m">${fmt(sub)}</td></tr>`;
+    items.forEach(it=>{ const u=cu(it.base); const q=Number(it.qty)||0; if(u==null)algunSinCosto=true;
+      body+=`<tr><td class="p">${esc(it.base||'—')}</td><td class="c">${it.qty}</td><td class="m">${u!=null?fmt(u):'—'}</td><td class="m">${u!=null?fmt(u*q):'—'}</td><td class="m">${fmt(it.total)}</td></tr>`; });
   });
   const fecha=document.getElementById('cFecha').value||todayStr(); const turno=(document.getElementById('cTurno').value||'').trim();
   const html=`<!doctype html><html><head><meta charset="utf-8"><title>Desglose Otros ${esc(currentSede)} ${fecha}</title>
   <style>*{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;} body{margin:22px;color:#111;}
   h1{font-size:18px;margin:0 0 2px;} .sub{font-size:12px;color:#555;margin:0 0 14px;}
   table{width:100%;border-collapse:collapse;font-size:13px;} th,td{border:1px solid #bbb;padding:7px 9px;text-align:left;}
-  th{background:#eee;} td.c{width:60px;text-align:center;} td.m{width:120px;text-align:right;}
+  th{background:#eee;} td.c{width:50px;text-align:center;} td.m{width:100px;text-align:right;} th.m,th.c{text-align:inherit;}
   tr.cat td{background:#f0f7f4;font-weight:800;} td.p{padding-left:22px;color:#333;}
   tfoot td{background:#eafaf0;color:#166534;font-weight:800;font-size:14px;}
+  .warn{font-size:11px;color:#b45309;margin-top:8px;}
   @media print{.noprint{display:none;}}</style></head><body>
   <h1>🧃 Desglose de Otros (minita)</h1>
   <div class="sub">Sede: <b>${esc(currentSede)}</b> · Fecha: ${fecha}${turno?` · ${esc(turno)}`:''}</div>
-  <table><thead><tr><th>Categoría / Producto</th><th class="c">Cant.</th><th class="m">Total</th></tr></thead>
+  <table><thead><tr><th>Categoría / Producto</th><th class="c">Cant.</th><th class="m">C. unit.</th><th class="m">C. total</th><th class="m">Venta</th></tr></thead>
   <tbody>${body}</tbody>
-  <tfoot><tr><td>Total minita (Otros) · ${gqty} u</td><td class="c">${gqty}</td><td class="m">${fmt(gtotal)}</td></tr></tfoot></table>
+  <tfoot><tr><td>Total minita (Otros) · ${gqty} u</td><td class="c">${gqty}</td><td class="m"></td><td class="m">${fmt(gcosto)}</td><td class="m">${fmt(gtotal)}</td></tr></tfoot></table>
+  ${algunSinCosto?'<div class="warn">⚠ Hay productos sin costo unitario asignado (marcados con —). Se asignan en el módulo de Otros.</div>':''}
   <button class="noprint" onclick="window.print()" style="margin-top:16px;padding:8px 16px;font-size:14px;cursor:pointer;">🖨️ Imprimir</button>
   </body></html>`;
   const w=window.open('','_blank'); if(!w){ alert('Permití las ventanas emergentes para imprimir.'); return; }
@@ -1095,8 +1182,9 @@ function cargarVentasProducto(file){
       const sum=a=>a.reduce((s,x)=>s+(Number(x.Total)||0),0);
       const totMemb=Math.round(sum(memb)), totClases=Math.round(sum(clases)), totSinC=Math.round(sum(sinclasif));
       const totalVentas=totMemb+totClases+totSinC;
+      const totMembCaja=totMemb+totClases;   // caja.html: membresías incluye clases grupales y sesiones de gym
       document.getElementById('cTotalVentas').value=totalVentas;
-      document.getElementById('cMembresias').value=totMemb;
+      document.getElementById('cMembresias').value=totMembCaja;
       document.getElementById('cOtros').value=totSinC;   // minita = solo productos "Otros" (sin sesiones ni membresías), acumulado del día
       const ref=fechas.length?new Date(Math.max(...fechas)):new Date();
       const mes=ref.toLocaleDateString('es-CR',{month:'long',year:'numeric'}).replace(/^\w/,c=>c.toUpperCase());
@@ -1112,7 +1200,7 @@ function cargarVentasProducto(file){
       // IMPORTANTE: recepción NO toca gym_snapshots (comparativa/sedes). El histórico del mes
       // lo carga el admin desde index; subir solo el día borraría los días anteriores. Aquí
       // la carga afecta únicamente el CIERRE DE CAJA (y el descuento de inventario).
-      let msg=`📦 Día: ${memb.length} membresías (${fmt(totMemb)}) · sesiones ${fmt(totClases)} · otros/minita ${fmt(totSinC)} · Total ${fmt(totalVentas)}.`;
+      let msg=`📦 Día: membresías ${fmt(totMembCaja)} (planes ${fmt(totMemb)} + clases/sesiones ${fmt(totClases)}) · otros/minita ${fmt(totSinC)} · Total ${fmt(totalVentas)}.`;
       if(window._informeVentas){ const dif=Math.round(totalVentas-window._informeVentas.total); msg+= (dif===0?' · ✓ corrobora con Informe de Ventas.':` · ⚠ difiere del Informe en ${fmt(Math.abs(dif))}.`); }
       try{
         const desc=await descontarInventario(soldByBase, origName, D);   // idempotente por día
@@ -1136,6 +1224,9 @@ async function cerrarTurno(estado){
   if(document.getElementById('cTarjeta').value===''||document.getElementById('cSinpe').value===''){ msg.className='msg err'; msg.textContent='Cargue el 📤 Informe de Ventas (llena Tarjeta y SINPE automáticamente).'; return; }
   if(estado==='final'&&!window._sinpeReporte){ msg.className='msg err'; msg.textContent='Para el cierre final debe cargar el 🔷 Reporte SINPE del día.'; return; }
   if(!fotoDatafono){ msg.className='msg err'; msg.textContent=`Suba la foto del datáfono (${estado==='final'?'cierre de lote':'auditoría'}) — es obligatoria para el cierre.`; return; }
+  // Conteo de inventario obligatorio en cada cierre (parcial y final) para detectar diferencias entre turnos. No modifica el stock.
+  const _invE = inventarioCierre ? Object.values(inventarioCierre) : null;
+  if(!_invE || _invE.some(o=>o.contado==null)){ msg.className='msg err'; msg.textContent='Cargue el 📦 conteo de inventario del cierre (todos los productos) — es obligatorio para detectar diferencias entre turnos.'; return; }
   const c=calc();
   // El sobre solo sale en el cierre FINAL. En parciales la minita queda en caja (no se descuenta ni se suma).
   const esFinal=estado==='final';
@@ -1151,7 +1242,7 @@ async function cerrarTurno(estado){
     total_tarjeta:c.tarjeta, total_sinpe:c.sinpe, total_transferencia:c.transfer, efectivo:c.efectivo,
     denominaciones, gastos:gastosLimpios, ingresos:ingresosLimpios,
     total_gastos:c.totGastos, total_ingresos:c.totIngresos, minita:c.minita,
-    efectivo_final:efectivoFinal, otros_vendidos:c.otros, otros_desglose:window._otrosResumen||null, sobre_retirado:esFinal&&c.sobreRetirado, sobre_modo:esFinal?c.sobreModo:'no',
+    efectivo_final:efectivoFinal, otros_vendidos:c.otros, otros_desglose:window._otrosResumen||null, inventario_cierre:inventarioCierre||null, sobre_retirado:esFinal&&c.sobreRetirado, sobre_modo:esFinal?c.sobreModo:'no',
     diferencia, estado_dif:diferencia===0?'OK':'Diferencia',
     informe_ventas:window._informeVentas||null, estado, hora_cierre:new Date().toISOString()
   };
@@ -1261,6 +1352,7 @@ function cargarCierre(id){
   document.getElementById('cFecha').value=c.fecha; document.getElementById('cTurno').value=c.turno||'';
   document.getElementById('cCajaInicial').value=c.caja_inicial||0; document.getElementById('cMembresias').value=c.membresias||0; document.getElementById('cOtros').value=c.otros_vendidos||0;
   window._otrosResumen=c.otros_desglose||null; renderOtrosResumen(window._otrosResumen);
+  inventarioCierre=c.inventario_cierre||null; renderConteoCierreResumen();
   renderAperturaInv(c);
   document.getElementById('cTarjeta').value=c.total_tarjeta||0; document.getElementById('cSinpe').value=c.total_sinpe||0; document.getElementById('cTransfer').value=c.total_transferencia||0;
   document.getElementById('cTotalVentas').value=c.total_ventas||0;

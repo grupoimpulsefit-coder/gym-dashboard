@@ -49,6 +49,8 @@ alter table cierres_caja add column if not exists sinpe_reporte jsonb;          
 alter table cierres_caja add column if not exists sinpe_pendiente numeric;
 -- Marca de última modificación (autoguardado en vivo del turno abierto → los admin lo ven en tiempo real).
 alter table cierres_caja add column if not exists updated_at timestamptz;
+-- Conteo físico de inventario AL CIERRE (verifica contra el sistema; detecta diferencias del turno). { producto: { contado, sistema } }
+alter table cierres_caja add column if not exists inventario_cierre jsonb;
 -- Foto de auditoría del datáfono (parcial) y del cierre (final) + resultado del análisis con IA.
 alter table cierres_caja add column if not exists foto_datafono text;   -- path en Storage (cierre parcial)
 alter table cierres_caja add column if not exists foto_cierre   text;   -- path en Storage (cierre final)
