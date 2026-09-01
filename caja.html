@@ -1078,43 +1078,34 @@ function renderOtrosResumen(map){
   box.innerHTML=html; card.style.display='block';
 }
 // Imprime el desglose de "Otros/minita" tal como se ve en pantalla (por categoría).
-// Costos unitarios de productos (tabla product_costs, misma clave que otros.html: nombre canónico).
-let otrosCostMap={};
-async function loadCostosOtros(){ try{ const rows=await supaFetch('/product_costs?select=producto,costo')||[]; otrosCostMap={}; rows.forEach(r=>{ otrosCostMap[normP(r.producto)]=Number(r.costo)||0; }); }catch(_){ } }
-async function imprimirDesgloseOtros(){
+function imprimirDesgloseOtros(){
   const map=window._otrosResumen; const keys=map?Object.keys(map):[];
   if(!keys.length){ alert('Primero cargá "Ventas por Producto" para ver el desglose.'); return; }
-  await loadCostosOtros();
-  const cu=base=>{ const c=otrosCostMap[normP(base||'')]; return (c!=null&&c>0)?c:null; };   // costo unitario o null si no está asignado
-  const groups={}; let gtotal=0, gqty=0, gcosto=0; let algunSinCosto=false;
+  const pu=it=>{ const q=Number(it.qty)||0; return q>0?Math.round((Number(it.total)||0)/q):(Number(it.total)||0); };   // monto unitario de venta = total ÷ cantidad
+  const groups={}; let gtotal=0, gqty=0;
   keys.forEach(k=>{ const it=map[k]; const cat=it.cat||resolverOtro(it.base||k).cat; (groups[cat]=groups[cat]||[]).push(it); gtotal+=Number(it.total)||0; gqty+=Number(it.qty)||0; });
   let body='';
   CAT_ORDER.forEach(cid=>{
     const items=(groups[cid]||[]).sort((a,b)=>b.total-a.total); if(!items.length)return;
     const sub=items.reduce((s,x)=>s+(Number(x.total)||0),0), qty=items.reduce((s,x)=>s+(Number(x.qty)||0),0);
-    let subCosto=0, subTieneCosto=false;
-    items.forEach(it=>{ const u=cu(it.base); if(u!=null){ subCosto+=u*(Number(it.qty)||0); subTieneCosto=true; } });
-    gcosto+=subCosto;
-    body+=`<tr class="cat"><td>${esc(CAT_LABEL[cid])}</td><td class="c">${qty}</td><td class="m"></td><td class="m">${subTieneCosto?fmt(subCosto):'—'}</td><td class="m">${fmt(sub)}</td></tr>`;
-    items.forEach(it=>{ const u=cu(it.base); const q=Number(it.qty)||0; if(u==null)algunSinCosto=true;
-      body+=`<tr><td class="p">${esc(it.base||'—')}</td><td class="c">${it.qty}</td><td class="m">${u!=null?fmt(u):'—'}</td><td class="m">${u!=null?fmt(u*q):'—'}</td><td class="m">${fmt(it.total)}</td></tr>`; });
+    body+=`<tr class="cat"><td>${esc(CAT_LABEL[cid])}</td><td class="c">${qty}</td><td class="m"></td><td class="m">${fmt(sub)}</td></tr>`;
+    items.forEach(it=>{
+      body+=`<tr><td class="p">${esc(it.base||'—')}</td><td class="c">${it.qty}</td><td class="m">${fmt(pu(it))}</td><td class="m">${fmt(it.total)}</td></tr>`; });
   });
   const fecha=document.getElementById('cFecha').value||todayStr(); const turno=(document.getElementById('cTurno').value||'').trim();
   const html=`<!doctype html><html><head><meta charset="utf-8"><title>Desglose Otros ${esc(currentSede)} ${fecha}</title>
   <style>*{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;} body{margin:22px;color:#111;}
   h1{font-size:18px;margin:0 0 2px;} .sub{font-size:12px;color:#555;margin:0 0 14px;}
   table{width:100%;border-collapse:collapse;font-size:13px;} th,td{border:1px solid #bbb;padding:7px 9px;text-align:left;}
-  th{background:#eee;} td.c{width:50px;text-align:center;} td.m{width:100px;text-align:right;} th.m,th.c{text-align:inherit;}
+  th{background:#eee;} td.c{width:50px;text-align:center;} td.m{width:110px;text-align:right;} th.m,th.c{text-align:inherit;}
   tr.cat td{background:#f0f7f4;font-weight:800;} td.p{padding-left:22px;color:#333;}
   tfoot td{background:#eafaf0;color:#166534;font-weight:800;font-size:14px;}
-  .warn{font-size:11px;color:#b45309;margin-top:8px;}
   @media print{.noprint{display:none;}}</style></head><body>
   <h1>🧃 Desglose de Otros (minita)</h1>
   <div class="sub">Sede: <b>${esc(currentSede)}</b> · Fecha: ${fecha}${turno?` · ${esc(turno)}`:''}</div>
-  <table><thead><tr><th>Categoría / Producto</th><th class="c">Cant.</th><th class="m">C. unit.</th><th class="m">C. total</th><th class="m">Venta</th></tr></thead>
+  <table><thead><tr><th>Categoría / Producto</th><th class="c">Cant.</th><th class="m">Monto unit.</th><th class="m">Total</th></tr></thead>
   <tbody>${body}</tbody>
-  <tfoot><tr><td>Total minita (Otros) · ${gqty} u</td><td class="c">${gqty}</td><td class="m"></td><td class="m">${fmt(gcosto)}</td><td class="m">${fmt(gtotal)}</td></tr></tfoot></table>
-  ${algunSinCosto?'<div class="warn">⚠ Hay productos sin costo unitario asignado (marcados con —). Se asignan en el módulo de Otros.</div>':''}
+  <tfoot><tr><td>Total minita (Otros) · ${gqty} u</td><td class="c">${gqty}</td><td class="m"></td><td class="m">${fmt(gtotal)}</td></tr></tfoot></table>
   <button class="noprint" onclick="window.print()" style="margin-top:16px;padding:8px 16px;font-size:14px;cursor:pointer;">🖨️ Imprimir</button>
   </body></html>`;
   const w=window.open('','_blank'); if(!w){ alert('Permití las ventanas emergentes para imprimir.'); return; }
