@@ -715,8 +715,14 @@ function calc(){
   document.getElementById('rMinita').textContent=fmt(minita);
   document.getElementById('totGastos').textContent=fmt(totGastos)+(pg.gastos?` (+${fmt(pg.gastos)} turnos previos)`:'');
   document.getElementById('totIngresos').textContent=fmt(totIngresos)+(pg.ingresos?` (+${fmt(pg.ingresos)} turnos previos)`:'');
-  const ok=Math.round(diferencia)===0;
-  document.getElementById('rEstado').innerHTML=ok?'<span class="badge-ok">✓ Caja cuadra</span>':`<span class="badge-dif">⚠ Diferencia ${fmt(diferencia)}</span>`;
+  const difR=Math.round(diferencia);
+  const ok=difR===0;
+  // diferencia = totalVentas − conciliado. >0 = falta dinero (de menos vs facturado); <0 = sobra (de más).
+  document.getElementById('rEstado').innerHTML=ok
+    ? '<span class="badge-ok">✓ Caja cuadra</span>'
+    : (difR>0
+        ? `<span class="badge-dif">⚠ Faltante ${fmt(Math.abs(difR))} (de menos vs facturado)</span>`
+        : `<span class="badge-dif" style="background:#dbeafe;color:#1e40af;">⚠ Sobrante ${fmt(Math.abs(difR))} (de más vs facturado)</span>`);
   // Efectivo final: solo se descuenta la minita cuando el sobre se retira hoy ('retira').
   const efectivoFinal=(sobreModo==='retira')?(efectivo-minita):efectivo;
   document.getElementById('rEfectivoFinal').textContent=fmt(efectivoFinal);
@@ -1243,7 +1249,7 @@ async function cerrarTurno(estado){
     denominaciones, gastos:gastosLimpios, ingresos:ingresosLimpios,
     total_gastos:c.totGastos, total_ingresos:c.totIngresos, minita:c.minita,
     efectivo_final:efectivoFinal, otros_vendidos:c.otros, otros_desglose:window._otrosResumen||null, inventario_cierre:inventarioCierre||null, sobre_retirado:esFinal&&c.sobreRetirado, sobre_modo:esFinal?c.sobreModo:'no',
-    diferencia, estado_dif:diferencia===0?'OK':'Diferencia',
+    diferencia, estado_dif:diferencia===0?'OK':(diferencia>0?'Faltante':'Sobrante'),
     informe_ventas:window._informeVentas||null, estado, hora_cierre:new Date().toISOString()
   };
   if(fotoDatafono){
@@ -1341,7 +1347,7 @@ function renderHist(){
     <td class="num">${fmt(c.caja_inicial)}</td><td class="num">${fmt(c.efectivo)}</td>
     <td class="num">${fmt(c.total_ventas)}</td><td class="num">${fmt(c.minita)}</td>
     <td class="num" style="color:${Math.round(c.diferencia||0)===0?'#2e7d32':'#c62828'};">${fmt(c.diferencia)}</td>
-    <td>${c.estado_dif==='OK'?'<span class="pill ok">OK</span>':'<span class="pill dif">Dif.</span>'}</td>
+    <td>${Math.round(c.diferencia||0)===0?'<span class="pill ok">OK</span>':(Math.round(c.diferencia||0)>0?'<span class="pill dif">Faltante</span>':'<span class="pill dif" style="background:#dbeafe;color:#1e40af;">Sobrante</span>')}</td>
     <td><button class="btn-ghost" onclick='cargarCierre(${JSON.stringify(c.id)})'>Ver</button></td>
   </tr>`).join('');
 }
@@ -1413,7 +1419,7 @@ function generarPDF(){
   y+=3; const bw=210, bx=X+(W-bw)/2; const[br,bg,bb]=hex(c.ok?'C6EFCE':'FFC7CE');
   doc.setFillColor(br,bg,bb); doc.roundedRect(bx,y-RH+6,bw,RH,6,6,'F');
   doc.setFont('helvetica','bold');doc.setFontSize(11.5); doc.setTextColor(c.ok?6:156, c.ok?100:0, c.ok?50:24);
-  doc.text(c.ok?'CAJA CUADRA':'DIFERENCIA  '+money(Math.abs(c.diferencia)), X+W/2, y-4, {align:'center'}); y+=RH+7;
+  doc.text(c.ok?'CAJA CUADRA':((Math.round(c.diferencia||0)>0?'FALTANTE (de menos)  ':'SOBRANTE (de más)  ')+money(Math.abs(c.diferencia))), X+W/2, y-4, {align:'center'}); y+=RH+7;
   head('GASTOS (día)','FFC000');
   const gs=gastosDelDia(); const totGD=gs.reduce((s,g)=>s+g.monto,0);
   (gs.length?gs:[{desc:'Sin gastos',monto:0}]).forEach(g=>{ border(); doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(40); doc.text((g.turno?`T${g.turno} · `:'')+esc(g.desc||'Gasto'),X+11,y-4); doc.setFont('helvetica','bold'); doc.text(money(g.monto),X+W-11,y-4,{align:'right'}); y+=RH; });
