@@ -232,6 +232,12 @@
                     <option value="Natación">🏊 Natación</option>
                 </select>
             </div>
+            <div style="border-left:1.5px solid #c7d2fe;padding-left:16px;">
+                <div style="font-size:0.8em;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">📅 Mes destino</div>
+                <select id="mesDestinoSelector" style="font-size:1em;font-weight:600;color:#302b63;border:none;background:transparent;cursor:pointer;outline:none;padding:2px 8px 2px 0;">
+                    <option value="">Automático (según fecha del archivo)</option>
+                </select>
+            </div>
             <div id="sedeSeleccionadaBadge" style="display:none;margin-left:auto;background:#4338ca;color:white;border-radius:20px;padding:4px 16px;font-size:0.85em;font-weight:700;"></div>
         </div>
 
@@ -2425,8 +2431,15 @@ async function autoSaveToSupabase() {
         : document.getElementById('uploadStatusR');
     try {
         const _mesDetectado = detectMesFromData();
-        const mes      = (feData.loaded && feData.mes && !renoLoaded) ? feData.mes      : _mesDetectado.mes;
-        const mesOrden = (feData.loaded && feData.mesOrden && !renoLoaded) ? feData.mesOrden : _mesDetectado.mesOrden;
+        const _mesForzado = document.getElementById('mesDestinoSelector')?.value || '';   // override manual del admin
+        let mes, mesOrden;
+        if (_mesForzado) {
+            mesOrden = _mesForzado;
+            mes = mesLabelFromOrden(_mesForzado);
+        } else {
+            mes      = (feData.loaded && feData.mes && !renoLoaded) ? feData.mes      : _mesDetectado.mes;
+            mesOrden = (feData.loaded && feData.mesOrden && !renoLoaded) ? feData.mesOrden : _mesDetectado.mesOrden;
+        }
         const today = new Date(); today.setHours(0,0,0,0);
         const ranges = [
             { label:'Vencen en 7 días',  days:7  },
@@ -2696,6 +2709,21 @@ function setupUploadBox(boxId, inputId, processFn) {
 setupUploadBox('uploadBoxU', 'fileInputU', processUsuariosFile);
 setupUploadBox('uploadBoxR', 'fileInputR', processRenovacionesFile);
 setupUploadBox('uploadBoxFE', 'fileInputFE', processComprobantesFile);
+
+// "2026-09" → "Septiembre 2026" (mismo formato que detectMesFromData)
+function mesLabelFromOrden(o){ const [y,m]=String(o).split('-').map(Number); const d=new Date(y,(m||1)-1,1); return d.toLocaleDateString('es-CR',{month:'long',year:'numeric'}).replace(/^\w/,c=>c.toUpperCase()); }
+// Puebla el selector "Mes destino" con una ventana de meses (2 atrás … 2 adelante).
+function initMesDestino(){
+    const sel=document.getElementById('mesDestinoSelector'); if(!sel) return;
+    const now=new Date(); sel.innerHTML='<option value="">Automático (según fecha del archivo)</option>';
+    for(let off=-2; off<=2; off++){
+        const d=new Date(now.getFullYear(), now.getMonth()+off, 1);
+        const orden=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        const o=document.createElement('option'); o.value=orden; o.textContent=mesLabelFromOrden(orden)+(off===0?' (mes actual)':off===1?' (próximo)':'');
+        sel.appendChild(o);
+    }
+}
+initMesDestino();
 
 let feData = { total: 0, count: 0, loaded: false };
 
