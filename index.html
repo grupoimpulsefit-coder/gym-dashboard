@@ -630,6 +630,28 @@
     </div>
 </div>
 
+<!-- ── Modal: Sedes de un usuario (multi-sede recepción) ── -->
+<div id="sedesUsuarioModal" class="modal">
+    <div class="summary-modal-content" style="max-width:460px;">
+        <h3>🏢🔀 Sedes de un usuario</h3>
+        <p style="color:#888;margin-top:6px;font-size:13px;">Habilita sedes adicionales para recepción / admin de sucursal (por ejemplo, cubrir un turno en otra sede). No cambia su sede principal.</p>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px;">
+            <div><label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Usuario</label>
+                <select id="suUser" onchange="suRenderSedes()" style="width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:14px;background:white;"><option value="">— Seleccione —</option></select></div>
+            <div id="suSedesWrap" style="display:none;">
+                <label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:6px;">Sedes habilitadas</label>
+                <div id="suSedes" style="display:flex;flex-direction:column;gap:8px;"></div>
+                <div style="font-size:12px;color:#888;margin-top:8px;">La sede principal siempre queda marcada. Marque las adicionales.</div>
+            </div>
+            <div id="suMsg" style="font-size:13px;min-height:18px;"></div>
+        </div>
+        <div class="modal-buttons" style="margin-top:18px;">
+            <button class="btn btn-green" id="suBtn" onclick="guardarSedesUsuario()">💾 Guardar sedes</button>
+            <button class="btn btn-orange" onclick="document.getElementById('sedesUsuarioModal').style.display='none'">Cancelar</button>
+        </div>
+    </div>
+</div>
+
 <!-- ══════════ PRICE MODAL ══════════ -->
 <div id="priceModal" class="modal">
     <div class="modal-content">
@@ -729,7 +751,7 @@ async function supaFetch(path, opts = {}) {
 // ══════════════════════════════════════════════════════
 //  AUTH
 // ══════════════════════════════════════════════════════
-let currentToken = null, currentRole = null, currentUserEmail = '', currentSede = null, currentUserId = null;
+let currentToken = null, currentRole = null, currentUserEmail = '', currentSede = null, currentUserId = null, currentSedesExtra = [];
 
 async function doLogin() {
     const email = document.getElementById('loginEmail').value.trim();
@@ -752,9 +774,10 @@ async function doLogin() {
         sessionStorage.setItem('supa_token', currentToken);
 
         // Obtener rol
-        const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede`, { userToken: currentToken });
+        const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede,sedes_extra`, { userToken: currentToken });
         currentRole = roles?.[0]?.role || 'colaborador';
         currentSede = roles?.[0]?.sede || null;
+        currentSedesExtra = Array.isArray(roles?.[0]?.sedes_extra) ? roles[0].sedes_extra : [];
         const nombre = roles?.[0]?.nombre || currentUserEmail;
 
         document.getElementById('userNombre').textContent = nombre;
@@ -837,6 +860,59 @@ async function crearCuenta() {
     }
 }
 
+// ── Sedes de un usuario (habilitar sedes adicionales para recepción / admin_sucursal) ──
+let _suUsers = [];
+function _suEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+async function openSedesUsuarioModal() {
+    const msg = document.getElementById('suMsg'); msg.textContent = '';
+    document.getElementById('suSedesWrap').style.display = 'none';
+    const sel = document.getElementById('suUser'); sel.innerHTML = '<option value="">Cargando…</option>';
+    document.getElementById('sedesUsuarioModal').style.display = 'block';
+    try {
+        _suUsers = await supaFetch('/user_roles?role=in.(recepcion,admin_sucursal)&select=id,nombre,sede,sedes_extra&order=nombre.asc', { userToken: currentToken }) || [];
+    } catch(e) { _suUsers = []; msg.style.color = '#c62828'; msg.textContent = 'No se pudieron cargar los usuarios: ' + e.message; }
+    sel.innerHTML = '<option value="">— Seleccione —</option>' +
+        _suUsers.map(u => `<option value="${_suEsc(u.id)}">${_suEsc(u.nombre || '(sin nombre)')} · ${_suEsc(u.sede || 'sin sede')}</option>`).join('');
+}
+function suRenderSedes() {
+    const id = document.getElementById('suUser').value;
+    const wrap = document.getElementById('suSedesWrap'), box = document.getElementById('suSedes');
+    const u = _suUsers.find(x => x.id === id);
+    document.getElementById('suMsg').textContent = '';
+    if (!u) { wrap.style.display = 'none'; return; }
+    const SED = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
+    const extra = Array.isArray(u.sedes_extra) ? u.sedes_extra : [];
+    box.innerHTML = SED.map(s => {
+        const isPrimary = (s === u.sede);
+        const checked = isPrimary || extra.includes(s);
+        return `<label style="display:flex;align-items:center;gap:8px;font-size:14px;${isPrimary?'opacity:.65;':''}">
+            <input type="checkbox" value="${_suEsc(s)}" ${checked?'checked':''} ${isPrimary?'disabled':''}> ${_suEsc(s)}${isPrimary?' <span style="font-size:11px;color:#1a5276;font-weight:700;">(principal)</span>':''}</label>`;
+    }).join('');
+    wrap.style.display = '';
+}
+async function guardarSedesUsuario() {
+    const msg = document.getElementById('suMsg');
+    const id = document.getElementById('suUser').value;
+    const u = _suUsers.find(x => x.id === id);
+    if (!u) { msg.style.color = '#c62828'; msg.textContent = 'Seleccione un usuario.'; return; }
+    const marcadas = [...document.querySelectorAll('#suSedes input[type=checkbox]:checked')].map(c => c.value);
+    const extra = marcadas.filter(s => s !== u.sede);   // la principal no va en sedes_extra
+    const btn = document.getElementById('suBtn'); btn.disabled = true; btn.textContent = 'Guardando…';
+    msg.style.color = '#666'; msg.textContent = 'Guardando…';
+    try {
+        await supaFetch('/rpc/set_user_sedes', { method: 'POST', userToken: currentToken, body: { p_id: id, p_extra: extra } });
+        u.sedes_extra = extra;
+        msg.style.color = '#2e7d32';
+        msg.textContent = extra.length
+            ? `✅ ${u.nombre || 'Usuario'} ahora también puede: ${extra.join(', ')} (además de ${u.sede}). Debe cerrar sesión y volver a entrar.`
+            : `✅ ${u.nombre || 'Usuario'}: sin sedes adicionales (solo ${u.sede}).`;
+    } catch(e) {
+        msg.style.color = '#c62828'; msg.textContent = '⚠️ ' + e.message;
+    } finally {
+        btn.disabled = false; btn.textContent = '💾 Guardar sedes';
+    }
+}
+
 // 'admin' conserva su acceso actual; 'admin_sedes' y 'admin_g' entran con los mismos permisos de admin en index/nat
 const esRolAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes' || currentRole === 'admin_g';
 // Solo admin_sedes puede SUBIR el archivo de usuarios para generar proyecciones
@@ -909,7 +985,7 @@ async function showSedePicker() {
             sessionStorage.setItem('gymAuth', JSON.stringify({
                 token: currentToken, role: currentRole,
                 nombre: document.getElementById('userNombre').textContent,
-                email: currentUserEmail, sede: currentSede, user_id: currentUserId
+                email: currentUserEmail, sede: currentSede, sedes_extra: currentSedesExtra, user_id: currentUserId
             }));
             window.location.href = path;
         };
@@ -992,6 +1068,18 @@ async function showSedePicker() {
             cc.onmouseleave = () => { cc.style.transform=''; cc.style.boxShadow=''; };
             cc.onclick = openCrearCuentaModal;
             cardsEl.appendChild(cc);
+            // Sedes de usuarios — habilitar sedes adicionales (multi-sede)
+            const su = document.createElement('div');
+            su.style.cssText = `cursor:pointer;background:#eef2fb;border:2px dashed #1a527666;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;
+            su.innerHTML = `
+                <div style="font-size:3em;margin-bottom:12px;">🏢🔀</div>
+                <div style="font-size:1.2em;font-weight:700;color:#1a5276;">Sedes de usuarios</div>
+                <div style="font-size:0.85em;color:#666;margin-top:6px;">Recepción multi-sede</div>
+                <div style="font-size:0.8em;color:#999;margin-top:4px;">Habilita sedes adicionales</div>`;
+            su.onmouseenter = () => { su.style.transform='translateY(-4px)'; su.style.boxShadow='0 12px 32px #1a527633'; };
+            su.onmouseleave = () => { su.style.transform=''; su.style.boxShadow=''; };
+            su.onclick = openSedesUsuarioModal;
+            cardsEl.appendChild(su);
         }
         // admin_g: además de index/natación (arriba), sus cards de Gastos, Caja e Inventario
         if (currentRole === 'admin_g') {

@@ -358,7 +358,9 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
 
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-let currentToken=null,currentRole=null,currentSede=null,currentEmail='';
+let currentToken=null,currentRole=null,currentSede=null,currentEmail='',currentSedes=[];
+// Sedes donde el usuario (no admin) puede operar: su sede principal + sedes_extra, validadas y sin duplicar.
+function computeSedes(sede,extra){ const set=[]; [sede,...(Array.isArray(extra)?extra:[])].forEach(s=>{ if(s&&SEDES.includes(s)&&!set.includes(s))set.push(s); }); return set; }
 async function supaFetch(path,opts={}){
   const token=currentToken||SUPA_KEY;
   const res=await fetch(SUPA_URL+'/rest/v1'+path,{method:opts.method||'GET',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':opts.prefer||'return=minimal',...(opts.headers||{})},body:opts.body!=null?JSON.stringify(opts.body):undefined});
@@ -426,8 +428,8 @@ async function doLogin(){
     const res=await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password:pwd})});
     const data=await res.json(); if(!data.access_token)throw new Error(data.error_description||data.msg||'Credenciales incorrectas');
     currentToken=data.access_token;currentEmail=email;
-    const roles=await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede`);
-    currentRole=roles?.[0]?.role||null;currentSede=roles?.[0]?.sede||null;
+    const roles=await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede,sedes_extra`);
+    currentRole=roles?.[0]?.role||null;currentSede=roles?.[0]?.sede||null;currentSedes=computeSedes(currentSede,roles?.[0]?.sedes_extra);
     if(!ROLES_PERMITIDOS.includes(currentRole)){errEl.textContent='Su cuenta no tiene acceso a este módulo.';await doLogout(true);return;}
     if((currentRole==='recepcion'||currentRole==='admin_sucursal')&&!currentSede){errEl.textContent='Su cuenta no tiene sede asignada.';await doLogout(true);return;}
     document.getElementById('userNombre').textContent=roles?.[0]?.nombre||email;
@@ -436,7 +438,7 @@ async function doLogin(){
 }
 document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 (function(){try{const auth=JSON.parse(sessionStorage.getItem('gymAuth')||'null');
-  if(auth?.token&&ROLES_PERMITIDOS.includes(auth.role)){sessionStorage.removeItem('gymAuth');currentToken=auth.token;currentRole=auth.role;currentSede=auth.sede||null;currentEmail=auth.email||'';
+  if(auth?.token&&ROLES_PERMITIDOS.includes(auth.role)){sessionStorage.removeItem('gymAuth');currentToken=auth.token;currentRole=auth.role;currentSede=auth.sede||null;currentEmail=auth.email||'';currentSedes=computeSedes(currentSede,auth.sedes_extra);
     document.getElementById('userNombre').textContent=auth.nombre||'—';document.getElementById('loginScreen').style.display='none';setTimeout(init,0);}}catch(_){}})();
 async function doLogout(silent){stopLivePoll();try{await fetch(`${SUPA_URL}/auth/v1/logout`,{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}});}catch(_){}
   currentToken=null;currentRole=null;currentSede=null;currentEmail='';document.getElementById('app').style.display='none';
@@ -445,12 +447,13 @@ async function doLogout(silent){stopLivePoll();try{await fetch(`${SUPA_URL}/auth
 // ── Init ──
 async function init(){
   const ctrl=document.getElementById('sedeControl');
-  if(esAdmin()){
-    if(!currentSede)currentSede=SEDES[0];
+  const opciones = esAdmin() ? SEDES : currentSedes;
+  if(esAdmin() || (currentSedes.length>1)){
+    if(!currentSede)currentSede=opciones[0];
     ctrl.innerHTML=`<label>🏢 Sede:</label> <select id="sedeSel"></select>`;
     const sel=document.getElementById('sedeSel');
-    sel.innerHTML=SEDES.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
-    sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;loadPricesForSede(currentSede);loadCierres();};
+    sel.innerHTML=opciones.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
+    sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;stopLivePoll();loadPricesForSede(currentSede);loadCierres();};
   }else ctrl.innerHTML=`<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
   document.getElementById('sedeTitle').textContent='· '+currentSede;
   limpiarCacheVieja();   // borra borradores viejos en localStorage (ya no se usan)

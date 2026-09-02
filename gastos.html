@@ -300,7 +300,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 // ── Supabase ──────────────────────────────────────────────────────────────
 const SUPA_URL = '__SUPA_URL__';
 const SUPA_KEY = '__SUPA_KEY__';
-let currentToken = null, currentRole = null, currentSede = null, currentEmail = '';
+let currentToken = null, currentRole = null, currentSede = null, currentEmail = '', currentSedes = [];
 
 async function supaFetch(path, opts = {}) {
   const token = currentToken || SUPA_KEY;
@@ -319,6 +319,8 @@ async function supaFetch(path, opts = {}) {
 // ── Config ──────────────────────────────────────────────────────────────
 const ROLES_PERMITIDOS = ['recepcion', 'admin_sucursal', 'admin_sedes', 'admin_g'];
 const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
+// Sedes donde el usuario (no admin) puede operar: principal + sedes_extra, validadas y sin duplicar.
+function computeSedes(sede, extra){ const set=[]; [sede, ...(Array.isArray(extra)?extra:[])].forEach(s=>{ if(s && SEDES.includes(s) && !set.includes(s)) set.push(s); }); return set; }
 const SEDE_META = {
   '3 Ríos':   { icon: '🌊', color: '#00838f' },
   'Natación': { icon: '🏊', color: '#6a1b9a' },
@@ -364,9 +366,10 @@ async function doLogin() {
     if (!data.access_token) throw new Error(data.error_description || data.msg || 'Credenciales incorrectas');
     currentToken = data.access_token;
     currentEmail = email;
-    const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede`);
+    const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede,sedes_extra`);
     currentRole = roles?.[0]?.role || null;
     currentSede = roles?.[0]?.sede || null;
+    currentSedes = computeSedes(currentSede, roles?.[0]?.sedes_extra);
     if (!ROLES_PERMITIDOS.includes(currentRole)) {
       errEl.textContent = 'Su cuenta no tiene acceso a este módulo.';
       await doLogout(true);
@@ -397,6 +400,7 @@ document.getElementById('loginPassword').addEventListener('keydown', e => { if (
       currentToken = auth.token;
       currentRole = auth.role;
       currentSede = auth.sede || null;
+      currentSedes = computeSedes(currentSede, auth.sedes_extra);
       currentEmail = auth.email || '';
       document.getElementById('userNombre').textContent = auth.nombre || '—';
       document.getElementById('loginScreen').style.display = 'none';
@@ -422,11 +426,12 @@ async function doLogout(silent) {
 async function initGastos() {
   // Control de sede: admin elige; recepción queda fija en su sede
   const ctrl = document.getElementById('sedeControl');
-  if (esAdmin()) {
-    if (!currentSede) currentSede = SEDES[0];
+  const opciones = esAdmin() ? SEDES : currentSedes;
+  if (esAdmin() || currentSedes.length > 1) {
+    if (!currentSede) currentSede = opciones[0];
     ctrl.innerHTML = `<label>🏢 Sede:</label> <select id="sedeSelector"></select>`;
     const sel = document.getElementById('sedeSelector');
-    sel.innerHTML = SEDES.map(s => `<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
+    sel.innerHTML = opciones.map(s => `<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
     sel.onchange = () => { currentSede = sel.value; loadGastos(); };
   } else {
     ctrl.innerHTML = `<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
