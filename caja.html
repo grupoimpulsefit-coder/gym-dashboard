@@ -370,7 +370,7 @@ const ROLES_PERMITIDOS=['recepcion','admin_sucursal','admin_sedes','admin_g','ad
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_META={'3 Ríos':{icon:'🌊'},'Natación':{icon:'🏊'},'Pinares':{icon:'🌲'},'Sabanilla':{icon:'🏙️'}};
 const DENOMS=[20000,10000,5000,2000,1000,500,100,50,25,10,5];
-const CATS_GASTO=[{id:'clases_grupales',label:'🧘 Clases grupales'},{id:'instructores_planta',label:'🏋️ Instructores de planta'},{id:'parqueo',label:'🅿️ Parqueo'},{id:'mantenimiento',label:'🔧 Mantenimiento'},{id:'otros',label:'📦 Otros'}];
+const CATS_GASTO=[{id:'clases_grupales',label:'🧘 Clases grupales'},{id:'instructores_planta',label:'🏋️ Instructores de planta'},{id:'parqueo',label:'🅿️ Parqueo'},{id:'mantenimiento',label:'🔧 Mantenimiento'},{id:'deposito',label:'🏦 Depósito al banco (no es gasto)'},{id:'otros',label:'📦 Otros'}];
 // Clasificación de productos "Otros" — MISMO esquema que otros.html (mantener sincronizados).
 const CAT_META=[
   {id:'everlast',    label:'Everlast / Mercadería Natación', icon:'🏊'},
@@ -950,6 +950,25 @@ function renderSinpeResumen(){
       <div style="padding:9px 12px;background:${bg};color:${cl};font-weight:800;border-top:1px solid var(--border);"><div style="display:flex;justify-content:space-between;"><span>${ic} Pendiente por facturar</span><span>${fmt(pendAfter)}</span></div><div style="font-weight:600;font-size:11px;margin-top:2px;opacity:.9;">${txt}</div></div>
     </div>`;
 }
+// Al auditar un cierre del historial se muestra el SINPE tal como quedó guardado (sr = c.sinpe_reporte).
+function renderSinpeResumenHist(sr){
+  const box=document.getElementById('sinpeResumen'); if(!box)return;
+  if(!sr){ box.innerHTML=''; return; }
+  const pendAfter=Math.round(sr.pendAfter!=null?sr.pendAfter:((Number(sr.pendPrev)||0)+(Number(sr.nuevosMonto)||0)-(Number(sr.facturado)||0)));
+  let bg,cl,ic,txt;
+  if(pendAfter<0){ bg='#fdecec'; cl='#b91c1c'; ic='⚠'; txt='Se facturó más SINPE del recibido — faltó (revisar)'; }
+  else if(pendAfter===0){ bg='#eafaf0'; cl='#166534'; ic='✓'; txt='Todo el SINPE recibido quedó facturado (cuadró)'; }
+  else { bg='#eef4ff'; cl='#1e40af'; ic='🕒'; txt='SINPE recibido que sobró, pendiente de facturar (se factura después)'; }
+  box.innerHTML=`
+    <div style="margin-top:8px;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#f4fbf9;font-weight:700;"><span>📄 ${esc(sr.fileName||'Reporte SINPE')}</span><span>${sr.totalN||0} mov · ${fmt(sr.totalMonto||0)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--muted);"><span>Ya registrados (no se recuentan)</span><span>${sr.yaRegN||0} · ${fmt(sr.yaRegMonto||0)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 12px;font-weight:700;color:var(--primary);border-top:1px dashed var(--border);"><span>🆕 SINPE recibidos nuevos</span><span>${sr.nuevosN||0} · ${fmt(sr.nuevosMonto||0)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 12px;"><span>Facturado (cierre)</span><span>${fmt(sr.facturado||0)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--muted);"><span>Pendiente arrastrado</span><span>${fmt(sr.pendPrev||0)}</span></div>
+      <div style="padding:9px 12px;background:${bg};color:${cl};font-weight:800;border-top:1px solid var(--border);"><div style="display:flex;justify-content:space-between;"><span>${ic} Pendiente por facturar</span><span>${fmt(pendAfter)}</span></div><div style="font-weight:600;font-size:11px;margin-top:2px;opacity:.9;">${txt}</div></div>
+    </div>`;
+}
 
 // ── Foto del datáfono (obligatoria en parcial/final) + análisis con IA (Claude Vision) ──
 async function onFotoDatafono(file){
@@ -1261,9 +1280,11 @@ async function cerrarTurno(estado){
   const bt0=btn.textContent; btn.disabled=true; btn.textContent='Guardando...';
   try{
     await supaFetch(`/cierres_caja?id=eq.${turnoActual.id}`,{method:'PATCH',body:payload});
-    if(gastosLimpios.length){
+    // Los depósitos al banco salen de caja (cuentan para el cuadre) pero NO son gastos → no van al módulo de Gastos.
+    const gastosParaModulo=gastosLimpios.filter(g=>g.cat!=='deposito');
+    if(gastosParaModulo.length){
       const d=parseFecha(fecha);
-      const filas=gastosLimpios.map(g=>({ sede:currentSede, categoria:g.cat||'otros', fecha_clase:fecha, mes:mesEt(d), mes_orden:mesOrd(d),
+      const filas=gastosParaModulo.map(g=>({ sede:currentSede, categoria:g.cat||'otros', fecha_clase:fecha, mes:mesEt(d), mes_orden:mesOrd(d),
         emisor:g.desc, documento_cobro:'Cierre de caja', numero_factura:null, monto:g.monto, metodo_pago:'caja', banco_pago:'Pago de caja', cuenta_pago:null, created_by:currentEmail||null }));
       try{ await supaFetch('/gastos',{method:'POST',body:filas}); }catch(ge){ console.warn('gastos:',ge.message); }
     }
@@ -1275,7 +1296,8 @@ async function cerrarTurno(estado){
       catch(se){ sinpeMsg=' ⚠ No se pudieron registrar los SINPE: '+se.message; }
     }
     stopLivePoll();   // turno cerrado → detener refresco en vivo
-    msg.className='msg ok'; msg.textContent=(estado==='final'?'⏹️ Turno cerrado (final).':'⏸️ Cierre parcial guardado. Puede abrir el siguiente turno.')+(gastosLimpios.length?` ${gastosLimpios.length} gasto(s) enviados a Gastos.`:'')+sinpeMsg;
+    const nDep=gastosLimpios.length-gastosParaModulo.length;
+    msg.className='msg ok'; msg.textContent=(estado==='final'?'⏹️ Turno cerrado (final).':'⏸️ Cierre parcial guardado. Puede abrir el siguiente turno.')+(gastosParaModulo.length?` ${gastosParaModulo.length} gasto(s) enviados a Gastos.`:'')+(nDep?` 🏦 ${nDep} depósito(s) (no van a Gastos).`:'')+sinpeMsg;
     await loadCierres();
   }catch(e){ msg.className='msg err'; msg.textContent='⚠️ '+e.message; }
   finally{ btn.disabled=false; btn.textContent=bt0; }
@@ -1367,7 +1389,9 @@ function cargarCierre(id){
   if(c.foto_cierre)links.push(`<button class="btn-ghost" onclick="verFoto('${esc(c.foto_cierre)}')">📷 Ver foto cierre (final)</button>`);
   if(c.foto_analisis&&c.foto_analisis.total_leido!=null){ const a=c.foto_analisis; links.push(`<div style="font-size:12px;margin-top:4px;color:${a.calza?'#166534':'#b91c1c'};">IA: datáfono ${fmt(a.total_leido)} vs tarjeta ${fmt(a.tarjeta)} ${a.calza?'✓':'⚠'}</div>`); }
   document.getElementById('fotoResumen').innerHTML=links.length?`<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">${links.join('')}</div>`:'';
+  window._sinpeReporte=null;              // historial: no hay reporte en vivo
   calc();
+  renderSinpeResumenHist(c.sinpe_reporte||null);   // muestra cómo quedó el SINPE de ese cierre (sobró/faltó)
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
