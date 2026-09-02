@@ -940,8 +940,10 @@ function renderSinpeResumen(){
   if(pendAfter<0){ bg='#fdecec'; cl='#b91c1c'; ic='⚠'; txt='Se facturó más SINPE del recibido — revisar'; }
   else if(pendAfter===0){ bg='#eafaf0'; cl='#166534'; ic='✓'; txt='Todo el SINPE recibido está facturado'; }
   else { bg='#eef4ff'; cl='#1e40af'; ic='🕒'; txt='SINPE recibido pendiente de facturar (se factura después)'; }
+  const esParcial = !!(turnoActual && turnoActual.estado!=='final');
   box.innerHTML=`
-    <div style="margin-top:8px;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;">
+    <div style="font-size:11px;color:var(--muted);padding:2px 2px 6px;">${esParcial?'🔎 Validación en vivo del turno — se registra y guarda hasta el cierre <b>final</b> del día.':'Se registra al hacer el cierre final.'}</div>
+    <div style="margin-top:2px;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;">
       <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#f4fbf9;font-weight:700;"><span>📄 ${esc(s.fileName)}</span><span>${s.totalN} mov · ${fmt(s.totalMonto)}</span></div>
       <div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--muted);"><span>Ya registrados (no se recuentan)</span><span>${s.yaRegN} · ${fmt(s.yaRegMonto)}</span></div>
       <div style="display:flex;justify-content:space-between;padding:6px 12px;font-weight:700;color:var(--primary);border-top:1px dashed var(--border);"><span>🆕 SINPE recibidos nuevos</span><span>${s.nuevos.length} · ${fmt(s.nuevosMonto)}</span></div>
