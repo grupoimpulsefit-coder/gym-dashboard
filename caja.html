@@ -916,9 +916,10 @@ async function cargarReporteSinpe(file){
       const cierreDate=document.getElementById('cFecha').value;
       let nuevosPrev=0, nuevosPrevMonto=0;
       nuevos.forEach(x=>{ const d=parseDateCR(String(x.fecha_tx||'').split(/\s+/)[0]); if(d && cierreDate){ const iso=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; if(iso<cierreDate){ nuevosPrev++; nuevosPrevMonto+=x.monto; } } });
-      // Saldo pendiente por facturar arrastrado del cierre anterior (excluye el turno actual, aún sin guardar).
+      // Saldo pendiente arrastrado: SOLO de un DÍA ANTERIOR (no de turnos del mismo día, que reutilizan
+      // el mismo Informe acumulado). El SINPE se concilia una sola vez, en el cierre final del día.
       let pendPrev=0;
-      try{ const prev=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(currentSede)}&sinpe_pendiente=not.is.null${turnoActual?`&id=neq.${turnoActual.id}`:''}&order=fecha.desc,created_at.desc&limit=1&select=sinpe_pendiente`))||[]; if(prev.length)pendPrev=Number(prev[0].sinpe_pendiente)||0; }catch(_){}
+      try{ const fPrevDia=cierreDate?`&fecha=lt.${encodeURIComponent(cierreDate)}`:''; const prev=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(currentSede)}&sinpe_pendiente=not.is.null${fPrevDia}&order=fecha.desc,created_at.desc&limit=1&select=sinpe_pendiente`))||[]; if(prev.length)pendPrev=Number(prev[0].sinpe_pendiente)||0; }catch(_){}
       window._sinpeReporte={ fileName:file.name, all, nuevos,
         nuevosMonto:nuevos.reduce((s,x)=>s+x.monto,0),
         yaRegN:yaReg.length, yaRegMonto:yaReg.reduce((s,x)=>s+x.monto,0),
@@ -1270,8 +1271,10 @@ async function cerrarTurno(estado){
     const a=fotoDatafono.analisis||{}; const tj=Math.round(c.tarjeta);
     payload.foto_analisis={ tipo:estado, total_leido:(a.total==null?null:a.total), tarjeta:tj, calza:(a.total!=null?(a.total===tj):null), confianza:a.confianza||null };
   }
+  // El SINPE se concilia SOLO en el cierre final (con el reporte del día completo vs el facturado del día).
+  // En parciales no se guarda pendiente ni se registran refs, para no contar dos veces la mañana.
   const sr=window._sinpeReporte;
-  if(sr){
+  if(sr && esFinal){
     const pendAfter=Math.round((sr.pendPrev||0)+sr.nuevosMonto-c.sinpe);
     payload.sinpe_pendiente=pendAfter;
     payload.sinpe_reporte={ fileName:sr.fileName, totalN:sr.totalN, totalMonto:sr.totalMonto, yaRegN:sr.yaRegN, yaRegMonto:sr.yaRegMonto, nuevosN:sr.nuevos.length, nuevosMonto:sr.nuevosMonto, facturado:Math.round(c.sinpe), pendPrev:Math.round(sr.pendPrev||0), pendAfter };
@@ -1289,12 +1292,13 @@ async function cerrarTurno(estado){
       try{ await supaFetch('/gastos',{method:'POST',body:filas}); }catch(ge){ console.warn('gastos:',ge.message); }
     }
     let sinpeMsg='';
-    if(sr&&sr.nuevos.length){
+    if(esFinal&&sr&&sr.nuevos.length){   // registrar refs SOLO en el final (evita doble conteo intra-día)
       const filas=sr.nuevos.map(x=>({ sede:currentSede, referencia:x.referencia, monto:x.monto, fecha_tx:x.fecha_tx||null, detalle:x.detalle||null, cierre_id:turnoActual.id, created_by:currentEmail||null }));
       try{ await supaFetch('/sinpe_registrados?on_conflict=sede,referencia',{method:'POST',prefer:'resolution=ignore-duplicates,return=minimal',body:filas});
         sinpeMsg=` 🔷 ${filas.length} SINPE registrados.`; }
       catch(se){ sinpeMsg=' ⚠ No se pudieron registrar los SINPE: '+se.message; }
     }
+    else if(!esFinal&&sr) sinpeMsg=' 🔷 El SINPE se conciliará en el cierre final del día.';
     stopLivePoll();   // turno cerrado → detener refresco en vivo
     const nDep=gastosLimpios.length-gastosParaModulo.length;
     msg.className='msg ok'; msg.textContent=(estado==='final'?'⏹️ Turno cerrado (final).':'⏸️ Cierre parcial guardado. Puede abrir el siguiente turno.')+(gastosParaModulo.length?` ${gastosParaModulo.length} gasto(s) enviados a Gastos.`:'')+(nDep?` 🏦 ${nDep} depósito(s) (no van a Gastos).`:'')+sinpeMsg;
