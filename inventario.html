@@ -194,8 +194,23 @@ function renderEnvios(){
     const prods=(e.items||[]).map(it=>`${esc(it.producto)} (${it.enviado})`).join(', ');
     const recibido=e.estado==='aceptado'?(e.items||[]).map(it=>`${esc(it.producto)}: ${it.recibido==null?'—':it.recibido}`).join(', '):'—';
     const badge=e.estado==='aceptado'?'<span class="pill ok">aceptado</span>':'<span class="pill low" style="background:#fff3e0;color:#e65100;">pendiente</span>';
-    return `<tr><td>${new Date(e.created_at).toLocaleDateString('es-CR')}</td><td style="font-size:12px;max-width:300px;">${prods}</td><td>${badge}</td><td style="font-size:12px;">${recibido}${e.nota?'<br><span style="color:var(--warn);">'+esc(e.nota)+'</span>':''}</td><td></td></tr>`;
+    // Solo se puede eliminar un envío que AÚN NO fue aceptado (por si se creó por error/confusión).
+    const acciones=e.estado==='aceptado'?'':`<button class="btn-del" title="Eliminar envío pendiente" onclick="eliminarEnvio('${e.id}')">🗑</button>`;
+    return `<tr><td>${new Date(e.created_at).toLocaleDateString('es-CR')}</td><td style="font-size:12px;max-width:300px;">${prods}</td><td>${badge}</td><td style="font-size:12px;">${recibido}${e.nota?'<br><span style="color:var(--warn);">'+esc(e.nota)+'</span>':''}</td><td style="text-align:right;">${acciones}</td></tr>`;
   }).join('');
+}
+async function eliminarEnvio(id){
+  const e=envios.find(x=>x.id===id);
+  if(!e) return;
+  if(e.estado==='aceptado'){ alert('Este envío ya fue aceptado por recepción y no se puede eliminar.'); return; }
+  const prods=(e.items||[]).map(it=>`${it.producto} (${it.enviado})`).join(', ');
+  if(!confirm(`¿Eliminar este envío PENDIENTE?\n\n${prods}\n\nNo afecta el stock (nunca se sumó). Esta acción no se puede deshacer.`)) return;
+  try{
+    // Guarda: solo borra si sigue pendiente (evita borrar uno recién aceptado por recepción)
+    await supaFetch(`/envios_mercaderia?id=eq.${encodeURIComponent(id)}&estado=eq.pendiente`,{method:'DELETE'});
+    document.getElementById('msg').className='msg ok'; document.getElementById('msg').textContent='🗑 Envío pendiente eliminado.';
+    loadEnvios();
+  }catch(err){ alert('No se pudo eliminar: '+err.message); }
 }
 function openEnvioModal(){
   document.getElementById('envioSedeLbl').textContent='· '+currentSede;
