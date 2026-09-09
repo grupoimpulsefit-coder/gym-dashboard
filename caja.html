@@ -865,11 +865,13 @@ function cargarInformeVentas(file){
       const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
       let colTotal=-1;
       for(let i=0;i<Math.min(rows.length,15);i++){const idx=rows[i].findIndex(c=>String(c||'').trim().toLowerCase()==='total crc'); if(idx>=0){colTotal=idx;break;}}
+      // El informe puede traer VARIAS secciones/"ubicaciones" (ej. "Sin Ubicación" + "Cross Training"),
+      // cada una con su propio "Total SINPE/Tarjeta/Efectivo". Se SUMAN todas (antes la última pisaba a la anterior).
       let efectivo=0,sinpe=0,tarjeta=0,transfer=0;
       rows.forEach(r=>{
         const label=(r||[]).map(c=>String(c||'').trim()).find(t=>/^total\s+(efectivo|sinpe|tarjeta|transferencia)\b/i.test(t));
         if(label){const amt=colTotal>=0?(Number(r[colTotal])||0):(Number([...r].reverse().find(x=>typeof x==='number'))||0);
-          const m=label.toLowerCase(); if(m.includes('efectivo'))efectivo=amt; else if(m.includes('sinpe'))sinpe=amt; else if(m.includes('transferencia'))transfer=amt; else if(m.includes('tarjeta'))tarjeta=amt;}
+          const m=label.toLowerCase(); if(m.includes('efectivo'))efectivo+=amt; else if(m.includes('sinpe'))sinpe+=amt; else if(m.includes('transferencia'))transfer+=amt; else if(m.includes('tarjeta'))tarjeta+=amt;}
       });
       const total=efectivo+sinpe+tarjeta+transfer;
       if(!total){alert('No se encontraron los totales por método en el archivo. Verifique que sea el Informe de Ventas.');return;}
