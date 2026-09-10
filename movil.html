@@ -150,6 +150,11 @@
   .cell input.qty{width:76px;min-height:44px;border:0;border-radius:10px;background:var(--fill);color:var(--label);text-align:right;padding:0 10px;font-size:17px;font-weight:600;flex:none}
   .toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 90px);background:var(--label);color:var(--bg);padding:12px 16px;border-radius:14px;font-size:14px;text-align:center;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none}
   .toast.show{opacity:.95}
+  .btn.plain{background:var(--fill);color:var(--label)}
+  .btn.plain svg{stroke:var(--label)}
+  .pill.wrap{white-space:normal;height:auto;min-height:24px;padding:3px 9px;line-height:1.25;text-align:left}
+  .foto img{cursor:zoom-in}
+  .foto img.zoom{max-height:none;cursor:zoom-out}
 </style>
 </head>
 <body>
@@ -179,7 +184,7 @@
 
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-09-10d';
+const APP_VER='2026-09-10f';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','admin_sedes','admin_g','admin'];
@@ -193,16 +198,19 @@ const ICONS={
   inventario:'<svg viewBox="0 0 24 24"><path d="M3 8l9-4 9 4-9 4z"/><path d="M3 8v8l9 4 9-4V8"/><path d="M12 12v8"/></svg>',
   cierres:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
   envios:'<svg viewBox="0 0 24 24"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></svg>',
-  proyecciones:'<svg viewBox="0 0 24 24"><path d="M4 18L10 11l4 4 6-8"/><path d="M15 7h5v5"/></svg>'
+  proyecciones:'<svg viewBox="0 0 24 24"><path d="M4 18L10 11l4 4 6-8"/><path d="M15 7h5v5"/></svg>',
+  arqueo:'<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8 13l3 3 5-6"/></svg>'
 };
 const MODS=[
   {id:'caja',label:'Caja',color:'var(--brand)'},
   {id:'gastos',label:'Gastos',color:'var(--orange)'},
   {id:'inventario',label:'Inventario',color:'var(--amber)'},
+  {id:'arqueo',label:'Arqueo',color:'#FF2D55',arqueo:true},
   {id:'cierres',label:'Cierres',color:'var(--indigo)'},
   {id:'envios',label:'Envíos',color:'var(--teal)'},
   {id:'proyecciones',label:'Proyecciones',color:'var(--purple)',admin:true}
 ];
+const modVisible=m=>m.arqueo?puedeArquear():(!m.admin||esAdmin());
 
 // ── Helpers (van ANTES del estado: el estado inicial los usa) ──
 const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
@@ -225,6 +233,9 @@ let gMes=mesOrdDe(new Date());          // mes para Gastos
 let cierres=[], ultimosFinales=[], invCache={}, invFiltro='';
 let view='sedes', curMod=null, detSede=null, detTurnoId=null, pollTimer=null, navStack=[];
 const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(me?.role);
+const puedeArquear=()=>esAdmin()||me?.role==='admin_sucursal';
+let arq={rows:[],items:{},filtro:'',soloDif:false,saved:null}, arqVerId=null;
+let audit={seg:'finales',rango:7,soloAlertas:false,rows:[]};
 
 // ── Sesión persistente ──
 function saveAuth(a){auth=a;try{localStorage.setItem(AUTH_KEY,JSON.stringify(a));}catch(_){}}
@@ -281,7 +292,7 @@ async function loadUltimosFinales(){
   const seen={}; ultimosFinales=[]; rows.forEach(c=>{ if(!seen[c.sede]){ seen[c.sede]=true; ultimosFinales.push(c); } });
 }
 async function loadInventario(sede){
-  const rows=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(sede)}&activo=eq.true&order=producto.asc&select=producto,cantidad,cantidad_minima,precio,updated_at`))||[];
+  const rows=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(sede)}&activo=eq.true&order=producto.asc&select=id,producto,cantidad,cantidad_minima,precio,updated_at`))||[];
   invCache[sede]=rows; return rows;
 }
 const sedesVisibles=()=>{ if(esAdmin()) return SEDES; const set=[me?.sede,...(Array.isArray(me?.sedes_extra)?me.sedes_extra:[])].filter(s=>s&&SEDES.includes(s)); return [...new Set(set)]; };
@@ -290,26 +301,44 @@ const ultimoTurno=s=>{const ts=turnosDe(s);return ts[ts.length-1]||null;};
 function difInfo(c){ if(!c) return null; const d=Math.round(Number(c.diferencia)||0); if(d===0) return {cls:'ok',txt:'Cuadra'}; if(d>0) return {cls:'bad',txt:'Faltante '+fmt(d)}; return {cls:'info',txt:'Sobrante '+fmt(-d)}; }
 function estadoPill(c){ if(!c) return '<span class="pill warn">Sin turno</span>'; if(c.estado==='abierto') return '<span class="pill status live"><span class="dot"></span>Abierto '+hora(c.hora_apertura)+'</span>'; if(c.estado==='parcial') return '<span class="pill status">Parcial '+hora(c.hora_cierre)+'</span>'; return '<span class="pill status">Final '+hora(c.hora_cierre)+'</span>'; }
 function sinpePill(c){ const sr=c?.sinpe_reporte; if(!sr) return null; const pa=Math.round(sr.pendAfter!=null?sr.pendAfter:((Number(sr.pendPrev)||0)+(Number(sr.nuevosMonto)||0)-(Number(sr.facturado)||0))); return pa<0?{cls:'bad',txt:'SINPE faltó '+fmt(-pa),pa}:pa===0?{cls:'ok',txt:'SINPE cuadró',pa}:{cls:'info',txt:'SINPE +'+fmt(pa)+' por facturar',pa}; }
-function pendientesDe(s){ const c=ultimoTurno(s); const p=[]; if(!c) return p;
-  if(c.estado==='final'&&!c.sinpe_reporte) p.push('Cierre final sin reporte SINPE');
-  if(c.estado!=='abierto'&&!(c.inventario_cierre&&Object.keys(c.inventario_cierre).length)) p.push('Cierre sin conteo de inventario');
-  const inv=c.inventario_cierre||{}; const difs=Object.values(inv).filter(o=>o&&o.contado!=null&&Number(o.contado)!==Number(o.sistema)).length; if(difs) p.push(`${difs} producto(s) con diferencia en el conteo`);
-  return p; }
+// Alertas automáticas de un cierre (misma lógica para cards, hub y auditoría). prev = turno anterior del mismo día.
+function prevDe(s,c){ if(!c) return null; return turnosDe(s).find(t=>t.turno_num===(c.turno_num||0)-1)||null; }
+function alertasDe(c,prev){ const a=[]; if(!c) return a; const cerrado=c.estado!=='abierto';
+  const d=Math.round(Number(c.diferencia)||0); if(cerrado&&d!==0) a.push({cls:d>0?'bad':'info',t:(d>0?'Faltante ':'Sobrante ')+fmt(Math.abs(d))});
+  if(c.estado==='final'&&!c.sinpe_reporte) a.push({cls:'warn',t:'Sin reporte SINPE'});
+  const sp=sinpePill(c); if(sp&&sp.pa<0) a.push({cls:'bad',t:'SINPE: facturó '+fmt(-sp.pa)+' más de lo recibido'});
+  if(cerrado){ const inv=c.inventario_cierre||{}; const k=Object.keys(inv);
+    if(!k.length) a.push({cls:'warn',t:'Sin conteo de inventario'});
+    else { const n=k.filter(x=>inv[x]&&inv[x].contado!=null&&Number(inv[x].contado)!==Number(inv[x].sistema)).length; if(n) a.push({cls:'warn',t:n+' producto(s) con diferencia en el conteo'}); } }
+  if(cerrado&&!(c.foto_datafono||c.foto_cierre)) a.push({cls:'warn',t:'Sin foto del datáfono'});
+  if(cerrado&&(c.foto_datafono||c.foto_cierre)){ const st=estadoDatafono(c);
+    if(st.k==='nocalza') a.push({cls:'bad',t:'Datáfono verificado: NO calza con tarjeta'});
+    else if(st.k==='ia_no') a.push({cls:'warn',t:'Datáfono (IA) no calza con tarjeta'});
+    else if(st.k==='pend'&&puedeArquear()) a.push({cls:'warn',t:'Datáfono sin verificar'}); }
+  if(cerrado&&!(Number(c.total_ventas)>0)) a.push({cls:'warn',t:'Sin ventas cargadas'});
+  if(prev){ const fin=Math.round(Number(prev.efectivo_final??prev.efectivo)||0), ini=Math.round(Number(c.caja_inicial)||0); if(fin!==ini) a.push({cls:'bad',t:'Fondo inicial '+fmt(ini)+' ≠ efectivo final del turno anterior '+fmt(fin)}); }
+  return a; }
+function pendientesDe(s){ const c=ultimoTurno(s); return alertasDe(c,prevDe(s,c)).map(a=>a.t); }
 
 // ── Live (solo hoy, solo con la app visible) ──
 function startPoll(){ stopPoll(); if(selDate!==todayStr()) return; pollTimer=setInterval(async()=>{ if(document.visibilityState!=='visible') return; try{ if(view==='sedes'){await loadDia();renderSedes(false);} else if(view==='hub'){await loadDia();renderHub(false);} else if(view==='mod'&&curMod==='caja'){await loadDia();renderCaja(false);} }catch(_){} },20000); }
 function stopPoll(){ if(pollTimer){clearInterval(pollTimer);pollTimer=null;} }
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=='visible'||!auth) return; if(view==='sedes') renderSedes(true); else if(view==='hub') renderHub(true); else if(view==='mod') renderMod(true); else if(view==='cierresTab') renderCierresTab(true); });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=='visible'||!auth) return;
+  // No refrescar si hay trabajo en curso: un arqueo a medio contar o una hoja de envío abierta se perderían.
+  if(view==='mod'&&(curMod==='arqueo'||curMod==='arqueoVer')) return; const sh=document.getElementById('sheet'); if(sh&&!sh.hidden) return;
+  if(view==='sedes') renderSedes(true); else if(view==='hub') renderHub(true); else if(view==='mod') renderMod(true); else if(view==='cierresTab') renderCierresTab(true); });
 
 // ── Navegación (pila de "atrás") ──
 function setTabs(on){ ['sedes','cierres','cuenta'].forEach(k=>document.getElementById('tab'+k[0].toUpperCase()+k.slice(1)).classList.toggle('on',on===k)); }
 async function goSedes(){ view='sedes'; navStack=[]; setTabs('sedes'); await renderSedes(true); startPoll(); window.scrollTo(0,0); }
 async function goCierresTab(){ view='cierresTab'; navStack=[]; stopPoll(); setTabs('cierres'); await renderCierresTab(true); window.scrollTo(0,0); }
 function goCuenta(){ view='cuenta'; navStack=[]; stopPoll(); setTabs('cuenta'); renderCuenta(); window.scrollTo(0,0); }
-// Pila de "atrás": cada entrada lleva etiqueta; no se apila dos veces seguidas la misma pantalla.
-function pushBack(tag,fn){ const top=navStack[navStack.length-1]; if(top&&top.tag===tag) return; navStack.push({tag,fn}); }
-async function goHub(sede,push){ if(push) pushBack(view+':'+(detSede||''),push); view='hub'; detSede=sede; setTabs('sedes'); await renderHub(true); startPoll(); window.scrollTo(0,0); }
-async function goMod(mod,push){ if(push) pushBack(view+':'+(view==='mod'?curMod:detSede||''),push); view='mod'; curMod=mod; await renderMod(true); startPoll(); window.scrollTo(0,0); }
+// Pila de "atrás": cada entrada lleva etiqueta y el rótulo del botón; no se apila dos veces seguidas la misma pantalla.
+function pushBack(tag,fn,label){ const top=navStack[navStack.length-1]; if(top&&top.tag===tag) return; navStack.push({tag,fn,label}); }
+const backLabel=()=>navStack[navStack.length-1]?.label||'Atrás';
+const labelActual=()=>view==='mod'?(MODS.find(x=>x.id===curMod)?.label||'Atrás'):view==='hub'?(detSede||'Sede'):view==='cierresTab'?'Cierres':'Sedes';
+async function goHub(sede,push){ if(push) pushBack(view+':'+(detSede||''),push,labelActual()); view='hub'; detSede=sede; setTabs('sedes'); await renderHub(true); startPoll(); window.scrollTo(0,0); }
+async function goMod(mod,push){ if(push) pushBack(view+':'+(view==='mod'?curMod:detSede||''),push,labelActual()); view='mod'; curMod=mod; await renderMod(true); startPoll(); window.scrollTo(0,0); }
 function back(){ const e=navStack.pop(); if(e&&e.fn) e.fn(); else goSedes(); }
 function setFecha(f){ if(!f) return; selDate=f; if(view==='mod'&&curMod==='caja') renderCaja(true); else if(view==='hub') renderHub(true); else renderSedes(true); startPoll(); }
 function abrirCierreFinal(id){ const c=ultimosFinales.find(x=>x.id===id); if(!c) return; selDate=c.fecha; detSede=c.sede; detTurnoId=c.id; goMod('caja',goCierresTab); }
@@ -343,7 +372,7 @@ async function renderSedes(showLoading){
 // ── Hub de la sede: resumen + módulos filtrados a esa sede ──
 async function renderHub(showLoading){
   const s=detSede;
-  document.getElementById('nav').innerHTML=`<div class="row"><button class="back" onclick="back()"><svg viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Sedes</button><span class="tt">${esc(s)}</span><button class="act" onclick="abrirCaja()">Abrir caja</button></div><div class="row"><span class="st">${esc(fechaLarga(selDate))}</span><span id="hubEstado"></span></div>`;
+  document.getElementById('nav').innerHTML=`<div class="row"><button class="back" onclick="back()"><svg viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(backLabel())}</button><span class="tt">${esc(s)}</span><button class="act" onclick="abrirCaja()">Abrir caja</button></div><div class="row"><span class="st">${esc(fechaLarga(selDate))}</span><span id="hubEstado"></span></div>`;
   const v=document.getElementById('view');
   if(showLoading) v.innerHTML='<div class="tiles"><div class="skel" style="margin:0;height:70px"></div><div class="skel" style="margin:0;height:70px"></div></div><div class="mods">'+'<div class="skel" style="margin:0;width:60px;height:60px;border-radius:14px"></div>'.repeat(4)+'</div>';
   const [r1,r2,r3]=await Promise.allSettled([loadDia(), supaFetch(`/envios_mercaderia?sede=eq.${encodeURIComponent(s)}&estado=eq.pendiente&select=id`), invCache[s]?Promise.resolve(invCache[s]):loadInventario(s)]);
@@ -354,7 +383,7 @@ async function renderHub(showLoading){
   const pend=pendientesDe(s);
   const badges={caja:pend.length,inventario:nBajo,envios:nEnv};
   const est=document.getElementById('hubEstado'); if(est) est.innerHTML=estadoPill(c);
-  const mods=MODS.filter(m=>!m.admin||esAdmin()).map(m=>`<button class="mod" onclick="goMod('${m.id}',()=>goHub('${esc(s)}'))"><span class="app" style="background:${m.color}">${ICONS[m.id]}${badges[m.id]?`<span class="badge">${badges[m.id]}</span>`:''}</span>${m.label}</button>`).join('');
+  const mods=MODS.filter(modVisible).map(m=>`<button class="mod" onclick="goMod('${m.id}',()=>goHub('${esc(s)}'))"><span class="app" style="background:${m.color}">${ICONS[m.id]}${badges[m.id]?`<span class="badge">${badges[m.id]}</span>`:''}</span>${m.label}</button>`).join('');
   v.innerHTML=`
     <div class="tiles">
       <div class="tile"><span class="l">Ventas del día</span><span class="n num">${c?fmt(c.total_ventas):'—'}</span></div>
@@ -370,12 +399,14 @@ async function renderHub(showLoading){
 }
 
 // ── Módulos ──
-function navMod(title,extraHtml){
+function navMod(title,extraHtml,actHtml){
   const m=MODS.find(x=>x.id===curMod);
-  document.getElementById('nav').innerHTML=`<div class="row"><button class="back" onclick="back()"><svg viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(detSede)}</button><span class="tt">${esc(title||m?.label||'')}</span>${curMod==='caja'?'<button class="act" onclick="abrirCaja()">Editar</button>':'<span class="act" style="visibility:hidden">·</span>'}</div>${extraHtml||''}`;
+  document.getElementById('nav').innerHTML=`<div class="row"><button class="back" onclick="back()"><svg viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(backLabel())}</button><span class="tt">${esc(title||m?.label||'')}</span>${actHtml!=null?actHtml:(curMod==='caja'?'<button class="act" onclick="abrirCaja()">Editar</button>':'<span class="act" style="visibility:hidden">·</span>')}</div>${extraHtml||''}`;
 }
 async function renderMod(showLoading){
   if(curMod==='caja') return renderCaja(showLoading);
+  if(curMod==='arqueo') return renderArqueoMod();
+  if(curMod==='arqueoVer') return renderArqueoVer();
   if(curMod==='inventario') return renderInventarioMod();
   if(curMod==='gastos') return renderGastosMod();
   if(curMod==='cierres') return renderCierresMod();
@@ -410,7 +441,7 @@ async function renderCaja(showLoading){
   else invHtml=`<div class="cell"><div class="main"><span class="t">${invDifs.length} producto(s) con diferencia</span><span class="s">${invKeys.length} contados</span></div><span class="pill bad">Revisar</span></div>`+
     (esAdmin()?invDifs.slice(0,12).map(k=>`<div class="cell"><div class="main"><span class="t">${esc(k)}</span></div><span class="v num">contó ${inv[k].contado} · sistema ${inv[k].sistema}</span></div>`).join(''):`<div class="cell"><span class="s">Solo un administrador ve las cantidades del sistema.</span></div>`);
   const fa=c.foto_analisis||null;
-  const reqs=[{ok:!!(c.foto_datafono||c.foto_cierre),t:'Foto datáfono'},{ok:!!invKeys.length,t:'Conteo inventario'},{ok:!!sr,t:'Reporte SINPE'},{ok:c.total_tarjeta!=null&&c.total_sinpe!=null,t:'Informe de Ventas'}];
+  const reqs=[{ok:!!(c.foto_datafono||c.foto_cierre),t:'Foto datáfono'},{ok:estadoDatafono(c).k==='ok',t:'Datáfono verificado'},{ok:!!invKeys.length,t:'Conteo inventario'},{ok:!!sr,t:'Reporte SINPE'},{ok:c.total_tarjeta!=null&&c.total_sinpe!=null,t:'Informe de Ventas'}];
   v.innerHTML=`
     <div class="tiles">
       <div class="tile"><span class="l">Ventas del día</span><span class="n num"><small>₡</small>${Math.round(Number(c.total_ventas)||0).toLocaleString('es-CR')}</span></div>
@@ -431,12 +462,43 @@ async function renderCaja(showLoading){
     <div class="sect"><div class="hdr">SINPE del día</div><div class="group">${sinpeHtml}</div></div>
     <div class="sect"><div class="hdr">Inventario al cierre</div><div class="group">${invHtml}</div></div>
     <div class="sect"><div class="hdr">Requisitos del cierre</div><div class="chips">${reqs.map(r=>`<span class="pill ${r.ok?'ok':'warn'}">${r.ok?'✓':'○'} ${r.t}</span>`).join('')}</div></div>
-    <div class="sect"><div class="hdr">Fotos</div><div class="group">
-      ${c.foto_datafono?`<button class="cell" onclick="verFoto('${esc(c.foto_datafono)}','f1')"><div class="main"><span class="t">Foto datáfono (auditoría)</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button><div id="f1"></div>`:''}
-      ${c.foto_cierre?`<button class="cell" onclick="verFoto('${esc(c.foto_cierre)}','f2')"><div class="main"><span class="t">Foto cierre de lote (final)</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button><div id="f2"></div>`:''}
-      ${(!c.foto_datafono&&!c.foto_cierre)?'<div class="cell"><span class="s">Sin fotos todavía.</span></div>':''}</div>
-      <div class="ftr">Actualizado ${c.updated_at?hora(c.updated_at):'—'}${c.created_by?' · abierto por '+esc(c.created_by):''}</div></div>`;
+    <div class="sect"><div class="hdr">Verificación del datáfono</div>${datafonoHtml(c)}
+      <div class="ftr">Mientras la lectura por IA no esté activa, compará a ojo el total del voucher con la tarjeta reportada y marcá el resultado. Actualizado ${c.updated_at?hora(c.updated_at):'—'}${c.created_by?' · abierto por '+esc(c.created_by):''}</div></div>`;
+  cargarFotosDatafono(c);
 }
+// Estado de verificación del datáfono: manual (persona) manda sobre la IA.
+function estadoDatafono(c){ const fa=c.foto_analisis||{}; const m=fa.manual||null; const tieneFoto=!!(c.foto_datafono||c.foto_cierre);
+  if(!tieneFoto) return {k:'sinfoto',cls:'warn',t:'Sin foto del datáfono'};
+  if(m&&m.calza===true) return {k:'ok',cls:'ok',t:'Verificado: calza'+(m.monto_leido!=null?' · voucher '+fmt(m.monto_leido):'')};
+  if(m&&m.calza===false) return {k:'nocalza',cls:'bad',t:'Verificado: NO calza'+(m.monto_leido!=null?' · voucher '+fmt(m.monto_leido):'')};
+  if(fa.calza===true&&fa.total_leido!=null) return {k:'ok',cls:'ok',t:'IA: calza · leyó '+fmt(fa.total_leido)};
+  if(fa.calza===false&&fa.total_leido!=null) return {k:'ia_no',cls:'bad',t:'IA: no calza · leyó '+fmt(fa.total_leido)};
+  return {k:'pend',cls:'warn',t:'Sin verificar'}; }
+function datafonoHtml(c){ const tj=Math.round(Number(c.total_tarjeta)||0); const st=estadoDatafono(c); const m=(c.foto_analisis||{}).manual; const puede=puedeArquear()&&c.estado!=='abierto'&&st.k!=='sinfoto';
+  return `<div class="group">
+    <div class="cell"><div class="main"><span class="t">Tarjeta reportada</span><span class="s">Del Informe de Ventas · el voucher de cierre debe decir lo mismo</span></div><span class="v strong num" style="font-size:20px">${fmt(tj)}</span></div>
+    ${c.foto_datafono?`<div class="cell"><div class="main"><span class="t">Foto datáfono (auditoría · parcial)</span><span class="s">Tocá la foto para ampliarla</span></div></div><div id="f1"><div class="cell"><span class="s">Cargando foto…</span></div></div>`:''}
+    ${c.foto_cierre?`<div class="cell"><div class="main"><span class="t">Foto cierre de lote (final)</span><span class="s">Tocá la foto para ampliarla</span></div></div><div id="f2"><div class="cell"><span class="s">Cargando foto…</span></div></div>`:''}
+    ${st.k==='sinfoto'?'<div class="cell"><span class="s">Sin fotos todavía.</span></div>':''}
+    <div class="cell"><div class="main"><span class="t">Estado</span>${m?`<span class="s">Por ${esc(m.por||'')}${m.at?' · '+hora(m.at):''}</span>`:''}</div><span class="pill wrap ${st.cls}">${esc(st.t)}</span></div>
+  </div>
+  ${puede?`<div class="group" style="margin-top:8px">
+    <div class="cell"><div class="main"><span class="t">Total según el voucher</span><span class="s">Opcional · lo que dice la foto</span></div><input class="qty num" id="dfMonto" type="number" inputmode="numeric" min="0" step="1" placeholder="${tj}" style="width:118px"></div>
+    <div class="cell" style="gap:10px"><button class="btn primary" style="min-height:44px;flex:1" onclick="verificarDatafono('${c.id}',true)">✓ Calza</button><button class="btn plain" style="min-height:44px;flex:1;color:var(--red)" onclick="verificarDatafono('${c.id}',false)">✗ No calza</button></div>
+  </div>`:''}`; }
+function cargarFotosDatafono(c){ if(c.foto_datafono) cargarFotoEn(c.foto_datafono,'f1'); if(c.foto_cierre) cargarFotoEn(c.foto_cierre,'f2'); }
+async function cargarFotoEn(path,boxId){ const box=document.getElementById(boxId); if(!box) return;
+  try{ const res=await fetch(`${SUPA_URL}/storage/v1/object/sign/cierres-caja/${path}`,{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+auth.access_token,'Content-Type':'application/json'},body:JSON.stringify({expiresIn:600})});
+    const d=await res.json(); if(!d.signedURL) throw new Error(d.message||'No se pudo firmar la URL');
+    box.innerHTML=`<div class="foto" style="margin:0 12px 10px"><img src="${SUPA_URL}/storage/v1${d.signedURL}" alt="Foto del datáfono" onclick="this.classList.toggle('zoom')"></div>`; }
+  catch(e){ box.innerHTML=`<div class="cell"><span class="s" style="color:var(--red)">${esc(e.message)}</span></div>`; } }
+async function verificarDatafono(id,calza){ const c=cierres.find(x=>x.id===id); if(!c) return;
+  const raw=document.getElementById('dfMonto')?.value; const monto=(raw==null||raw==='')?null:Math.round(Number(raw)||0); const tj=Math.round(Number(c.total_tarjeta)||0);
+  if(monto!=null&&calza&&monto!==tj&&!confirm(`El voucher dice ${fmt(monto)} y la tarjeta reportada es ${fmt(tj)}. ¿Marcar igual como "calza"?`)) return;
+  if(monto!=null&&!calza&&monto===tj&&!confirm(`El voucher dice ${fmt(monto)}, igual que la tarjeta reportada. ¿Marcar igual como "NO calza"?`)) return;
+  const fa={...(c.foto_analisis||{}),manual:{calza:!!calza,monto_leido:monto,tarjeta:tj,por:auth.email||null,at:new Date().toISOString()}};
+  try{ await supaFetch(`/cierres_caja?id=eq.${id}`,{method:'PATCH',body:{foto_analisis:fa}}); c.foto_analisis=fa; toast(calza?'Datáfono verificado: calza.':'Datáfono marcado como NO calza.'); renderCaja(false); }
+  catch(e){ toast('No se pudo guardar: '+e.message); } }
 
 // Inventario: stock actual de la sede
 async function renderInventarioMod(){
@@ -444,6 +506,7 @@ async function renderInventarioMod(){
   const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
   let rows; try{ rows=await loadInventario(detSede); }catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar el inventario: ${esc(e.message)}</div>`; return; }
   pintarInventario(v,rows);
+  pintarArqueosRecientes(v);
 }
 function pintarInventario(v,rows){
   const f=invFiltro.trim().toLowerCase();
@@ -456,7 +519,8 @@ function pintarInventario(v,rows){
   v.innerHTML=`
     <div class="tiles"><div class="tile"><span class="l">Productos</span><span class="n num">${rows.length}</span></div><div class="tile"><span class="l">Bajo mínimo</span><span class="n num" style="color:${bajo?'var(--red)':'var(--green)'}">${bajo}</span></div>
       <div class="tile wide"><div><span class="l">Valor del inventario</span><div class="n num"><small>₡</small>${Math.round(valor).toLocaleString('es-CR')}</div></div>${upd?`<span class="pill status">Actualizado ${hora(upd)}</span>`:''}</div></div>
-    ${esAdmin()?`<div class="actionbar"><button class="btn primary" onclick="abrirEnvio()">${ICONS.envios}Enviar mercadería a ${esc(detSede)}</button></div>`:''}
+    ${puedeArquear()?`<div class="actionbar"><button class="btn primary" onclick="goMod('arqueo',()=>goMod('inventario'))">${ICONS.arqueo}Hacer arqueo de ${esc(detSede)}</button></div>`:''}
+    ${esAdmin()?`<div class="actionbar"><button class="btn plain" onclick="abrirEnvio()">${ICONS.envios}Enviar mercadería a ${esc(detSede)}</button></div>`:''}
     <div class="search"><input type="search" placeholder="Buscar producto" value="${esc(invFiltro)}" oninput="invFiltro=this.value;pintarInventario(document.getElementById('view'),invCache['${esc(detSede)}']||[]);const i=document.querySelector('.search input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}"></div>
     <div class="sect"><div class="hdr">Stock actual · ${esc(detSede)}</div><div class="group">${items||'<div class="cell"><span class="s">Sin productos.</span></div>'}</div>
       <div class="ftr">Stock del sistema (se descuenta al subir "Ventas por Producto"). Solo lectura; los ajustes se hacen en Inventario.</div></div>`;
@@ -530,8 +594,10 @@ async function renderProyMod(){
 }
 
 // ── Pestaña Cierres: último cierre final por sede ──
+const auditSeg=()=>`<div class="seg"><button class="${audit.seg==='finales'?'on':''}" onclick="audit.seg='finales';renderCierresTab(true)">Últimos finales</button><button class="${audit.seg==='todos'?'on':''}" onclick="audit.seg='todos';renderCierresTab(true)">Auditar todos</button></div>`;
 async function renderCierresTab(showLoading){
-  document.getElementById('nav').innerHTML=`<div class="row"><span class="st">Último cierre final de cada sede</span></div><div class="lt">Cierres</div>`;
+  if(audit.seg==='todos') return renderAuditoria(showLoading);
+  document.getElementById('nav').innerHTML=`<div class="row"><span class="st">Último cierre final de cada sede</span></div><div class="lt">Cierres</div>${auditSeg()}`;
   const v=document.getElementById('view');
   if(showLoading) v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
   try{ await loadUltimosFinales(); }catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(e.message)}</div>`; return; }
@@ -550,6 +616,114 @@ async function verFoto(path,boxId){
     const d=await res.json(); if(!d.signedURL) throw new Error(d.message||'No se pudo firmar la URL');
     box.innerHTML=`<div class="foto"><img src="${SUPA_URL}/storage/v1${d.signedURL}" alt="Foto del cierre"></div>`;
   }catch(e){ box.innerHTML=`<div class="cell"><span class="s" style="color:var(--red)">${esc(e.message)}</span></div>`; }
+}
+
+// ── Auditoría de cierres de todas las sedes (rango de días + alertas automáticas) ──
+async function renderAuditoria(showLoading){
+  const hoy=new Date(); const desdeD=new Date(hoy); desdeD.setDate(hoy.getDate()-(audit.rango-1)); const desde=ymd(desdeD);
+  document.getElementById('nav').innerHTML=`<div class="row"><span class="st">Del ${esc(fechaCorta(desde))} al ${esc(fechaCorta(todayStr()))} · ${sedesVisibles().length} sede(s)</span></div><div class="lt">Cierres</div>${auditSeg()}
+    <div class="seg">${[7,14,30].map(n=>`<button class="${audit.rango===n?'on':''}" onclick="audit.rango=${n};renderAuditoria(true)">${n} días</button>`).join('')}</div>
+    <div class="seg"><button class="${!audit.soloAlertas?'on':''}" onclick="audit.soloAlertas=false;renderAuditoria(false)">Todos</button><button class="${audit.soloAlertas?'on':''}" onclick="audit.soloAlertas=true;renderAuditoria(false)">Solo con alertas</button></div>`;
+  const v=document.getElementById('view');
+  if(showLoading){ v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
+    try{ audit.rows=(await supaFetch(`/cierres_caja?fecha=gte.${desde}&order=fecha.desc,sede.asc,turno_num.asc&limit=500&select=${SEL_CIERRE}`))||[]; }
+    catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(e.message)}</div>`; return; } }
+  const sedes=sedesVisibles(); const rows=audit.rows.filter(c=>sedes.includes(c.sede));
+  const byKey={}; rows.forEach(c=>{ (byKey[c.sede+'|'+c.fecha]=byKey[c.sede+'|'+c.fecha]||[]).push(c); });
+  rows.forEach(c=>{ const g=byKey[c.sede+'|'+c.fecha]; c._al=alertasDe(c,g.find(t=>t.turno_num===(c.turno_num||0)-1)||null); });
+  const cerr=rows.filter(c=>c.estado!=='abierto');
+  const conAl=rows.filter(c=>c._al.length).length;
+  const falt=cerr.reduce((s,c)=>{const d=Math.round(Number(c.diferencia)||0);return s+(d>0?d:0);},0);
+  const sobr=cerr.reduce((s,c)=>{const d=Math.round(Number(c.diferencia)||0);return s+(d<0?-d:0);},0);
+  const sinSinpe=rows.filter(c=>c.estado==='final'&&!c.sinpe_reporte).length;
+  const sinDf=rows.filter(c=>c.estado!=='abierto'&&(c.foto_datafono||c.foto_cierre)&&estadoDatafono(c).k==='pend').length;
+  const dfNo=rows.filter(c=>['nocalza','ia_no'].includes(estadoDatafono(c).k)).length;
+  const lista=audit.soloAlertas?rows.filter(c=>c._al.length):rows;
+  const porFecha={}; lista.forEach(c=>{ (porFecha[c.fecha]=porFecha[c.fecha]||[]).push(c); });
+  const fechas=Object.keys(porFecha).sort().reverse();
+  v.innerHTML=`
+    <div class="tiles">
+      <div class="tile"><span class="l">Cierres revisados</span><span class="n num">${rows.length}</span></div>
+      <div class="tile"><span class="l">Con alertas</span><span class="n num" style="color:${conAl?'var(--orange)':'var(--green)'}">${conAl}</span></div>
+      <div class="tile"><span class="l">Faltantes acumulados</span><span class="n num" style="color:${falt?'var(--red)':'var(--green)'}"><small>₡</small>${Math.round(falt).toLocaleString('es-CR')}</span></div>
+      <div class="tile"><span class="l">Sobrantes acumulados</span><span class="n num" style="color:${sobr?'var(--blue)':'var(--green)'}"><small>₡</small>${Math.round(sobr).toLocaleString('es-CR')}</span></div>
+      ${sinSinpe?`<div class="tile wide"><span class="l">Cierres finales sin reporte SINPE</span><span class="pill warn">${sinSinpe}</span></div>`:''}
+      ${sinDf?`<div class="tile wide"><span class="l">Datáfonos sin verificar (foto vs tarjeta)</span><span class="pill warn">${sinDf}</span></div>`:''}
+      ${dfNo?`<div class="tile wide"><span class="l">Datáfonos que NO calzan</span><span class="pill bad">${dfNo}</span></div>`:''}
+    </div>
+    ${fechas.length?fechas.map(f=>`<div class="sect"><div class="hdr">${esc(fechaLarga(f))}${f===todayStr()?' · hoy':f===ayerStr()?' · ayer':''}</div><div class="group">${porFecha[f].sort((a,b)=>a.sede.localeCompare(b.sede)||(b.turno_num||0)-(a.turno_num||0)).map(c=>`<button class="cell ico" onclick="abrirCierreAudit('${c.id}')"><div class="ic" style="background:${SEDE_COLOR[c.sede]||'var(--sec)'}">${esc(c.sede[0])}</div><div class="main"><span class="t">${esc(c.sede)} · T${c.turno_num} · ${c.estado}</span><span class="s num">Ventas ${fmt(c.total_ventas)} · efectivo ${fmt(c.efectivo)}${c.hora_cierre?' · '+hora(c.hora_cierre):''}</span><span class="s" style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${c._al.length?c._al.slice(0,3).map(a=>`<span class="pill wrap ${a.cls}">${esc(a.t)}</span>`).join('')+(c._al.length>3?`<span class="pill status">+${c._al.length-3}</span>`:''):'<span class="pill ok">✓ Sin alertas</span>'}</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`).join('')}</div></div>`).join('')
+      :`<div class="empty">${audit.soloAlertas?'Ningún cierre con alertas en este rango.':'Sin cierres en este rango.'}</div>`}
+    <div class="sect"><div class="ftr">Alertas: diferencia de caja, reporte SINPE, conteo de inventario, foto del datáfono, lectura IA, ventas cargadas y continuidad del fondo entre turnos. Tocá un cierre para ver el detalle.</div></div>`;
+}
+function abrirCierreAudit(id){ const c=audit.rows.find(x=>x.id===id); if(!c) return; selDate=c.fecha; detSede=c.sede; detTurnoId=c.id; goMod('caja',goCierresTab); }
+
+// ── Arqueo de inventario (admin / admin_sucursal): conteo físico vs sistema, registro para auditoría y aplicación opcional ──
+const difBadge=d=>d==null?'':d===0?'<span class="pill ok" style="height:20px">✓ igual</span>':`<span class="pill ${d<0?'bad':'info'}" style="height:20px">${d>0?'+':''}${d}</span>`;
+function arqStats(){ const it=arq.items; let contados=0,conDif=0,uDif=0,vDif=0; arq.rows.forEach(r=>{ const c=it[r.producto]; if(c==null) return; contados++; const d=c-(Number(r.cantidad)||0); if(d!==0){conDif++;uDif+=d;vDif+=d*(Number(r.precio)||0);} }); return {contados,conDif,uDif,vDif,total:arq.rows.length}; }
+function arqTilesHtml(st){ return `<div class="tile"><span class="l">Contados</span><span class="n num">${st.contados}<small style="margin-left:4px">/ ${st.total}</small></span></div><div class="tile"><span class="l">Con diferencia</span><span class="n num" style="color:${st.conDif?'var(--red)':'var(--green)'}">${st.conDif}</span></div><div class="tile wide"><div><span class="l">Diferencia neta</span><div class="n num" style="color:${st.uDif<0?'var(--red)':st.uDif>0?'var(--blue)':'var(--green)'}">${st.uDif>0?'+':''}${st.uDif} u</div></div><span class="pill ${st.vDif<0?'bad':st.vDif>0?'info':'ok'}">${st.vDif<0?'−':st.vDif>0?'+':''}${fmt(Math.abs(st.vDif))}</span></div>`; }
+function arqProgreso(st){ const p=document.getElementById('arqProg'); if(p) p.textContent=`${st.contados} de ${st.total} contados`; const b=document.getElementById('btnArqGuardar'); if(b) b.disabled=!st.contados; }
+async function renderArqueoMod(){
+  if(!puedeArquear()){ back(); return; }
+  navMod('Arqueo',`<div class="row"><span class="st">${esc(detSede)} · ${esc(fechaLarga(todayStr()))}</span><span class="pill status" id="arqProg">0 contados</span></div>`,`<button class="act" id="btnArqGuardar" onclick="guardarArqueo()" disabled>Guardar</button>`);
+  const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
+  let rows; try{ rows=await loadInventario(detSede); }catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar el inventario: ${esc(e.message)}</div>`; return; }
+  arq={rows,items:{},filtro:'',soloDif:false,saved:null};
+  pintarArqueo();
+}
+function pintarArqueo(){
+  const v=document.getElementById('view'); const f=arq.filtro.trim().toLowerCase(); const st=arqStats();
+  const lista=arq.rows.map((r,i)=>({r,i})).filter(({r})=>(!f||String(r.producto).toLowerCase().includes(f))&&(!arq.soloDif||(arq.items[r.producto]!=null&&arq.items[r.producto]!==(Number(r.cantidad)||0))));
+  v.innerHTML=`
+    <div class="tiles" id="arqTiles">${arqTilesHtml(st)}</div>
+    <div class="search"><input type="search" placeholder="Buscar producto" value="${esc(arq.filtro)}" oninput="arq.filtro=this.value;pintarArqueo();const i=document.querySelector('.search input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}"></div>
+    <div class="actionbar"><div class="seg"><button class="${!arq.soloDif?'on':''}" onclick="arq.soloDif=false;pintarArqueo()">Todos</button><button class="${arq.soloDif?'on':''}" onclick="arq.soloDif=true;pintarArqueo()">Solo con diferencia</button></div></div>
+    <div class="sect"><div class="hdr">Conteo físico · sistema vs contado</div><div class="group">${lista.length?lista.map(({r,i})=>{const c=arq.items[r.producto];const sis=Number(r.cantidad)||0;
+      return `<div class="cell"><div class="main"><span class="t">${esc(r.producto)}</span><span class="s num">sistema <b>${sis}</b>${r.precio?' · '+fmt(r.precio):''} <span id="arqDif_${i}">${difBadge(c==null?null:c-sis)}</span></span></div><input class="qty num" type="number" inputmode="numeric" min="0" step="1" placeholder="—" value="${c==null?'':c}" oninput="arqInput(${i},this.value)"></div>`;}).join(''):'<div class="cell"><span class="s">Sin productos.</span></div>'}</div>
+      <div class="ftr">Contá lo que hay físicamente. Podés hacer un arqueo parcial: lo no contado no se toma en cuenta. Al guardar queda registrado para auditoría; el stock del sistema no cambia hasta que lo apliques.</div></div>`;
+  arqProgreso(st);
+}
+function arqInput(i,val){ const r=arq.rows[i]; if(!r) return; const v=val===''?null:Math.max(0,Math.floor(Number(val)||0)); arq.items[r.producto]=v; const sis=Number(r.cantidad)||0; const el=document.getElementById('arqDif_'+i); if(el) el.innerHTML=difBadge(v==null?null:v-sis); const st=arqStats(); const t=document.getElementById('arqTiles'); if(t) t.innerHTML=arqTilesHtml(st); arqProgreso(st); }
+async function guardarArqueo(){
+  const st=arqStats(); if(!st.contados) return; const b=document.getElementById('btnArqGuardar'); b.disabled=true; b.textContent='Guardando…';
+  const items={}; arq.rows.forEach(r=>{ const c=arq.items[r.producto]; if(c==null) return; const sis=Number(r.cantidad)||0; items[r.producto]={id:r.id,sistema:sis,contado:c,dif:c-sis,precio:Number(r.precio)||0}; });
+  try{
+    const res=await supaFetch('/arqueos_inventario',{method:'POST',prefer:'return=representation',body:{sede:detSede,fecha:todayStr(),items,productos:st.total,contados:st.contados,con_diferencia:st.conDif,unidades_dif:st.uDif,valor_dif:st.vDif,ajustado:false,created_by:auth.email||null}});
+    arq.saved=Array.isArray(res)?res[0]:res; renderArqueoResultado();
+  }catch(e){ b.disabled=false; b.textContent='Guardar'; toast('No se pudo guardar: '+(/arqueos_inventario/.test(e.message)&&/relation|exist|schema cache/i.test(e.message)?'falta correr arqueos.sql en Supabase':e.message)); }
+}
+function renderArqueoResultado(){
+  const st=arqStats(); const a=arq.saved||{};
+  navMod('Arqueo guardado','','<span class="act" style="visibility:hidden">·</span>');
+  const difs=arq.rows.filter(r=>arq.items[r.producto]!=null&&arq.items[r.producto]!==(Number(r.cantidad)||0));
+  document.getElementById('view').innerHTML=`
+    <div class="tiles">${arqTilesHtml(st)}</div>
+    <div class="sect"><div class="hdr">Productos con diferencia</div><div class="group">${difs.length?difs.map(r=>{const c=arq.items[r.producto];const sis=Number(r.cantidad)||0;return `<div class="cell"><div class="main"><span class="t">${esc(r.producto)}</span><span class="s num">sistema ${sis} · contado ${c}</span></div>${difBadge(c-sis)}</div>`;}).join(''):'<div class="cell"><span class="s">Todo coincide con el sistema.</span></div>'}</div>
+      <div class="ftr">Arqueo registrado${a.created_at?' a las '+hora(a.created_at):''} por ${esc(auth.email||'')}. El stock del sistema no cambió.</div></div>
+    ${difs.length?`<div class="actionbar"><button class="btn primary" id="btnAplicar" onclick="aplicarArqueo()">Aplicar conteo al sistema (${difs.length})</button></div><div class="sect"><div class="ftr" style="text-align:center">Reemplaza la cantidad del sistema por lo contado en esos ${difs.length} producto(s), igual que "guardar conteo" en Inventario.</div></div>`:''}
+    <div class="actionbar"><button class="btn plain" onclick="invCache[detSede]=null;back()">Volver</button></div>`;
+}
+async function aplicarArqueo(){
+  const difs=arq.rows.filter(r=>arq.items[r.producto]!=null&&arq.items[r.producto]!==(Number(r.cantidad)||0));
+  if(!difs.length) return; if(!confirm(`¿Reemplazar la cantidad del sistema por lo contado en ${difs.length} producto(s)? Queda registrado en el arqueo.`)) return;
+  const b=document.getElementById('btnAplicar'); b.disabled=true; b.textContent='Aplicando…'; let ok=0, err=null;
+  for(const r of difs){ try{ await supaFetch(`/inventario?id=eq.${r.id}`,{method:'PATCH',body:{cantidad:arq.items[r.producto],updated_at:new Date().toISOString()}}); ok++; }catch(e){ err=e; } }
+  try{ if(arq.saved?.id) await supaFetch(`/arqueos_inventario?id=eq.${arq.saved.id}`,{method:'PATCH',body:{ajustado:true}}); }catch(_){}
+  invCache[detSede]=null; toast(err?`Se aplicaron ${ok} de ${difs.length}. Error: ${err.message}`:`Inventario actualizado: ${ok} producto(s).`); back();
+}
+async function pintarArqueosRecientes(v){
+  let rows; try{ rows=(await supaFetch(`/arqueos_inventario?sede=eq.${encodeURIComponent(detSede)}&order=created_at.desc&limit=5&select=id,fecha,contados,productos,con_diferencia,unidades_dif,valor_dif,ajustado,created_by,created_at`))||[]; }catch(_){ return; }
+  if(!rows.length) return;
+  v.insertAdjacentHTML('beforeend',`<div class="sect"><div class="hdr">Arqueos recientes</div><div class="group">${rows.map(a=>`<button class="cell" onclick="verArqueo('${a.id}')"><div class="main"><span class="t">${esc(fechaLarga(a.fecha))}</span><span class="s num">${a.contados}/${a.productos} contados · ${a.con_diferencia} con diferencia${a.ajustado?' · aplicado':''}${a.created_by?' · '+esc(a.created_by):''}</span></div><span class="pill ${a.con_diferencia?'warn':'ok'}">${a.con_diferencia?a.con_diferencia+' dif.':'OK'}</span><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`).join('')}</div></div>`);
+}
+function verArqueo(id){ arqVerId=id; goMod('arqueoVer',()=>goMod('inventario')); }
+async function renderArqueoVer(){
+  navMod('Arqueo','','<span class="act" style="visibility:hidden">·</span>');
+  const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div></div>';
+  let a; try{ const r=await supaFetch(`/arqueos_inventario?id=eq.${arqVerId}&select=*`); a=r&&r[0]; }catch(e){ v.innerHTML=`<div class="empty">${esc(e.message)}</div>`; return; }
+  if(!a){ v.innerHTML='<div class="empty">Arqueo no encontrado.</div>'; return; }
+  const items=a.items||{}; const keys=Object.keys(items).sort((x,y)=>Math.abs(Number(items[y].dif)||0)-Math.abs(Number(items[x].dif)||0));
+  v.innerHTML=`<div class="tiles"><div class="tile"><span class="l">${esc(fechaLarga(a.fecha))}</span><span class="n num">${a.contados}<small style="margin-left:4px">/ ${a.productos}</small></span></div><div class="tile"><span class="l">Con diferencia</span><span class="n num" style="color:${a.con_diferencia?'var(--red)':'var(--green)'}">${a.con_diferencia}</span></div><div class="tile wide"><div><span class="l">Diferencia neta</span><div class="n num">${Number(a.unidades_dif)>0?'+':''}${Number(a.unidades_dif)||0} u · ${fmt(a.valor_dif)}</div></div><span class="pill ${a.ajustado?'ok':'status'}">${a.ajustado?'Aplicado al sistema':'Solo registrado'}</span></div></div>
+    <div class="sect"><div class="hdr">Detalle</div><div class="group">${keys.length?keys.map(k=>`<div class="cell"><div class="main"><span class="t">${esc(k)}</span><span class="s num">sistema ${items[k].sistema} · contado ${items[k].contado}</span></div>${difBadge(Number(items[k].dif)||0)}</div>`).join(''):'<div class="cell"><span class="s">Sin productos.</span></div>'}</div><div class="ftr">Registrado${a.created_at?' a las '+hora(a.created_at):''}${a.created_by?' por '+esc(a.created_by):''}.</div></div>`;
 }
 
 // ── Enviar mercadería a la sede (solo admins; igual que inventario.html: crea el envío pendiente, no toca stock) ──

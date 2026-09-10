@@ -1,6 +1,6 @@
 // Service worker mínimo para la app móvil (/movil).
 // Cachea SOLO la carcasa (página, manifest, iconos). Nunca cachea Supabase ni otras páginas.
-const VERSION = 'impulse-movil-2026-09-10d';
+const VERSION = 'impulse-movil-2026-09-10f';
 const SHELL = ['/movil', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png', '/icons/favicon-64.png'];
 
 self.addEventListener('install', (e) => {
