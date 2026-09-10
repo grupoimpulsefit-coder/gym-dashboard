@@ -35,9 +35,8 @@
   html,body{margin:0;background:var(--bg);color:var(--label);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;font-size:17px;line-height:1.35;-webkit-font-smoothing:antialiased}
   body{min-height:100vh;min-height:100dvh;overscroll-behavior-y:none}
   [hidden]{display:none!important}
-  button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+  button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:left}
   input{font:inherit}
-  .safe-top{padding-top:env(safe-area-inset-top)}
   .num{font-variant-numeric:tabular-nums}
 
   /* ── Login ── */
@@ -51,8 +50,6 @@
   .btn{min-height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:17px;width:100%}
   .btn.primary{background:var(--brand);color:#fff}
   .btn.primary:disabled{opacity:.6}
-  .btn.plain{background:var(--fill);color:var(--label)}
-  .btn.link{color:var(--brand-text);min-height:44px}
   .err{color:var(--red);font-size:14px;min-height:18px;text-align:center}
 
   /* ── App shell ── */
@@ -66,20 +63,19 @@
   .nav .back svg{width:12px;height:20px}
   .nav .act{color:var(--brand-text);font-weight:600;min-height:44px;display:flex;align-items:center}
   .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--fill);border-radius:10px;padding:2px;gap:2px}
-  .seg button{min-height:36px;border-radius:8px;font-size:14px;font-weight:600;color:var(--label)}
+  .seg button{min-height:36px;border-radius:8px;font-size:14px;font-weight:600;color:var(--label);text-align:center}
   .seg button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12)}
-  .datebox{display:flex;align-items:center;gap:10px}
-  .datebox input{flex:1;min-height:40px;border:0;border-radius:10px;background:var(--card);color:var(--label);padding:0 12px;font-size:16px}
+  .datebox input{width:100%;min-height:40px;border:0;border-radius:10px;background:var(--card);color:var(--label);padding:0 12px;font-size:16px}
 
   main{display:flex;flex-direction:column;gap:22px;padding-top:6px}
   .sect{display:flex;flex-direction:column;gap:6px}
   .sect .hdr{padding:0 32px;font-size:13px;color:var(--sec);text-transform:uppercase;letter-spacing:.04em}
   .sect .ftr{padding:0 32px;font-size:13px;color:var(--sec)}
   .group{margin:0 16px;background:var(--card);border-radius:12px;overflow:hidden}
-  .cell{display:flex;align-items:center;gap:12px;min-height:44px;padding:10px 16px;position:relative;text-align:left;width:100%}
+  .cell{display:flex;align-items:center;gap:12px;min-height:44px;padding:10px 16px;position:relative;width:100%}
   .cell + .cell::before{content:"";position:absolute;left:16px;right:0;top:0;height:.5px;background:var(--sep)}
   .cell.ico + .cell.ico::before{left:58px}
-  .cell:active{background:var(--fill)}
+  button.cell:active{background:var(--fill)}
   .cell .ic{width:30px;height:30px;border-radius:8px;flex:none;display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px}
   .cell .main{flex:1;min-width:0;display:flex;flex-direction:column}
   .cell .t{font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -109,10 +105,24 @@
   .foto img{display:block;width:100%;max-height:360px;object-fit:contain;background:#000}
   .skel{height:44px;margin:0 16px;border-radius:12px;background:var(--card);opacity:.6}
 
+  /* ── Cards de sedes (2 columnas) ── */
+  .cards{margin:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .card{background:var(--card);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;min-height:150px;position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--c)}
+  .card:active{background:var(--fill)}
+  .card .h{display:flex;align-items:center;gap:8px}
+  .card .h .ic{width:28px;height:28px;border-radius:8px;background:var(--c);color:#fff;font-weight:700;font-size:13px;display:grid;place-items:center;flex:none}
+  .card .h .name{font-size:17px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .card .n{font-size:22px;font-weight:700;letter-spacing:-.01em;line-height:1.1}
+  .card .l{font-size:12px;color:var(--sec)}
+  .card .f{margin-top:auto;display:flex;flex-wrap:wrap;gap:6px}
+  .search{margin:0 16px}
+  .search input{width:100%;min-height:40px;border:0;border-radius:10px;background:var(--card);color:var(--label);padding:0 12px;font-size:16px}
+
   /* ── Tab bar flotante (Liquid Glass) ── */
   .tabbar{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 12px);height:64px;padding:6px;background:var(--glass);backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);
-    border:.5px solid var(--sep);border-radius:32px;box-shadow:0 10px 30px -6px rgba(0,0,0,.22);display:grid;grid-template-columns:1fr 1fr;z-index:5}
-  .tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:500;color:var(--sec);border-radius:26px;min-height:44px}
+    border:.5px solid var(--sep);border-radius:32px;box-shadow:0 10px 30px -6px rgba(0,0,0,.22);display:grid;grid-template-columns:1fr 1fr 1fr;z-index:5}
+  .tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:500;color:var(--sec);border-radius:26px;min-height:44px;text-align:center}
   .tab svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
   .tab.on{color:var(--brand-text);background:var(--brand-tint)}
   .toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 90px);background:var(--label);color:var(--bg);padding:12px 16px;border-radius:14px;font-size:14px;text-align:center;z-index:6;opacity:0;transition:opacity .2s;pointer-events:none}
@@ -137,6 +147,7 @@
   <main id="view"></main>
   <nav class="tabbar">
     <button class="tab on" id="tabSedes" onclick="goSedes()"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Sedes</button>
+    <button class="tab" id="tabCierres" onclick="goCierres()"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Cierres</button>
     <button class="tab" id="tabCuenta" onclick="goCuenta()"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>Cuenta</button>
   </nav>
 </div>
@@ -144,26 +155,32 @@
 
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-09-10a';
+const APP_VER='2026-09-10b';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','admin_sedes','admin_g','admin'];
 const AUTH_KEY='impulseMovilAuth';
-let auth=null;            // {access_token, refresh_token, expires_at, user_id, email}
-let me=null;              // {role,nombre,sede,sedes_extra}
-let selDate=todayStr();   // fecha seleccionada (local)
-let cierres=[];           // cierres del día seleccionado (todas las sedes visibles por RLS)
-let view='sedes', detSede=null, detTurnoId=null, pollTimer=null;
+const SEL_CIERRE=['id','sede','fecha','turno_num','estado','hora_apertura','hora_cierre','caja_inicial','efectivo','efectivo_final','total_ventas','total_tarjeta','total_sinpe','total_transferencia','total_gastos','total_ingresos','minita','otros_vendidos','diferencia','estado_dif','sobre_modo','gastos','ingresos','sinpe_reporte','inventario_cierre','foto_datafono','foto_cierre','foto_analisis','updated_at','created_by'].join(',');
 
+// ── Helpers (van ANTES del estado: el estado inicial los usa) ──
 const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-function todayStr(){return ymd(new Date());}
-function ayerStr(){const d=new Date();d.setDate(d.getDate()-1);return ymd(d);}
+const todayStr=()=>ymd(new Date());
+const ayerStr=()=>{const d=new Date();d.setDate(d.getDate()-1);return ymd(d);};
 const hora=iso=>iso?new Date(iso).toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit'}):'—';
-const fechaLarga=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'}).replace(/^\w/,c=>c.toUpperCase());};
-const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(me?.role);
+const fechaLarga=s=>{const [y,m,d]=String(s).split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'}).replace(/^\w/,c=>c.toUpperCase());};
+const fechaCorta=s=>{const [y,m,d]=String(s).split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('es-CR',{day:'numeric',month:'short'});};
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2200);}
+
+// ── Estado ──
+let auth=null;            // {access_token, refresh_token, expires_at, user_id, email}
+let me=null;              // {role,nombre,sede,sedes_extra}
+let selDate=todayStr();   // fecha seleccionada (local)
+let cierres=[];           // cierres del día seleccionado (RLS filtra las sedes)
+let ultimosFinales=[];    // último cierre final por sede (pestaña Cierres)
+let view='sedes', prevView='sedes', detSede=null, detTurnoId=null, detTab='turno', pollTimer=null, invCache={}, invFiltro='';
+const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(me?.role);
 
 // ── Sesión persistente (el PWA se abre como app: no pedir login cada vez) ──
 function saveAuth(a){auth=a;try{localStorage.setItem(AUTH_KEY,JSON.stringify(a));}catch(_){}}
@@ -214,28 +231,37 @@ async function boot(){
 function enterApp(){ document.getElementById('login').hidden=true; document.getElementById('app').hidden=false; goSedes(); }
 
 // ── Datos ──
-async function loadDia(){
-  const sel=['id','sede','fecha','turno_num','estado','hora_apertura','hora_cierre','caja_inicial','efectivo','efectivo_final','total_ventas','total_tarjeta','total_sinpe','total_transferencia','total_gastos','total_ingresos','minita','otros_vendidos','diferencia','estado_dif','sobre_modo','gastos','ingresos','sinpe_reporte','inventario_cierre','foto_datafono','foto_cierre','foto_analisis','updated_at','created_by'].join(',');
-  cierres=(await supaFetch(`/cierres_caja?fecha=eq.${selDate}&order=sede.asc,turno_num.asc&select=${sel}`))||[];
+async function loadDia(){ cierres=(await supaFetch(`/cierres_caja?fecha=eq.${selDate}&order=sede.asc,turno_num.asc&select=${SEL_CIERRE}`))||[]; }
+async function loadUltimosFinales(){
+  const rows=(await supaFetch(`/cierres_caja?estado=eq.final&order=fecha.desc,turno_num.desc&limit=60&select=${SEL_CIERRE}`))||[];
+  const seen={}; ultimosFinales=[]; rows.forEach(c=>{ if(!seen[c.sede]){ seen[c.sede]=true; ultimosFinales.push(c); } });
+}
+async function loadInventario(sede){
+  const rows=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(sede)}&activo=eq.true&order=producto.asc&select=producto,cantidad,cantidad_minima,precio,updated_at`))||[];
+  invCache[sede]=rows; return rows;
 }
 const sedesVisibles=()=>{ if(esAdmin()) return SEDES; const set=[me?.sede,...(Array.isArray(me?.sedes_extra)?me.sedes_extra:[])].filter(s=>s&&SEDES.includes(s)); return [...new Set(set)]; };
 const turnosDe=s=>cierres.filter(c=>c.sede===s).sort((a,b)=>(a.turno_num||0)-(b.turno_num||0));
-function difInfo(c){ const d=Math.round(Number(c?.diferencia)||0); if(!c) return null; if(d===0) return {cls:'ok',txt:'Cuadra'}; if(d>0) return {cls:'bad',txt:'Faltante '+fmt(d)}; return {cls:'info',txt:'Sobrante '+fmt(-d)}; }
+function difInfo(c){ if(!c) return null; const d=Math.round(Number(c.diferencia)||0); if(d===0) return {cls:'ok',txt:'Cuadra'}; if(d>0) return {cls:'bad',txt:'Faltante '+fmt(d)}; return {cls:'info',txt:'Sobrante '+fmt(-d)}; }
 function estadoPill(c){ if(!c) return '<span class="pill warn">Sin turno</span>'; if(c.estado==='abierto') return '<span class="pill status live"><span class="dot"></span>Abierto '+hora(c.hora_apertura)+'</span>'; if(c.estado==='parcial') return '<span class="pill status">Parcial '+hora(c.hora_cierre)+'</span>'; return '<span class="pill status">Final '+hora(c.hora_cierre)+'</span>'; }
+function sinpePill(c){ const sr=c?.sinpe_reporte; if(!sr) return null; const pa=Math.round(sr.pendAfter!=null?sr.pendAfter:((Number(sr.pendPrev)||0)+(Number(sr.nuevosMonto)||0)-(Number(sr.facturado)||0))); return pa<0?{cls:'bad',txt:'SINPE faltó '+fmt(-pa),pa}:pa===0?{cls:'ok',txt:'SINPE cuadró',pa}:{cls:'info',txt:'SINPE +'+fmt(pa)+' por facturar',pa}; }
 
-// ── Live (solo para hoy y con la app visible) ──
-function startPoll(){ stopPoll(); if(selDate!==todayStr()) return; pollTimer=setInterval(async()=>{ if(document.visibilityState!=='visible') return; try{ await loadDia(); if(view==='sedes') renderSedes(false); else if(view==='detalle') renderDetalle(false); }catch(_){} },20000); }
+// ── Live (solo hoy, solo con la app visible) ──
+function startPoll(){ stopPoll(); if(selDate!==todayStr()) return; pollTimer=setInterval(async()=>{ if(document.visibilityState!=='visible') return; try{ if(view==='sedes'){ await loadDia(); renderSedes(false);} else if(view==='detalle'&&detTab==='turno'){ await loadDia(); renderDetalle(false);} }catch(_){} },20000); }
 function stopPoll(){ if(pollTimer){clearInterval(pollTimer);pollTimer=null;} }
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&auth&&view!=='cuenta'){ (view==='sedes'?renderSedes:renderDetalle)(true); } });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=='visible'||!auth) return; if(view==='sedes') renderSedes(true); else if(view==='detalle') renderDetalle(true); else if(view==='cierres') renderCierres(true); });
 
 // ── Navegación ──
-function setTabs(on){ document.getElementById('tabSedes').classList.toggle('on',on==='sedes'); document.getElementById('tabCuenta').classList.toggle('on',on==='cuenta'); }
-async function goSedes(){ view='sedes'; setTabs('sedes'); await renderSedes(true); startPoll(); window.scrollTo(0,0); }
-async function goDetalle(sede,turnoId){ view='detalle'; detSede=sede; detTurnoId=turnoId||null; setTabs('sedes'); await renderDetalle(true); startPoll(); window.scrollTo(0,0); }
-function goCuenta(){ view='cuenta'; stopPoll(); setTabs('cuenta'); renderCuenta(); window.scrollTo(0,0); }
-function setFecha(f){ selDate=f; if(view==='detalle') goDetalle(detSede); else goSedes(); }
+function setTabs(on){ ['sedes','cierres','cuenta'].forEach(k=>document.getElementById('tab'+k[0].toUpperCase()+k.slice(1)).classList.toggle('on',on===k)); }
+async function goSedes(){ view='sedes'; prevView='sedes'; setTabs('sedes'); await renderSedes(true); startPoll(); window.scrollTo(0,0); }
+async function goCierres(){ view='cierres'; prevView='cierres'; stopPoll(); setTabs('cierres'); await renderCierres(true); window.scrollTo(0,0); }
+async function goDetalle(sede,turnoId,tab){ view='detalle'; detSede=sede; detTurnoId=turnoId||null; detTab=tab||'turno'; setTabs(prevView==='cierres'?'cierres':'sedes'); await renderDetalle(true); startPoll(); window.scrollTo(0,0); }
+function goCuenta(){ view='cuenta'; prevView='cuenta'; stopPoll(); setTabs('cuenta'); renderCuenta(); window.scrollTo(0,0); }
+function volver(){ if(prevView==='cierres') goCierres(); else goSedes(); }
+function setFecha(f){ if(!f) return; selDate=f; if(view==='detalle') goDetalle(detSede,null,detTab); else goSedes(); }
+function abrirCierreFinal(id){ const c=ultimosFinales.find(x=>x.id===id); if(!c) return; selDate=c.fecha; prevView='cierres'; goDetalle(c.sede,c.id,'turno'); }
 
-// ── Render: Sedes ──
+// ── Render: Sedes (cards) ──
 function navSedes(){
   const hoy=selDate===todayStr(), ayer=selDate===ayerStr();
   document.getElementById('nav').innerHTML=`
@@ -244,19 +270,23 @@ function navSedes(){
     <div class="seg" role="tablist">
       <button class="${hoy?'on':''}" onclick="setFecha(todayStr())">Hoy</button>
       <button class="${ayer?'on':''}" onclick="setFecha(ayerStr())">Ayer</button>
-      <button class="${(!hoy&&!ayer)?'on':''}" onclick="document.getElementById('fPick').showPicker?document.getElementById('fPick').showPicker():document.getElementById('fPick').focus()">Fecha</button>
+      <button class="${(!hoy&&!ayer)?'on':''}" onclick="const p=document.getElementById('fPick');p.showPicker?p.showPicker():p.focus()">Fecha</button>
     </div>
     <div class="datebox"><input type="date" id="fPick" value="${selDate}" max="${todayStr()}" onchange="setFecha(this.value)"></div>`;
 }
 async function renderSedes(showLoading){
   navSedes();
   const v=document.getElementById('view');
-  if(showLoading) v.innerHTML='<div class="sect"><div class="hdr">Caja</div><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
+  if(showLoading) v.innerHTML='<div class="cards"><div class="skel" style="margin:0;height:150px"></div><div class="skel" style="margin:0;height:150px"></div><div class="skel" style="margin:0;height:150px"></div><div class="skel" style="margin:0;height:150px"></div></div>';
   try{ await loadDia(); }catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(e.message)}</div>`; return; }
   const sedes=sedesVisibles();
-  const rows=sedes.map(s=>{ const ts=turnosDe(s); const c=ts[ts.length-1]||null; const di=difInfo(c);
-    const sub=c?`Turno ${c.turno_num} · ventas ${fmt(c.total_ventas)} · efectivo ${fmt(c.efectivo)}`:'Sin turno abierto';
-    return `<button class="cell ico" onclick="goDetalle('${esc(s)}')"><div class="ic" style="background:${SEDE_COLOR[s]}">${esc(s[0])}</div><div class="main"><span class="t">${esc(s)}</span><span class="s">${sub}</span></div>${c?(di?`<span class="pill ${di.cls}">${di.txt}</span>`:''):estadoPill(null)}<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`; }).join('');
+  const cards=sedes.map(s=>{ const ts=turnosDe(s); const c=ts[ts.length-1]||null; const di=difInfo(c);
+    return `<button class="card" style="--c:${SEDE_COLOR[s]}" onclick="goDetalle('${esc(s)}')">
+      <div class="h"><span class="ic">${esc(s[0])}</span><span class="name">${esc(s)}</span></div>
+      <div><div class="n num">${c?fmt(c.total_ventas):'—'}</div><div class="l">${c?('Ventas · turno '+c.turno_num):'Sin turno abierto'}</div></div>
+      ${c?`<div class="l num">Efectivo ${fmt(c.efectivo)}${c.total_gastos?' · gastos '+fmt(c.total_gastos):''}</div>`:''}
+      <div class="f">${estadoPill(c)}${di?`<span class="pill ${di.cls}">${di.txt}</span>`:''}</div>
+    </button>`; }).join('');
   const totV=cierres.reduce((m,c)=>{ m[c.sede]=Math.max(m[c.sede]||0,Number(c.total_ventas)||0); return m; },{});
   const sumV=Object.values(totV).reduce((a,b)=>a+b,0);
   const pend=[]; sedes.forEach(s=>{ const ts=turnosDe(s); const c=ts[ts.length-1]; if(!c) return;
@@ -264,23 +294,41 @@ async function renderSedes(showLoading){
     if(c.estado!=='abierto'&&!(c.inventario_cierre&&Object.keys(c.inventario_cierre).length)) pend.push({s,t:'Cierre sin conteo de inventario'});
     const inv=c.inventario_cierre||{}; const difs=Object.values(inv).filter(o=>o&&o.contado!=null&&Number(o.contado)!==Number(o.sistema)).length; if(difs) pend.push({s,t:`${difs} producto(s) con diferencia de inventario`}); });
   v.innerHTML=`
-    <div class="tiles"><div class="tile"><span class="l">Ventas del día (sedes visibles)</span><span class="n num"><small>₡</small>${Math.round(sumV).toLocaleString('es-CR')}</span></div>
+    <div class="cards">${cards||'<div class="empty" style="grid-column:1/-1;margin:0">Sin sedes asignadas.</div>'}</div>
+    <div class="tiles"><div class="tile"><span class="l">Ventas del día</span><span class="n num"><small>₡</small>${Math.round(sumV).toLocaleString('es-CR')}</span></div>
       <div class="tile"><span class="l">Turnos registrados</span><span class="n num">${cierres.filter(c=>sedes.includes(c.sede)).length}</span></div></div>
-    <div class="sect"><div class="hdr">Caja por sede</div><div class="group">${rows||'<div class="cell"><span class="s">Sin sedes asignadas.</span></div>'}</div>
-      <div class="ftr">${selDate===todayStr()?'Se actualiza cada 20 s mientras la app está abierta.':'Datos del cierre guardado ese día.'}</div></div>
-    ${pend.length?`<div class="sect"><div class="hdr">Revisar</div><div class="group">${pend.map(p=>`<div class="cell"><div class="main"><span class="t">${esc(p.t)}</span><span class="s">${esc(p.s)}</span></div><span class="pill warn">Pendiente</span></div>`).join('')}</div></div>`:''}`;
+    ${pend.length?`<div class="sect"><div class="hdr">Revisar</div><div class="group">${pend.map(p=>`<div class="cell"><div class="main"><span class="t">${esc(p.t)}</span><span class="s">${esc(p.s)}</span></div><span class="pill warn">Pendiente</span></div>`).join('')}</div></div>`:''}
+    <div class="sect"><div class="ftr" style="text-align:center">${selDate===todayStr()?'Se actualiza cada 20 s mientras la app está abierta.':'Datos del cierre guardado ese día.'}</div></div>`;
 }
 
-// ── Render: Detalle de sede / turno ──
+// ── Render: Cierres (último cierre final por sede) ──
+async function renderCierres(showLoading){
+  document.getElementById('nav').innerHTML=`<div class="row"><span class="st">Último cierre final de cada sede</span></div><div class="lt">Cierres</div>`;
+  const v=document.getElementById('view');
+  if(showLoading) v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
+  try{ await loadUltimosFinales(); }catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(e.message)}</div>`; return; }
+  const sedes=sedesVisibles();
+  const rows=sedes.map(s=>{ const c=ultimosFinales.find(x=>x.sede===s); if(!c) return `<div class="cell ico"><div class="ic" style="background:${SEDE_COLOR[s]}">${esc(s[0])}</div><div class="main"><span class="t">${esc(s)}</span><span class="s">Sin cierres finales</span></div></div>`;
+    const di=difInfo(c), sp=sinpePill(c);
+    return `<button class="cell ico" onclick="abrirCierreFinal('${c.id}')"><div class="ic" style="background:${SEDE_COLOR[s]}">${esc(s[0])}</div><div class="main"><span class="t">${esc(s)} · ${esc(fechaCorta(c.fecha))}${c.fecha===todayStr()?' (hoy)':c.fecha===ayerStr()?' (ayer)':''}</span><span class="s num">Turno ${c.turno_num} · ventas ${fmt(c.total_ventas)} · efectivo final ${fmt(c.efectivo_final??c.efectivo)}</span><span class="s" style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap"><span class="pill ${di.cls}">${di.txt}</span>${sp?`<span class="pill ${sp.cls}">${sp.txt}</span>`:'<span class="pill warn">Sin reporte SINPE</span>'}</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`; }).join('');
+  v.innerHTML=`<div class="sect"><div class="group">${rows}</div><div class="ftr">Tocá una sede para ver el detalle completo de ese cierre.</div></div>`;
+}
+
+// ── Render: Detalle de sede (Turno actual | Inventario) ──
+function navDetalle(c,ts){
+  document.getElementById('nav').innerHTML=`
+    <div class="row"><button class="back" onclick="volver()"><svg viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>${prevView==='cierres'?'Cierres':'Sedes'}</button><span class="tt">${esc(detSede)}</span><button class="act" onclick="abrirCaja()">Caja</button></div>
+    <div class="row"><span class="st">${esc(fechaLarga(selDate))}</span>${c?estadoPill(c):estadoPill(null)}</div>
+    <div class="seg"><button class="${detTab==='turno'?'on':''}" onclick="detTab='turno';renderDetalle(false)">Turno actual</button><button class="${detTab==='inventario'?'on':''}" onclick="detTab='inventario';renderDetalle(false)">Inventario</button></div>
+    ${(detTab==='turno'&&ts.length>1)?`<div class="seg">${ts.map(t=>`<button class="${t.id===c.id?'on':''}" onclick="detTurnoId='${t.id}';renderDetalle(false)">T${t.turno_num} · ${t.estado}</button>`).join('')}</div>`:''}`;
+}
 async function renderDetalle(showLoading){
   const v=document.getElementById('view');
   if(showLoading) v.innerHTML='<div class="sect"><div class="skel"></div></div>';
   try{ await loadDia(); }catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(e.message)}</div>`; return; }
   const ts=turnosDe(detSede); let c=ts.find(x=>x.id===detTurnoId)||ts[ts.length-1]||null; detTurnoId=c?.id||null;
-  document.getElementById('nav').innerHTML=`
-    <div class="row"><button class="back" onclick="goSedes()"><svg viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Sedes</button><span class="tt">${c?('Turno '+c.turno_num):esc(detSede)}</span><button class="act" onclick="abrirCaja()">Caja</button></div>
-    <div class="row"><span class="st">${esc(detSede)} · ${esc(fechaLarga(selDate))}</span>${c?estadoPill(c):estadoPill(null)}</div>
-    ${ts.length>1?`<div class="seg">${ts.map(t=>`<button class="${t.id===c.id?'on':''}" onclick="detTurnoId='${t.id}';renderDetalle(false)">T${t.turno_num} · ${t.estado}</button>`).join('')}</div>`:''}`;
+  navDetalle(c,ts);
+  if(detTab==='inventario') return renderInventario(v);
   if(!c){ v.innerHTML=`<div class="empty">No hay turnos de ${esc(detSede)} el ${esc(fechaLarga(selDate))}.</div>`; return; }
   const di=difInfo(c); const difAbs=Math.abs(Math.round(Number(c.diferencia)||0));
   const gastos=Array.isArray(c.gastos)?c.gastos:[]; const ingresos=Array.isArray(c.ingresos)?c.ingresos:[];
@@ -288,12 +336,11 @@ async function renderDetalle(showLoading){
   const gReal=gastos.filter(g=>g.cat!=='deposito').reduce((s,g)=>s+(Number(g.monto)||0),0);
   const ing=ingresos.reduce((s,g)=>s+(Number(g.monto)||0),0);
   const sr=c.sinpe_reporte||null; let sinpeHtml='';
-  if(sr){ const pa=Math.round(sr.pendAfter!=null?sr.pendAfter:((Number(sr.pendPrev)||0)+(Number(sr.nuevosMonto)||0)-(Number(sr.facturado)||0)));
-    const pp=pa<0?{cls:'bad',txt:'Faltó '+fmt(-pa)}:pa===0?{cls:'ok',txt:'Cuadró'}:{cls:'info',txt:'Sobró '+fmt(pa)+' · por facturar'};
+  if(sr){ const sp=sinpePill(c);
     sinpeHtml=`<div class="cell"><div class="main"><span class="t">Recibidos nuevos</span><span class="s">${esc(sr.fileName||'Reporte SINPE')} · ${sr.nuevosN||0} mov.</span></div><span class="v strong num">${fmt(sr.nuevosMonto)}</span></div>
       <div class="cell"><div class="main"><span class="t">Facturado</span></div><span class="v num">${fmt(sr.facturado)}</span></div>
       <div class="cell"><div class="main"><span class="t">Pendiente arrastrado</span></div><span class="v num">${fmt(sr.pendPrev)}</span></div>
-      <div class="cell"><div class="main"><span class="t">Pendiente por facturar</span></div><span class="pill ${pp.cls}">${pp.txt}</span></div>`; }
+      <div class="cell"><div class="main"><span class="t">Pendiente por facturar</span></div><span class="pill ${sp.cls}">${sp.pa<0?'Faltó '+fmt(-sp.pa):sp.pa===0?'Cuadró':'Sobró '+fmt(sp.pa)}</span></div>`; }
   else sinpeHtml=`<div class="cell"><div class="main"><span class="t">Sin reporte SINPE</span><span class="s">${c.estado==='final'?'Obligatorio en el cierre final':'Se concilia en el cierre final'}</span></div><span class="pill ${c.estado==='final'?'warn':'status'}">${c.estado==='final'?'Falta':'Aún no'}</span></div>`;
   const inv=c.inventario_cierre||{}; const invKeys=Object.keys(inv); const invDifs=invKeys.filter(k=>inv[k]&&inv[k].contado!=null&&Number(inv[k].contado)!==Number(inv[k].sistema));
   let invHtml='';
@@ -302,11 +349,7 @@ async function renderDetalle(showLoading){
   else invHtml=`<div class="cell"><div class="main"><span class="t">${invDifs.length} producto(s) con diferencia</span><span class="s">${invKeys.length} contados</span></div><span class="pill bad">Revisar</span></div>`+
     (esAdmin()?invDifs.slice(0,12).map(k=>`<div class="cell"><div class="main"><span class="t">${esc(k)}</span></div><span class="v num">contó ${inv[k].contado} · sistema ${inv[k].sistema}</span></div>`).join(''):`<div class="cell"><span class="s">Solo un administrador ve las cantidades del sistema.</span></div>`);
   const fa=c.foto_analisis||null;
-  const reqs=[
-    {ok:!!(c.foto_datafono||c.foto_cierre),t:'Foto datáfono'},
-    {ok:!!invKeys.length,t:'Conteo inventario'},
-    {ok:!!sr,t:'Reporte SINPE'},
-    {ok:c.total_tarjeta!=null&&c.total_sinpe!=null,t:'Informe de Ventas'}];
+  const reqs=[{ok:!!(c.foto_datafono||c.foto_cierre),t:'Foto datáfono'},{ok:!!invKeys.length,t:'Conteo inventario'},{ok:!!sr,t:'Reporte SINPE'},{ok:c.total_tarjeta!=null&&c.total_sinpe!=null,t:'Informe de Ventas'}];
   v.innerHTML=`
     <div class="tiles">
       <div class="tile"><span class="l">Ventas del día</span><span class="n num"><small>₡</small>${Math.round(Number(c.total_ventas)||0).toLocaleString('es-CR')}</span></div>
@@ -336,6 +379,29 @@ async function renderDetalle(showLoading){
       <button class="cell" onclick="abrirModulo('/gastos')"><div class="main"><span class="t" style="color:var(--brand-text)">Abrir Gastos</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button></div>
       <div class="ftr">Actualizado ${c.updated_at?hora(c.updated_at):'—'}${c.created_by?' · abierto por '+esc(c.created_by):''}</div></div>`;
 }
+
+// ── Render: Inventario de la sede (stock actual del sistema) ──
+async function renderInventario(v){
+  v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
+  let rows; try{ rows=await loadInventario(detSede); }catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar el inventario: ${esc(e.message)}</div>`; return; }
+  pintarInventario(v,rows);
+}
+function pintarInventario(v,rows){
+  const f=invFiltro.trim().toLowerCase();
+  const lista=rows.filter(r=>!f||String(r.producto||'').toLowerCase().includes(f));
+  const bajo=rows.filter(r=>Number(r.cantidad)<Number(r.cantidad_minima||0)).length;
+  const valor=rows.reduce((s,r)=>s+(Number(r.cantidad)||0)*(Number(r.precio)||0),0);
+  const upd=rows.reduce((m,r)=>r.updated_at&&r.updated_at>m?r.updated_at:m,'');
+  const items=lista.map(r=>{ const q=Number(r.cantidad)||0, min=Number(r.cantidad_minima)||0; const low=q<min;
+    return `<div class="cell"><div class="main"><span class="t">${esc(r.producto)}</span><span class="s num">${min?'mínimo '+min+' · ':''}${r.precio?fmt(r.precio):''}</span></div>${low?'<span class="pill bad">Bajo mínimo</span>':''}<span class="v strong num" style="min-width:44px;text-align:right">${q}</span></div>`; }).join('');
+  v.innerHTML=`
+    <div class="tiles"><div class="tile"><span class="l">Productos</span><span class="n num">${rows.length}</span></div><div class="tile"><span class="l">Bajo mínimo</span><span class="n num" style="color:${bajo?'var(--red)':'var(--green)'}">${bajo}</span></div>
+      <div class="tile wide"><div><span class="l">Valor del inventario</span><div class="n num"><small>₡</small>${Math.round(valor).toLocaleString('es-CR')}</div></div>${upd?`<span class="pill status">Actualizado ${hora(upd)}</span>`:''}</div></div>
+    <div class="search"><input type="search" placeholder="Buscar producto" value="${esc(invFiltro)}" oninput="invFiltro=this.value;pintarInventario(document.getElementById('view'),invCache['${esc(detSede)}']||[]);const i=document.querySelector('.search input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}"></div>
+    <div class="sect"><div class="hdr">Stock actual · ${esc(detSede)}</div><div class="group">${items||'<div class="cell"><span class="s">Sin productos.</span></div>'}</div>
+      <div class="ftr">Stock del sistema (se descuenta al subir "Ventas por Producto"). Solo lectura; los ajustes se hacen en Inventario.</div></div>`;
+}
+
 async function verFoto(path,boxId){
   const box=document.getElementById(boxId); if(!box) return; if(box.innerHTML){box.innerHTML='';return;}
   box.innerHTML='<div class="cell"><span class="s">Cargando foto…</span></div>';
