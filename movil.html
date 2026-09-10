@@ -21,14 +21,14 @@
     --green:#34C759; --red:#FF383C; --orange:#FF8D28; --blue:#0088FF;
     --green-tint:rgba(52,199,89,.16); --red-tint:rgba(255,56,60,.14); --orange-tint:rgba(255,141,40,.16); --blue-tint:rgba(0,136,255,.14);
     --status-fill:rgba(120,120,128,.16); --status-ink:rgba(60,60,67,.72);
-    --indigo:#6155F5; --teal:#00C3D0; --pinares:#2E7D32;
+    --indigo:#6155F5; --teal:#00C3D0; --purple:#CB30E0; --pinares:#2E7D32; --amber:#B9770E;
   }
   @media (prefers-color-scheme: dark){
     :root{
       --bg:#000; --card:#1C1C1E; --label:#fff; --sec:rgba(235,235,245,.6); --ter:rgba(235,235,245,.3); --sep:rgba(84,84,88,.65); --fill:rgba(120,120,128,.24);
       --glass:rgba(30,30,30,.76); --brand:#2DBFAC; --brand-text:#3FD0BC; --brand-tint:rgba(45,191,172,.18);
       --green:#30D158; --red:#FF4245; --orange:#FF9230; --blue:#0091FF;
-      --status-fill:rgba(120,120,128,.28); --status-ink:rgba(235,235,245,.72); --indigo:#6D7CFF; --teal:#00D2E0; --pinares:#4CAF50;
+      --status-fill:rgba(120,120,128,.28); --status-ink:rgba(235,235,245,.72); --indigo:#6D7CFF; --teal:#00D2E0; --purple:#DB34F2; --pinares:#4CAF50; --amber:#D08A1F;
     }
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -59,9 +59,9 @@
   .nav .lt{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.15}
   .nav .tt{font-size:17px;font-weight:600;flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .nav .st{font-size:13px;color:var(--sec)}
-  .nav .back{color:var(--brand-text);display:flex;align-items:center;gap:2px;min-height:44px;font-size:17px}
+  .nav .back{color:var(--brand-text);display:flex;align-items:center;gap:2px;min-height:44px;font-size:17px;flex:none}
   .nav .back svg{width:12px;height:20px}
-  .nav .act{color:var(--brand-text);font-weight:600;min-height:44px;display:flex;align-items:center}
+  .nav .act{color:var(--brand-text);font-weight:600;min-height:44px;display:flex;align-items:center;flex:none}
   .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--fill);border-radius:10px;padding:2px;gap:2px}
   .seg button{min-height:36px;border-radius:8px;font-size:14px;font-weight:600;color:var(--label);text-align:center}
   .seg button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12)}
@@ -94,7 +94,7 @@
   @media (prefers-reduced-motion:reduce){.live .dot{animation:none}}
   .tiles{margin:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .tile{background:var(--card);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
-  .tile.wide{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:space-between}
+  .tile.wide{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
   .tile .l{font-size:13px;color:var(--sec)}
   .tile .n{font-size:22px;font-weight:700;letter-spacing:-.01em}
   .tile .n small{font-size:14px;font-weight:600;color:var(--sec);margin-right:2px}
@@ -104,8 +104,10 @@
   .foto{margin:8px 16px 0;border-radius:12px;overflow:hidden;background:var(--card)}
   .foto img{display:block;width:100%;max-height:360px;object-fit:contain;background:#000}
   .skel{height:44px;margin:0 16px;border-radius:12px;background:var(--card);opacity:.6}
+  .search{margin:0 16px}
+  .search input{width:100%;min-height:40px;border:0;border-radius:10px;background:var(--card);color:var(--label);padding:0 12px;font-size:16px}
 
-  /* ── Cards de sedes (2 columnas) ── */
+  /* ── Cards de sedes ── */
   .cards{margin:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .card{background:var(--card);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;min-height:150px;position:relative;overflow:hidden}
   .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--c)}
@@ -116,8 +118,14 @@
   .card .n{font-size:22px;font-weight:700;letter-spacing:-.01em;line-height:1.1}
   .card .l{font-size:12px;color:var(--sec)}
   .card .f{margin-top:auto;display:flex;flex-wrap:wrap;gap:6px}
-  .search{margin:0 16px}
-  .search input{width:100%;min-height:40px;border:0;border-radius:10px;background:var(--card);color:var(--label);padding:0 12px;font-size:16px}
+
+  /* ── Módulos de la sede (iconos de app, como en el concept) ── */
+  .mods{margin:0 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px 8px}
+  .mod{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--label);text-align:center;min-height:44px}
+  .mod .app{width:60px;height:60px;border-radius:14px;display:grid;place-items:center;box-shadow:0 1px 2px rgba(0,0,0,.12);position:relative}
+  .mod .app svg{width:28px;height:28px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .mod:active .app{transform:scale(.94)}
+  .badge{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--red);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;border:2px solid var(--bg)}
 
   /* ── Tab bar flotante (Liquid Glass) ── */
   .tabbar{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 12px);height:64px;padding:6px;background:var(--glass);backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);
@@ -125,7 +133,22 @@
   .tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:500;color:var(--sec);border-radius:26px;min-height:44px;text-align:center}
   .tab svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
   .tab.on{color:var(--brand-text);background:var(--brand-tint)}
-  .toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 90px);background:var(--label);color:var(--bg);padding:12px 16px;border-radius:14px;font-size:14px;text-align:center;z-index:6;opacity:0;transition:opacity .2s;pointer-events:none}
+
+  /* ── Botón de acción dentro de un módulo ── */
+  .actionbar{margin:0 16px}
+  .btn svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;margin-right:8px}
+
+  /* ── Hoja inferior (sheet) para capturar un envío ── */
+  #sheet{position:fixed;inset:0;z-index:20}
+  .sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.45)}
+  .sheet-panel{position:absolute;left:0;right:0;bottom:0;max-height:88dvh;background:var(--bg);border-radius:18px 18px 0 0;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -12px 40px rgba(0,0,0,.25)}
+  .sheet-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 16px;min-height:52px;border-bottom:.5px solid var(--sep)}
+  .sheet-h .tt{font-size:17px;font-weight:600;flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sheet-h .act{color:var(--brand-text);font-weight:600;min-height:44px;display:flex;align-items:center;flex:none}
+  .sheet-h .act:disabled{opacity:.4}
+  .sheet-body{overflow:auto;padding:12px 16px 16px}
+  .cell input.qty{width:76px;min-height:44px;border:0;border-radius:10px;background:var(--fill);color:var(--label);text-align:right;padding:0 10px;font-size:17px;font-weight:600;flex:none}
+  .toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 90px);background:var(--label);color:var(--bg);padding:12px 16px;border-radius:14px;font-size:14px;text-align:center;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none}
   .toast.show{opacity:.95}
 </style>
 </head>
@@ -134,7 +157,7 @@
 <div id="login">
   <img class="logo" src="/icons/icon-192.png" alt="">
   <h1>Impulse Fit</h1>
-  <p>Validación rápida de caja desde tu celular</p>
+  <p>Validación rápida por sede desde tu celular</p>
   <div class="field"><input id="lEmail" type="email" placeholder="Correo" autocomplete="username" inputmode="email" autocapitalize="none"></div>
   <div class="field"><input id="lPass" type="password" placeholder="Contraseña" autocomplete="current-password"></div>
   <div class="err" id="lErr"></div>
@@ -147,20 +170,39 @@
   <main id="view"></main>
   <nav class="tabbar">
     <button class="tab on" id="tabSedes" onclick="goSedes()"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Sedes</button>
-    <button class="tab" id="tabCierres" onclick="goCierres()"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Cierres</button>
+    <button class="tab" id="tabCierres" onclick="goCierresTab()"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Cierres</button>
     <button class="tab" id="tabCuenta" onclick="goCuenta()"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>Cuenta</button>
   </nav>
 </div>
+<div id="sheet" hidden></div>
 <div class="toast" id="toast"></div>
 
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-09-10b';
+const APP_VER='2026-09-10d';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','admin_sedes','admin_g','admin'];
 const AUTH_KEY='impulseMovilAuth';
+const MESES_ES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const CAT_GASTO={clases_grupales:'Clases grupales',instructores_planta:'Instructores de planta',parqueo:'Parqueo',mantenimiento:'Mantenimiento',otros:'Otros'};
 const SEL_CIERRE=['id','sede','fecha','turno_num','estado','hora_apertura','hora_cierre','caja_inicial','efectivo','efectivo_final','total_ventas','total_tarjeta','total_sinpe','total_transferencia','total_gastos','total_ingresos','minita','otros_vendidos','diferencia','estado_dif','sobre_modo','gastos','ingresos','sinpe_reporte','inventario_cierre','foto_datafono','foto_cierre','foto_analisis','updated_at','created_by'].join(',');
+const ICONS={
+  caja:'<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M3 10h2M19 10h2"/></svg>',
+  gastos:'<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h6M9 16h6"/></svg>',
+  inventario:'<svg viewBox="0 0 24 24"><path d="M3 8l9-4 9 4-9 4z"/><path d="M3 8v8l9 4 9-4V8"/><path d="M12 12v8"/></svg>',
+  cierres:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  envios:'<svg viewBox="0 0 24 24"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></svg>',
+  proyecciones:'<svg viewBox="0 0 24 24"><path d="M4 18L10 11l4 4 6-8"/><path d="M15 7h5v5"/></svg>'
+};
+const MODS=[
+  {id:'caja',label:'Caja',color:'var(--brand)'},
+  {id:'gastos',label:'Gastos',color:'var(--orange)'},
+  {id:'inventario',label:'Inventario',color:'var(--amber)'},
+  {id:'cierres',label:'Cierres',color:'var(--indigo)'},
+  {id:'envios',label:'Envíos',color:'var(--teal)'},
+  {id:'proyecciones',label:'Proyecciones',color:'var(--purple)',admin:true}
+];
 
 // ── Helpers (van ANTES del estado: el estado inicial los usa) ──
 const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
@@ -168,21 +210,23 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const todayStr=()=>ymd(new Date());
 const ayerStr=()=>{const d=new Date();d.setDate(d.getDate()-1);return ymd(d);};
+const mesOrdDe=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+const mesLabel=o=>{const [y,m]=String(o).split('-').map(Number);return (MESES_ES[(m||1)-1]||'')+' '+y;};
+const mesAnterior=o=>{const [y,m]=String(o).split('-').map(Number);const d=new Date(y,m-2,1);return mesOrdDe(d);};
 const hora=iso=>iso?new Date(iso).toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit'}):'—';
 const fechaLarga=s=>{const [y,m,d]=String(s).split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'}).replace(/^\w/,c=>c.toUpperCase());};
 const fechaCorta=s=>{const [y,m,d]=String(s).split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('es-CR',{day:'numeric',month:'short'});};
-function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2200);}
+const fechaDMY=s=>{const [y,m,d]=String(s).split('-').map(Number);return `${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}/${y}`;};
 
 // ── Estado ──
-let auth=null;            // {access_token, refresh_token, expires_at, user_id, email}
-let me=null;              // {role,nombre,sede,sedes_extra}
-let selDate=todayStr();   // fecha seleccionada (local)
-let cierres=[];           // cierres del día seleccionado (RLS filtra las sedes)
-let ultimosFinales=[];    // último cierre final por sede (pestaña Cierres)
-let view='sedes', prevView='sedes', detSede=null, detTurnoId=null, detTab='turno', pollTimer=null, invCache={}, invFiltro='';
+let auth=null, me=null;
+let selDate=todayStr();                 // fecha para Caja / Sedes
+let gMes=mesOrdDe(new Date());          // mes para Gastos
+let cierres=[], ultimosFinales=[], invCache={}, invFiltro='';
+let view='sedes', curMod=null, detSede=null, detTurnoId=null, pollTimer=null, navStack=[];
 const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(me?.role);
 
-// ── Sesión persistente (el PWA se abre como app: no pedir login cada vez) ──
+// ── Sesión persistente ──
 function saveAuth(a){auth=a;try{localStorage.setItem(AUTH_KEY,JSON.stringify(a));}catch(_){}}
 function clearAuth(){auth=null;me=null;try{localStorage.removeItem(AUTH_KEY);}catch(_){}}
 async function supaFetch(path,opts={}){
@@ -242,93 +286,110 @@ async function loadInventario(sede){
 }
 const sedesVisibles=()=>{ if(esAdmin()) return SEDES; const set=[me?.sede,...(Array.isArray(me?.sedes_extra)?me.sedes_extra:[])].filter(s=>s&&SEDES.includes(s)); return [...new Set(set)]; };
 const turnosDe=s=>cierres.filter(c=>c.sede===s).sort((a,b)=>(a.turno_num||0)-(b.turno_num||0));
+const ultimoTurno=s=>{const ts=turnosDe(s);return ts[ts.length-1]||null;};
 function difInfo(c){ if(!c) return null; const d=Math.round(Number(c.diferencia)||0); if(d===0) return {cls:'ok',txt:'Cuadra'}; if(d>0) return {cls:'bad',txt:'Faltante '+fmt(d)}; return {cls:'info',txt:'Sobrante '+fmt(-d)}; }
 function estadoPill(c){ if(!c) return '<span class="pill warn">Sin turno</span>'; if(c.estado==='abierto') return '<span class="pill status live"><span class="dot"></span>Abierto '+hora(c.hora_apertura)+'</span>'; if(c.estado==='parcial') return '<span class="pill status">Parcial '+hora(c.hora_cierre)+'</span>'; return '<span class="pill status">Final '+hora(c.hora_cierre)+'</span>'; }
 function sinpePill(c){ const sr=c?.sinpe_reporte; if(!sr) return null; const pa=Math.round(sr.pendAfter!=null?sr.pendAfter:((Number(sr.pendPrev)||0)+(Number(sr.nuevosMonto)||0)-(Number(sr.facturado)||0))); return pa<0?{cls:'bad',txt:'SINPE faltó '+fmt(-pa),pa}:pa===0?{cls:'ok',txt:'SINPE cuadró',pa}:{cls:'info',txt:'SINPE +'+fmt(pa)+' por facturar',pa}; }
+function pendientesDe(s){ const c=ultimoTurno(s); const p=[]; if(!c) return p;
+  if(c.estado==='final'&&!c.sinpe_reporte) p.push('Cierre final sin reporte SINPE');
+  if(c.estado!=='abierto'&&!(c.inventario_cierre&&Object.keys(c.inventario_cierre).length)) p.push('Cierre sin conteo de inventario');
+  const inv=c.inventario_cierre||{}; const difs=Object.values(inv).filter(o=>o&&o.contado!=null&&Number(o.contado)!==Number(o.sistema)).length; if(difs) p.push(`${difs} producto(s) con diferencia en el conteo`);
+  return p; }
 
 // ── Live (solo hoy, solo con la app visible) ──
-function startPoll(){ stopPoll(); if(selDate!==todayStr()) return; pollTimer=setInterval(async()=>{ if(document.visibilityState!=='visible') return; try{ if(view==='sedes'){ await loadDia(); renderSedes(false);} else if(view==='detalle'&&detTab==='turno'){ await loadDia(); renderDetalle(false);} }catch(_){} },20000); }
+function startPoll(){ stopPoll(); if(selDate!==todayStr()) return; pollTimer=setInterval(async()=>{ if(document.visibilityState!=='visible') return; try{ if(view==='sedes'){await loadDia();renderSedes(false);} else if(view==='hub'){await loadDia();renderHub(false);} else if(view==='mod'&&curMod==='caja'){await loadDia();renderCaja(false);} }catch(_){} },20000); }
 function stopPoll(){ if(pollTimer){clearInterval(pollTimer);pollTimer=null;} }
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=='visible'||!auth) return; if(view==='sedes') renderSedes(true); else if(view==='detalle') renderDetalle(true); else if(view==='cierres') renderCierres(true); });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=='visible'||!auth) return; if(view==='sedes') renderSedes(true); else if(view==='hub') renderHub(true); else if(view==='mod') renderMod(true); else if(view==='cierresTab') renderCierresTab(true); });
 
-// ── Navegación ──
+// ── Navegación (pila de "atrás") ──
 function setTabs(on){ ['sedes','cierres','cuenta'].forEach(k=>document.getElementById('tab'+k[0].toUpperCase()+k.slice(1)).classList.toggle('on',on===k)); }
-async function goSedes(){ view='sedes'; prevView='sedes'; setTabs('sedes'); await renderSedes(true); startPoll(); window.scrollTo(0,0); }
-async function goCierres(){ view='cierres'; prevView='cierres'; stopPoll(); setTabs('cierres'); await renderCierres(true); window.scrollTo(0,0); }
-async function goDetalle(sede,turnoId,tab){ view='detalle'; detSede=sede; detTurnoId=turnoId||null; detTab=tab||'turno'; setTabs(prevView==='cierres'?'cierres':'sedes'); await renderDetalle(true); startPoll(); window.scrollTo(0,0); }
-function goCuenta(){ view='cuenta'; prevView='cuenta'; stopPoll(); setTabs('cuenta'); renderCuenta(); window.scrollTo(0,0); }
-function volver(){ if(prevView==='cierres') goCierres(); else goSedes(); }
-function setFecha(f){ if(!f) return; selDate=f; if(view==='detalle') goDetalle(detSede,null,detTab); else goSedes(); }
-function abrirCierreFinal(id){ const c=ultimosFinales.find(x=>x.id===id); if(!c) return; selDate=c.fecha; prevView='cierres'; goDetalle(c.sede,c.id,'turno'); }
+async function goSedes(){ view='sedes'; navStack=[]; setTabs('sedes'); await renderSedes(true); startPoll(); window.scrollTo(0,0); }
+async function goCierresTab(){ view='cierresTab'; navStack=[]; stopPoll(); setTabs('cierres'); await renderCierresTab(true); window.scrollTo(0,0); }
+function goCuenta(){ view='cuenta'; navStack=[]; stopPoll(); setTabs('cuenta'); renderCuenta(); window.scrollTo(0,0); }
+// Pila de "atrás": cada entrada lleva etiqueta; no se apila dos veces seguidas la misma pantalla.
+function pushBack(tag,fn){ const top=navStack[navStack.length-1]; if(top&&top.tag===tag) return; navStack.push({tag,fn}); }
+async function goHub(sede,push){ if(push) pushBack(view+':'+(detSede||''),push); view='hub'; detSede=sede; setTabs('sedes'); await renderHub(true); startPoll(); window.scrollTo(0,0); }
+async function goMod(mod,push){ if(push) pushBack(view+':'+(view==='mod'?curMod:detSede||''),push); view='mod'; curMod=mod; await renderMod(true); startPoll(); window.scrollTo(0,0); }
+function back(){ const e=navStack.pop(); if(e&&e.fn) e.fn(); else goSedes(); }
+function setFecha(f){ if(!f) return; selDate=f; if(view==='mod'&&curMod==='caja') renderCaja(true); else if(view==='hub') renderHub(true); else renderSedes(true); startPoll(); }
+function abrirCierreFinal(id){ const c=ultimosFinales.find(x=>x.id===id); if(!c) return; selDate=c.fecha; detSede=c.sede; detTurnoId=c.id; goMod('caja',goCierresTab); }
+function abrirCierreHist(sede,fecha,id){ selDate=fecha; detSede=sede; detTurnoId=id; goMod('caja',()=>goMod('cierres')); }
 
-// ── Render: Sedes (cards) ──
-function navSedes(){
-  const hoy=selDate===todayStr(), ayer=selDate===ayerStr();
-  document.getElementById('nav').innerHTML=`
-    <div class="row"><span class="st">${esc(fechaLarga(selDate))}</span>${hoy?'<span class="pill ok live"><span class="dot"></span>En vivo</span>':'<span class="pill status">Histórico</span>'}</div>
-    <div class="lt">Sedes</div>
-    <div class="seg" role="tablist">
-      <button class="${hoy?'on':''}" onclick="setFecha(todayStr())">Hoy</button>
-      <button class="${ayer?'on':''}" onclick="setFecha(ayerStr())">Ayer</button>
-      <button class="${(!hoy&&!ayer)?'on':''}" onclick="const p=document.getElementById('fPick');p.showPicker?p.showPicker():p.focus()">Fecha</button>
-    </div>
-    <div class="datebox"><input type="date" id="fPick" value="${selDate}" max="${todayStr()}" onchange="setFecha(this.value)"></div>`;
-}
+// ── Sedes (cards) ──
+function segFecha(){ const hoy=selDate===todayStr(), ayer=selDate===ayerStr();
+  return `<div class="seg" role="tablist"><button class="${hoy?'on':''}" onclick="setFecha(todayStr())">Hoy</button><button class="${ayer?'on':''}" onclick="setFecha(ayerStr())">Ayer</button><button class="${(!hoy&&!ayer)?'on':''}" onclick="const p=document.getElementById('fPick');p.showPicker?p.showPicker():p.focus()">Fecha</button></div>
+    <div class="datebox"><input type="date" id="fPick" value="${selDate}" max="${todayStr()}" onchange="setFecha(this.value)"></div>`; }
 async function renderSedes(showLoading){
-  navSedes();
+  const hoy=selDate===todayStr();
+  document.getElementById('nav').innerHTML=`<div class="row"><span class="st">${esc(fechaLarga(selDate))}</span>${hoy?'<span class="pill ok live"><span class="dot"></span>En vivo</span>':'<span class="pill status">Histórico</span>'}</div><div class="lt">Sedes</div>${segFecha()}`;
   const v=document.getElementById('view');
   if(showLoading) v.innerHTML='<div class="cards"><div class="skel" style="margin:0;height:150px"></div><div class="skel" style="margin:0;height:150px"></div><div class="skel" style="margin:0;height:150px"></div><div class="skel" style="margin:0;height:150px"></div></div>';
   try{ await loadDia(); }catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(e.message)}</div>`; return; }
   const sedes=sedesVisibles();
-  const cards=sedes.map(s=>{ const ts=turnosDe(s); const c=ts[ts.length-1]||null; const di=difInfo(c);
-    return `<button class="card" style="--c:${SEDE_COLOR[s]}" onclick="goDetalle('${esc(s)}')">
+  const cards=sedes.map(s=>{ const c=ultimoTurno(s); const di=difInfo(c); const np=pendientesDe(s).length;
+    return `<button class="card" style="--c:${SEDE_COLOR[s]}" onclick="goHub('${esc(s)}',goSedes)">
       <div class="h"><span class="ic">${esc(s[0])}</span><span class="name">${esc(s)}</span></div>
       <div><div class="n num">${c?fmt(c.total_ventas):'—'}</div><div class="l">${c?('Ventas · turno '+c.turno_num):'Sin turno abierto'}</div></div>
-      ${c?`<div class="l num">Efectivo ${fmt(c.efectivo)}${c.total_gastos?' · gastos '+fmt(c.total_gastos):''}</div>`:''}
-      <div class="f">${estadoPill(c)}${di?`<span class="pill ${di.cls}">${di.txt}</span>`:''}</div>
+      ${c?`<div class="l num">Efectivo ${fmt(c.efectivo)}</div>`:''}
+      <div class="f">${estadoPill(c)}${di?`<span class="pill ${di.cls}">${di.txt}</span>`:''}${np?`<span class="pill warn">${np} por revisar</span>`:''}</div>
     </button>`; }).join('');
   const totV=cierres.reduce((m,c)=>{ m[c.sede]=Math.max(m[c.sede]||0,Number(c.total_ventas)||0); return m; },{});
   const sumV=Object.values(totV).reduce((a,b)=>a+b,0);
-  const pend=[]; sedes.forEach(s=>{ const ts=turnosDe(s); const c=ts[ts.length-1]; if(!c) return;
-    if(c.estado==='final'&&!c.sinpe_reporte) pend.push({s,t:'Cierre final sin reporte SINPE'});
-    if(c.estado!=='abierto'&&!(c.inventario_cierre&&Object.keys(c.inventario_cierre).length)) pend.push({s,t:'Cierre sin conteo de inventario'});
-    const inv=c.inventario_cierre||{}; const difs=Object.values(inv).filter(o=>o&&o.contado!=null&&Number(o.contado)!==Number(o.sistema)).length; if(difs) pend.push({s,t:`${difs} producto(s) con diferencia de inventario`}); });
-  v.innerHTML=`
-    <div class="cards">${cards||'<div class="empty" style="grid-column:1/-1;margin:0">Sin sedes asignadas.</div>'}</div>
-    <div class="tiles"><div class="tile"><span class="l">Ventas del día</span><span class="n num"><small>₡</small>${Math.round(sumV).toLocaleString('es-CR')}</span></div>
-      <div class="tile"><span class="l">Turnos registrados</span><span class="n num">${cierres.filter(c=>sedes.includes(c.sede)).length}</span></div></div>
-    ${pend.length?`<div class="sect"><div class="hdr">Revisar</div><div class="group">${pend.map(p=>`<div class="cell"><div class="main"><span class="t">${esc(p.t)}</span><span class="s">${esc(p.s)}</span></div><span class="pill warn">Pendiente</span></div>`).join('')}</div></div>`:''}
-    <div class="sect"><div class="ftr" style="text-align:center">${selDate===todayStr()?'Se actualiza cada 20 s mientras la app está abierta.':'Datos del cierre guardado ese día.'}</div></div>`;
+  v.innerHTML=`<div class="cards">${cards||'<div class="empty" style="grid-column:1/-1;margin:0">Sin sedes asignadas.</div>'}</div>
+    <div class="tiles"><div class="tile"><span class="l">Ventas del día</span><span class="n num"><small>₡</small>${Math.round(sumV).toLocaleString('es-CR')}</span></div><div class="tile"><span class="l">Turnos registrados</span><span class="n num">${cierres.filter(c=>sedes.includes(c.sede)).length}</span></div></div>
+    <div class="sect"><div class="ftr" style="text-align:center">${hoy?'Tocá una sede para ver sus módulos. Se actualiza cada 20 s.':'Datos guardados de ese día.'}</div></div>`;
 }
 
-// ── Render: Cierres (último cierre final por sede) ──
-async function renderCierres(showLoading){
-  document.getElementById('nav').innerHTML=`<div class="row"><span class="st">Último cierre final de cada sede</span></div><div class="lt">Cierres</div>`;
+// ── Hub de la sede: resumen + módulos filtrados a esa sede ──
+async function renderHub(showLoading){
+  const s=detSede;
+  document.getElementById('nav').innerHTML=`<div class="row"><button class="back" onclick="back()"><svg viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Sedes</button><span class="tt">${esc(s)}</span><button class="act" onclick="abrirCaja()">Abrir caja</button></div><div class="row"><span class="st">${esc(fechaLarga(selDate))}</span><span id="hubEstado"></span></div>`;
   const v=document.getElementById('view');
-  if(showLoading) v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
-  try{ await loadUltimosFinales(); }catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(e.message)}</div>`; return; }
-  const sedes=sedesVisibles();
-  const rows=sedes.map(s=>{ const c=ultimosFinales.find(x=>x.sede===s); if(!c) return `<div class="cell ico"><div class="ic" style="background:${SEDE_COLOR[s]}">${esc(s[0])}</div><div class="main"><span class="t">${esc(s)}</span><span class="s">Sin cierres finales</span></div></div>`;
-    const di=difInfo(c), sp=sinpePill(c);
-    return `<button class="cell ico" onclick="abrirCierreFinal('${c.id}')"><div class="ic" style="background:${SEDE_COLOR[s]}">${esc(s[0])}</div><div class="main"><span class="t">${esc(s)} · ${esc(fechaCorta(c.fecha))}${c.fecha===todayStr()?' (hoy)':c.fecha===ayerStr()?' (ayer)':''}</span><span class="s num">Turno ${c.turno_num} · ventas ${fmt(c.total_ventas)} · efectivo final ${fmt(c.efectivo_final??c.efectivo)}</span><span class="s" style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap"><span class="pill ${di.cls}">${di.txt}</span>${sp?`<span class="pill ${sp.cls}">${sp.txt}</span>`:'<span class="pill warn">Sin reporte SINPE</span>'}</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`; }).join('');
-  v.innerHTML=`<div class="sect"><div class="group">${rows}</div><div class="ftr">Tocá una sede para ver el detalle completo de ese cierre.</div></div>`;
+  if(showLoading) v.innerHTML='<div class="tiles"><div class="skel" style="margin:0;height:70px"></div><div class="skel" style="margin:0;height:70px"></div></div><div class="mods">'+'<div class="skel" style="margin:0;width:60px;height:60px;border-radius:14px"></div>'.repeat(4)+'</div>';
+  const [r1,r2,r3]=await Promise.allSettled([loadDia(), supaFetch(`/envios_mercaderia?sede=eq.${encodeURIComponent(s)}&estado=eq.pendiente&select=id`), invCache[s]?Promise.resolve(invCache[s]):loadInventario(s)]);
+  if(r1.status==='rejected'){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(r1.reason?.message||'error')}</div>`; return; }
+  const c=ultimoTurno(s); const di=difInfo(c);
+  const nEnv=r2.status==='fulfilled'?(r2.value||[]).length:0;
+  const inv=r3.status==='fulfilled'?(r3.value||[]):[]; const nBajo=inv.filter(r=>Number(r.cantidad)<Number(r.cantidad_minima||0)).length;
+  const pend=pendientesDe(s);
+  const badges={caja:pend.length,inventario:nBajo,envios:nEnv};
+  const est=document.getElementById('hubEstado'); if(est) est.innerHTML=estadoPill(c);
+  const mods=MODS.filter(m=>!m.admin||esAdmin()).map(m=>`<button class="mod" onclick="goMod('${m.id}',()=>goHub('${esc(s)}'))"><span class="app" style="background:${m.color}">${ICONS[m.id]}${badges[m.id]?`<span class="badge">${badges[m.id]}</span>`:''}</span>${m.label}</button>`).join('');
+  v.innerHTML=`
+    <div class="tiles">
+      <div class="tile"><span class="l">Ventas del día</span><span class="n num">${c?fmt(c.total_ventas):'—'}</span></div>
+      <div class="tile"><span class="l">Efectivo contado</span><span class="n num">${c?fmt(c.efectivo):'—'}</span></div>
+      <div class="tile wide"><div><span class="l">Diferencia de caja</span><div class="n num" style="color:${!di?'var(--sec)':di.cls==='ok'?'var(--green)':di.cls==='bad'?'var(--red)':'var(--blue)'}">${c?fmt(Math.abs(Math.round(Number(c.diferencia)||0))):'—'}</div></div>${di?`<span class="pill ${di.cls}">${di.txt}</span>`:'<span class="pill warn">Sin turno</span>'}</div>
+    </div>
+    <div class="sect"><div class="hdr">Módulos de ${esc(s)}</div><div class="mods">${mods}</div></div>
+    ${pend.length||nBajo||nEnv?`<div class="sect"><div class="hdr">Revisar</div><div class="group">
+      ${pend.map(t=>`<button class="cell" onclick="goMod('caja',()=>goHub('${esc(s)}'))"><div class="main"><span class="t">${esc(t)}</span><span class="s">Caja · turno ${c?c.turno_num:''}</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`).join('')}
+      ${nBajo?`<button class="cell" onclick="goMod('inventario',()=>goHub('${esc(s)}'))"><div class="main"><span class="t">${nBajo} producto(s) bajo mínimo</span><span class="s">Inventario</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`:''}
+      ${nEnv?`<button class="cell" onclick="goMod('envios',()=>goHub('${esc(s)}'))"><div class="main"><span class="t">${nEnv} envío(s) por aceptar</span><span class="s">Envíos de mercadería</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`:''}
+    </div></div>`:`<div class="sect"><div class="ftr" style="text-align:center">Nada pendiente por revisar en ${esc(s)}.</div></div>`}`;
 }
 
-// ── Render: Detalle de sede (Turno actual | Inventario) ──
-function navDetalle(c,ts){
-  document.getElementById('nav').innerHTML=`
-    <div class="row"><button class="back" onclick="volver()"><svg viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>${prevView==='cierres'?'Cierres':'Sedes'}</button><span class="tt">${esc(detSede)}</span><button class="act" onclick="abrirCaja()">Caja</button></div>
-    <div class="row"><span class="st">${esc(fechaLarga(selDate))}</span>${c?estadoPill(c):estadoPill(null)}</div>
-    <div class="seg"><button class="${detTab==='turno'?'on':''}" onclick="detTab='turno';renderDetalle(false)">Turno actual</button><button class="${detTab==='inventario'?'on':''}" onclick="detTab='inventario';renderDetalle(false)">Inventario</button></div>
-    ${(detTab==='turno'&&ts.length>1)?`<div class="seg">${ts.map(t=>`<button class="${t.id===c.id?'on':''}" onclick="detTurnoId='${t.id}';renderDetalle(false)">T${t.turno_num} · ${t.estado}</button>`).join('')}</div>`:''}`;
+// ── Módulos ──
+function navMod(title,extraHtml){
+  const m=MODS.find(x=>x.id===curMod);
+  document.getElementById('nav').innerHTML=`<div class="row"><button class="back" onclick="back()"><svg viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(detSede)}</button><span class="tt">${esc(title||m?.label||'')}</span>${curMod==='caja'?'<button class="act" onclick="abrirCaja()">Editar</button>':'<span class="act" style="visibility:hidden">·</span>'}</div>${extraHtml||''}`;
 }
-async function renderDetalle(showLoading){
+async function renderMod(showLoading){
+  if(curMod==='caja') return renderCaja(showLoading);
+  if(curMod==='inventario') return renderInventarioMod();
+  if(curMod==='gastos') return renderGastosMod();
+  if(curMod==='cierres') return renderCierresMod();
+  if(curMod==='envios') return renderEnviosMod();
+  if(curMod==='proyecciones') return renderProyMod();
+}
+
+// Caja: turno del día seleccionado (con T1/T2/T3)
+async function renderCaja(showLoading){
   const v=document.getElementById('view');
   if(showLoading) v.innerHTML='<div class="sect"><div class="skel"></div></div>';
   try{ await loadDia(); }catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(e.message)}</div>`; return; }
   const ts=turnosDe(detSede); let c=ts.find(x=>x.id===detTurnoId)||ts[ts.length-1]||null; detTurnoId=c?.id||null;
-  navDetalle(c,ts);
-  if(detTab==='inventario') return renderInventario(v);
+  navMod('Caja',`<div class="row"><span class="st">${esc(fechaLarga(selDate))}</span>${estadoPill(c)}</div>${segFecha()}${ts.length>1?`<div class="seg">${ts.map(t=>`<button class="${t.id===c.id?'on':''}" onclick="detTurnoId='${t.id}';renderCaja(false)">T${t.turno_num} · ${t.estado}</button>`).join('')}</div>`:''}`);
   if(!c){ v.innerHTML=`<div class="empty">No hay turnos de ${esc(detSede)} el ${esc(fechaLarga(selDate))}.</div>`; return; }
   const di=difInfo(c); const difAbs=Math.abs(Math.round(Number(c.diferencia)||0));
   const gastos=Array.isArray(c.gastos)?c.gastos:[]; const ingresos=Array.isArray(c.ingresos)?c.ingresos:[];
@@ -373,16 +434,14 @@ async function renderDetalle(showLoading){
     <div class="sect"><div class="hdr">Fotos</div><div class="group">
       ${c.foto_datafono?`<button class="cell" onclick="verFoto('${esc(c.foto_datafono)}','f1')"><div class="main"><span class="t">Foto datáfono (auditoría)</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button><div id="f1"></div>`:''}
       ${c.foto_cierre?`<button class="cell" onclick="verFoto('${esc(c.foto_cierre)}','f2')"><div class="main"><span class="t">Foto cierre de lote (final)</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button><div id="f2"></div>`:''}
-      ${(!c.foto_datafono&&!c.foto_cierre)?'<div class="cell"><span class="s">Sin fotos todavía.</span></div>':''}</div></div>
-    <div class="sect"><div class="group">
-      <button class="cell" onclick="abrirCaja()"><div class="main"><span class="t" style="color:var(--brand-text)">Abrir Caja completa de ${esc(detSede)}</span><span class="s">Para editar, subir informes o cerrar</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>
-      <button class="cell" onclick="abrirModulo('/gastos')"><div class="main"><span class="t" style="color:var(--brand-text)">Abrir Gastos</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button></div>
+      ${(!c.foto_datafono&&!c.foto_cierre)?'<div class="cell"><span class="s">Sin fotos todavía.</span></div>':''}</div>
       <div class="ftr">Actualizado ${c.updated_at?hora(c.updated_at):'—'}${c.created_by?' · abierto por '+esc(c.created_by):''}</div></div>`;
 }
 
-// ── Render: Inventario de la sede (stock actual del sistema) ──
-async function renderInventario(v){
-  v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
+// Inventario: stock actual de la sede
+async function renderInventarioMod(){
+  navMod('Inventario');
+  const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
   let rows; try{ rows=await loadInventario(detSede); }catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar el inventario: ${esc(e.message)}</div>`; return; }
   pintarInventario(v,rows);
 }
@@ -397,9 +456,90 @@ function pintarInventario(v,rows){
   v.innerHTML=`
     <div class="tiles"><div class="tile"><span class="l">Productos</span><span class="n num">${rows.length}</span></div><div class="tile"><span class="l">Bajo mínimo</span><span class="n num" style="color:${bajo?'var(--red)':'var(--green)'}">${bajo}</span></div>
       <div class="tile wide"><div><span class="l">Valor del inventario</span><div class="n num"><small>₡</small>${Math.round(valor).toLocaleString('es-CR')}</div></div>${upd?`<span class="pill status">Actualizado ${hora(upd)}</span>`:''}</div></div>
+    ${esAdmin()?`<div class="actionbar"><button class="btn primary" onclick="abrirEnvio()">${ICONS.envios}Enviar mercadería a ${esc(detSede)}</button></div>`:''}
     <div class="search"><input type="search" placeholder="Buscar producto" value="${esc(invFiltro)}" oninput="invFiltro=this.value;pintarInventario(document.getElementById('view'),invCache['${esc(detSede)}']||[]);const i=document.querySelector('.search input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}"></div>
     <div class="sect"><div class="hdr">Stock actual · ${esc(detSede)}</div><div class="group">${items||'<div class="cell"><span class="s">Sin productos.</span></div>'}</div>
       <div class="ftr">Stock del sistema (se descuenta al subir "Ventas por Producto"). Solo lectura; los ajustes se hacen en Inventario.</div></div>`;
+}
+
+// Gastos: del mes, solo esta sede
+async function renderGastosMod(){
+  const esteMes=gMes===mesOrdDe(new Date()), ant=gMes===mesAnterior(mesOrdDe(new Date()));
+  navMod('Gastos',`<div class="seg"><button class="${esteMes?'on':''}" onclick="gMes=mesOrdDe(new Date());renderGastosMod()">Este mes</button><button class="${ant?'on':''}" onclick="gMes=mesAnterior(mesOrdDe(new Date()));renderGastosMod()">Mes anterior</button><button class="${(!esteMes&&!ant)?'on':''}" onclick="const p=document.getElementById('mPick');p.showPicker?p.showPicker():p.focus()">Mes</button></div><div class="datebox"><input type="month" id="mPick" value="${gMes}" max="${mesOrdDe(new Date())}" onchange="if(this.value){gMes=this.value;renderGastosMod();}"></div>`);
+  const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
+  let rows; try{ rows=(await supaFetch(`/gastos?sede=eq.${encodeURIComponent(detSede)}&mes_orden=eq.${gMes}&order=fecha_clase.desc&select=id,categoria,fecha_clase,emisor,monto,banco_pago,documento_cobro,numero_factura`))||[]; }
+  catch(e){ v.innerHTML=`<div class="empty">No se pudieron cargar los gastos: ${esc(e.message)}</div>`; return; }
+  const total=rows.reduce((s,g)=>s+(Number(g.monto)||0),0);
+  const porCat={}; rows.forEach(g=>{ (porCat[g.categoria]=porCat[g.categoria]||[]).push(g); });
+  const cats=Object.keys(porCat).sort((a,b)=>porCat[b].reduce((s,g)=>s+Number(g.monto||0),0)-porCat[a].reduce((s,g)=>s+Number(g.monto||0),0));
+  const catLabel=id=>CAT_GASTO[id]||String(id||'otros').replace(/_/g,' ').replace(/^\w/,c=>c.toUpperCase());
+  v.innerHTML=`
+    <div class="tiles"><div class="tile"><span class="l">${esc(mesLabel(gMes))}</span><span class="n num"><small>₡</small>${Math.round(total).toLocaleString('es-CR')}</span></div><div class="tile"><span class="l">Facturas</span><span class="n num">${rows.length}</span></div></div>
+    ${cats.length?`<div class="sect"><div class="hdr">Por categoría</div><div class="group">${cats.map(cId=>{const arr=porCat[cId];const sub=arr.reduce((s,g)=>s+Number(g.monto||0),0);return `<div class="cell"><div class="main"><span class="t">${esc(catLabel(cId))}</span><span class="s">${arr.length} factura(s)</span></div><span class="v strong num">${fmt(sub)}</span></div>`;}).join('')}</div></div>`:''}
+    <div class="sect"><div class="hdr">Detalle</div><div class="group">${rows.length?rows.map(g=>`<div class="cell"><div class="main"><span class="t">${esc(g.emisor||'—')}</span><span class="s">${esc(fechaDMY(g.fecha_clase))} · ${esc(catLabel(g.categoria))}${g.banco_pago?' · '+esc(g.banco_pago):''}${g.numero_factura?' · #'+esc(g.numero_factura):''}</span></div><span class="v num">${fmt(g.monto)}</span></div>`).join(''):'<div class="cell"><span class="s">Sin gastos registrados en este mes.</span></div>'}</div>
+      <div class="ftr">Gastos de ${esc(detSede)} registrados en el módulo de Gastos (incluye los pagos de caja; no incluye depósitos).</div></div>`;
+}
+
+// Cierres: historial de la sede
+async function renderCierresMod(){
+  navMod('Cierres');
+  const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
+  let rows; try{ rows=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(detSede)}&order=fecha.desc,turno_num.desc&limit=30&select=${SEL_CIERRE}`))||[]; }
+  catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(e.message)}</div>`; return; }
+  const porFecha={}; rows.forEach(c=>{ (porFecha[c.fecha]=porFecha[c.fecha]||[]).push(c); });
+  const fechas=Object.keys(porFecha).sort().reverse();
+  v.innerHTML=fechas.length?fechas.map(f=>`<div class="sect"><div class="hdr">${esc(fechaLarga(f))}${f===todayStr()?' · hoy':f===ayerStr()?' · ayer':''}</div><div class="group">${porFecha[f].sort((a,b)=>(b.turno_num||0)-(a.turno_num||0)).map(c=>{const di=difInfo(c);const sp=sinpePill(c);
+      return `<button class="cell" onclick="abrirCierreHist('${esc(c.sede)}','${c.fecha}','${c.id}')"><div class="main"><span class="t">Turno ${c.turno_num} · ${c.estado}</span><span class="s num">Ventas ${fmt(c.total_ventas)} · efectivo ${fmt(c.efectivo)}${c.hora_cierre?' · '+hora(c.hora_cierre):''}</span><span class="s" style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap"><span class="pill ${di.cls}">${di.txt}</span>${sp?`<span class="pill ${sp.cls}">${sp.txt}</span>`:''}</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`;}).join('')}</div></div>`).join('')
+    :`<div class="empty">Sin cierres registrados en ${esc(detSede)}.</div>`;
+}
+
+// Envíos de mercadería a la sede
+async function renderEnviosMod(){
+  navMod('Envíos');
+  const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div></div>';
+  let rows; try{ rows=(await supaFetch(`/envios_mercaderia?sede=eq.${encodeURIComponent(detSede)}&order=created_at.desc&limit=20&select=id,estado,items,nota,created_at,aceptado_at,aceptado_por,created_by`))||[]; }
+  catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(e.message)}</div>`; return; }
+  const pend=rows.filter(r=>r.estado==='pendiente'), acep=rows.filter(r=>r.estado!=='pendiente');
+  const item=r=>{ const items=Array.isArray(r.items)?r.items:[]; const n=items.reduce((s,i)=>s+(Number(i.enviado)||0),0);
+    const det=items.map(i=>`<div class="cell"><div class="main"><span class="t">${esc(i.producto)}</span></div><span class="v num">${r.estado==='pendiente'?'enviado '+(i.enviado??0):(i.enviado??0)+' → recibido '+(i.recibido==null?'—':i.recibido)}</span></div>`).join('');
+    return `<button class="cell" onclick="const d=document.getElementById('env_${r.id}');d.hidden=!d.hidden"><div class="main"><span class="t">${items.length} producto(s) · ${n} unidades</span><span class="s">${new Date(r.created_at).toLocaleDateString('es-CR',{day:'numeric',month:'short'})} ${hora(r.created_at)}${r.aceptado_at?' · aceptado '+hora(r.aceptado_at):''}${r.nota?' · '+esc(r.nota):''}</span></div><span class="pill ${r.estado==='pendiente'?'warn':'ok'}">${r.estado==='pendiente'?'Por aceptar':'Aceptado'}</span><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button><div id="env_${r.id}" hidden>${det}</div>`; };
+  v.innerHTML=`
+    ${esAdmin()?`<div class="actionbar"><button class="btn primary" onclick="abrirEnvio()">${ICONS.envios}Enviar mercadería a ${esc(detSede)}</button></div>`:''}
+    <div class="tiles"><div class="tile"><span class="l">Por aceptar</span><span class="n num" style="color:${pend.length?'var(--orange)':'var(--green)'}">${pend.length}</span></div><div class="tile"><span class="l">Aceptados (últimos)</span><span class="n num">${acep.length}</span></div></div>
+    ${pend.length?`<div class="sect"><div class="hdr">Pendientes</div><div class="group">${pend.map(item).join('')}</div><div class="ftr">Recepción los acepta desde Caja indicando lo que realmente llegó; el stock se suma con lo recibido.</div></div>`:''}
+    <div class="sect"><div class="hdr">Historial</div><div class="group">${acep.length?acep.map(item).join(''):'<div class="cell"><span class="s">Sin envíos aceptados todavía.</span></div>'}</div></div>`;
+}
+
+// Proyecciones (solo admin): último snapshot de la sede
+async function renderProyMod(){
+  navMod('Proyecciones');
+  const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div></div>';
+  let rows; try{ rows=(await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(detSede)}&order=mes_orden.desc,updated_at.desc&limit=2&select=mes,mes_orden,activos,total_usuarios,proyecciones,renovaciones,updated_at`))||[]; }
+  catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(e.message)}</div>`; return; }
+  const s=rows[0]; if(!s){ v.innerHTML=`<div class="empty">Sin proyecciones cargadas para ${esc(detSede)}.</div>`; return; }
+  const proy=Array.isArray(s.proyecciones)?s.proyecciones:[]; const r=s.renovaciones||{};
+  v.innerHTML=`
+    <div class="tiles"><div class="tile"><span class="l">Activos · ${esc(s.mes)}</span><span class="n num">${Number(s.activos)||0}</span></div><div class="tile"><span class="l">Usuarios en total</span><span class="n num">${Number(s.total_usuarios)||0}</span></div></div>
+    <div class="sect"><div class="hdr">Proyección de renovaciones</div><div class="group">${proy.length?proy.map(p=>`<div class="cell"><div class="main"><span class="t">${esc(p.label)}</span><span class="s">${Number(p.count)||0} usuario(s)</span></div><span class="v strong num">${fmt(p.revenue)}</span></div>`).join(''):'<div class="cell"><span class="s">Sin datos.</span></div>'}</div></div>
+    <div class="sect"><div class="hdr">Renovaciones del mes</div><div class="group">
+      <div class="cell"><div class="main"><span class="t">Nuevos</span></div><span class="v num">${Number(r.nuevos)||0}</span></div>
+      <div class="cell"><div class="main"><span class="t">Renovaciones</span></div><span class="v num">${Number(r.renovaciones)||0}</span></div>
+      <div class="cell"><div class="main"><span class="t">Reingresos</span></div><span class="v num">${Number(r.reingresos)||0}</span></div>
+      <div class="cell"><div class="main"><span class="t">Total cobrado</span></div><span class="v strong num">${fmt(r.total)}</span></div></div>
+      <div class="ftr">Actualizado ${s.updated_at?new Date(s.updated_at).toLocaleDateString('es-CR',{day:'numeric',month:'short'})+' '+hora(s.updated_at):'—'}. Se carga desde el Informe de Usuarios en el escritorio.</div></div>`;
+}
+
+// ── Pestaña Cierres: último cierre final por sede ──
+async function renderCierresTab(showLoading){
+  document.getElementById('nav').innerHTML=`<div class="row"><span class="st">Último cierre final de cada sede</span></div><div class="lt">Cierres</div>`;
+  const v=document.getElementById('view');
+  if(showLoading) v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
+  try{ await loadUltimosFinales(); }catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(e.message)}</div>`; return; }
+  const sedes=sedesVisibles();
+  const rows=sedes.map(s=>{ const c=ultimosFinales.find(x=>x.sede===s); if(!c) return `<div class="cell ico"><div class="ic" style="background:${SEDE_COLOR[s]}">${esc(s[0])}</div><div class="main"><span class="t">${esc(s)}</span><span class="s">Sin cierres finales</span></div></div>`;
+    const di=difInfo(c), sp=sinpePill(c);
+    return `<button class="cell ico" onclick="abrirCierreFinal('${c.id}')"><div class="ic" style="background:${SEDE_COLOR[s]}">${esc(s[0])}</div><div class="main"><span class="t">${esc(s)} · ${esc(fechaCorta(c.fecha))}${c.fecha===todayStr()?' (hoy)':c.fecha===ayerStr()?' (ayer)':''}</span><span class="s num">Turno ${c.turno_num} · ventas ${fmt(c.total_ventas)} · efectivo final ${fmt(c.efectivo_final??c.efectivo)}</span><span class="s" style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap"><span class="pill ${di.cls}">${di.txt}</span>${sp?`<span class="pill ${sp.cls}">${sp.txt}</span>`:'<span class="pill warn">Sin reporte SINPE</span>'}</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`; }).join('');
+  v.innerHTML=`<div class="sect"><div class="group">${rows}</div><div class="ftr">Tocá una sede para ver el detalle completo de ese cierre.</div></div>`;
 }
 
 async function verFoto(path,boxId){
@@ -412,12 +552,40 @@ async function verFoto(path,boxId){
   }catch(e){ box.innerHTML=`<div class="cell"><span class="s" style="color:var(--red)">${esc(e.message)}</span></div>`; }
 }
 
+// ── Enviar mercadería a la sede (solo admins; igual que inventario.html: crea el envío pendiente, no toca stock) ──
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2600);}
+async function abrirEnvio(){
+  if(!esAdmin()) return;
+  let rows=invCache[detSede]; if(!rows){ try{ rows=await loadInventario(detSede); }catch(e){ toast('No se pudo cargar el inventario: '+e.message); return; } }
+  const sh=document.getElementById('sheet');
+  sh.innerHTML=`<div class="sheet-bg" onclick="cerrarSheet()"></div>
+    <div class="sheet-panel" role="dialog" aria-label="Enviar mercadería">
+      <div class="sheet-h"><button class="act" onclick="cerrarSheet()">Cancelar</button><span class="tt">Enviar a ${esc(detSede)}</span><button class="act" id="btnEnviar" onclick="enviarMercaderia()" disabled>Enviar</button></div>
+      <div class="sheet-body">
+        <div class="ftr" style="padding:0 0 10px">Indicá la cantidad a enviar de cada producto. Recepción confirma lo recibido desde Caja; el stock se suma al aceptar.</div>
+        <div class="group" style="margin:0">${rows.length?rows.map(r=>`<div class="cell"><div class="main"><span class="t">${esc(r.producto)}</span><span class="s num">stock ${Number(r.cantidad)||0}</span></div><input class="qty num" type="number" inputmode="numeric" min="0" step="1" placeholder="0" data-prod="${esc(r.producto)}" oninput="envioTotal()"></div>`).join(''):'<div class="cell"><span class="s">Sin productos en inventario.</span></div>'}</div>
+        <div class="ftr" id="envioSum" style="padding:10px 0 0"></div><div class="err" id="envioErr"></div>
+      </div></div>`;
+  sh.hidden=false; document.body.style.overflow='hidden';
+}
+function cerrarSheet(){ const sh=document.getElementById('sheet'); sh.hidden=true; sh.innerHTML=''; document.body.style.overflow=''; }
+function envioItems(){ return [...document.querySelectorAll('#sheet input.qty')].map(i=>({producto:i.getAttribute('data-prod'),enviado:Math.max(0,Math.floor(Number(i.value)||0)),recibido:null})).filter(x=>x.enviado>0); }
+function envioTotal(){ const it=envioItems(); const n=it.reduce((s,x)=>s+x.enviado,0); const b=document.getElementById('btnEnviar'); if(b) b.disabled=!it.length; const s=document.getElementById('envioSum'); if(s) s.textContent=it.length?`${it.length} producto(s) · ${n} unidades`:''; }
+async function enviarMercaderia(){
+  const it=envioItems(); const err=document.getElementById('envioErr'); if(!it.length){ err.textContent='Indicá al menos una cantidad.'; return; }
+  const b=document.getElementById('btnEnviar'); b.disabled=true; b.textContent='Enviando…';
+  try{
+    await supaFetch('/envios_mercaderia',{method:'POST',body:{sede:detSede,estado:'pendiente',items:it,created_by:auth.email||null}});
+    cerrarSheet(); toast(`Envío creado: ${it.length} producto(s). Pendiente de que recepción lo acepte.`);
+    if(curMod==='envios') renderEnviosMod();
+  }catch(e){ err.textContent='No se pudo enviar: '+e.message; b.disabled=false; b.textContent='Enviar'; }
+}
+
 // ── Salto a los módulos completos (misma sesión, vía handoff gymAuth como index.html) ──
 function handoff(sede){ sessionStorage.setItem('gymAuth',JSON.stringify({token:auth.access_token,role:me.role,nombre:me.nombre||auth.email,email:auth.email,sede:sede||me.sede||null,sedes_extra:me.sedes_extra||[],user_id:auth.user_id})); }
-function abrirCaja(){ handoff(detSede||me.sede); location.href='/caja'; }
-function abrirModulo(p){ handoff(detSede||me.sede); location.href=p; }
+function abrirCaja(){ handoff(detSede||me.sede); location.href='/caja?from=movil'; }   // caja.html muestra "← App móvil" con este parámetro
 
-// ── Render: Cuenta ──
+// ── Cuenta ──
 function renderCuenta(){
   document.getElementById('nav').innerHTML=`<div class="row"><span class="st">Impulse Fit · v${APP_VER}</span></div><div class="lt">Cuenta</div>`;
   const sedes=sedesVisibles();

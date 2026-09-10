@@ -152,8 +152,13 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
     <p>Clases grupales e instructores de planta · resumen mensual</p>
   </div>
   <div class="header-right">
+    <a id="btnVolverApp" class="logout-btn" href="/movil" style="display:none;text-decoration:none;margin-right:8px;">← App móvil</a>
     <span>👤 <span id="userNombre">—</span></span>
     <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+    <script>/* Volver a la app móvil: visible si se llegó desde /movil o si corre instalada como app. */
+    (function(){try{var q=new URLSearchParams(location.search);var sa=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
+      if(q.get('from')==='movil'||sa)sessionStorage.setItem('fromMovil','1');
+      if(sessionStorage.getItem('fromMovil')==='1'){var b=document.getElementById('btnVolverApp');if(b)b.style.display='';}}catch(_){}})();</script>
   </div>
 </div>
 
