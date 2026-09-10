@@ -321,7 +321,7 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
     <div style="padding:18px 22px;max-height:70vh;overflow-y:auto;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
         <div class="hint" style="margin:0;">Cuente físicamente cada producto. Se compara con el sistema para detectar diferencias del turno. No cambia el stock.</div>
-        <button type="button" class="btn-ghost" style="margin-left:auto;font-size:12px;padding:5px 10px;white-space:nowrap;" onclick="imprimirListaInventario()">🖨️ Hoja</button>
+        <button type="button" class="btn-ghost" style="margin-left:auto;font-size:12px;padding:5px 10px;white-space:nowrap;" onclick="imprimirListaInventario('cierre')">🖨️ Hoja</button>
       </div>
       <div id="ccInvList" style="max-height:46vh;overflow-y:auto;border:1px solid var(--border);border-radius:10px;"></div>
       <div id="ccErr" style="color:var(--warn);font-size:13px;min-height:16px;margin-top:10px;"></div>
@@ -347,7 +347,7 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
       <div class="hint" id="aEfectivoHint" style="margin:2px 0 14px;"></div>
       <div style="display:flex;align-items:center;gap:10px;margin:10px 0 6px;">
         <div style="font-size:13px;font-weight:800;color:var(--primary);">📦 Inventario contado (obligatorio, a ciegas)</div>
-        <button type="button" class="btn-ghost" style="margin-left:auto;font-size:12px;padding:5px 10px;" onclick="imprimirListaInventario()">🖨️ Imprimir hoja de conteo</button>
+        <button type="button" class="btn-ghost" style="margin-left:auto;font-size:12px;padding:5px 10px;" onclick="imprimirListaInventario('apertura')">🖨️ Imprimir hoja de conteo</button>
       </div>
       <div class="hint" style="margin-bottom:8px;">Cuente físicamente cada producto y anote la cantidad. El sistema comparará con lo registrado (no se muestra para que el conteo sea real). No se modifica el stock, solo se verifica. Podés imprimir la hoja para anotar a mano y luego digitar.</div>
       <div id="aInvList" style="max-height:34vh;overflow-y:auto;border:1px solid var(--border);border-radius:10px;"></div>
@@ -556,8 +556,8 @@ async function openAbrirModal(){
   document.getElementById('abrirModal').style.display='flex';
 }
 // Hoja imprimible para contar el inventario a mano (todas las cantidades en 0).
-function imprimirListaInventario(){
-  const inv=window._invAp||[];
+function imprimirListaInventario(origen){
+  const inv=origen==='cierre'?(window._ccInv||[]):(window._invAp||[]);
   if(!inv.length){ alert('Esta sede no tiene productos en inventario para imprimir.'); return; }
   const fecha=todayStr(), turno=window._turnoNum||'';
   const rows=inv.map((p,i)=>`<tr><td class="n">${i+1}</td><td>${esc(p.producto)}</td><td class="c">0</td></tr>`).join('');
