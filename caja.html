@@ -360,14 +360,28 @@ table.hist td { padding:9px 12px; font-size:13px; border-bottom:1px solid #f2f5f
   </div>
 </div>
 
+<script src="/sesion.js"></script>
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
 let currentToken=null,currentRole=null,currentSede=null,currentEmail='',currentSedes=[];
+
+/* ── Sesión: renovación silenciosa + cierre por inactividad (ver sesion.js) ── */
+Sesion.init({ url: SUPA_URL, key: SUPA_KEY, idleMin: 30,
+  onToken: function (t) { currentToken = t; },
+  onExpira: function (m) { _sesionExpirada(m); } });
+function _sesionExpirada(motivo) {
+  var msg = motivo === 'inactividad' ? 'Su sesión se cerró por 30 minutos de inactividad. Vuelva a entrar.'
+          : motivo === 'cerrada'     ? 'La sesión se cerró en otra pestaña.'
+          :                            'Su sesión expiró. Vuelva a entrar.';
+  try { doLogout(true); } catch (_) {}
+  var e = document.getElementById('loginError'); if (e) e.textContent = msg;
+}
 // Sedes donde el usuario (no admin) puede operar: su sede principal + sedes_extra, validadas y sin duplicar.
 function computeSedes(sede,extra){ const set=[]; [sede,...(Array.isArray(extra)?extra:[])].forEach(s=>{ if(s&&SEDES.includes(s)&&!set.includes(s))set.push(s); }); return set; }
 async function supaFetch(path,opts={}){
   const token=currentToken||SUPA_KEY;
   const res=await fetch(SUPA_URL+'/rest/v1'+path,{method:opts.method||'GET',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':opts.prefer||'return=minimal',...(opts.headers||{})},body:opts.body!=null?JSON.stringify(opts.body):undefined});
+  if(res.status===401&&!opts._retry&&await Sesion.renovar())return supaFetch(path,{...opts,_retry:true});
   if(!res.ok){const t=await res.text();throw new Error(t);} const txt=await res.text(); return txt?JSON.parse(txt):null;
 }
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','admin_sedes','admin_g','admin'];
@@ -431,7 +445,7 @@ async function doLogin(){
   try{
     const res=await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password:pwd})});
     const data=await res.json(); if(!data.access_token)throw new Error(data.error_description||data.msg||'Credenciales incorrectas');
-    currentToken=data.access_token;currentEmail=email;
+    currentToken=data.access_token; Sesion.set(data);currentEmail=email;
     const roles=await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede,sedes_extra`);
     currentRole=roles?.[0]?.role||null;currentSede=roles?.[0]?.sede||null;currentSedes=computeSedes(currentSede,roles?.[0]?.sedes_extra);
     if(!ROLES_PERMITIDOS.includes(currentRole)){errEl.textContent='Su cuenta no tiene acceso a este módulo.';await doLogout(true);return;}
@@ -442,9 +456,9 @@ async function doLogin(){
 }
 document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 (function(){try{const auth=JSON.parse(sessionStorage.getItem('gymAuth')||'null');
-  if(auth?.token&&ROLES_PERMITIDOS.includes(auth.role)){sessionStorage.removeItem('gymAuth');currentToken=auth.token;currentRole=auth.role;currentSede=auth.sede||null;currentEmail=auth.email||'';currentSedes=computeSedes(currentSede,auth.sedes_extra);
+  if(auth?.token&&ROLES_PERMITIDOS.includes(auth.role)){sessionStorage.removeItem('gymAuth');currentToken=auth.token; Sesion.adoptar(auth);currentRole=auth.role;currentSede=auth.sede||null;currentEmail=auth.email||'';currentSedes=computeSedes(currentSede,auth.sedes_extra);
     document.getElementById('userNombre').textContent=auth.nombre||'—';document.getElementById('loginScreen').style.display='none';setTimeout(init,0);}}catch(_){}})();
-async function doLogout(silent){stopLivePoll();try{await fetch(`${SUPA_URL}/auth/v1/logout`,{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}});}catch(_){}
+async function doLogout(silent){ Sesion.cerrar();stopLivePoll();try{await fetch(`${SUPA_URL}/auth/v1/logout`,{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}});}catch(_){}
   currentToken=null;currentRole=null;currentSede=null;currentEmail='';document.getElementById('app').style.display='none';
   if(!silent){document.getElementById('loginEmail').value='';document.getElementById('loginPassword').value='';}document.getElementById('loginScreen').style.display='flex';}
 

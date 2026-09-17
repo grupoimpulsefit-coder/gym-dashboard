@@ -611,6 +611,7 @@
                     <option value="recepcion">🧾 Recepción (una sede)</option>
                     <option value="admin_sucursal">🏪 Admin de sucursal (una sede)</option>
                     <option value="instructor">🏋️ Instructor (una sede · solo mediciones)</option>
+                    <option value="coordinador">👁 Coordinador (solo consultar inventario)</option>
                     <option value="colaborador">👁 Colaborador</option>
                     <option value="admin_sedes">🏢 Admin Sedes</option>
                     <option value="admin">⚙ Admin</option>
@@ -667,6 +668,7 @@
     </div>
 </div>
 
+<script src="/sesion.js"></script>
 <script>
 // ══════════════════════════════════════════════════════
 //  GLOBALS
@@ -744,6 +746,7 @@ async function supaFetch(path, opts = {}) {
         },
         body: opts.body != null ? JSON.stringify(opts.body) : undefined
     });
+    if (res.status === 401 && !opts._retry && await Sesion.renovar()) return supaFetch(path, { ...opts, _retry: true });
     if (!res.ok) { const t = await res.text(); throw new Error(t); }
     const txt = await res.text();
     return txt ? JSON.parse(txt) : null;
@@ -753,6 +756,18 @@ async function supaFetch(path, opts = {}) {
 //  AUTH
 // ══════════════════════════════════════════════════════
 let currentToken = null, currentRole = null, currentUserEmail = '', currentSede = null, currentUserId = null, currentSedesExtra = [];
+
+/* ── Sesión: renovación silenciosa + cierre por inactividad (ver sesion.js) ── */
+Sesion.init({ url: SUPA_URL, key: SUPA_KEY, idleMin: 30,
+  onToken: function (t) { currentToken = t; },
+  onExpira: function (m) { _sesionExpirada(m); } });
+function _sesionExpirada(motivo) {
+  var msg = motivo === 'inactividad' ? 'Su sesión se cerró por 30 minutos de inactividad. Vuelva a entrar.'
+          : motivo === 'cerrada'     ? 'La sesión se cerró en otra pestaña.'
+          :                            'Su sesión expiró. Vuelva a entrar.';
+  try { doLogout(true); } catch (_) {}
+  var e = document.getElementById('loginError'); if (e) e.textContent = msg;
+}
 
 async function doLogin() {
     const email = document.getElementById('loginEmail').value.trim();
@@ -769,7 +784,7 @@ async function doLogin() {
         });
         const data = await res.json();
         if (!data.access_token) throw new Error(data.error_description || data.msg || 'Credenciales incorrectas');
-        currentToken     = data.access_token;
+        currentToken     = data.access_token; Sesion.set(data);
         currentUserEmail = data.user?.email || email;
         currentUserId    = data.user?.id || null;
         sessionStorage.setItem('supa_token', currentToken);
@@ -789,6 +804,7 @@ async function doLogin() {
             currentRole === 'admin_g' ? '💰 Admin Gastos' :
             currentRole === 'admin_sucursal' ? '🏪 Admin Sucursal' :
             currentRole === 'instructor' ? '🏋️ Instructor' :
+            currentRole === 'coordinador' ? '👁 Coordinador' :
             currentRole === 'empleado' ? '👤 Empleado' : '👁 Colaborador';
         applyRole();
         document.getElementById('loginScreen').style.display = 'none';
@@ -804,6 +820,7 @@ document.getElementById('loginPassword').addEventListener('keydown', e => {
 });
 
 async function doLogout() {
+    Sesion.cerrar();
     try {
         await fetch(`${SUPA_URL}/auth/v1/logout`, {
             method: 'POST',
@@ -987,7 +1004,8 @@ async function showSedePicker() {
             sessionStorage.setItem('gymAuth', JSON.stringify({
                 token: currentToken, role: currentRole,
                 nombre: document.getElementById('userNombre').textContent,
-                email: currentUserEmail, sede: currentSede, sedes_extra: currentSedesExtra, user_id: currentUserId
+                email: currentUserEmail, sede: currentSede, sedes_extra: currentSedesExtra, user_id: currentUserId,
+                ...Sesion.paraHandoff()   // refresh_token + exp: el módulo destino puede renovar solo
             }));
             window.location.href = path;
         };
@@ -1000,6 +1018,13 @@ async function showSedePicker() {
         cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
         cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
         cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agendar citas','Agenda semanal cada 15 minutos','#e8f4fd','#1a5276','/mediciones'));
+        return;
+    }
+
+    // Coordinador: solo consulta del inventario (no edita nada)
+    if (currentRole === 'coordinador') {
+        statusEl.textContent = 'Su módulo' + (currentSede ? ` (${currentSede})` : ' (todas las sedes)') + ':';
+        cardsEl.appendChild(makeHandoffCard('📦','Inventario','Consultar stock','Solo lectura: productos, precios y faltantes','#fff8e1','#b9770e','/inventario'));
         return;
     }
 

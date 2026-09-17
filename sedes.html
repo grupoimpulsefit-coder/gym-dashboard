@@ -228,11 +228,24 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 
 </div>
 
+<script src="/sesion.js"></script>
 <script>
 // ── Supabase ──────────────────────────────────────────────────────────────
 const SUPA_URL = '__SUPA_URL__';
 const SUPA_KEY = '__SUPA_KEY__';
 let currentToken = null, currentRole = null;
+
+/* ── Sesión: renovación silenciosa + cierre por inactividad (ver sesion.js) ── */
+Sesion.init({ url: SUPA_URL, key: SUPA_KEY, idleMin: 30,
+  onToken: function (t) { currentToken = t; },
+  onExpira: function (m) { _sesionExpirada(m); } });
+function _sesionExpirada(motivo) {
+  var msg = motivo === 'inactividad' ? 'Su sesión se cerró por 30 minutos de inactividad. Vuelva a entrar.'
+          : motivo === 'cerrada'     ? 'La sesión se cerró en otra pestaña.'
+          :                            'Su sesión expiró. Vuelva a entrar.';
+  try { doLogout(true); } catch (_) {}
+  var e = document.getElementById('loginError'); if (e) e.textContent = msg;
+}
 
 async function supaFetch(path, opts = {}) {
   const token = currentToken || SUPA_KEY;
@@ -243,7 +256,8 @@ async function supaFetch(path, opts = {}) {
       ...(opts.headers || {}) },
     body: opts.body != null ? JSON.stringify(opts.body) : undefined
   });
-  if (!res.ok) { const t = await res.text(); throw new Error(t); }
+  if (res.status === 401 && !opts._retry && await Sesion.renovar()) return supaFetch(path, { ...opts, _retry: true });
+    if (!res.ok) { const t = await res.text(); throw new Error(t); }
   const txt = await res.text();
   return txt ? JSON.parse(txt) : null;
 }
@@ -266,7 +280,7 @@ async function doLogin() {
     });
     const data = await res.json();
     if (!data.access_token) throw new Error(data.error_description || data.msg || 'Credenciales incorrectas');
-    currentToken = data.access_token;
+    currentToken = data.access_token; Sesion.set(data);
     const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre`);
     currentRole = roles?.[0]?.role || null;
     if (!ROLES_PERMITIDOS.includes(currentRole)) {
@@ -292,7 +306,7 @@ document.getElementById('loginPassword').addEventListener('keydown', e => { if (
     const auth = JSON.parse(sessionStorage.getItem('gymAuth') || 'null');
     if (auth?.token && ROLES_PERMITIDOS.includes(auth.role)) {
       sessionStorage.removeItem('gymAuth');
-      currentToken = auth.token;
+      currentToken = auth.token; Sesion.adoptar(auth);
       currentRole = auth.role;
       document.getElementById('userNombre').textContent = auth.nombre || '—';
       document.getElementById('loginScreen').style.display = 'none';
@@ -303,7 +317,7 @@ document.getElementById('loginPassword').addEventListener('keydown', e => { if (
   } catch(_) {}
 })();
 
-async function doLogout(silent) {
+async function doLogout(silent) { Sesion.cerrar();
   try { await fetch(`${SUPA_URL}/auth/v1/logout`, { method:'POST', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken} }); } catch(_) {}
   currentToken = null; currentRole = null;
   document.getElementById('dashboard').style.display = 'none';

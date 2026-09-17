@@ -841,6 +841,7 @@
   </div>
 </div>
 
+<script src="/sesion.js"></script>
 <script>
 // ─────────────────────────────────────────
 // SUPABASE
@@ -848,6 +849,18 @@
 const SUPA_URL = '__SUPA_URL__';
 const SUPA_KEY = '__SUPA_KEY__';
 let currentToken = null, currentRole = null;
+
+/* ── Sesión: renovación silenciosa + cierre por inactividad (ver sesion.js) ── */
+Sesion.init({ url: SUPA_URL, key: SUPA_KEY, idleMin: 30,
+  onToken: function (t) { currentToken = t; },
+  onExpira: function (m) { _sesionExpirada(m); } });
+function _sesionExpirada(motivo) {
+  var msg = motivo === 'inactividad' ? 'Su sesión se cerró por 30 minutos de inactividad. Vuelva a entrar.'
+          : motivo === 'cerrada'     ? 'La sesión se cerró en otra pestaña.'
+          :                            'Su sesión expiró. Vuelva a entrar.';
+  try { doLogout(true); } catch (_) {}
+  var e = document.getElementById('loginError'); if (e) e.textContent = msg;
+}
 // 'admin' conserva su acceso actual; 'admin_sedes' entra con los mismos permisos de admin
 const esRolAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes' || currentRole === 'admin_g';
 // Solo admin_sedes puede SUBIR el archivo de usuarios y guardar proyecciones
@@ -862,7 +875,8 @@ async function supaFetch(path, opts = {}) {
       ...(opts.headers || {}) },
     body: opts.body != null ? JSON.stringify(opts.body) : undefined
   });
-  if (!res.ok) { const t = await res.text(); throw new Error(t); }
+  if (res.status === 401 && !opts._retry && await Sesion.renovar()) return supaFetch(path, { ...opts, _retry: true });
+    if (!res.ok) { const t = await res.text(); throw new Error(t); }
   const txt = await res.text();
   return txt ? JSON.parse(txt) : null;
 }
@@ -882,7 +896,7 @@ async function doLogin() {
     });
     const data = await res.json();
     if (!data.access_token) throw new Error(data.error_description || 'Credenciales incorrectas');
-    currentToken = data.access_token;
+    currentToken = data.access_token; Sesion.set(data);
     const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre`);
     currentRole = roles?.[0]?.role || 'colaborador';
     const nombre = roles?.[0]?.nombre || email;
@@ -1124,7 +1138,7 @@ function mostrarDashboardDesdeSnapshot(s) {
   document.getElementById('dashboard').style.display = 'block';
 }
 
-async function doLogout() {
+async function doLogout() { Sesion.cerrar();
   try { await fetch(`${SUPA_URL}/auth/v1/logout`, { method:'POST', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken} }); } catch(_) {}
   currentToken = null; currentRole = null;
   document.getElementById('loginScreen').style.display = 'flex';

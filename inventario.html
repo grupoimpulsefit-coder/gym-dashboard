@@ -79,8 +79,9 @@ tr.bajo td { background:#fff8e1; } tr.faltante td { background:#fdecea; }
   <div class="topbar-controls">
     <label>🏢 Sede:</label><select id="sedeSel"></select>
     <input class="srch" id="buscar" placeholder="Buscar producto…" oninput="render()">
+    <span id="roBadge" style="display:none;background:#eef3fa;border:1.5px solid #d5dce8;border-radius:16px;padding:5px 12px;font-size:12px;font-weight:700;color:#1a5276;">👁 Solo consulta</span>
   </div>
-  <div class="topbar-controls">
+  <div class="topbar-controls" id="topbarControls">
     <label class="btn-ghost" for="fileInv" style="cursor:pointer;">📤 Cargar Excel</label>
     <input type="file" id="fileInv" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarExcel(this.files[0])">
     <button class="btn-ghost" onclick="addProducto()">＋ Producto</button>
@@ -100,7 +101,7 @@ tr.bajo td { background:#fff8e1; } tr.faltante td { background:#fdecea; }
   <thead><tr><th>Producto</th><th class="num">Precio</th><th class="num">Cantidad</th><th class="num">Mínima</th><th class="num">Conteo físico</th><th class="num">Diferencia</th><th>Estado</th><th></th></tr></thead>
   <tbody id="body"></tbody>
 </table></div>
-<div style="padding:0 32px 20px;" class="msg">💡 “Cantidad” = stock esperado. Ingrese el <b>conteo físico</b> para detectar faltantes; al guardar, el conteo reemplaza la cantidad. Productos bajo el mínimo se marcan en naranja.</div>
+<div style="padding:0 32px 20px;" class="msg" id="hintTabla">💡 “Cantidad” = stock esperado. Ingrese el <b>conteo físico</b> para detectar faltantes; al guardar, el conteo reemplaza la cantidad. Productos bajo el mínimo se marcan en naranja.</div>
 
 <div class="section"><div class="section-title">🚚 Envíos de mercadería</div></div>
 <div class="tbl-wrap"><table class="tbl">
@@ -125,16 +126,38 @@ tr.bajo td { background:#fff8e1; } tr.faltante td { background:#fdecea; }
   </div>
 </div>
 
+<script src="/sesion.js"></script>
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-let currentToken=null,currentRole=null,currentSede=null,currentEmail='';
+let currentToken=null,currentRole=null,currentSede=null,currentEmail='',currentSedesExtra=[];
+
+/* ── Sesión: renovación silenciosa + cierre por inactividad (ver sesion.js) ── */
+Sesion.init({ url: SUPA_URL, key: SUPA_KEY, idleMin: 30,
+  onToken: function (t) { currentToken = t; },
+  onExpira: function (m) { _sesionExpirada(m); } });
+function _sesionExpirada(motivo) {
+  var msg = motivo === 'inactividad' ? 'Su sesión se cerró por 30 minutos de inactividad. Vuelva a entrar.'
+          : motivo === 'cerrada'     ? 'La sesión se cerró en otra pestaña.'
+          :                            'Su sesión expiró. Vuelva a entrar.';
+  try { doLogout(true); } catch (_) {}
+  var e = document.getElementById('loginError'); if (e) e.textContent = msg;
+}
 async function supaFetch(path,opts={}){
   const token=currentToken||SUPA_KEY;
   const res=await fetch(SUPA_URL+'/rest/v1'+path,{method:opts.method||'GET',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':opts.prefer||'return=minimal',...(opts.headers||{})},body:opts.body!=null?JSON.stringify(opts.body):undefined});
+  if(res.status===401&&!opts._retry&&await Sesion.renovar())return supaFetch(path,{...opts,_retry:true});
   if(!res.ok){const t=await res.text();throw new Error(t);} const txt=await res.text(); return txt?JSON.parse(txt):null;
 }
-const ROLES_PERMITIDOS=['admin','admin_sedes','admin_g'];
+const ROLES_PERMITIDOS=['admin','admin_sedes','admin_g','coordinador'];
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
+// El coordinador SOLO consulta: no edita, no agrega, no borra, no envía mercadería.
+const soloLectura=()=>currentRole==='coordinador';
+// Sedes que puede consultar: admins todas; coordinador sin sede asignada todas, con sede solo la suya (+ extras).
+function sedesDisponibles(){
+  if(!soloLectura()||!currentSede) return SEDES;
+  const set=[currentSede,...(Array.isArray(currentSedesExtra)?currentSedesExtra:[])].filter(s=>SEDES.includes(s));
+  return [...new Set(set)];
+}
 const SEDE_META={'3 Ríos':{icon:'🌊'},'Natación':{icon:'🏊'},'Pinares':{icon:'🌲'},'Sabanilla':{icon:'🏙️'}};
 const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -148,28 +171,38 @@ async function doLogin(){
   try{
     const res=await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password:pwd})});
     const data=await res.json(); if(!data.access_token)throw new Error(data.error_description||data.msg||'Credenciales incorrectas');
-    currentToken=data.access_token;currentEmail=email;
-    const roles=await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede`);
+    currentToken=data.access_token; Sesion.set(data);currentEmail=email;
+    const roles=await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede,sedes_extra`);
     currentRole=roles?.[0]?.role||null;currentSede=roles?.[0]?.sede||null;
-    if(!ROLES_PERMITIDOS.includes(currentRole)){errEl.textContent='Solo administradores tienen acceso al inventario.';await doLogout(true);return;}
+    currentSedesExtra=Array.isArray(roles?.[0]?.sedes_extra)?roles[0].sedes_extra:[];
+    if(!ROLES_PERMITIDOS.includes(currentRole)){errEl.textContent='Su cuenta no tiene acceso al inventario.';await doLogout(true);return;}
     document.getElementById('userNombre').textContent=roles?.[0]?.nombre||email;
     document.getElementById('loginScreen').style.display='none'; init();
   }catch(e){errEl.textContent=e.message;}finally{btn.textContent='Entrar';btn.disabled=false;}
 }
 document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 (function(){try{const auth=JSON.parse(sessionStorage.getItem('gymAuth')||'null');
-  if(auth?.token&&ROLES_PERMITIDOS.includes(auth.role)){sessionStorage.removeItem('gymAuth');currentToken=auth.token;currentRole=auth.role;currentSede=auth.sede||null;currentEmail=auth.email||'';
+  if(auth?.token&&ROLES_PERMITIDOS.includes(auth.role)){sessionStorage.removeItem('gymAuth');currentToken=auth.token; Sesion.adoptar(auth);currentRole=auth.role;currentSede=auth.sede||null;currentEmail=auth.email||'';currentSedesExtra=Array.isArray(auth.sedes_extra)?auth.sedes_extra:[];
     document.getElementById('userNombre').textContent=auth.nombre||'—';document.getElementById('loginScreen').style.display='none';setTimeout(init,0);}}catch(_){}})();
-async function doLogout(silent){try{await fetch(`${SUPA_URL}/auth/v1/logout`,{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}});}catch(_){}
-  currentToken=null;currentRole=null;currentSede=null;currentEmail='';
+async function doLogout(silent){ Sesion.cerrar();try{await fetch(`${SUPA_URL}/auth/v1/logout`,{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}});}catch(_){}
+  currentToken=null;currentRole=null;currentSede=null;currentEmail='';currentSedesExtra=[];
   if(!silent){document.getElementById('loginEmail').value='';document.getElementById('loginPassword').value='';}document.getElementById('loginScreen').style.display='flex';}
 
 function init(){
-  if(!currentSede)currentSede=SEDES[0];
+  const opciones=sedesDisponibles();
+  if(!currentSede||!opciones.includes(currentSede))currentSede=opciones[0];
   const sel=document.getElementById('sedeSel');
-  sel.innerHTML=SEDES.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
+  sel.innerHTML=opciones.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
   sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;load();};
   document.getElementById('sedeTitle').textContent='· '+currentSede;
+  // Coordinador: se ocultan todos los controles de escritura y se marca la vista como consulta
+  if(soloLectura()){
+    const tc=document.getElementById('topbarControls'); if(tc)tc.style.display='none';
+    const b=document.getElementById('roBadge'); if(b)b.style.display='';
+    const h=document.getElementById('hintTabla');
+    if(h)h.innerHTML='👁 Vista de <b>solo consulta</b>: “Cantidad” es el stock actual del sistema. Los productos bajo el mínimo se marcan en naranja.';
+    const kf=document.getElementById('kFalt'); if(kf&&kf.parentElement)kf.parentElement.style.display='none';
+  }
   load();
 }
 async function load(){
@@ -195,11 +228,12 @@ function renderEnvios(){
     const recibido=e.estado==='aceptado'?(e.items||[]).map(it=>`${esc(it.producto)}: ${it.recibido==null?'—':it.recibido}`).join(', '):'—';
     const badge=e.estado==='aceptado'?'<span class="pill ok">aceptado</span>':'<span class="pill low" style="background:#fff3e0;color:#e65100;">pendiente</span>';
     // Solo se puede eliminar un envío que AÚN NO fue aceptado (por si se creó por error/confusión).
-    const acciones=e.estado==='aceptado'?'':`<button class="btn-del" title="Eliminar envío pendiente" onclick="eliminarEnvio('${e.id}')">🗑</button>`;
+    const acciones=(e.estado==='aceptado'||soloLectura())?'':`<button class="btn-del" title="Eliminar envío pendiente" onclick="eliminarEnvio('${e.id}')">🗑</button>`;
     return `<tr><td>${new Date(e.created_at).toLocaleDateString('es-CR')}</td><td style="font-size:12px;max-width:300px;">${prods}</td><td>${badge}</td><td style="font-size:12px;">${recibido}${e.nota?'<br><span style="color:var(--warn);">'+esc(e.nota)+'</span>':''}</td><td style="text-align:right;">${acciones}</td></tr>`;
   }).join('');
 }
 async function eliminarEnvio(id){
+  if(soloLectura())return;
   const e=envios.find(x=>x.id===id);
   if(!e) return;
   if(e.estado==='aceptado'){ alert('Este envío ya fue aceptado por recepción y no se puede eliminar.'); return; }
@@ -213,6 +247,7 @@ async function eliminarEnvio(id){
   }catch(err){ alert('No se pudo eliminar: '+err.message); }
 }
 function openEnvioModal(){
+  if(soloLectura())return;
   document.getElementById('envioSedeLbl').textContent='· '+currentSede;
   const prods=items.filter(it=>!it._del&&(it.producto||'').trim());
   document.getElementById('envioList').innerHTML = prods.length ? prods.map((p,i)=>`
@@ -225,6 +260,7 @@ function openEnvioModal(){
   document.getElementById('envioModal').style.display='flex';
 }
 async function crearEnvio(){
+  if(soloLectura())return;
   const err=document.getElementById('envioErr');
   const inputs=[...document.querySelectorAll('#envioList input[id^="env_"]')];
   const arr=inputs.map(inp=>({producto:inp.getAttribute('data-prod'),enviado:Number(inp.value)||0,recibido:null})).filter(x=>x.enviado>0);
@@ -254,8 +290,20 @@ function render(){
   const q=(document.getElementById('buscar').value||'').toLowerCase();
   const vis=items.filter(it=>!it._del && (!q || (it.producto||'').toLowerCase().includes(q)));
   const tb=document.getElementById('body');
+  const ro=soloLectura();
   tb.innerHTML = vis.length ? vis.map(it=>{ const i=items.indexOf(it); const e=estadoDe(it);
-    return `<tr class="${e.cls}">
+    return ro
+    ? `<tr class="${e.cls}">
+      <td>${esc(it.producto)}</td>
+      <td class="num">${fmt(it.precio||0)}</td>
+      <td class="num" style="font-weight:700;">${Number(it.cantidad)||0}</td>
+      <td class="num">${Number(it.cantidad_minima)||0}</td>
+      <td class="num" style="color:var(--muted);">—</td>
+      <td class="num" style="color:var(--muted);">—</td>
+      <td><span class="pill ${e.pill}">${e.txt}</span></td>
+      <td></td>
+    </tr>`
+    : `<tr class="${e.cls}">
       <td><input class="prod" value="${esc(it.producto)}" oninput="items[${i}].producto=this.value;items[${i}]._mod=true"></td>
       <td class="num"><input type="number" step="1" value="${it.precio??0}" oninput="items[${i}].precio=this.value;items[${i}]._mod=true;render()"></td>
       <td class="num"><input type="number" step="1" value="${it.cantidad??0}" oninput="items[${i}].cantidad=this.value;items[${i}]._mod=true;render()"></td>
@@ -265,7 +313,7 @@ function render(){
       <td><span class="pill ${e.pill}">${e.txt}</span></td>
       <td><button class="btn-del" onclick="items[${i}]._del=true;render()">🗑</button></td>
     </tr>`; }).join('')
-    : '<tr><td colspan="8" style="padding:16px;color:var(--muted);">Sin productos. Cargue un Excel o agregue con “＋ Producto”.</td></tr>';
+    : `<tr><td colspan="8" style="padding:16px;color:var(--muted);">${ro?'Esta sede no tiene productos en inventario.':'Sin productos. Cargue un Excel o agregue con “＋ Producto”.'}</td></tr>`;
   // KPIs
   const activos=items.filter(it=>!it._del);
   document.getElementById('kProd').textContent=activos.length;
@@ -274,9 +322,10 @@ function render(){
   document.getElementById('kBajo').textContent=activos.filter(it=>(Number(it.cantidad)||0)<(Number(it.cantidad_minima)||0)).length;
   document.getElementById('kFalt').textContent=activos.filter(it=>{const c=it.conteo===''||it.conteo==null?null:Number(it.conteo);return c!=null&&c<(Number(it.cantidad)||0);}).length;
 }
-function addProducto(){ items.unshift({producto:'',precio:0,cantidad:0,cantidad_minima:0,moneda:'CRC',conteo:'',_nuevo:true,_mod:true,_del:false}); render(); }
+function addProducto(){ if(soloLectura())return; items.unshift({producto:'',precio:0,cantidad:0,cantidad_minima:0,moneda:'CRC',conteo:'',_nuevo:true,_mod:true,_del:false}); render(); }
 
 function cargarExcel(file){
+  if(soloLectura())return;
   const reader=new FileReader();
   reader.onload=e=>{ try{
     const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
@@ -302,6 +351,7 @@ function cargarExcel(file){
 }
 
 async function guardarConteo(){
+  if(soloLectura())return;
   const msg=document.getElementById('msg');
   // Aplicar conteo físico → cantidad
   items.forEach(it=>{ if(it.conteo!==''&&it.conteo!=null){ if(Number(it.conteo)!==Number(it.cantidad)){ it.cantidad=Number(it.conteo); it._mod=true; } it.conteo=''; } });

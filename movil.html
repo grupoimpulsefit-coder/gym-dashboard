@@ -756,7 +756,7 @@ async function enviarMercaderia(){
 }
 
 // ── Salto a los módulos completos (misma sesión, vía handoff gymAuth como index.html) ──
-function handoff(sede){ sessionStorage.setItem('gymAuth',JSON.stringify({token:auth.access_token,role:me.role,nombre:me.nombre||auth.email,email:auth.email,sede:sede||me.sede||null,sedes_extra:me.sedes_extra||[],user_id:auth.user_id})); }
+function handoff(sede){ sessionStorage.setItem('gymAuth',JSON.stringify({token:auth.access_token,refresh_token:auth.refresh_token||null,exp:auth.expires_at||0,role:me.role,nombre:me.nombre||auth.email,email:auth.email,sede:sede||me.sede||null,sedes_extra:me.sedes_extra||[],user_id:auth.user_id})); }
 function abrirCaja(){ handoff(detSede||me.sede); location.href='/caja?from=movil'; }   // caja.html muestra "← App móvil" con este parámetro
 
 // ── Cuenta ──

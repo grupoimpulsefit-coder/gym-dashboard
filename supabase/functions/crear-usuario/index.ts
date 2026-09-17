@@ -21,7 +21,7 @@ const CORS = {
 };
 
 const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
-const ROLES = ['recepcion', 'admin_sucursal', 'instructor', 'colaborador', 'admin_sedes', 'admin', 'empleado'];
+const ROLES = ['recepcion', 'admin_sucursal', 'instructor', 'coordinador', 'colaborador', 'admin_sedes', 'admin', 'empleado'];
 const ROLES_CON_SEDE = ['recepcion', 'admin_sucursal', 'instructor', 'empleado'];
 
 function json(obj: unknown, status = 200) {
