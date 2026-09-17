@@ -426,6 +426,9 @@ function resolverOtro(raw){
 }
 const MESES_ES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(currentRole);
+// Quién ve la cantidad REAL del sistema en los conteos de inventario (apertura y cierre).
+// Recepción cuenta a ciegas: solo ve su conteo y si difiere. Admins y coordinador ven el número real.
+const verInventarioReal=()=>esAdmin()||currentRole==='coordinador';
 const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function parseFecha(s){const[y,m,d]=String(s).split('-').map(Number);return new Date(y,m-1,d);}
@@ -612,7 +615,7 @@ async function abrirTurno(){
   const btn=document.getElementById('btnConfirmarApertura'); btn.disabled=true; btn.textContent='Abriendo...';
   try{
     inv.forEach((p,i)=>{ const raw=document.getElementById('ainv_'+i).value; const contado=raw===''?null:(Number(raw)||0); const sistema=Number(p.cantidad)||0;
-      conteo[p.producto]={contado,sistema}; if(contado!=null && contado!==sistema) discrep.push(esAdmin()?`${p.producto}: contó ${contado} vs sistema ${sistema}`:`${p.producto} (contaste ${contado})`); });
+      conteo[p.producto]={contado,sistema}; if(contado!=null && contado!==sistema) discrep.push(verInventarioReal()?`${p.producto}: contó ${contado} vs sistema ${sistema}`:`${p.producto} (contaste ${contado})`); });
     const rec={ sede:currentSede, fecha:todayStr(), turno:'Turno '+window._turnoNum, turno_num:window._turnoNum, estado:'abierto', hora_apertura:new Date().toISOString(), caja_inicial:efectivo, denominaciones_apertura:denom, inventario_apertura:conteo, created_by:currentEmail||null };
     await supaFetch('/cierres_caja',{method:'POST',body:rec});
     document.getElementById('abrirModal').style.display='none';
@@ -1045,7 +1048,7 @@ function renderAperturaInv(t){
   const card=document.getElementById('aperturaInvCard'), box=document.getElementById('aperturaInvBody');
   const inv=t&&t.inventario_apertura; const keys=inv?Object.keys(inv):[];
   if(!keys.length){ card.style.display='none'; box.innerHTML=''; return; }
-  const showReal=esAdmin();   // solo admin/admin_sedes/admin_g ven la cantidad del sistema
+  const showReal=verInventarioReal();   // admins y coordinador ven la cantidad del sistema
   let difs=0;
   const rows=keys.map(prod=>{ const o=inv[prod]||{}; const contado=o.contado;
     const dif=(contado!=null && Number(contado)!==Number(o.sistema)); if(dif)difs++;
@@ -1093,7 +1096,7 @@ function renderConteoCierreResumen(){
   const box=document.getElementById('conteoCierreResumen'); const inv=inventarioCierre; const keys=inv?Object.keys(inv):[];
   const conCont=keys.filter(k=>inv[k].contado!=null);
   if(!conCont.length){ box.innerHTML=''; return; }
-  const showReal=esAdmin(); let difs=0;
+  const showReal=verInventarioReal(); let difs=0;
   const rows=conCont.map(prod=>{ const o=inv[prod]||{}; const dif=(o.contado!=null && Number(o.contado)!==Number(o.sistema)); if(dif)difs++;
     const right = showReal
       ? `contó <b>${o.contado}</b> · sistema <b>${o.sistema}</b>${dif?` <span style="color:#b91c1c;">(dif ${Math.abs(Number(o.contado)-Number(o.sistema))})</span>`:''}`

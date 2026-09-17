@@ -187,7 +187,7 @@ const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
 const APP_VER='2026-09-10f';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
-const ROLES_PERMITIDOS=['recepcion','admin_sucursal','admin_sedes','admin_g','admin'];
+const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
 const AUTH_KEY='impulseMovilAuth';
 const MESES_ES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const CAT_GASTO={clases_grupales:'Clases grupales',instructores_planta:'Instructores de planta',parqueo:'Parqueo',mantenimiento:'Mantenimiento',otros:'Otros'};
@@ -234,6 +234,8 @@ let cierres=[], ultimosFinales=[], invCache={}, invFiltro='';
 let view='sedes', curMod=null, detSede=null, detTurnoId=null, pollTimer=null, navStack=[];
 const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(me?.role);
 const puedeArquear=()=>esAdmin()||me?.role==='admin_sucursal';
+// Recepción cuenta a ciegas; admins y coordinador ven la cantidad real del sistema.
+const verInventarioReal=()=>esAdmin()||me?.role==='coordinador';
 let arq={rows:[],items:{},filtro:'',soloDif:false,saved:null}, arqVerId=null;
 let audit={seg:'finales',rango:7,soloAlertas:false,rows:[]};
 
@@ -439,7 +441,7 @@ async function renderCaja(showLoading){
   if(!invKeys.length) invHtml=`<div class="cell"><div class="main"><span class="t">Sin conteo de inventario</span><span class="s">Obligatorio en cada cierre</span></div><span class="pill ${c.estado==='abierto'?'status':'warn'}">${c.estado==='abierto'?'Aún no':'Falta'}</span></div>`;
   else if(!invDifs.length) invHtml=`<div class="cell"><div class="main"><span class="t">Conteo coincide con el sistema</span><span class="s">${invKeys.length} productos contados</span></div><span class="pill ok">✓ Cuadra</span></div>`;
   else invHtml=`<div class="cell"><div class="main"><span class="t">${invDifs.length} producto(s) con diferencia</span><span class="s">${invKeys.length} contados</span></div><span class="pill bad">Revisar</span></div>`+
-    (esAdmin()?invDifs.slice(0,12).map(k=>`<div class="cell"><div class="main"><span class="t">${esc(k)}</span></div><span class="v num">contó ${inv[k].contado} · sistema ${inv[k].sistema}</span></div>`).join(''):`<div class="cell"><span class="s">Solo un administrador ve las cantidades del sistema.</span></div>`);
+    (verInventarioReal()?invDifs.slice(0,12).map(k=>`<div class="cell"><div class="main"><span class="t">${esc(k)}</span></div><span class="v num">contó ${inv[k].contado} · sistema ${inv[k].sistema}</span></div>`).join(''):`<div class="cell"><span class="s">Solo un administrador ve las cantidades del sistema.</span></div>`);
   const fa=c.foto_analisis||null;
   const reqs=[{ok:!!(c.foto_datafono||c.foto_cierre),t:'Foto datáfono'},{ok:estadoDatafono(c).k==='ok',t:'Datáfono verificado'},{ok:!!invKeys.length,t:'Conteo inventario'},{ok:!!sr,t:'Reporte SINPE'},{ok:c.total_tarjeta!=null&&c.total_sinpe!=null,t:'Informe de Ventas'}];
   v.innerHTML=`
