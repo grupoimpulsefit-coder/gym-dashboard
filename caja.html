@@ -384,7 +384,7 @@ async function supaFetch(path,opts={}){
   if(res.status===401&&!opts._retry&&await Sesion.renovar())return supaFetch(path,{...opts,_retry:true});
   if(!res.ok){const t=await res.text();throw new Error(t);} const txt=await res.text(); return txt?JSON.parse(txt):null;
 }
-const ROLES_PERMITIDOS=['recepcion','admin_sucursal','admin_sedes','admin_g','admin'];
+const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_META={'3 Ríos':{icon:'🌊'},'Natación':{icon:'🏊'},'Pinares':{icon:'🌲'},'Sabanilla':{icon:'🏙️'}};
 const DENOMS=[20000,10000,5000,2000,1000,500,100,50,25,10,5];
@@ -449,7 +449,7 @@ async function doLogin(){
     const roles=await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede,sedes_extra`);
     currentRole=roles?.[0]?.role||null;currentSede=roles?.[0]?.sede||null;currentSedes=computeSedes(currentSede,roles?.[0]?.sedes_extra);
     if(!ROLES_PERMITIDOS.includes(currentRole)){errEl.textContent='Su cuenta no tiene acceso a este módulo.';await doLogout(true);return;}
-    if((currentRole==='recepcion'||currentRole==='admin_sucursal')&&!currentSede){errEl.textContent='Su cuenta no tiene sede asignada.';await doLogout(true);return;}
+    if(['recepcion','admin_sucursal','coordinador'].includes(currentRole)&&!currentSede){errEl.textContent='Su cuenta no tiene sede asignada. Pídale al administrador que le asigne una.';await doLogout(true);return;}
     document.getElementById('userNombre').textContent=roles?.[0]?.nombre||email;
     document.getElementById('loginScreen').style.display='none'; init();
   }catch(e){errEl.textContent=e.message;}finally{btn.textContent='Entrar';btn.disabled=false;}
@@ -537,6 +537,8 @@ function checkTurno(){
   turnoActual=cierres.find(c=>c.estado==='abierto')||null;
   updateTurnoUI();
   // Recepción no ve el módulo hasta abrir la caja
+  // Solo recepción queda bloqueada sin turno abierto. Coordinador y admin de sucursal
+  // entran siempre, para poder consultar los cierres anteriores con la caja cerrada.
   const gated = !turnoActual && currentRole==='recepcion';
   document.getElementById('gate').style.display = gated?'block':'none';
   document.getElementById('app').style.display = gated?'none':'block';

@@ -611,7 +611,7 @@
                     <option value="recepcion">🧾 Recepción (una sede)</option>
                     <option value="admin_sucursal">🏪 Admin de sucursal (una sede)</option>
                     <option value="instructor">🏋️ Instructor (una sede · solo mediciones)</option>
-                    <option value="coordinador">👁 Coordinador (solo consultar inventario)</option>
+                    <option value="coordinador">🧭 Coordinador (una sede · recepción + inventario)</option>
                     <option value="colaborador">👁 Colaborador</option>
                     <option value="admin_sedes">🏢 Admin Sedes</option>
                     <option value="admin">⚙ Admin</option>
@@ -804,7 +804,7 @@ async function doLogin() {
             currentRole === 'admin_g' ? '💰 Admin Gastos' :
             currentRole === 'admin_sucursal' ? '🏪 Admin Sucursal' :
             currentRole === 'instructor' ? '🏋️ Instructor' :
-            currentRole === 'coordinador' ? '👁 Coordinador' :
+            currentRole === 'coordinador' ? '🧭 Coordinador' :
             currentRole === 'empleado' ? '👤 Empleado' : '👁 Colaborador';
         applyRole();
         document.getElementById('loginScreen').style.display = 'none';
@@ -1021,9 +1021,12 @@ async function showSedePicker() {
         return;
     }
 
-    // Coordinador: solo consulta del inventario (no edita nada)
+    // Coordinador: lo mismo que recepción + consulta del inventario
     if (currentRole === 'coordinador') {
-        statusEl.textContent = 'Su módulo' + (currentSede ? ` (${currentSede})` : ' (todas las sedes)') + ':';
+        statusEl.textContent = 'Módulos disponibles para su sede' + (currentSede ? ` (${currentSede})` : '') + ':';
+        cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
+        cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
+        cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agendar citas','Agenda semanal cada 15 minutos','#e8f4fd','#1a5276','/mediciones'));
         cardsEl.appendChild(makeHandoffCard('📦','Inventario','Consultar stock','Solo lectura: productos, precios y faltantes','#fff8e1','#b9770e','/inventario'));
         return;
     }

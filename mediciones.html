@@ -180,7 +180,7 @@ td.pasado .cell{opacity:.62;}
 <script src="/sesion.js"></script>
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const ROLES_PERMITIDOS=['recepcion','admin_sucursal','instructor','admin_sedes','admin_g','admin'];
+const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','instructor','admin_sedes','admin_g','admin'];
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_META={'3 Ríos':{icon:'🌊'},'Natación':{icon:'🏊'},'Pinares':{icon:'🌲'},'Sabanilla':{icon:'🏙️'}};
 const DIAS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
@@ -217,7 +217,7 @@ function diaDe(i){const d=new Date(lunes);d.setDate(d.getDate()+i);return d;}
 const fechaCorta=d=>d.toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit'});
 const normHora=h=>String(h||'').slice(0,5);
 const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(currentRole);
-const puedeAgendar=()=>esAdmin()||['recepcion','admin_sucursal'].includes(currentRole);
+const puedeAgendar=()=>esAdmin()||['recepcion','admin_sucursal','coordinador'].includes(currentRole);
 const puedeRutina=()=>esAdmin()||currentRole==='instructor';
 function computeSedes(sede,extra){const set=[];[sede,...(Array.isArray(extra)?extra:[])].forEach(s=>{if(s&&SEDES.includes(s)&&!set.includes(s))set.push(s);});return set;}
 function aviso(txt,ok){const m=document.getElementById('msg');m.className='msg '+(ok?'ok':'err');m.textContent=txt;clearTimeout(m._h);m._h=setTimeout(()=>{m.className='msg';},4500);}
@@ -245,7 +245,7 @@ async function doLogin(){
     currentRole=roles?.[0]?.role||null; currentSede=roles?.[0]?.sede||null; currentNombre=roles?.[0]?.nombre||email;
     currentSedes=computeSedes(currentSede,roles?.[0]?.sedes_extra);
     if(!ROLES_PERMITIDOS.includes(currentRole)){errEl.textContent='Su cuenta no tiene acceso a este módulo.';await doLogout(true);return;}
-    if(['recepcion','admin_sucursal','instructor'].includes(currentRole)&&!currentSede){errEl.textContent='Su cuenta no tiene sede asignada.';await doLogout(true);return;}
+    if(['recepcion','admin_sucursal','coordinador','instructor'].includes(currentRole)&&!currentSede){errEl.textContent='Su cuenta no tiene sede asignada.';await doLogout(true);return;}
     document.getElementById('loginScreen').style.display='none'; init();
   }catch(e){errEl.textContent=e.message;}finally{btn.textContent='Entrar';btn.disabled=false;}
 }

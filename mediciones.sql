@@ -96,7 +96,7 @@ create policy mediciones_select on mediciones
   for select to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid()
     and (ur.role in ('admin','admin_sedes','admin_g')
-         or (ur.role in ('recepcion','admin_sucursal','instructor')
+         or (ur.role in ('recepcion','admin_sucursal','coordinador','instructor')
              and (ur.sede = mediciones.sede or mediciones.sede = any(ur.sedes_extra))))));
 
 -- Agendar: admins + recepción + admin de sucursal (el instructor NO agenda)
@@ -105,7 +105,7 @@ create policy mediciones_insert on mediciones
   for insert to authenticated
   with check (exists (select 1 from user_roles ur where ur.id = auth.uid()
     and (ur.role in ('admin','admin_sedes','admin_g')
-         or (ur.role in ('recepcion','admin_sucursal')
+         or (ur.role in ('recepcion','admin_sucursal','coordinador')
              and (ur.sede = mediciones.sede or mediciones.sede = any(ur.sedes_extra))))));
 
 -- Editar: también el instructor, pero el trigger lo limita a la rutina
@@ -114,11 +114,11 @@ create policy mediciones_update on mediciones
   for update to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid()
     and (ur.role in ('admin','admin_sedes','admin_g')
-         or (ur.role in ('recepcion','admin_sucursal','instructor')
+         or (ur.role in ('recepcion','admin_sucursal','coordinador','instructor')
              and (ur.sede = mediciones.sede or mediciones.sede = any(ur.sedes_extra))))))
   with check (exists (select 1 from user_roles ur where ur.id = auth.uid()
     and (ur.role in ('admin','admin_sedes','admin_g')
-         or (ur.role in ('recepcion','admin_sucursal','instructor')
+         or (ur.role in ('recepcion','admin_sucursal','coordinador','instructor')
              and (ur.sede = mediciones.sede or mediciones.sede = any(ur.sedes_extra))))));
 
 -- Borrar: admins + recepción + admin de sucursal (el instructor NO borra)
@@ -127,5 +127,5 @@ create policy mediciones_delete on mediciones
   for delete to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid()
     and (ur.role in ('admin','admin_sedes','admin_g')
-         or (ur.role in ('recepcion','admin_sucursal')
+         or (ur.role in ('recepcion','admin_sucursal','coordinador')
              and (ur.sede = mediciones.sede or mediciones.sede = any(ur.sedes_extra))))));
