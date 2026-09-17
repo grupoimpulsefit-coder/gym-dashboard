@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mediciones por Sede</title>
+<style>
+:root{
+  --primary:#1a5276; --primary-light:#2e86c1; --accent:#148f77; --accent2:#e67e22;
+  --bg:#f0f4f8; --border:#d5dce8; --text:#1c2833; --muted:#6c757d;
+  --warn:#c0392b; --success:#27ae60; --pend:#8e8e93;
+  --am:#2e86c1; --pm:#8e44ad;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px;}
+button{font-family:inherit;}
+
+/* ── Login ── */
+#loginScreen{position:fixed;inset:0;background:linear-gradient(135deg,#0f0c29 0%,#302b63 50%,#24243e 100%);display:flex;align-items:center;justify-content:center;z-index:9999;}
+.login-card{background:white;border-radius:24px;padding:40px 44px;width:100%;max-width:420px;box-shadow:0 32px 80px rgba(0,0,0,.5);}
+.login-logo{width:64px;height:64px;background:linear-gradient(135deg,#1a5276,#2e86c1);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:30px;margin:0 auto 20px;}
+.login-card h2{text-align:center;font-size:1.4em;font-weight:800;color:#2d2d5e;margin-bottom:6px;}
+.login-card .login-sub{text-align:center;font-size:.85em;color:#888;margin-bottom:28px;}
+.login-field{margin-bottom:16px;}
+.login-field label{display:block;font-size:.8em;font-weight:700;color:#444;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
+.login-field input{width:100%;padding:11px 14px;border:1.5px solid #dde1f0;border-radius:10px;font-size:14px;font-family:inherit;color:#333;}
+.login-field input:focus{outline:none;border-color:#2e86c1;box-shadow:0 0 0 3px rgba(46,134,193,.15);}
+.login-btn{width:100%;padding:13px;background:linear-gradient(135deg,#1a5276,#2e86c1);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;}
+.login-btn:disabled{opacity:.6;cursor:not-allowed;}
+.login-err{color:#c0392b;font-size:13px;min-height:18px;text-align:center;margin-top:10px;}
+
+/* ── Header / topbar ── */
+.header{background:linear-gradient(135deg,#1a5276,#2e86c1);color:white;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.header h1{font-size:1.2em;font-weight:800;}
+.header-right{display:flex;align-items:center;gap:14px;font-size:.9em;}
+.logout-btn{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);color:white;border-radius:16px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;}
+.topbar{background:white;border-bottom:1px solid var(--border);padding:12px 32px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.dash-title{font-size:15px;font-weight:700;color:var(--primary);}
+.sede-lock{background:#eef3fa;border:1.5px solid var(--border);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--primary);}
+select,input[type=text],input[type=tel],input[type=date]{padding:8px 11px;border:1.5px solid var(--border);border-radius:9px;font-size:14px;font-family:inherit;color:var(--text);background:white;}
+.btn{border:1.5px solid var(--border);background:white;color:var(--text);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;}
+.btn:hover{border-color:var(--primary-light);}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:white;}
+.btn-primary:hover{background:var(--primary-light);}
+.btn-danger{background:#fdecec;border-color:#f5c6c6;color:var(--warn);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.spacer{margin-left:auto;}
+.week-nav{display:flex;align-items:center;gap:8px;}
+.week-label{font-weight:700;color:var(--primary);min-width:210px;text-align:center;}
+
+/* ── KPIs ── */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;padding:18px 32px 4px;}
+.kpi{background:white;border:1px solid var(--border);border-radius:14px;padding:14px 16px;}
+.kpi .l{font-size:12px;color:var(--muted);font-weight:600;}
+.kpi .n{font-size:24px;font-weight:800;margin-top:2px;}
+
+/* ── Grid semanal ── */
+.grid-wrap{margin:18px 32px 40px;background:white;border:1px solid var(--border);border-radius:14px;overflow:auto;max-height:calc(100vh - 260px);}
+table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:900px;}
+table.grid th,table.grid td{border-bottom:1px solid #eef1f6;border-right:1px solid #eef1f6;padding:0;}
+table.grid thead th{position:sticky;top:0;z-index:3;background:#f7f9fc;padding:10px 8px;font-size:12px;font-weight:700;color:var(--primary);text-align:center;}
+table.grid thead th small{display:block;font-weight:600;color:var(--muted);font-size:11px;}
+table.grid thead th.hoy{background:#e8f4fd;}
+td.h,th.h{position:sticky;left:0;z-index:2;background:#f7f9fc;width:72px;min-width:72px;text-align:center;font-size:12px;font-weight:700;color:var(--muted);padding:6px 4px;}
+thead th.h{z-index:4;}
+tr.blk td{background:#eef3fa;color:var(--primary);font-weight:800;font-size:12px;letter-spacing:.4px;padding:6px 12px;position:sticky;left:0;}
+td.slot{padding:3px;}
+.cell{width:100%;min-height:38px;border-radius:8px;border:1.5px dashed #e3e8f0;background:#fcfdff;color:#c3cbd8;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s;}
+.cell:hover{border-color:var(--primary-light);color:var(--primary-light);background:#f4faff;}
+.cell.taken{border-style:solid;cursor:pointer;display:block;text-align:left;padding:5px 8px;font-size:12px;color:var(--text);}
+.cell.taken .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cell.taken .st{font-size:11px;font-weight:600;margin-top:1px;}
+.cell.pend{background:#f6f7f9;border-color:#d8dde6;}
+.cell.pend .st{color:var(--pend);}
+.cell.completa{background:#eafaf1;border-color:#a9e3c4;}
+.cell.completa .st{color:var(--success);}
+.cell.incompleta{background:#fdecec;border-color:#f3c0c0;}
+.cell.incompleta .st{color:var(--warn);}
+.cell.ro{cursor:default;}
+td.pasado .cell{opacity:.62;}
+.leyenda{display:flex;gap:16px;flex-wrap:wrap;padding:0 32px 26px;font-size:12px;color:var(--muted);align-items:center;}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+
+/* ── Modal ── */
+.modal{display:none;position:fixed;inset:0;background:rgba(15,20,35,.55);z-index:10000;align-items:center;justify-content:center;padding:20px;overflow-y:auto;}
+.modal.open{display:flex;}
+.modal-card{background:white;border-radius:16px;width:100%;max-width:440px;box-shadow:0 32px 80px rgba(0,0,0,.4);overflow:hidden;margin:auto;}
+.modal-head{background:linear-gradient(135deg,#1a5276,#2e86c1);color:white;padding:16px 22px;}
+.modal-head .t{font-size:16px;font-weight:800;}
+.modal-head .s{font-size:12px;opacity:.9;margin-top:2px;}
+.modal-body{padding:18px 22px;display:flex;flex-direction:column;gap:13px;}
+.f label{display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;}
+.f input{width:100%;}
+.info-row{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:7px 0;border-bottom:1px dashed #eef1f6;}
+.info-row .k{color:var(--muted);}
+.info-row .v{font-weight:600;text-align:right;}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:#f1f4f9;border-radius:10px;padding:4px;}
+.seg button{border:0;background:transparent;border-radius:8px;padding:9px 6px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;}
+.seg button.on{background:white;box-shadow:0 1px 4px rgba(0,0,0,.12);}
+.seg button.on[data-v="completa"]{color:var(--success);}
+.seg button.on[data-v="incompleta"]{color:var(--warn);}
+.seg button.on[data-v=""]{color:var(--text);}
+.seg button:disabled{cursor:not-allowed;opacity:.65;}
+.hint{font-size:12px;color:var(--muted);}
+.err{color:var(--warn);font-size:13px;min-height:18px;}
+.modal-foot{padding:14px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);flex-wrap:wrap;}
+.msg{margin:0 32px;padding:10px 14px;border-radius:10px;font-size:13px;display:none;}
+.msg.ok{display:block;background:#eafaf1;color:#1e7a4d;}
+.msg.err{display:block;background:#fdecec;color:var(--warn);}
+@media(max-width:700px){.header,.topbar,.kpis,.grid-wrap,.leyenda{padding-left:14px;padding-right:14px;}.grid-wrap{margin-left:10px;margin-right:10px;}}
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">📏</div>
+    <h2>Mediciones</h2>
+    <div class="login-sub">Agenda semanal por sede</div>
+    <div class="login-field"><label>Correo</label><input type="email" id="loginEmail" autocomplete="username"></div>
+    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" autocomplete="current-password"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div class="login-err" id="loginError"></div>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <div class="header">
+    <h1>📏 Mediciones <span id="sedeTitle"></span></h1>
+    <div class="header-right">
+      <a id="btnVolverApp" class="logout-btn" href="/movil" style="display:none;">← App móvil</a>
+      <span>👤 <span id="userNombre">—</span> <span id="userRol" style="opacity:.8;"></span></span>
+      <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <div class="topbar">
+    <span class="dash-title">🗓️ Semana</span>
+    <span id="sedeControl"></span>
+    <div class="week-nav">
+      <button class="btn" onclick="cambiarSemana(-1)">‹</button>
+      <span class="week-label" id="weekLabel">—</span>
+      <button class="btn" onclick="cambiarSemana(1)">›</button>
+      <button class="btn" onclick="irHoy()">Esta semana</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" onclick="cargar()">↻ Recargar</button>
+    <button class="btn" onclick="imprimirSemana()">🖨️ Imprimir</button>
+  </div>
+
+  <div class="msg" id="msg"></div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="l">Agendadas</div><div class="n" id="kAgend">0</div></div>
+    <div class="kpi"><div class="l">Rutina completa</div><div class="n" id="kComp" style="color:var(--success)">0</div></div>
+    <div class="kpi"><div class="l">Rutina incompleta</div><div class="n" id="kInc" style="color:var(--warn)">0</div></div>
+    <div class="kpi"><div class="l">Pendientes de rutina</div><div class="n" id="kPend" style="color:var(--pend)">0</div></div>
+    <div class="kpi"><div class="l">Espacios libres</div><div class="n" id="kLibres" style="color:var(--muted)">0</div></div>
+  </div>
+
+  <div class="grid-wrap"><table class="grid" id="grid"></table></div>
+
+  <div class="leyenda">
+    <span><span class="dot" style="background:#d8dde6"></span>Pendiente de rutina</span>
+    <span><span class="dot" style="background:#a9e3c4"></span>Rutina completa</span>
+    <span><span class="dot" style="background:#f3c0c0"></span>Rutina incompleta</span>
+    <span id="leyRol"></span>
+  </div>
+</div>
+
+<!-- Modal medición -->
+<div class="modal" id="modal">
+  <div class="modal-card">
+    <div class="modal-head"><div class="t" id="mTitulo">Nueva medición</div><div class="s" id="mSub">—</div></div>
+    <div class="modal-body" id="mBody"></div>
+    <div class="modal-foot" id="mFoot"></div>
+  </div>
+</div>
+
+<script>
+const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
+const ROLES_PERMITIDOS=['recepcion','admin_sucursal','instructor','admin_sedes','admin_g','admin'];
+const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
+const SEDE_META={'3 Ríos':{icon:'🌊'},'Natación':{icon:'🏊'},'Pinares':{icon:'🌲'},'Sabanilla':{icon:'🏙️'}};
+const DIAS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const ROL_LABEL={admin:'⚙ Admin',admin_sedes:'🏢 Admin Sedes',admin_g:'💰 Admin Gastos',recepcion:'🧾 Recepción',admin_sucursal:'🏪 Admin Sucursal',instructor:'🏋️ Instructor'};
+
+// Espacios de 15 min: mañana 08:00→10:45 · tarde 17:00→19:45 (la última es la hora de inicio)
+const SLOTS_AM=[], SLOTS_PM=[];
+for(let m=8*60;  m<=10*60+45; m+=15) SLOTS_AM.push(m);
+for(let m=17*60; m<=19*60+45; m+=15) SLOTS_PM.push(m);
+const SLOTS=[...SLOTS_AM,...SLOTS_PM];
+const hhmm=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+
+let currentToken=null,currentRole=null,currentSede=null,currentEmail='',currentNombre='',currentSedes=[];
+let lunes=lunesDe(new Date()), citas={}, reqSeq=0;
+
+// ── Helpers ──
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const todayStr=()=>ymd(new Date());
+function lunesDe(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);x.setHours(0,0,0,0);return x;}
+function diaDe(i){const d=new Date(lunes);d.setDate(d.getDate()+i);return d;}
+const fechaCorta=d=>d.toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit'});
+const normHora=h=>String(h||'').slice(0,5);
+const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(currentRole);
+const puedeAgendar=()=>esAdmin()||['recepcion','admin_sucursal'].includes(currentRole);
+const puedeRutina=()=>esAdmin()||currentRole==='instructor';
+function computeSedes(sede,extra){const set=[];[sede,...(Array.isArray(extra)?extra:[])].forEach(s=>{if(s&&SEDES.includes(s)&&!set.includes(s))set.push(s);});return set;}
+function aviso(txt,ok){const m=document.getElementById('msg');m.className='msg '+(ok?'ok':'err');m.textContent=txt;clearTimeout(m._h);m._h=setTimeout(()=>{m.className='msg';},4500);}
+
+async function supaFetch(path,opts={}){
+  const res=await fetch(SUPA_URL+'/rest/v1'+path,{method:opts.method||'GET',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+(currentToken||SUPA_KEY),'Content-Type':'application/json','Prefer':opts.prefer||'return=minimal'},
+    body:opts.body!=null?JSON.stringify(opts.body):undefined});
+  if(!res.ok){const t=await res.text();throw new Error(t||('HTTP '+res.status));}
+  const txt=await res.text(); return txt?JSON.parse(txt):null;
+}
+
+// ── Login / sesión ──
+async function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim(),pwd=document.getElementById('loginPassword').value;
+  const btn=document.getElementById('loginBtn'),errEl=document.getElementById('loginError');
+  if(!email||!pwd){errEl.textContent='Complete todos los campos.';return;}
+  btn.textContent='Ingresando...';btn.disabled=true;errEl.textContent='';
+  try{
+    const res=await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password:pwd})});
+    const data=await res.json(); if(!data.access_token)throw new Error(data.error_description||data.msg||'Credenciales incorrectas');
+    currentToken=data.access_token; currentEmail=email;
+    const roles=await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede,sedes_extra`);
+    currentRole=roles?.[0]?.role||null; currentSede=roles?.[0]?.sede||null; currentNombre=roles?.[0]?.nombre||email;
+    currentSedes=computeSedes(currentSede,roles?.[0]?.sedes_extra);
+    if(!ROLES_PERMITIDOS.includes(currentRole)){errEl.textContent='Su cuenta no tiene acceso a este módulo.';await doLogout(true);return;}
+    if(['recepcion','admin_sucursal','instructor'].includes(currentRole)&&!currentSede){errEl.textContent='Su cuenta no tiene sede asignada.';await doLogout(true);return;}
+    document.getElementById('loginScreen').style.display='none'; init();
+  }catch(e){errEl.textContent=e.message;}finally{btn.textContent='Entrar';btn.disabled=false;}
+}
+document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+// Entrada por SSO desde index.html / app móvil
+(function(){try{const auth=JSON.parse(sessionStorage.getItem('gymAuth')||'null');
+  if(auth?.token&&ROLES_PERMITIDOS.includes(auth.role)){
+    sessionStorage.removeItem('gymAuth');
+    currentToken=auth.token;currentRole=auth.role;currentSede=auth.sede||null;currentEmail=auth.email||'';currentNombre=auth.nombre||auth.email||'';
+    currentSedes=computeSedes(currentSede,auth.sedes_extra);
+    document.getElementById('loginScreen').style.display='none';setTimeout(init,0);
+  }}catch(_){}})();
+
+// Volver a la app móvil si se llegó desde ahí (instalada no hay barra de Safari)
+(function(){try{const q=new URLSearchParams(location.search);
+  const sa=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
+  if(q.get('from')==='movil'||sa)sessionStorage.setItem('fromMovil','1');
+  if(sessionStorage.getItem('fromMovil')==='1'){const b=document.getElementById('btnVolverApp');if(b)b.style.display='';}
+}catch(_){}})();
+
+async function doLogout(silent){
+  try{await fetch(`${SUPA_URL}/auth/v1/logout`,{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}});}catch(_){}
+  currentToken=null;currentRole=null;currentSede=null;currentEmail='';
+  document.getElementById('app').style.display='none';
+  if(!silent){document.getElementById('loginEmail').value='';document.getElementById('loginPassword').value='';}
+  document.getElementById('loginScreen').style.display='flex';
+}
+
+// ── Init ──
+function init(){
+  document.getElementById('userNombre').textContent=currentNombre||currentEmail;
+  document.getElementById('userRol').textContent=ROL_LABEL[currentRole]||'';
+  const ctrl=document.getElementById('sedeControl');
+  const opciones=esAdmin()?SEDES:currentSedes;
+  if(esAdmin()||currentSedes.length>1){
+    if(!currentSede)currentSede=opciones[0];
+    ctrl.innerHTML=`<select id="sedeSel"></select>`;
+    const sel=document.getElementById('sedeSel');
+    sel.innerHTML=opciones.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
+    sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;cargar();};
+  }else ctrl.innerHTML=`<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
+  document.getElementById('sedeTitle').textContent='· '+currentSede;
+  document.getElementById('leyRol').textContent = puedeRutina()&&!puedeAgendar()
+    ? 'Como instructor solo podés marcar la rutina de cada medición.'
+    : puedeAgendar()&&!puedeRutina() ? 'La rutina la marca el instructor.' : '';
+  document.getElementById('app').style.display='block';
+  cargar();
+}
+
+function cambiarSemana(n){lunes.setDate(lunes.getDate()+n*7);cargar();}
+function irHoy(){lunes=lunesDe(new Date());cargar();}
+
+// ── Datos ──
+async function cargar(){
+  const seq=++reqSeq;   // si dos cargas se cruzan, solo se pinta la más reciente
+  const desde=ymd(lunes), hastaD=diaDe(6), hasta=ymd(hastaD);
+  document.getElementById('weekLabel').textContent=`${lunes.toLocaleDateString('es-CR',{day:'numeric',month:'short'})} — ${hastaD.toLocaleDateString('es-CR',{day:'numeric',month:'short',year:'numeric'})}`;
+  try{
+    const rows=(await supaFetch(`/mediciones?sede=eq.${encodeURIComponent(currentSede)}&fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.asc,hora.asc&select=*`))||[];
+    if(seq!==reqSeq)return;
+    citas={}; rows.forEach(r=>{citas[r.fecha+'|'+normHora(r.hora)]=r;});
+    render();
+  }catch(e){
+    if(seq!==reqSeq)return;
+    aviso(/mediciones/.test(e.message)&&/relation|exist|schema cache/i.test(e.message)
+      ? 'Falta crear la tabla: corra mediciones.sql en Supabase.' : 'No se pudo cargar: '+e.message);
+    citas={}; render();
+  }
+}
+
+// ── Render del calendario ──
+function render(){
+  const hoy=todayStr();
+  let head='<thead><tr><th class="h">Hora</th>';
+  for(let i=0;i<7;i++){const d=diaDe(i);const f=ymd(d);
+    head+=`<th class="${f===hoy?'hoy':''}">${DIAS[i]}<small>${fechaCorta(d)}${f===hoy?' · hoy':''}</small></th>`;}
+  head+='</tr></thead>';
+
+  const fila=m=>{
+    let tr=`<tr><td class="h">${hhmm(m)}</td>`;
+    for(let i=0;i<7;i++){
+      const d=diaDe(i), f=ymd(d), h=hhmm(m), c=citas[f+'|'+h];
+      const pasado=f<hoy?' pasado':'';
+      if(c){
+        const est=c.rutina||'pend';
+        const lbl=c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':'• Pendiente';
+        tr+=`<td class="slot${pasado}"><div class="cell taken ${est}" onclick="abrir('${f}','${h}')" title="${esc(c.nombre)}">
+              <div class="nm">${esc(c.nombre)}</div><div class="st">${lbl}</div></div></td>`;
+      }else{
+        tr+= puedeAgendar()
+          ? `<td class="slot${pasado}"><div class="cell" onclick="abrir('${f}','${h}')" title="Agendar ${h}">+</div></td>`
+          : `<td class="slot${pasado}"><div class="cell ro">·</div></td>`;
+      }
+    }
+    return tr+'</tr>';
+  };
+
+  let body='<tbody>';
+  body+=`<tr class="blk"><td colspan="8">🌅 MAÑANA · 8:00 a 10:45</td></tr>`;
+  SLOTS_AM.forEach(m=>body+=fila(m));
+  body+=`<tr class="blk"><td colspan="8">🌇 TARDE · 5:00 a 7:45 p. m.</td></tr>`;
+  SLOTS_PM.forEach(m=>body+=fila(m));
+  body+='</tbody>';
+  document.getElementById('grid').innerHTML=head+body;
+
+  const list=Object.values(citas);
+  const comp=list.filter(c=>c.rutina==='completa').length, inc=list.filter(c=>c.rutina==='incompleta').length;
+  document.getElementById('kAgend').textContent=list.length;
+  document.getElementById('kComp').textContent=comp;
+  document.getElementById('kInc').textContent=inc;
+  document.getElementById('kPend').textContent=list.length-comp-inc;
+  document.getElementById('kLibres').textContent=(SLOTS.length*7)-list.length;
+}
+
+// ── Modal ──
+let mFecha=null,mHora=null,mRutina=null;
+function cerrar(){document.getElementById('modal').classList.remove('open');}
+document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')cerrar();});
+
+function abrir(f,h){
+  mFecha=f; mHora=h;
+  const c=citas[f+'|'+h];
+  const d=new Date(f+'T00:00:00');
+  const sub=`${d.toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'})} · ${h} · ${currentSede}`;
+  document.getElementById('mSub').textContent=sub;
+  if(!c){
+    if(!puedeAgendar())return;
+    document.getElementById('mTitulo').textContent='Nueva medición';
+    document.getElementById('mBody').innerHTML=`
+      <div class="f"><label>Nombre *</label><input type="text" id="fNombre" placeholder="Nombre del cliente" autocomplete="off"></div>
+      <div class="f"><label>Número de teléfono</label><input type="tel" id="fTel" placeholder="8888-8888" autocomplete="off"></div>
+      <div class="f"><label>PIN</label><input type="text" id="fPin" placeholder="PIN del cliente" autocomplete="off"></div>
+      <div class="info-row"><span class="k">Agendado por</span><span class="v">${esc(currentNombre||currentEmail)}</span></div>
+      <div class="hint">La rutina (completa / incompleta) la marca el instructor.</div>
+      <div class="err" id="mErr"></div>`;
+    document.getElementById('mFoot').innerHTML=`
+      <button class="btn" onclick="cerrar()">Cancelar</button>
+      <button class="btn btn-primary" id="mSave" onclick="guardarNueva()">Agendar</button>`;
+    setTimeout(()=>document.getElementById('fNombre').focus(),50);
+  }else{
+    mRutina=c.rutina||'';
+    document.getElementById('mTitulo').textContent=esc(c.nombre);
+    const editable=puedeAgendar();
+    document.getElementById('mBody').innerHTML=`
+      ${editable?`
+        <div class="f"><label>Nombre *</label><input type="text" id="fNombre" value="${esc(c.nombre)}"></div>
+        <div class="f"><label>Número de teléfono</label><input type="tel" id="fTel" value="${esc(c.telefono||'')}"></div>
+        <div class="f"><label>PIN</label><input type="text" id="fPin" value="${esc(c.pin||'')}"></div>`
+      :`<div class="info-row"><span class="k">Nombre</span><span class="v">${esc(c.nombre)}</span></div>
+        <div class="info-row"><span class="k">Teléfono</span><span class="v">${esc(c.telefono||'—')}</span></div>
+        <div class="info-row"><span class="k">PIN</span><span class="v">${esc(c.pin||'—')}</span></div>`}
+      <div class="info-row"><span class="k">Agendado por</span><span class="v">${esc(c.agendado_por_nombre||c.agendado_por||'—')}</span></div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:6px;">Rutina ${puedeRutina()?'':'(la marca el instructor)'}</label>
+        <div class="seg" id="segRutina">
+          <button data-v="" onclick="setRutina('')" ${puedeRutina()?'':'disabled'}>Pendiente</button>
+          <button data-v="completa" onclick="setRutina('completa')" ${puedeRutina()?'':'disabled'}>✓ Completa</button>
+          <button data-v="incompleta" onclick="setRutina('incompleta')" ${puedeRutina()?'':'disabled'}>✗ Incompleta</button>
+        </div>
+        ${c.rutina_por?`<div class="hint" style="margin-top:6px;">Marcada por ${esc(c.rutina_por)}${c.rutina_at?' · '+new Date(c.rutina_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</div>`:''}
+      </div>
+      <div class="err" id="mErr"></div>`;
+    pintarSeg();
+    document.getElementById('mFoot').innerHTML=`
+      ${puedeAgendar()?`<button class="btn btn-danger" onclick="borrar('${c.id}')">🗑 Eliminar</button>`:''}
+      <div class="spacer"></div>
+      <button class="btn" onclick="cerrar()">Cerrar</button>
+      ${(editable||puedeRutina())?`<button class="btn btn-primary" id="mSave" onclick="guardarEdicion('${c.id}')">Guardar</button>`:''}`;
+  }
+  document.getElementById('modal').classList.add('open');
+}
+function setRutina(v){mRutina=v;pintarSeg();}
+function pintarSeg(){document.querySelectorAll('#segRutina button').forEach(b=>b.classList.toggle('on',b.dataset.v===mRutina));}
+
+async function guardarNueva(){
+  const err=document.getElementById('mErr'), btn=document.getElementById('mSave');
+  const nombre=document.getElementById('fNombre').value.trim();
+  if(!nombre){err.textContent='El nombre es obligatorio.';return;}
+  btn.disabled=true;btn.textContent='Guardando…';err.textContent='';
+  try{
+    await supaFetch('/mediciones',{method:'POST',body:{
+      sede:currentSede,fecha:mFecha,hora:mHora,nombre,
+      telefono:document.getElementById('fTel').value.trim()||null,
+      pin:document.getElementById('fPin').value.trim()||null,
+      agendado_por:currentEmail||null, agendado_por_nombre:currentNombre||currentEmail||null}});
+    cerrar(); aviso(`Medición agendada: ${nombre} · ${mHora}`,true); cargar();
+  }catch(e){
+    btn.disabled=false;btn.textContent='Agendar';
+    err.textContent=/duplicate|unique/i.test(e.message)?'Ese espacio ya fue tomado por otra persona. Recargue.':e.message;
+  }
+}
+
+async function guardarEdicion(id){
+  const err=document.getElementById('mErr'), btn=document.getElementById('mSave');
+  const body={rutina:mRutina||null};
+  if(puedeAgendar()){
+    const nombre=document.getElementById('fNombre').value.trim();
+    if(!nombre){err.textContent='El nombre es obligatorio.';return;}
+    body.nombre=nombre;
+    body.telefono=document.getElementById('fTel').value.trim()||null;
+    body.pin=document.getElementById('fPin').value.trim()||null;
+  }
+  btn.disabled=true;btn.textContent='Guardando…';err.textContent='';
+  try{
+    await supaFetch(`/mediciones?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body});
+    cerrar(); aviso('Medición actualizada.',true); cargar();
+  }catch(e){btn.disabled=false;btn.textContent='Guardar';err.textContent=e.message;}
+}
+
+async function borrar(id){
+  if(!confirm('¿Eliminar esta medición? El espacio queda libre.'))return;
+  try{ await supaFetch(`/mediciones?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});
+    cerrar(); aviso('Medición eliminada.',true); cargar();
+  }catch(e){aviso('No se pudo eliminar: '+e.message);}
+}
+
+// ── Impresión de la semana ──
+function imprimirSemana(){
+  const hoy=todayStr();
+  let head='<tr><th>Hora</th>';
+  for(let i=0;i<7;i++){const d=diaDe(i);head+=`<th>${DIAS[i]}<br><small>${fechaCorta(d)}</small></th>`;}
+  head+='</tr>';
+  const fila=m=>{let tr=`<tr><td class="h">${hhmm(m)}</td>`;
+    for(let i=0;i<7;i++){const f=ymd(diaDe(i)),h=hhmm(m),c=citas[f+'|'+h];
+      tr+=c?`<td class="${c.rutina||'pend'}"><b>${esc(c.nombre)}</b>${c.telefono?'<br><span class="tel">'+esc(c.telefono)+'</span>':''}${c.pin?'<br><span class="tel">PIN '+esc(c.pin)+'</span>':''}<br><span class="rt">${c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':'☐ Pendiente'}</span></td>`:'<td></td>';}
+    return tr+'</tr>';};
+  let body=`<tr class="blk"><td colspan="8">MAÑANA · 8:00 a 10:45</td></tr>`;
+  SLOTS_AM.forEach(m=>body+=fila(m));
+  body+=`<tr class="blk"><td colspan="8">TARDE · 5:00 a 7:45 p. m.</td></tr>`;
+  SLOTS_PM.forEach(m=>body+=fila(m));
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Mediciones ${esc(currentSede)}</title>
+  <style>*{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;}body{margin:16px;color:#111;}
+  h1{font-size:17px;margin:0 0 2px;}.sub{font-size:12px;color:#555;margin:0 0 12px;}
+  table{width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;}
+  th,td{border:1px solid #999;padding:3px 4px;vertical-align:top;height:34px;}
+  th{background:#eee;font-size:10px;}td.h{background:#f4f4f4;text-align:center;font-weight:700;width:52px;}
+  tr.blk td{background:#e8eef6;font-weight:800;font-size:11px;letter-spacing:.3px;height:auto;}
+  .tel{color:#555;font-size:9px;}.rt{font-size:9px;color:#333;}
+  td.completa{background:#eafaf1;}td.incompleta{background:#fdecec;}td.pend{background:#fafafa;}
+  @page{size:landscape;margin:10mm;}@media print{.noprint{display:none;}}</style></head><body>
+  <h1>📏 Mediciones — ${esc(currentSede)}</h1>
+  <div class="sub">Semana del ${lunes.toLocaleDateString('es-CR',{day:'numeric',month:'long'})} al ${diaDe(6).toLocaleDateString('es-CR',{day:'numeric',month:'long',year:'numeric'})} · impreso ${new Date().toLocaleString('es-CR')}</div>
+  <table>${head}${body}</table>
+  <button class="noprint" onclick="window.print()" style="margin-top:14px;padding:8px 16px;font-size:14px;cursor:pointer;">🖨️ Imprimir</button>
+  </body></html>`;
+  const w=window.open('','_blank'); if(!w){alert('Permití las ventanas emergentes para imprimir.');return;}
+  w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>{try{w.print();}catch(_){}} ,350);
+}
+</script>
+</body>
+</html>

@@ -11,6 +11,7 @@
     { "source": "/rrhh", "destination": "/rrhh.html" },
     { "source": "/caja", "destination": "/caja.html" },
     { "source": "/inventario", "destination": "/inventario.html" },
-    { "source": "/movil", "destination": "/movil.html" }
+    { "source": "/movil", "destination": "/movil.html" },
+    { "source": "/mediciones", "destination": "/mediciones.html" }
   ]
 }

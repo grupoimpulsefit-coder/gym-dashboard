@@ -610,6 +610,7 @@
                 <select id="ccRole" onchange="ccToggleSede()" style="width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:14px;background:white;">
                     <option value="recepcion">🧾 Recepción (una sede)</option>
                     <option value="admin_sucursal">🏪 Admin de sucursal (una sede)</option>
+                    <option value="instructor">🏋️ Instructor (una sede · solo mediciones)</option>
                     <option value="colaborador">👁 Colaborador</option>
                     <option value="admin_sedes">🏢 Admin Sedes</option>
                     <option value="admin">⚙ Admin</option>
@@ -787,6 +788,7 @@ async function doLogin() {
             currentRole === 'recepcion' ? '🧾 Recepción' :
             currentRole === 'admin_g' ? '💰 Admin Gastos' :
             currentRole === 'admin_sucursal' ? '🏪 Admin Sucursal' :
+            currentRole === 'instructor' ? '🏋️ Instructor' :
             currentRole === 'empleado' ? '👤 Empleado' : '👁 Colaborador';
         applyRole();
         document.getElementById('loginScreen').style.display = 'none';
@@ -825,7 +827,7 @@ function openCrearCuentaModal() {
 }
 function ccToggleSede() {
     document.getElementById('ccSedeWrap').style.display =
-        ['recepcion','admin_sucursal'].includes(document.getElementById('ccRole').value) ? '' : 'none';
+        ['recepcion','admin_sucursal','instructor'].includes(document.getElementById('ccRole').value) ? '' : 'none';
 }
 async function crearCuenta() {
     const msg = document.getElementById('ccMsg');
@@ -833,7 +835,7 @@ async function crearCuenta() {
     const email = document.getElementById('ccEmail').value.trim();
     const password = document.getElementById('ccPassword').value;
     const role = document.getElementById('ccRole').value;
-    const sede = ['recepcion','admin_sucursal'].includes(role) ? document.getElementById('ccSede').value : null;
+    const sede = ['recepcion','admin_sucursal','instructor'].includes(role) ? document.getElementById('ccSede').value : null;
     if (!email || !password) { msg.style.color='#c62828'; msg.textContent='Correo y contraseña son obligatorios.'; return; }
     if (password.length < 6) { msg.style.color='#c62828'; msg.textContent='La contraseña debe tener al menos 6 caracteres.'; return; }
     const btn = document.getElementById('ccBtn');
@@ -997,6 +999,14 @@ async function showSedePicker() {
         statusEl.textContent = 'Módulos disponibles para su sede' + (currentSede ? ` (${currentSede})` : '') + ':';
         cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
         cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
+        cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agendar citas','Agenda semanal cada 15 minutos','#e8f4fd','#1a5276','/mediciones'));
+        return;
+    }
+
+    // Instructor: solo la agenda de mediciones de su sede (únicamente marca la rutina)
+    if (currentRole === 'instructor') {
+        statusEl.textContent = 'Su módulo' + (currentSede ? ` (${currentSede})` : '') + ':';
+        cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agenda de la semana','Marcar rutina completa o incompleta','#e8f4fd','#1a5276','/mediciones'));
         return;
     }
 
@@ -1005,6 +1015,7 @@ async function showSedePicker() {
         statusEl.textContent = 'Módulos de su sucursal' + (currentSede ? ` (${currentSede})` : '') + ':';
         cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
         cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar / ver gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
+        cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agendar citas','Agenda semanal cada 15 minutos','#e8f4fd','#1a5276','/mediciones'));
         cardsEl.appendChild(makeHandoffCard('🌴','Mi Portal','Mis vacaciones','Ver saldo y solicitar días libres','#e8f7ee','#2e7d32','/rrhh'));
         return;
     }
@@ -1056,6 +1067,7 @@ async function showSedePicker() {
             cardsEl.appendChild(makeHandoffCard('👥','Recursos Humanos','Empleados y vacaciones','Salarios, ingresos y solicitudes','#eef2fb','#1a5276','/rrhh'));
             cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre de caja','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
             cardsEl.appendChild(makeHandoffCard('📦','Inventario','Productos por sede','Stock, precios y faltantes','#fff8e1','#b9770e','/inventario'));
+            cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agenda por sede','Citas cada 15 min y estado de rutina','#e8f4fd','#1a5276','/mediciones'));
             // Crear cuenta de acceso — abre modal (no navega)
             const cc = document.createElement('div');
             cc.style.cssText = `cursor:pointer;background:#eef7ee;border:2px dashed #2e7d3266;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;

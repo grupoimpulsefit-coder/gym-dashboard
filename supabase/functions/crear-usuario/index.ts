@@ -21,8 +21,8 @@ const CORS = {
 };
 
 const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
-const ROLES = ['recepcion', 'admin_sucursal', 'colaborador', 'admin_sedes', 'admin', 'empleado'];
-const ROLES_CON_SEDE = ['recepcion', 'admin_sucursal', 'empleado'];
+const ROLES = ['recepcion', 'admin_sucursal', 'instructor', 'colaborador', 'admin_sedes', 'admin', 'empleado'];
+const ROLES_CON_SEDE = ['recepcion', 'admin_sucursal', 'instructor', 'empleado'];
 
 function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), {
@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
       id: uid,
       role,
       nombre: nombre || email,
-      sede: ['recepcion', 'admin_sucursal'].includes(role) ? sede : null,
+      sede: ['recepcion', 'admin_sucursal', 'instructor'].includes(role) ? sede : null,
     });
     if (insErr) {
       // Rollback: borrar el usuario auth para no dejar cuentas huérfanas
