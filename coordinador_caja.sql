@@ -9,11 +9,12 @@
 --  recepción. Para dársela:
 --    update user_roles set sede = '3 Ríos' where id = '<uuid del usuario>';
 --
---  Correr UNA vez en Supabase → SQL Editor.
+--  Correr UNA vez en Supabase → SQL Editor. Es idempotente.
 -- ════════════════════════════════════════════════════════════════════════
 
 
 -- ── Políticas de caja ──
+drop policy if exists cierres_rw on cierres_caja;
 create policy cierres_rw on cierres_caja
   for all to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid()
@@ -21,24 +22,29 @@ create policy cierres_rw on cierres_caja
   with check (exists (select 1 from user_roles ur where ur.id = auth.uid()
           and (ur.role in ('admin','admin_sedes','admin_g') or (ur.role in ('recepcion','admin_sucursal','coordinador') and (ur.sede = cierres_caja.sede or cierres_caja.sede = any(ur.sedes_extra))))));
 
+drop policy if exists inventario_recep_select on inventario;
 create policy inventario_recep_select on inventario
   for select to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('recepcion','admin_sucursal','coordinador') and (ur.sede = inventario.sede or inventario.sede = any(ur.sedes_extra))));
 
+drop policy if exists inventario_recep_update on inventario;
 create policy inventario_recep_update on inventario
   for update to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('recepcion','admin_sucursal','coordinador') and (ur.sede = inventario.sede or inventario.sede = any(ur.sedes_extra))))
   with check (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('recepcion','admin_sucursal','coordinador') and (ur.sede = inventario.sede or inventario.sede = any(ur.sedes_extra))));
 
+drop policy if exists envios_recep_select on envios_mercaderia;
 create policy envios_recep_select on envios_mercaderia
   for select to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('recepcion','admin_sucursal','coordinador') and (ur.sede = envios_mercaderia.sede or envios_mercaderia.sede = any(ur.sedes_extra))));
 
+drop policy if exists envios_recep_update on envios_mercaderia;
 create policy envios_recep_update on envios_mercaderia
   for update to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('recepcion','admin_sucursal','coordinador') and (ur.sede = envios_mercaderia.sede or envios_mercaderia.sede = any(ur.sedes_extra))))
   with check (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('recepcion','admin_sucursal','coordinador') and (ur.sede = envios_mercaderia.sede or envios_mercaderia.sede = any(ur.sedes_extra))));
 
+drop policy if exists sinpe_rw on sinpe_registrados;
 create policy sinpe_rw on sinpe_registrados
   for all to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid()
@@ -46,6 +52,7 @@ create policy sinpe_rw on sinpe_registrados
   with check (exists (select 1 from user_roles ur where ur.id = auth.uid()
           and (ur.role in ('admin','admin_sedes','admin_g') or (ur.role in ('recepcion','admin_sucursal','coordinador') and (ur.sede = sinpe_registrados.sede or sinpe_registrados.sede = any(ur.sedes_extra))))));
 
+drop policy if exists cierres_fotos_rw on storage.objects;
 create policy cierres_fotos_rw on storage.objects
   for all to authenticated
   using (bucket_id = 'cierres-caja' and exists (select 1 from user_roles ur where ur.id = auth.uid()
@@ -53,7 +60,9 @@ create policy cierres_fotos_rw on storage.objects
   with check (bucket_id = 'cierres-caja' and exists (select 1 from user_roles ur where ur.id = auth.uid()
           and ur.role in ('recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin')));
 
+
 -- ── Políticas de gastos ──
+drop policy if exists gastos_select on gastos;
 create policy gastos_select on gastos
   for select to authenticated
   using (
@@ -62,6 +71,7 @@ create policy gastos_select on gastos
                  or (ur.role in ('recepcion','admin_sucursal','coordinador') and (ur.sede = gastos.sede or gastos.sede = any(ur.sedes_extra)))))
   );
 
+drop policy if exists gastos_insert on gastos;
 create policy gastos_insert on gastos
   for insert to authenticated
   with check (
@@ -70,7 +80,9 @@ create policy gastos_insert on gastos
                  or (ur.role in ('recepcion','admin_sucursal','coordinador') and (ur.sede = gastos.sede or gastos.sede = any(ur.sedes_extra)))))
   );
 
+
 -- ── Políticas de mediciones ──
+drop policy if exists mediciones_select on mediciones;
 create policy mediciones_select on mediciones
   for select to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid()
@@ -78,6 +90,7 @@ create policy mediciones_select on mediciones
          or (ur.role in ('recepcion','admin_sucursal','coordinador','instructor')
              and (ur.sede = mediciones.sede or mediciones.sede = any(ur.sedes_extra))))));
 
+drop policy if exists mediciones_insert on mediciones;
 create policy mediciones_insert on mediciones
   for insert to authenticated
   with check (exists (select 1 from user_roles ur where ur.id = auth.uid()
@@ -85,6 +98,7 @@ create policy mediciones_insert on mediciones
          or (ur.role in ('recepcion','admin_sucursal','coordinador')
              and (ur.sede = mediciones.sede or mediciones.sede = any(ur.sedes_extra))))));
 
+drop policy if exists mediciones_update on mediciones;
 create policy mediciones_update on mediciones
   for update to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid()
@@ -96,6 +110,7 @@ create policy mediciones_update on mediciones
          or (ur.role in ('recepcion','admin_sucursal','coordinador','instructor')
              and (ur.sede = mediciones.sede or mediciones.sede = any(ur.sedes_extra))))));
 
+drop policy if exists mediciones_delete on mediciones;
 create policy mediciones_delete on mediciones
   for delete to authenticated
   using (exists (select 1 from user_roles ur where ur.id = auth.uid()
