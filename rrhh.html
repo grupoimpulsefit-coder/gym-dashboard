@@ -240,7 +240,7 @@ table.tbl tr:last-child td { border-bottom: none; }
         <div class="f-field"><label>Ajuste de saldo (± días)</label><input type="number" id="eVacAjuste" step="0.5" value="0"></div>
         <div class="f-field full" style="flex-direction:row;align-items:center;gap:8px;">
           <input type="checkbox" id="eAsegurado" style="width:auto;" checked onchange="renderCcssDesglose()">
-          <label for="eAsegurado" style="margin:0;text-transform:none;font-size:13px;font-weight:600;cursor:pointer;">Asegurado por la CCSS (aplica deducción del ~10.67% y carga patronal del ~26.67%)</label>
+          <label for="eAsegurado" style="margin:0;text-transform:none;font-size:13px;font-weight:600;cursor:pointer;">Asegurado por la CCSS (aplica deducción del 10.83% y carga patronal del ~26.67%)</label>
         </div>
       </div>
       <div id="ccssDesglose" style="margin-top:10px;"></div>
@@ -329,7 +329,7 @@ const fmtCRC = n => n ? '₡' + Math.round(n).toLocaleString('es-CR') : '—';
 // Tasas configurables — verificar con la CCSS/contador (cambian con el tiempo).
 const RUBROS_TRABAJADOR = [
   { n: 'SEM (Salud)',      p: 5.50 },
-  { n: 'IVM (Pensiones)',  p: 4.17 },
+  { n: 'IVM (Pensiones)',  p: 4.33 },   // subió de 4.17% → total trabajador 10.83%
   { n: 'Banco Popular',    p: 1.00 },
 ];
 const RUBROS_PATRONO = [
@@ -344,7 +344,7 @@ const RUBROS_PATRONO = [
   { n: 'Otros aportes patronales',          p: 1.50 },
 ];
 const sumaRubros = arr => arr.reduce((a,r)=>a+r.p,0);
-const CCSS_TRABAJADOR = sumaRubros(RUBROS_TRABAJADOR) / 100; // 10.67%
+const CCSS_TRABAJADOR = sumaRubros(RUBROS_TRABAJADOR) / 100; // 10.83%
 const CCSS_PATRONO    = sumaRubros(RUBROS_PATRONO) / 100;    // 26.67% (solo CCSS; sin póliza de Riesgos del INS)
 const aseguradoCCSS = e => e.asegurado_ccss !== false;   // por defecto asegurado
 function deduccionCCSS(e){ return aseguradoCCSS(e) ? Number(e.salario_mensual||0) * CCSS_TRABAJADOR : 0; }
