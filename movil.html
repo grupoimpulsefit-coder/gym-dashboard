@@ -147,6 +147,9 @@
   .sheet-h .act{color:var(--brand-text);font-weight:600;min-height:44px;display:flex;align-items:center;flex:none}
   .sheet-h .act:disabled{opacity:.4}
   .sheet-body{overflow:auto;padding:12px 16px 16px}
+  /* .hdr/.ftr están scopeados a .sect; dentro de una hoja también deben verse como texto secundario */
+  .sheet-body .ftr{font-size:13px;color:var(--sec)}
+  .sheet-body .hdr{font-size:13px;color:var(--sec);text-transform:uppercase;letter-spacing:.04em}
   .cell input.qty{width:76px;min-height:44px;border:0;border-radius:10px;background:var(--fill);color:var(--label);text-align:right;padding:0 10px;font-size:17px;font-weight:600;flex:none}
   .toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 90px);background:var(--label);color:var(--bg);padding:12px 16px;border-radius:14px;font-size:14px;text-align:center;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none}
   .toast.show{opacity:.95}
@@ -184,7 +187,7 @@
 
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-09-10f';
+const APP_VER='2026-09-17a';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -199,18 +202,20 @@ const ICONS={
   cierres:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
   envios:'<svg viewBox="0 0 24 24"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></svg>',
   proyecciones:'<svg viewBox="0 0 24 24"><path d="M4 18L10 11l4 4 6-8"/><path d="M15 7h5v5"/></svg>',
-  arqueo:'<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8 13l3 3 5-6"/></svg>'
+  arqueo:'<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8 13l3 3 5-6"/></svg>',
+  mediciones:'<svg viewBox="0 0 24 24"><path d="M2 9h20v6H2z"/><path d="M6 9v3M10 9v4M14 9v3M18 9v4"/></svg>'
 };
 const MODS=[
   {id:'caja',label:'Caja',color:'var(--brand)'},
   {id:'gastos',label:'Gastos',color:'var(--orange)'},
   {id:'inventario',label:'Inventario',color:'var(--amber)'},
   {id:'arqueo',label:'Arqueo',color:'#FF2D55',arqueo:true},
+  {id:'mediciones',label:'Mediciones',color:'var(--purple)',med:true},
   {id:'cierres',label:'Cierres',color:'var(--indigo)'},
   {id:'envios',label:'Envíos',color:'var(--teal)'},
   {id:'proyecciones',label:'Proyecciones',color:'var(--purple)',admin:true}
 ];
-const modVisible=m=>m.arqueo?puedeArquear():(!m.admin||esAdmin());
+const modVisible=m=>m.arqueo?puedeArquear():m.med?puedeVerMed():(!m.admin||esAdmin());
 
 // ── Helpers (van ANTES del estado: el estado inicial los usa) ──
 const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
@@ -236,6 +241,10 @@ const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(me?.role);
 const puedeArquear=()=>esAdmin()||me?.role==='admin_sucursal';
 // Recepción cuenta a ciegas; admins y coordinador ven la cantidad real del sistema.
 const verInventarioReal=()=>esAdmin()||me?.role==='coordinador';
+// Mediciones: recepción/coordinación agenda, el instructor solo marca la rutina.
+const puedeAgendarMed=()=>esAdmin()||['recepcion','admin_sucursal','coordinador'].includes(me?.role);
+const puedeRutinaMed=()=>esAdmin()||me?.role==='instructor';
+const puedeVerMed=()=>puedeAgendarMed()||puedeRutinaMed();
 let arq={rows:[],items:{},filtro:'',soloDif:false,saved:null}, arqVerId=null;
 let audit={seg:'finales',rango:7,soloAlertas:false,rows:[]};
 
@@ -413,7 +422,123 @@ async function renderMod(showLoading){
   if(curMod==='gastos') return renderGastosMod();
   if(curMod==='cierres') return renderCierresMod();
   if(curMod==='envios') return renderEnviosMod();
+  if(curMod==='mediciones') return renderMedicionesMod();
   if(curMod==='proyecciones') return renderProyMod();
+}
+
+/* ══ Mediciones: agenda del día, solo lunes a viernes ══
+   Espacios de 15 min · mañana 08:00–10:45 · tarde 17:00–19:45. */
+const MED_AM=[], MED_PM=[];
+for(let m=8*60;  m<=10*60+45; m+=15) MED_AM.push(m);
+for(let m=17*60; m<=19*60+45; m+=15) MED_PM.push(m);
+const MED_SLOTS=MED_AM.length+MED_PM.length;
+const medHH=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const medDow=s=>{const [y,m,d]=String(s).split('-').map(Number);return (new Date(y,m-1,d).getDay()+6)%7;};
+const medSuma=(s,n)=>{const [y,m,d]=String(s).split('-').map(Number);const x=new Date(y,m-1,d);x.setDate(x.getDate()+n);return ymd(x);};
+function medHabil(f,dir){ let g=0; while(medDow(f)>4 && g++<7) f=medSuma(f,dir||1); return f; }   // salta sábado y domingo
+let medFecha=medHabil(todayStr()), medRows=[], medSeq=0;
+function medSetFecha(f){ if(!f) return; medFecha=medHabil(f); renderMedicionesMod(); }
+function medMover(n){ medFecha=medHabil(medSuma(medFecha,n), n>0?1:-1); renderMedicionesMod(); }
+const medPill=r=>r==='completa'?'<span class="pill ok">✓ Completa</span>'
+               :r==='incompleta'?'<span class="pill bad">✗ Incompleta</span>'
+               :'<span class="pill status">Pendiente</span>';
+
+async function renderMedicionesMod(){
+  const hoy=medHabil(todayStr()), esHoy=medFecha===hoy;
+  navMod('Mediciones',
+    `<div class="row"><span class="st">${esc(fechaLarga(medFecha))} · ${esc(detSede)}</span></div>
+     <div class="seg"><button onclick="medMover(-1)">‹</button><button class="${esHoy?'on':''}" onclick="medSetFecha('${hoy}')">Hoy</button><button onclick="medMover(1)">›</button></div>
+     <div class="datebox"><input type="date" id="medPick" value="${medFecha}" onchange="medSetFecha(this.value)"></div>`,
+    '<button class="act" onclick="abrirMediciones()">Semana</button>');
+  const v=document.getElementById('view');
+  v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
+  const seq=++medSeq;
+  try{ medRows=(await supaFetch(`/mediciones?sede=eq.${encodeURIComponent(detSede)}&fecha=eq.${medFecha}&order=hora.asc&select=*`))||[]; }
+  catch(e){ if(seq!==medSeq) return;
+    v.innerHTML=`<div class="empty">${/relation|exist|schema cache/i.test(e.message)?'Falta crear la tabla: corra mediciones.sql en Supabase.':'No se pudo cargar: '+esc(e.message)}</div>`; return; }
+  if(seq!==medSeq) return;
+  const by={}; medRows.forEach(r=>{ by[String(r.hora||'').slice(0,5)]=r; });
+  const comp=medRows.filter(r=>r.rutina==='completa').length, inc=medRows.filter(r=>r.rutina==='incompleta').length;
+  const chevSvg='<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg>';
+  const fila=m=>{ const h=medHH(m), c=by[h];
+    if(c) return `<button class="cell" onclick="medAbrir('${h}')"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}</span></div>${medPill(c.rutina)}${chevSvg}</button>`;
+    return puedeAgendarMed()
+      ? `<button class="cell" onclick="medAbrir('${h}')"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t" style="color:var(--ter)">Libre</span></div><span class="v" style="color:var(--brand-text);font-weight:600">Agendar</span></button>`
+      : `<div class="cell"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t" style="color:var(--ter)">Libre</span></div></div>`;
+  };
+  v.innerHTML=`
+    <div class="tiles">
+      <div class="tile"><span class="l">Agendadas</span><span class="n num">${medRows.length}</span></div>
+      <div class="tile"><span class="l">Libres</span><span class="n num">${MED_SLOTS-medRows.length}</span></div>
+      <div class="tile"><span class="l">Completas</span><span class="n num" style="color:var(--green)">${comp}</span></div>
+      <div class="tile"><span class="l">Incompletas</span><span class="n num" style="color:var(--red)">${inc}</span></div>
+    </div>
+    <div class="sect"><div class="hdr">Mañana · 8:00 a 10:45</div><div class="group">${MED_AM.map(fila).join('')}</div></div>
+    <div class="sect"><div class="hdr">Tarde · 5:00 a 7:45 p. m.</div><div class="group">${MED_PM.map(fila).join('')}</div>
+      <div class="ftr">${puedeRutinaMed()&&!puedeAgendarMed()?'Como instructor solo podés marcar la rutina.':'La rutina (completa / incompleta) la marca el instructor.'} Sábado y domingo no hay medición.</div></div>`;
+}
+
+// Hoja de una medición: crear, editar, marcar rutina o eliminar
+let medHora=null, medRutina='';
+function medAbrir(h){
+  const c=medRows.find(r=>String(r.hora||'').slice(0,5)===h)||null;
+  if(!c && !puedeAgendarMed()) return;
+  medHora=h; medRutina=c?.rutina||'';
+  const editable=puedeAgendarMed();
+  const campo=(lab,id,val,ph,tipo)=>editable
+    ? `<div class="cell"><div class="main"><span class="t">${lab}</span></div><input class="qty" id="${id}" type="${tipo||'text'}" value="${esc(val||'')}" placeholder="${ph}" style="width:58%;text-align:right;font-weight:400"></div>`
+    : `<div class="cell"><div class="main"><span class="t">${lab}</span></div><span class="v">${esc(val||'—')}</span></div>`;
+  const sh=document.getElementById('sheet');
+  sh.innerHTML=`<div class="sheet-bg" onclick="cerrarSheet()"></div>
+    <div class="sheet-panel" role="dialog" aria-label="Medición">
+      <div class="sheet-h"><button class="act" onclick="cerrarSheet()">Cancelar</button>
+        <span class="tt">${c?esc(c.nombre):'Nueva medición'}</span>
+        <button class="act" id="medSave" onclick="medGuardar('${c?c.id:''}')" ${(!c&&!editable)||(c&&!editable&&!puedeRutinaMed())?'disabled':''}>${c?'Guardar':'Agendar'}</button></div>
+      <div class="sheet-body">
+        <div class="ftr" style="padding:0 0 10px">${esc(fechaLarga(medFecha))} · ${h} · ${esc(detSede)}</div>
+        <div class="group" style="margin:0">
+          ${campo('Nombre','medNombre',c?.nombre,'Obligatorio')}
+          ${campo('Teléfono','medTel',c?.telefono,'8888-8888','tel')}
+          ${campo('PIN','medPin',c?.pin,'PIN')}
+          <div class="cell"><div class="main"><span class="t">Agendó</span></div><span class="v">${esc(c?(c.agendado_por_nombre||c.agendado_por||'—'):(me.nombre||auth.email))}</span></div>
+        </div>
+        ${c?`<div class="hdr" style="padding:16px 0 6px">Rutina</div>
+          <div class="seg" id="medSeg">
+            <button data-v="" onclick="medSetRutina('')" ${puedeRutinaMed()?'':'disabled'}>Pendiente</button>
+            <button data-v="completa" onclick="medSetRutina('completa')" ${puedeRutinaMed()?'':'disabled'}>✓ Completa</button>
+            <button data-v="incompleta" onclick="medSetRutina('incompleta')" ${puedeRutinaMed()?'':'disabled'}>✗ Incompleta</button>
+          </div>
+          ${c.rutina_por?`<div class="ftr" style="padding:8px 0 0">Marcada por ${esc(c.rutina_por)}</div>`:''}`:''}
+        <div class="err" id="medErr" style="text-align:left"></div>
+        ${c&&editable?`<button class="btn plain" style="margin-top:14px;color:var(--red)" onclick="medBorrar('${c.id}')">Eliminar medición</button>`:''}
+      </div></div>`;
+  sh.hidden=false; document.body.style.overflow='hidden'; medPintarSeg();
+}
+function medSetRutina(v){ medRutina=v; medPintarSeg(); }
+function medPintarSeg(){ document.querySelectorAll('#medSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===medRutina)); }
+async function medGuardar(id){
+  const err=document.getElementById('medErr'), btn=document.getElementById('medSave');
+  const inp=i=>document.getElementById(i)?.value.trim()||'';
+  const body = id ? {rutina:medRutina||null} : {};
+  if(puedeAgendarMed()){
+    const nombre=inp('medNombre');
+    if(!nombre){ err.textContent='El nombre es obligatorio.'; return; }
+    body.nombre=nombre; body.telefono=inp('medTel')||null; body.pin=inp('medPin')||null;
+  }
+  btn.disabled=true; btn.textContent='Guardando…'; err.textContent='';
+  try{
+    if(id) await supaFetch(`/mediciones?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body});
+    else   await supaFetch('/mediciones',{method:'POST',body:{...body,sede:detSede,fecha:medFecha,hora:medHora,
+             agendado_por:auth.email||null, agendado_por_nombre:me.nombre||auth.email||null}});
+    cerrarSheet(); toast(id?'Medición actualizada.':`Medición agendada · ${medHora}`); renderMedicionesMod();
+  }catch(e){ btn.disabled=false; btn.textContent=id?'Guardar':'Agendar';
+    err.textContent=/duplicate|unique/i.test(e.message)?'Ese espacio ya fue tomado. Recargá.':e.message; }
+}
+async function medBorrar(id){
+  if(!confirm('¿Eliminar esta medición? El espacio queda libre.')) return;
+  try{ await supaFetch(`/mediciones?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});
+    cerrarSheet(); toast('Medición eliminada.'); renderMedicionesMod();
+  }catch(e){ toast('No se pudo eliminar: '+e.message); }
 }
 
 // Caja: turno del día seleccionado (con T1/T2/T3)
@@ -760,6 +885,7 @@ async function enviarMercaderia(){
 // ── Salto a los módulos completos (misma sesión, vía handoff gymAuth como index.html) ──
 function handoff(sede){ sessionStorage.setItem('gymAuth',JSON.stringify({token:auth.access_token,refresh_token:auth.refresh_token||null,exp:auth.expires_at||0,role:me.role,nombre:me.nombre||auth.email,email:auth.email,sede:sede||me.sede||null,sedes_extra:me.sedes_extra||[],user_id:auth.user_id})); }
 function abrirCaja(){ handoff(detSede||me.sede); location.href='/caja?from=movil'; }   // caja.html muestra "← App móvil" con este parámetro
+function abrirMediciones(){ handoff(detSede||me.sede); location.href='/mediciones?from=movil'; }   // vista de semana completa
 
 // ── Cuenta ──
 function renderCuenta(){

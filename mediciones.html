@@ -2,112 +2,224 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mediciones por Sede</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F2F2F7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icons/favicon-64.png">
+<title>Mediciones</title>
 <style>
+/* ════ Sistema de diseño: iOS / Apple HIG ════
+   Colores del sistema, tipografía SF, radios de 10–16, alturas táctiles de 44px,
+   modo claro y oscuro automáticos. Mismos tokens que la app móvil. */
 :root{
-  --primary:#1a5276; --primary-light:#2e86c1; --accent:#148f77; --accent2:#e67e22;
-  --bg:#f0f4f8; --border:#d5dce8; --text:#1c2833; --muted:#6c757d;
-  --warn:#c0392b; --success:#27ae60; --pend:#8e8e93;
-  --am:#2e86c1; --pm:#8e44ad;
+  --bg:#F2F2F7; --card:#FFFFFF; --label:#000; --sec:rgba(60,60,67,.6); --ter:rgba(60,60,67,.3);
+  --sep:rgba(60,60,67,.29); --fill:rgba(120,120,128,.12); --fill2:rgba(120,120,128,.2);
+  --glass:rgba(249,249,249,.82);
+  --brand:#0E9F8E; --brand-text:#0B7F72; --brand-tint:rgba(14,159,142,.14);
+  --green:#34C759; --red:#FF3B30; --orange:#FF9500; --blue:#007AFF; --purple:#AF52DE;
+  --green-tint:rgba(52,199,89,.16); --red-tint:rgba(255,59,48,.14); --blue-tint:rgba(0,122,255,.12);
+  --status-fill:rgba(120,120,128,.16); --status-ink:rgba(60,60,67,.72);
+  --slot:rgba(120,120,128,.07); --shadow:0 1px 3px rgba(0,0,0,.08);
 }
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px;}
-button{font-family:inherit;}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#000; --card:#1C1C1E; --label:#fff; --sec:rgba(235,235,245,.6); --ter:rgba(235,235,245,.3);
+    --sep:rgba(84,84,88,.65); --fill:rgba(120,120,128,.24); --fill2:rgba(120,120,128,.36);
+    --glass:rgba(30,30,30,.78);
+    --brand:#2DBFAC; --brand-text:#3FD0BC; --brand-tint:rgba(45,191,172,.18);
+    --green:#30D158; --red:#FF453A; --orange:#FF9F0A; --blue:#0A84FF; --purple:#BF5AF2;
+    --status-fill:rgba(120,120,128,.28); --status-ink:rgba(235,235,245,.72);
+    --slot:rgba(120,120,128,.14); --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg);color:var(--label);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;
+  font-size:17px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{min-height:100dvh}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:left}
+input{font:inherit}
+[hidden]{display:none!important}
+.num{font-variant-numeric:tabular-nums}
 
 /* ── Login ── */
-#loginScreen{position:fixed;inset:0;background:linear-gradient(135deg,#0f0c29 0%,#302b63 50%,#24243e 100%);display:flex;align-items:center;justify-content:center;z-index:9999;}
-.login-card{background:white;border-radius:24px;padding:40px 44px;width:100%;max-width:420px;box-shadow:0 32px 80px rgba(0,0,0,.5);}
-.login-logo{width:64px;height:64px;background:linear-gradient(135deg,#1a5276,#2e86c1);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:30px;margin:0 auto 20px;}
-.login-card h2{text-align:center;font-size:1.4em;font-weight:800;color:#2d2d5e;margin-bottom:6px;}
-.login-card .login-sub{text-align:center;font-size:.85em;color:#888;margin-bottom:28px;}
-.login-field{margin-bottom:16px;}
-.login-field label{display:block;font-size:.8em;font-weight:700;color:#444;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
-.login-field input{width:100%;padding:11px 14px;border:1.5px solid #dde1f0;border-radius:10px;font-size:14px;font-family:inherit;color:#333;}
-.login-field input:focus{outline:none;border-color:#2e86c1;box-shadow:0 0 0 3px rgba(46,134,193,.15);}
-.login-btn{width:100%;padding:13px;background:linear-gradient(135deg,#1a5276,#2e86c1);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;}
-.login-btn:disabled{opacity:.6;cursor:not-allowed;}
-.login-err{color:#c0392b;font-size:13px;min-height:18px;text-align:center;margin-top:10px;}
+#loginScreen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;justify-content:center;
+  padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px);gap:14px;z-index:9999}
+.login-card{width:100%;max-width:400px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.login-logo{width:72px;height:72px;border-radius:18px;margin:0 auto 4px;display:grid;place-items:center;
+  font-size:34px;background:var(--brand-tint)}
+.login-card h2{font-size:28px;font-weight:700;letter-spacing:-.02em;text-align:center}
+.login-sub{text-align:center;color:var(--sec);font-size:15px;margin-top:-8px}
+.field{background:var(--card);border-radius:12px;padding:0 16px;min-height:50px;display:flex;align-items:center;box-shadow:var(--shadow)}
+.field input{flex:1;border:0;background:transparent;color:var(--label);outline:none;min-height:50px;font-size:17px}
+.field input::placeholder{color:var(--ter)}
+.btn-fill{min-height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+  font-weight:600;font-size:17px;width:100%;background:var(--brand);color:#fff}
+.btn-fill:disabled{opacity:.55}
+.login-err{color:var(--red);font-size:14px;min-height:20px;text-align:center}
 
-/* ── Header / topbar ── */
-.header{background:linear-gradient(135deg,#1a5276,#2e86c1);color:white;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
-.header h1{font-size:1.2em;font-weight:800;}
-.header-right{display:flex;align-items:center;gap:14px;font-size:.9em;}
-.logout-btn{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);color:white;border-radius:16px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;}
-.topbar{background:white;border-bottom:1px solid var(--border);padding:12px 32px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
-.dash-title{font-size:15px;font-weight:700;color:var(--primary);}
-.sede-lock{background:#eef3fa;border:1.5px solid var(--border);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--primary);}
-select,input[type=text],input[type=tel],input[type=date]{padding:8px 11px;border:1.5px solid var(--border);border-radius:9px;font-size:14px;font-family:inherit;color:var(--text);background:white;}
-.btn{border:1.5px solid var(--border);background:white;color:var(--text);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;}
-.btn:hover{border-color:var(--primary-light);}
-.btn-primary{background:var(--primary);border-color:var(--primary);color:white;}
-.btn-primary:hover{background:var(--primary-light);}
-.btn-danger{background:#fdecec;border-color:#f5c6c6;color:var(--warn);}
-.btn:disabled{opacity:.5;cursor:not-allowed;}
-.spacer{margin-left:auto;}
-.week-nav{display:flex;align-items:center;gap:8px;}
-.week-label{font-weight:700;color:var(--primary);min-width:210px;text-align:center;}
+/* ── Barra de navegación ── */
+.nav{position:sticky;top:0;z-index:20;background:var(--glass);backdrop-filter:blur(22px) saturate(180%);
+  -webkit-backdrop-filter:blur(22px) saturate(180%);border-bottom:.5px solid var(--sep);
+  padding:calc(env(safe-area-inset-top) + 8px) 16px 10px}
+.nav-in{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.nav-row{display:flex;align-items:center;gap:10px;min-height:36px}
+.nav-title{font-size:28px;font-weight:700;letter-spacing:-.022em;flex:1;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-title .sede{color:var(--sec);font-weight:600}
+.nav-act{color:var(--brand-text);font-weight:600;min-height:44px;display:flex;align-items:center;gap:5px;font-size:16px;flex:none}
+.nav-act.plain{color:var(--sec);font-weight:400}
+.who{font-size:13px;color:var(--sec);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 
-/* ── KPIs ── */
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;padding:18px 32px 4px;}
-.kpi{background:white;border:1px solid var(--border);border-radius:14px;padding:14px 16px;}
-.kpi .l{font-size:12px;color:var(--muted);font-weight:600;}
-.kpi .n{font-size:24px;font-weight:800;margin-top:2px;}
+/* Controles iOS */
+.sede-pick{position:relative;display:inline-flex;align-items:center}
+.sede-pick select{appearance:none;-webkit-appearance:none;background:var(--fill);color:var(--label);
+  border:0;border-radius:10px;min-height:36px;padding:0 30px 0 12px;font-size:15px;font-weight:600}
+.sede-pick::after{content:"";position:absolute;right:11px;width:8px;height:8px;border-right:2px solid var(--sec);
+  border-bottom:2px solid var(--sec);transform:rotate(45deg) translate(-2px,-2px);pointer-events:none}
+.sede-lock{background:var(--fill);border-radius:10px;min-height:36px;display:inline-flex;align-items:center;
+  padding:0 12px;font-size:15px;font-weight:600}
+.stepper{display:inline-flex;align-items:center;background:var(--fill);border-radius:10px;overflow:hidden;flex:none}
+.stepper button{width:40px;min-height:36px;display:grid;place-items:center;font-size:19px;color:var(--brand-text);font-weight:600}
+.stepper button:active{background:var(--fill2)}
+.stepper .sepv{width:.5px;background:var(--sep);align-self:stretch;margin:7px 0}
+.week-label{font-size:15px;font-weight:600;min-width:150px;text-align:center;color:var(--label)}
+.btn-soft{background:var(--fill);border-radius:10px;min-height:36px;padding:0 13px;font-size:15px;
+  font-weight:600;color:var(--brand-text);display:inline-flex;align-items:center;gap:6px;flex:none}
+.btn-soft:active{background:var(--fill2)}
+.btn-soft.gris{color:var(--label);font-weight:500}
+.spacer{margin-left:auto}
 
-/* ── Grid semanal ── */
-.grid-wrap{margin:18px 32px 40px;background:white;border:1px solid var(--border);border-radius:14px;overflow:auto;max-height:calc(100vh - 260px);}
-table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:900px;}
-table.grid th,table.grid td{border-bottom:1px solid #eef1f6;border-right:1px solid #eef1f6;padding:0;}
-table.grid thead th{position:sticky;top:0;z-index:3;background:#f7f9fc;padding:10px 8px;font-size:12px;font-weight:700;color:var(--primary);text-align:center;}
-table.grid thead th small{display:block;font-weight:600;color:var(--muted);font-size:11px;}
-table.grid thead th.hoy{background:#e8f4fd;}
-td.h,th.h{position:sticky;left:0;z-index:2;background:#f7f9fc;width:72px;min-width:72px;text-align:center;font-size:12px;font-weight:700;color:var(--muted);padding:6px 4px;}
-thead th.h{z-index:4;}
-tr.blk td{background:#eef3fa;color:var(--primary);font-weight:800;font-size:12px;letter-spacing:.4px;padding:6px 12px;position:sticky;left:0;}
-td.slot{padding:3px;}
-.cell{width:100%;min-height:38px;border-radius:8px;border:1.5px dashed #e3e8f0;background:#fcfdff;color:#c3cbd8;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s;}
-.cell:hover{border-color:var(--primary-light);color:var(--primary-light);background:#f4faff;}
-.cell.taken{border-style:solid;cursor:pointer;display:block;text-align:left;padding:5px 8px;font-size:12px;color:var(--text);}
-.cell.taken .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.cell.taken .st{font-size:11px;font-weight:600;margin-top:1px;}
-.cell.pend{background:#f6f7f9;border-color:#d8dde6;}
-.cell.pend .st{color:var(--pend);}
-.cell.completa{background:#eafaf1;border-color:#a9e3c4;}
-.cell.completa .st{color:var(--success);}
-.cell.incompleta{background:#fdecec;border-color:#f3c0c0;}
-.cell.incompleta .st{color:var(--warn);}
-.cell.ro{cursor:default;}
-td.pasado .cell{opacity:.62;}
-.leyenda{display:flex;gap:16px;flex-wrap:wrap;padding:0 32px 26px;font-size:12px;color:var(--muted);align-items:center;}
-.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+/* Segmented control (días) */
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--fill);border-radius:10px;padding:2px;gap:2px;width:100%}
+.seg button{min-height:42px;border-radius:8px;font-size:13px;font-weight:600;color:var(--label);
+  text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;line-height:1.1}
+.seg button small{font-size:11px;font-weight:500;color:var(--sec)}
+.seg button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.seg button.on small{color:var(--brand-text)}
+.seg button.hoy small{color:var(--brand-text);font-weight:700}
 
-/* ── Modal ── */
-.modal{display:none;position:fixed;inset:0;background:rgba(15,20,35,.55);z-index:10000;align-items:center;justify-content:center;padding:20px;overflow-y:auto;}
-.modal.open{display:flex;}
-.modal-card{background:white;border-radius:16px;width:100%;max-width:440px;box-shadow:0 32px 80px rgba(0,0,0,.4);overflow:hidden;margin:auto;}
-.modal-head{background:linear-gradient(135deg,#1a5276,#2e86c1);color:white;padding:16px 22px;}
-.modal-head .t{font-size:16px;font-weight:800;}
-.modal-head .s{font-size:12px;opacity:.9;margin-top:2px;}
-.modal-body{padding:18px 22px;display:flex;flex-direction:column;gap:13px;}
-.f label{display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;}
-.f input{width:100%;}
-.info-row{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:7px 0;border-bottom:1px dashed #eef1f6;}
-.info-row .k{color:var(--muted);}
-.info-row .v{font-weight:600;text-align:right;}
-.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:#f1f4f9;border-radius:10px;padding:4px;}
-.seg button{border:0;background:transparent;border-radius:8px;padding:9px 6px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;}
-.seg button.on{background:white;box-shadow:0 1px 4px rgba(0,0,0,.12);}
-.seg button.on[data-v="completa"]{color:var(--success);}
-.seg button.on[data-v="incompleta"]{color:var(--warn);}
-.seg button.on[data-v=""]{color:var(--text);}
-.seg button:disabled{cursor:not-allowed;opacity:.65;}
-.hint{font-size:12px;color:var(--muted);}
-.err{color:var(--warn);font-size:13px;min-height:18px;}
-.modal-foot{padding:14px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);flex-wrap:wrap;}
-.msg{margin:0 32px;padding:10px 14px;border-radius:10px;font-size:13px;display:none;}
-.msg.ok{display:block;background:#eafaf1;color:#1e7a4d;}
-.msg.err{display:block;background:#fdecec;color:var(--warn);}
-@media(max-width:700px){.header,.topbar,.kpis,.grid-wrap,.leyenda{padding-left:14px;padding-right:14px;}.grid-wrap{margin-left:10px;margin-right:10px;}}
+/* ── Contenido ── */
+main{max-width:1180px;margin:0 auto;padding:18px 16px calc(env(safe-area-inset-bottom) + 40px);
+  display:flex;flex-direction:column;gap:22px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:10px}
+.tile{background:var(--card);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;box-shadow:var(--shadow)}
+.tile .l{font-size:13px;color:var(--sec)}
+.tile .n{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.sect{display:flex;flex-direction:column;gap:7px}
+.sect .hdr{padding:0 16px;font-size:13px;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.sect .ftr{padding:0 16px;font-size:13px;color:var(--sec)}
+.group{background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+
+/* Fila de espacio (vista de día) */
+.row{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 16px;position:relative;width:100%}
+.row + .row::before{content:"";position:absolute;left:78px;right:0;top:0;height:.5px;background:var(--sep)}
+.row .hr{width:50px;flex:none;font-size:15px;font-weight:600;color:var(--sec);font-variant-numeric:tabular-nums}
+.row .main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.row .t{font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .s{font-size:13px;color:var(--sec)}
+.row.libre .t{color:var(--ter)}
+.row.libre .add{color:var(--brand-text);font-size:15px;font-weight:600}
+button.row:active{background:var(--fill)}
+.row.ro{cursor:default}
+.chev{width:8px;height:14px;flex:none;stroke:var(--ter);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.pill{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:12px;
+  font-size:12px;font-weight:600;white-space:nowrap;flex:none}
+.pill.ok{background:var(--green-tint);color:var(--green)}
+.pill.bad{background:var(--red-tint);color:var(--red)}
+.pill.status{background:var(--status-fill);color:var(--status-ink)}
+.pasado{opacity:.55}
+
+/* ── Grid semanal (pantallas grandes) ── */
+.grid-wrap{background:var(--card);border-radius:14px;overflow:auto;box-shadow:var(--shadow);max-height:calc(100dvh - 300px)}
+table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:760px}
+table.grid th,table.grid td{padding:0;border-bottom:.5px solid var(--sep);border-right:.5px solid var(--sep)}
+table.grid th:last-child,table.grid td:last-child{border-right:0}
+table.grid thead th{position:sticky;top:0;z-index:3;background:var(--card);padding:11px 8px;
+  font-size:13px;font-weight:600;text-align:center;letter-spacing:-.01em}
+table.grid thead th small{display:block;font-weight:500;color:var(--sec);font-size:12px;margin-top:1px}
+table.grid thead th.hoy{color:var(--brand-text)}
+table.grid thead th.hoy small{color:var(--brand-text)}
+td.h,th.h{position:sticky;left:0;z-index:2;background:var(--card);width:66px;min-width:66px;text-align:center;
+  font-size:13px;font-weight:600;color:var(--sec);font-variant-numeric:tabular-nums}
+thead th.h{z-index:4}
+tr.blk td{background:var(--fill);color:var(--sec);font-weight:600;font-size:12.5px;
+  letter-spacing:.01em;padding:7px 14px;position:sticky;left:0}
+td.slot{padding:3px}
+.cell{width:100%;min-height:44px;border-radius:9px;background:var(--slot);color:var(--ter);
+  font-size:20px;font-weight:300;display:flex;align-items:center;justify-content:center;transition:background .12s}
+.cell:hover,.cell:active{background:var(--fill2)}
+.cell.taken:hover{filter:brightness(.97)}
+@media (prefers-color-scheme:dark){.cell.taken:hover{filter:brightness(1.25)}}
+.cell.taken{display:block;text-align:left;padding:6px 9px;font-size:13px;color:var(--label);background:var(--fill)}
+.cell.taken .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
+.cell.taken .st{font-size:12px;font-weight:500;margin-top:1px;color:var(--sec)}
+.cell.completa{background:var(--green-tint)} .cell.completa .st{color:var(--green)}
+.cell.incompleta{background:var(--red-tint)} .cell.incompleta .st{color:var(--red)}
+.cell.ro{cursor:default}
+td.pasado .cell{opacity:.55}
+.leyenda{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--sec);align-items:center;padding:0 4px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+
+/* ── Sheet / modal ── */
+.sheet{position:fixed;inset:0;z-index:100;display:none}
+.sheet.open{display:block}
+.sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.45)}
+.sheet-panel{position:absolute;left:0;right:0;bottom:0;max-height:92dvh;background:var(--bg);
+  border-radius:18px 18px 0 0;display:flex;flex-direction:column;
+  padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -12px 40px rgba(0,0,0,.28)}
+.sheet-h{display:flex;align-items:center;gap:10px;padding:8px 16px;min-height:52px;border-bottom:.5px solid var(--sep)}
+.sheet-h .tt{flex:1;text-align:center;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet-h .act{color:var(--brand-text);font-weight:600;min-height:44px;display:flex;align-items:center;flex:none;font-size:16px}
+.sheet-h .act.plain{font-weight:400}
+.sheet-h .act:disabled{opacity:.4}
+.sheet-body{overflow:auto;padding:14px 16px 20px;display:flex;flex-direction:column;gap:18px}
+.sheet-sub{font-size:13px;color:var(--sec);text-align:center;margin-top:-6px}
+.f-group{background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+.f-row{display:flex;align-items:center;gap:12px;min-height:48px;padding:4px 16px;position:relative}
+.f-row + .f-row::before{content:"";position:absolute;left:16px;right:0;top:0;height:.5px;background:var(--sep)}
+.f-row label{width:92px;flex:none;font-size:16px}
+.f-row input{flex:1;min-width:0;border:0;background:transparent;color:var(--label);outline:none;min-height:44px;font-size:16px;text-align:right}
+.f-row input::placeholder{color:var(--ter)}
+.f-row .v{flex:1;text-align:right;font-size:16px;color:var(--sec);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seg-rutina{display:grid;grid-template-columns:repeat(3,1fr);background:var(--fill);border-radius:10px;padding:2px;gap:2px}
+.seg-rutina button{min-height:42px;border-radius:8px;font-size:14px;font-weight:600;color:var(--label);text-align:center}
+.seg-rutina button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.seg-rutina button.on[data-v="completa"]{color:var(--green)}
+.seg-rutina button.on[data-v="incompleta"]{color:var(--red)}
+.seg-rutina button:disabled{opacity:.45}
+.hint{font-size:13px;color:var(--sec);padding:0 4px}
+.err{color:var(--red);font-size:14px;min-height:20px;padding:0 4px}
+.btn-destroy{background:var(--card);border-radius:12px;min-height:50px;width:100%;display:flex;
+  align-items:center;justify-content:center;color:var(--red);font-size:17px;font-weight:500;box-shadow:var(--shadow)}
+.btn-destroy:active{background:var(--fill)}
+
+/* Toast */
+.toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 20px);max-width:420px;
+  margin:0 auto;background:var(--label);color:var(--bg);padding:12px 16px;border-radius:14px;
+  font-size:14px;text-align:center;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:.95}
+.toast.bad{background:var(--red);color:#fff}
+.empty{background:var(--card);border-radius:12px;padding:30px 16px;text-align:center;color:var(--sec);font-size:15px;box-shadow:var(--shadow)}
+.skel{height:56px;border-radius:12px;background:var(--card);opacity:.6}
+
+@media (min-width:821px){
+  .sheet-panel{left:50%;right:auto;bottom:auto;top:50%;transform:translate(-50%,-50%);
+    width:min(460px,92vw);border-radius:16px;max-height:88dvh}
+}
+@media (max-width:560px){
+  .nav-title{font-size:24px}
+  .tiles{grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px}
+  .tile{padding:10px 12px}
+  .tile .n{font-size:20px}
+  .tile .l{font-size:12px}
+  .solo-ancho{display:none}
+  main{gap:18px;padding-top:14px}
+}
 </style>
 </head>
 <body>
@@ -117,65 +229,79 @@ td.pasado .cell{opacity:.62;}
     <div class="login-logo">📏</div>
     <h2>Mediciones</h2>
     <div class="login-sub">Agenda semanal por sede</div>
-    <div class="login-field"><label>Correo</label><input type="email" id="loginEmail" autocomplete="username"></div>
-    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" autocomplete="current-password"></div>
-    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div class="field"><input type="email" id="loginEmail" placeholder="Correo" autocomplete="username" inputmode="email" autocapitalize="none"></div>
+    <div class="field"><input type="password" id="loginPassword" placeholder="Contraseña" autocomplete="current-password"></div>
     <div class="login-err" id="loginError"></div>
+    <button class="btn-fill" id="loginBtn" onclick="doLogin()">Entrar</button>
   </div>
 </div>
 
-<div id="app" style="display:none;">
-  <div class="header">
-    <h1>📏 Mediciones <span id="sedeTitle"></span></h1>
-    <div class="header-right">
-      <a id="btnVolverApp" class="logout-btn" href="/movil" style="display:none;">← App móvil</a>
-      <span>👤 <span id="userNombre">—</span> <span id="userRol" style="opacity:.8;"></span></span>
-      <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+<div id="app" hidden>
+  <header class="nav">
+    <div class="nav-in">
+      <div class="nav-row">
+        <span class="nav-title">Mediciones <span class="sede" id="sedeTitle"></span></span>
+        <a id="btnVolverApp" class="nav-act" href="/movil" hidden>App móvil</a>
+        <button class="nav-act plain" onclick="doLogout()">Salir</button>
+      </div>
+      <div class="nav-row" style="min-height:20px">
+        <span class="who">👤 <span id="userNombre">—</span> <span id="userRol"></span></span>
+      </div>
+      <div class="nav-tools">
+        <span id="sedeControl"></span>
+        <div class="stepper">
+          <button onclick="cambiarSemana(-1)" aria-label="Semana anterior">‹</button>
+          <span class="sepv"></span>
+          <button onclick="cambiarSemana(1)" aria-label="Semana siguiente">›</button>
+        </div>
+        <span class="week-label" id="weekLabel">—</span>
+        <button class="btn-soft" onclick="irHoy()">Hoy</button>
+        <span class="spacer"></span>
+        <button class="btn-soft gris" onclick="cargar()">↻</button>
+        <button class="btn-soft gris solo-ancho" onclick="imprimirSemana()">🖨️ Imprimir</button>
+      </div>
+      <div class="seg" id="segDias" hidden></div>
+    </div>
+  </header>
+
+  <main>
+    <div class="tiles">
+      <div class="tile"><span class="l">Agendadas</span><span class="n num" id="kAgend">0</span></div>
+      <div class="tile"><span class="l">Completas</span><span class="n num" id="kComp" style="color:var(--green)">0</span></div>
+      <div class="tile"><span class="l">Incompletas</span><span class="n num" id="kInc" style="color:var(--red)">0</span></div>
+      <div class="tile"><span class="l">Pendientes</span><span class="n num" id="kPend">0</span></div>
+      <div class="tile"><span class="l">Libres</span><span class="n num" id="kLibres" style="color:var(--sec)">0</span></div>
+    </div>
+
+    <div id="contenido"></div>
+
+    <div class="leyenda">
+      <span><span class="dot" style="background:var(--ter)"></span>Pendiente de rutina</span>
+      <span><span class="dot" style="background:var(--green)"></span>Rutina completa</span>
+      <span><span class="dot" style="background:var(--red)"></span>Rutina incompleta</span>
+      <span id="leyRol"></span>
+    </div>
+  </main>
+</div>
+
+<div class="sheet" id="modal">
+  <div class="sheet-bg" onclick="cerrar()"></div>
+  <div class="sheet-panel" role="dialog" aria-label="Medición">
+    <div class="sheet-h">
+      <button class="act plain" onclick="cerrar()">Cancelar</button>
+      <span class="tt" id="mTitulo">Medición</span>
+      <button class="act" id="mSave" hidden>Guardar</button>
+    </div>
+    <div class="sheet-body">
+      <div class="sheet-sub" id="mSub">—</div>
+      <div id="mBody"></div>
+      <div class="err" id="mErr"></div>
+      <div id="mFoot"></div>
     </div>
   </div>
-
-  <div class="topbar">
-    <span class="dash-title">🗓️ Semana</span>
-    <span id="sedeControl"></span>
-    <div class="week-nav">
-      <button class="btn" onclick="cambiarSemana(-1)">‹</button>
-      <span class="week-label" id="weekLabel">—</span>
-      <button class="btn" onclick="cambiarSemana(1)">›</button>
-      <button class="btn" onclick="irHoy()">Esta semana</button>
-    </div>
-    <div class="spacer"></div>
-    <button class="btn" onclick="cargar()">↻ Recargar</button>
-    <button class="btn" onclick="imprimirSemana()">🖨️ Imprimir</button>
-  </div>
-
-  <div class="msg" id="msg"></div>
-
-  <div class="kpis">
-    <div class="kpi"><div class="l">Agendadas</div><div class="n" id="kAgend">0</div></div>
-    <div class="kpi"><div class="l">Rutina completa</div><div class="n" id="kComp" style="color:var(--success)">0</div></div>
-    <div class="kpi"><div class="l">Rutina incompleta</div><div class="n" id="kInc" style="color:var(--warn)">0</div></div>
-    <div class="kpi"><div class="l">Pendientes de rutina</div><div class="n" id="kPend" style="color:var(--pend)">0</div></div>
-    <div class="kpi"><div class="l">Espacios libres</div><div class="n" id="kLibres" style="color:var(--muted)">0</div></div>
-  </div>
-
-  <div class="grid-wrap"><table class="grid" id="grid"></table></div>
-
-  <div class="leyenda">
-    <span><span class="dot" style="background:#d8dde6"></span>Pendiente de rutina</span>
-    <span><span class="dot" style="background:#a9e3c4"></span>Rutina completa</span>
-    <span><span class="dot" style="background:#f3c0c0"></span>Rutina incompleta</span>
-    <span id="leyRol"></span>
-  </div>
 </div>
 
-<!-- Modal medición -->
-<div class="modal" id="modal">
-  <div class="modal-card">
-    <div class="modal-head"><div class="t" id="mTitulo">Nueva medición</div><div class="s" id="mSub">—</div></div>
-    <div class="modal-body" id="mBody"></div>
-    <div class="modal-foot" id="mFoot"></div>
-  </div>
-</div>
+<div class="toast" id="toast"></div>
 
 <script src="/sesion.js"></script>
 <script>
@@ -183,8 +309,11 @@ const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','instructor','admin_sedes','admin_g','admin'];
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_META={'3 Ríos':{icon:'🌊'},'Natación':{icon:'🏊'},'Pinares':{icon:'🌲'},'Sabanilla':{icon:'🏙️'}};
-const DIAS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-const ROL_LABEL={admin:'⚙ Admin',admin_sedes:'🏢 Admin Sedes',admin_g:'💰 Admin Gastos',recepcion:'🧾 Recepción',admin_sucursal:'🏪 Admin Sucursal',instructor:'🏋️ Instructor'};
+// Solo días hábiles: sábado y domingo no hay medición.
+const DIAS=['Lunes','Martes','Miércoles','Jueves','Viernes'];
+const DIAS_CORTO=['Lun','Mar','Mié','Jue','Vie'];
+const NDIAS=DIAS.length;
+const ROL_LABEL={admin:'⚙ Admin',admin_sedes:'🏢 Admin Sedes',admin_g:'💰 Admin Gastos',recepcion:'🧾 Recepción',admin_sucursal:'🏪 Admin Sucursal',coordinador:'📋 Coordinador',instructor:'🏋️ Instructor'};
 
 // Espacios de 15 min: mañana 08:00→10:45 · tarde 17:00→19:45 (la última es la hora de inicio)
 const SLOTS_AM=[], SLOTS_PM=[];
@@ -206,7 +335,12 @@ function _sesionExpirada(motivo) {
   try { doLogout(true); } catch (_) {}
   var e = document.getElementById('loginError'); if (e) e.textContent = msg;
 }
-let lunes=lunesDe(new Date()), citas={}, reqSeq=0;
+
+let lunes=lunesDe(new Date()), citas={}, reqSeq=0, diaSel=diaHabilDeHoy();
+// En pantallas angostas se muestra un día a la vez; en grandes, la semana completa.
+const mqAncho=window.matchMedia('(min-width:821px)');
+let vistaSemana=mqAncho.matches;
+mqAncho.addEventListener('change',e=>{vistaSemana=e.matches;render();});
 
 // ── Helpers ──
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -214,13 +348,15 @@ const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${Str
 const todayStr=()=>ymd(new Date());
 function lunesDe(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);x.setHours(0,0,0,0);return x;}
 function diaDe(i){const d=new Date(lunes);d.setDate(d.getDate()+i);return d;}
+function diaHabilDeHoy(){const i=(new Date().getDay()+6)%7;return i<NDIAS?i:0;}  // sáb/dom caen en lunes
 const fechaCorta=d=>d.toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit'});
 const normHora=h=>String(h||'').slice(0,5);
 const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(currentRole);
 const puedeAgendar=()=>esAdmin()||['recepcion','admin_sucursal','coordinador'].includes(currentRole);
 const puedeRutina=()=>esAdmin()||currentRole==='instructor';
 function computeSedes(sede,extra){const set=[];[sede,...(Array.isArray(extra)?extra:[])].forEach(s=>{if(s&&SEDES.includes(s)&&!set.includes(s))set.push(s);});return set;}
-function aviso(txt,ok){const m=document.getElementById('msg');m.className='msg '+(ok?'ok':'err');m.textContent=txt;clearTimeout(m._h);m._h=setTimeout(()=>{m.className='msg';},4500);}
+function aviso(txt,ok){const t=document.getElementById('toast');t.textContent=txt;t.className='toast show'+(ok?'':' bad');clearTimeout(t._h);t._h=setTimeout(()=>{t.className='toast'+(ok?'':' bad');},3200);}
+const chev='<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg>';
 
 async function supaFetch(path,opts={}){
   const res=await fetch(SUPA_URL+'/rest/v1'+path,{method:opts.method||'GET',
@@ -246,7 +382,7 @@ async function doLogin(){
     currentSedes=computeSedes(currentSede,roles?.[0]?.sedes_extra);
     if(!ROLES_PERMITIDOS.includes(currentRole)){errEl.textContent='Su cuenta no tiene acceso a este módulo.';await doLogout(true);return;}
     if(['recepcion','admin_sucursal','coordinador','instructor'].includes(currentRole)&&!currentSede){errEl.textContent='Su cuenta no tiene sede asignada.';await doLogout(true);return;}
-    document.getElementById('loginScreen').style.display='none'; init();
+    document.getElementById('loginScreen').hidden=true; init();
   }catch(e){errEl.textContent=e.message;}finally{btn.textContent='Entrar';btn.disabled=false;}
 }
 document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
@@ -257,22 +393,22 @@ document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key
     sessionStorage.removeItem('gymAuth');
     currentToken=auth.token; Sesion.adoptar(auth);currentRole=auth.role;currentSede=auth.sede||null;currentEmail=auth.email||'';currentNombre=auth.nombre||auth.email||'';
     currentSedes=computeSedes(currentSede,auth.sedes_extra);
-    document.getElementById('loginScreen').style.display='none';setTimeout(init,0);
+    document.getElementById('loginScreen').hidden=true;setTimeout(init,0);
   }}catch(_){}})();
 
 // Volver a la app móvil si se llegó desde ahí (instalada no hay barra de Safari)
 (function(){try{const q=new URLSearchParams(location.search);
   const sa=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
   if(q.get('from')==='movil'||sa)sessionStorage.setItem('fromMovil','1');
-  if(sessionStorage.getItem('fromMovil')==='1'){const b=document.getElementById('btnVolverApp');if(b)b.style.display='';}
+  if(sessionStorage.getItem('fromMovil')==='1'){const b=document.getElementById('btnVolverApp');if(b)b.hidden=false;}
 }catch(_){}})();
 
 async function doLogout(silent){ Sesion.cerrar();
   try{await fetch(`${SUPA_URL}/auth/v1/logout`,{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}});}catch(_){}
   currentToken=null;currentRole=null;currentSede=null;currentEmail='';
-  document.getElementById('app').style.display='none';
+  document.getElementById('app').hidden=true;
   if(!silent){document.getElementById('loginEmail').value='';document.getElementById('loginPassword').value='';}
-  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('loginScreen').hidden=false;
 }
 
 // ── Init ──
@@ -283,7 +419,7 @@ function init(){
   const opciones=esAdmin()?SEDES:currentSedes;
   if(esAdmin()||currentSedes.length>1){
     if(!currentSede)currentSede=opciones[0];
-    ctrl.innerHTML=`<select id="sedeSel"></select>`;
+    ctrl.innerHTML=`<span class="sede-pick"><select id="sedeSel"></select></span>`;
     const sel=document.getElementById('sedeSel');
     sel.innerHTML=opciones.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
     sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;cargar();};
@@ -292,18 +428,20 @@ function init(){
   document.getElementById('leyRol').textContent = puedeRutina()&&!puedeAgendar()
     ? 'Como instructor solo podés marcar la rutina de cada medición.'
     : puedeAgendar()&&!puedeRutina() ? 'La rutina la marca el instructor.' : '';
-  document.getElementById('app').style.display='block';
+  document.getElementById('app').hidden=false;
   cargar();
 }
 
 function cambiarSemana(n){lunes.setDate(lunes.getDate()+n*7);cargar();}
-function irHoy(){lunes=lunesDe(new Date());cargar();}
+function irHoy(){lunes=lunesDe(new Date());diaSel=diaHabilDeHoy();cargar();}
+function verDia(i){diaSel=i;render();}
 
 // ── Datos ──
 async function cargar(){
   const seq=++reqSeq;   // si dos cargas se cruzan, solo se pinta la más reciente
-  const desde=ymd(lunes), hastaD=diaDe(6), hasta=ymd(hastaD);
-  document.getElementById('weekLabel').textContent=`${lunes.toLocaleDateString('es-CR',{day:'numeric',month:'short'})} — ${hastaD.toLocaleDateString('es-CR',{day:'numeric',month:'short',year:'numeric'})}`;
+  const desde=ymd(lunes), hastaD=diaDe(NDIAS-1), hasta=ymd(hastaD);
+  document.getElementById('weekLabel').textContent=`${lunes.toLocaleDateString('es-CR',{day:'numeric',month:'short'})} — ${hastaD.toLocaleDateString('es-CR',{day:'numeric',month:'short'})}`;
+  document.getElementById('contenido').innerHTML='<div class="sect"><div class="skel"></div></div>';
   try{
     const rows=(await supaFetch(`/mediciones?sede=eq.${encodeURIComponent(currentSede)}&fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.asc,hora.asc&select=*`))||[];
     if(seq!==reqSeq)return;
@@ -317,22 +455,71 @@ async function cargar(){
   }
 }
 
-// ── Render del calendario ──
+// ── Render ──
+const rutinaLbl=r=>r==='completa'?'Rutina completa':r==='incompleta'?'Rutina incompleta':'Pendiente de rutina';
+const rutinaPill=r=>r==='completa'?'<span class="pill ok">✓ Completa</span>'
+                   :r==='incompleta'?'<span class="pill bad">✗ Incompleta</span>'
+                   :'<span class="pill status">Pendiente</span>';
+
 function render(){
+  pintarSegDias();
+  document.getElementById('contenido').innerHTML = vistaSemana ? htmlSemana() : htmlDia();
+  const list=Object.values(citas);
+  const comp=list.filter(c=>c.rutina==='completa').length, inc=list.filter(c=>c.rutina==='incompleta').length;
+  document.getElementById('kAgend').textContent=list.length;
+  document.getElementById('kComp').textContent=comp;
+  document.getElementById('kInc').textContent=inc;
+  document.getElementById('kPend').textContent=list.length-comp-inc;
+  document.getElementById('kLibres').textContent=(SLOTS.length*NDIAS)-list.length;
+}
+
+function pintarSegDias(){
+  const seg=document.getElementById('segDias');
+  if(vistaSemana){seg.hidden=true;return;}
+  const hoy=todayStr();
+  seg.hidden=false;
+  seg.innerHTML=DIAS_CORTO.map((d,i)=>{const f=ymd(diaDe(i));const n=Object.keys(citas).filter(k=>k.startsWith(f+'|')).length;
+    return `<button class="${i===diaSel?'on':''} ${f===hoy?'hoy':''}" onclick="verDia(${i})">${d}<small>${f===hoy?'Hoy':fechaCorta(diaDe(i))}${n?' · '+n:''}</small></button>`;}).join('');
+}
+
+// Vista de un día (teléfono): lista de espacios agrupada en mañana y tarde
+function htmlDia(){
+  const f=ymd(diaDe(diaSel)), hoy=todayStr(), pasado=f<hoy?' pasado':'';
+  const bloque=(titulo,slots)=>{
+    const filas=slots.map(m=>{
+      const h=hhmm(m), c=citas[f+'|'+h];
+      if(c) return `<button class="row${pasado}" onclick="abrir('${f}','${h}')">
+        <span class="hr">${h}</span>
+        <span class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}</span></span>
+        ${rutinaPill(c.rutina)}${chev}</button>`;
+      return puedeAgendar()
+        ? `<button class="row libre${pasado}" onclick="abrir('${f}','${h}')"><span class="hr">${h}</span><span class="main"><span class="t">Libre</span></span><span class="add">Agendar</span></button>`
+        : `<div class="row libre ro${pasado}"><span class="hr">${h}</span><span class="main"><span class="t">Libre</span></span></div>`;
+    }).join('');
+    return `<div class="sect"><div class="hdr">${titulo}</div><div class="group">${filas}</div></div>`;
+  };
+  return `<div style="display:flex;flex-direction:column;gap:22px">
+    ${bloque('🌅 Mañana · 8:00 a 10:45',SLOTS_AM)}
+    ${bloque('🌇 Tarde · 5:00 a 7:45 p. m.',SLOTS_PM)}
+  </div>`;
+}
+
+// Vista semanal (pantallas grandes)
+function htmlSemana(){
   const hoy=todayStr();
   let head='<thead><tr><th class="h">Hora</th>';
-  for(let i=0;i<7;i++){const d=diaDe(i);const f=ymd(d);
+  for(let i=0;i<NDIAS;i++){const d=diaDe(i);const f=ymd(d);
     head+=`<th class="${f===hoy?'hoy':''}">${DIAS[i]}<small>${fechaCorta(d)}${f===hoy?' · hoy':''}</small></th>`;}
   head+='</tr></thead>';
 
   const fila=m=>{
     let tr=`<tr><td class="h">${hhmm(m)}</td>`;
-    for(let i=0;i<7;i++){
+    for(let i=0;i<NDIAS;i++){
       const d=diaDe(i), f=ymd(d), h=hhmm(m), c=citas[f+'|'+h];
       const pasado=f<hoy?' pasado':'';
       if(c){
         const est=c.rutina||'pend';
-        const lbl=c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':'• Pendiente';
+        const lbl=c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':'Pendiente';
         tr+=`<td class="slot${pasado}"><div class="cell taken ${est}" onclick="abrir('${f}','${h}')" title="${esc(c.nombre)}">
               <div class="nm">${esc(c.nombre)}</div><div class="st">${lbl}</div></div></td>`;
       }else{
@@ -344,79 +531,75 @@ function render(){
     return tr+'</tr>';
   };
 
+  const COLS=NDIAS+1;
   let body='<tbody>';
-  body+=`<tr class="blk"><td colspan="8">🌅 MAÑANA · 8:00 a 10:45</td></tr>`;
+  body+=`<tr class="blk"><td colspan="${COLS}">🌅 Mañana · 8:00 a 10:45</td></tr>`;
   SLOTS_AM.forEach(m=>body+=fila(m));
-  body+=`<tr class="blk"><td colspan="8">🌇 TARDE · 5:00 a 7:45 p. m.</td></tr>`;
+  body+=`<tr class="blk"><td colspan="${COLS}">🌇 Tarde · 5:00 a 7:45 p. m.</td></tr>`;
   SLOTS_PM.forEach(m=>body+=fila(m));
   body+='</tbody>';
-  document.getElementById('grid').innerHTML=head+body;
-
-  const list=Object.values(citas);
-  const comp=list.filter(c=>c.rutina==='completa').length, inc=list.filter(c=>c.rutina==='incompleta').length;
-  document.getElementById('kAgend').textContent=list.length;
-  document.getElementById('kComp').textContent=comp;
-  document.getElementById('kInc').textContent=inc;
-  document.getElementById('kPend').textContent=list.length-comp-inc;
-  document.getElementById('kLibres').textContent=(SLOTS.length*7)-list.length;
+  return `<div class="grid-wrap"><table class="grid">${head+body}</table></div>`;
 }
 
-// ── Modal ──
-let mFecha=null,mHora=null,mRutina=null;
-function cerrar(){document.getElementById('modal').classList.remove('open');}
-document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')cerrar();});
+// ── Sheet de medición ──
+let mFecha=null,mHora=null,mRutina=null,mId=null;
+function cerrar(){document.getElementById('modal').classList.remove('open');document.body.style.overflow='';}
 
 function abrir(f,h){
-  mFecha=f; mHora=h;
+  mFecha=f; mHora=h; mId=null;
   const c=citas[f+'|'+h];
   const d=new Date(f+'T00:00:00');
-  const sub=`${d.toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'})} · ${h} · ${currentSede}`;
-  document.getElementById('mSub').textContent=sub;
+  document.getElementById('mSub').textContent=`${d.toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'})} · ${h} · ${currentSede}`;
+  document.getElementById('mErr').textContent='';
+  const save=document.getElementById('mSave');
+
   if(!c){
     if(!puedeAgendar())return;
     document.getElementById('mTitulo').textContent='Nueva medición';
     document.getElementById('mBody').innerHTML=`
-      <div class="f"><label>Nombre *</label><input type="text" id="fNombre" placeholder="Nombre del cliente" autocomplete="off"></div>
-      <div class="f"><label>Número de teléfono</label><input type="tel" id="fTel" placeholder="8888-8888" autocomplete="off"></div>
-      <div class="f"><label>PIN</label><input type="text" id="fPin" placeholder="PIN del cliente" autocomplete="off"></div>
-      <div class="info-row"><span class="k">Agendado por</span><span class="v">${esc(currentNombre||currentEmail)}</span></div>
-      <div class="hint">La rutina (completa / incompleta) la marca el instructor.</div>
-      <div class="err" id="mErr"></div>`;
-    document.getElementById('mFoot').innerHTML=`
-      <button class="btn" onclick="cerrar()">Cancelar</button>
-      <button class="btn btn-primary" id="mSave" onclick="guardarNueva()">Agendar</button>`;
-    setTimeout(()=>document.getElementById('fNombre').focus(),50);
+      <div class="f-group">
+        <div class="f-row"><label>Nombre</label><input type="text" id="fNombre" placeholder="Obligatorio" autocomplete="off"></div>
+        <div class="f-row"><label>Teléfono</label><input type="tel" id="fTel" placeholder="8888-8888" autocomplete="off"></div>
+        <div class="f-row"><label>PIN</label><input type="text" id="fPin" placeholder="PIN del cliente" autocomplete="off"></div>
+        <div class="f-row"><label>Agendó</label><span class="v">${esc(currentNombre||currentEmail)}</span></div>
+      </div>
+      <div class="hint">La rutina (completa / incompleta) la marca el instructor.</div>`;
+    document.getElementById('mFoot').innerHTML='';
+    save.hidden=false; save.textContent='Agendar'; save.disabled=false; save.onclick=guardarNueva;
+    setTimeout(()=>document.getElementById('fNombre').focus(),120);
   }else{
-    mRutina=c.rutina||'';
-    document.getElementById('mTitulo').textContent=esc(c.nombre);
+    mId=c.id; mRutina=c.rutina||'';
+    document.getElementById('mTitulo').textContent=c.nombre;
     const editable=puedeAgendar();
     document.getElementById('mBody').innerHTML=`
-      ${editable?`
-        <div class="f"><label>Nombre *</label><input type="text" id="fNombre" value="${esc(c.nombre)}"></div>
-        <div class="f"><label>Número de teléfono</label><input type="tel" id="fTel" value="${esc(c.telefono||'')}"></div>
-        <div class="f"><label>PIN</label><input type="text" id="fPin" value="${esc(c.pin||'')}"></div>`
-      :`<div class="info-row"><span class="k">Nombre</span><span class="v">${esc(c.nombre)}</span></div>
-        <div class="info-row"><span class="k">Teléfono</span><span class="v">${esc(c.telefono||'—')}</span></div>
-        <div class="info-row"><span class="k">PIN</span><span class="v">${esc(c.pin||'—')}</span></div>`}
-      <div class="info-row"><span class="k">Agendado por</span><span class="v">${esc(c.agendado_por_nombre||c.agendado_por||'—')}</span></div>
-      <div>
-        <label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:6px;">Rutina ${puedeRutina()?'':'(la marca el instructor)'}</label>
-        <div class="seg" id="segRutina">
+      <div class="f-group">
+        ${editable?`
+          <div class="f-row"><label>Nombre</label><input type="text" id="fNombre" value="${esc(c.nombre)}"></div>
+          <div class="f-row"><label>Teléfono</label><input type="tel" id="fTel" value="${esc(c.telefono||'')}" placeholder="—"></div>
+          <div class="f-row"><label>PIN</label><input type="text" id="fPin" value="${esc(c.pin||'')}" placeholder="—"></div>`
+        :`<div class="f-row"><label>Nombre</label><span class="v">${esc(c.nombre)}</span></div>
+          <div class="f-row"><label>Teléfono</label><span class="v">${esc(c.telefono||'—')}</span></div>
+          <div class="f-row"><label>PIN</label><span class="v">${esc(c.pin||'—')}</span></div>`}
+        <div class="f-row"><label>Agendó</label><span class="v">${esc(c.agendado_por_nombre||c.agendado_por||'—')}</span></div>
+      </div>
+      <div class="sect" style="gap:7px">
+        <div class="hdr" style="padding:0 4px">Rutina${puedeRutina()?'':' · la marca el instructor'}</div>
+        <div class="seg-rutina" id="segRutina">
           <button data-v="" onclick="setRutina('')" ${puedeRutina()?'':'disabled'}>Pendiente</button>
           <button data-v="completa" onclick="setRutina('completa')" ${puedeRutina()?'':'disabled'}>✓ Completa</button>
           <button data-v="incompleta" onclick="setRutina('incompleta')" ${puedeRutina()?'':'disabled'}>✗ Incompleta</button>
         </div>
-        ${c.rutina_por?`<div class="hint" style="margin-top:6px;">Marcada por ${esc(c.rutina_por)}${c.rutina_at?' · '+new Date(c.rutina_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</div>`:''}
-      </div>
-      <div class="err" id="mErr"></div>`;
+        ${c.rutina_por?`<div class="hint">Marcada por ${esc(c.rutina_por)}${c.rutina_at?' · '+new Date(c.rutina_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</div>`:''}
+      </div>`;
     pintarSeg();
-    document.getElementById('mFoot').innerHTML=`
-      ${puedeAgendar()?`<button class="btn btn-danger" onclick="borrar('${c.id}')">🗑 Eliminar</button>`:''}
-      <div class="spacer"></div>
-      <button class="btn" onclick="cerrar()">Cerrar</button>
-      ${(editable||puedeRutina())?`<button class="btn btn-primary" id="mSave" onclick="guardarEdicion('${c.id}')">Guardar</button>`:''}`;
+    document.getElementById('mFoot').innerHTML = puedeAgendar()
+      ? `<button class="btn-destroy" onclick="borrar('${c.id}')">Eliminar medición</button>` : '';
+    const puedeGuardar=editable||puedeRutina();
+    save.hidden=!puedeGuardar; save.textContent='Guardar'; save.disabled=false;
+    save.onclick=()=>guardarEdicion(c.id);
   }
   document.getElementById('modal').classList.add('open');
+  document.body.style.overflow='hidden';
 }
 function setRutina(v){mRutina=v;pintarSeg();}
 function pintarSeg(){document.querySelectorAll('#segRutina button').forEach(b=>b.classList.toggle('on',b.dataset.v===mRutina));}
@@ -465,20 +648,20 @@ async function borrar(id){
 
 // ── Impresión de la semana ──
 function imprimirSemana(){
-  const hoy=todayStr();
+  const COLS=NDIAS+1;
   let head='<tr><th>Hora</th>';
-  for(let i=0;i<7;i++){const d=diaDe(i);head+=`<th>${DIAS[i]}<br><small>${fechaCorta(d)}</small></th>`;}
+  for(let i=0;i<NDIAS;i++){const d=diaDe(i);head+=`<th>${DIAS[i]}<br><small>${fechaCorta(d)}</small></th>`;}
   head+='</tr>';
   const fila=m=>{let tr=`<tr><td class="h">${hhmm(m)}</td>`;
-    for(let i=0;i<7;i++){const f=ymd(diaDe(i)),h=hhmm(m),c=citas[f+'|'+h];
+    for(let i=0;i<NDIAS;i++){const f=ymd(diaDe(i)),h=hhmm(m),c=citas[f+'|'+h];
       tr+=c?`<td class="${c.rutina||'pend'}"><b>${esc(c.nombre)}</b>${c.telefono?'<br><span class="tel">'+esc(c.telefono)+'</span>':''}${c.pin?'<br><span class="tel">PIN '+esc(c.pin)+'</span>':''}<br><span class="rt">${c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':'☐ Pendiente'}</span></td>`:'<td></td>';}
     return tr+'</tr>';};
-  let body=`<tr class="blk"><td colspan="8">MAÑANA · 8:00 a 10:45</td></tr>`;
+  let body=`<tr class="blk"><td colspan="${COLS}">MAÑANA · 8:00 a 10:45</td></tr>`;
   SLOTS_AM.forEach(m=>body+=fila(m));
-  body+=`<tr class="blk"><td colspan="8">TARDE · 5:00 a 7:45 p. m.</td></tr>`;
+  body+=`<tr class="blk"><td colspan="${COLS}">TARDE · 5:00 a 7:45 p. m.</td></tr>`;
   SLOTS_PM.forEach(m=>body+=fila(m));
   const html=`<!doctype html><html><head><meta charset="utf-8"><title>Mediciones ${esc(currentSede)}</title>
-  <style>*{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;}body{margin:16px;color:#111;}
+  <style>*{font-family:-apple-system,"SF Pro Text",Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;}body{margin:16px;color:#111;}
   h1{font-size:17px;margin:0 0 2px;}.sub{font-size:12px;color:#555;margin:0 0 12px;}
   table{width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;}
   th,td{border:1px solid #999;padding:3px 4px;vertical-align:top;height:34px;}
@@ -488,7 +671,7 @@ function imprimirSemana(){
   td.completa{background:#eafaf1;}td.incompleta{background:#fdecec;}td.pend{background:#fafafa;}
   @page{size:landscape;margin:10mm;}@media print{.noprint{display:none;}}</style></head><body>
   <h1>📏 Mediciones — ${esc(currentSede)}</h1>
-  <div class="sub">Semana del ${lunes.toLocaleDateString('es-CR',{day:'numeric',month:'long'})} al ${diaDe(6).toLocaleDateString('es-CR',{day:'numeric',month:'long',year:'numeric'})} · impreso ${new Date().toLocaleString('es-CR')}</div>
+  <div class="sub">Semana del ${lunes.toLocaleDateString('es-CR',{day:'numeric',month:'long'})} al ${diaDe(NDIAS-1).toLocaleDateString('es-CR',{day:'numeric',month:'long',year:'numeric'})} · impreso ${new Date().toLocaleString('es-CR')}</div>
   <table>${head}${body}</table>
   <button class="noprint" onclick="window.print()" style="margin-top:14px;padding:8px 16px;font-size:14px;cursor:pointer;">🖨️ Imprimir</button>
   </body></html>`;
