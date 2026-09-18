@@ -2,60 +2,26 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F2F2F7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icons/favicon-64.png">
 <title>Inventario</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="/ui.css">
 <style>
-:root { --primary:#1a5276; --primary-light:#2e86c1; --accent:#148f77; --accent2:#e67e22; --bg:#f0f4f8; --border:#d5dce8; --text:#1c2833; --muted:#6c757d; --warn:#c0392b; --success:#27ae60; }
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:'Segoe UI',Arial,sans-serif; background:radial-gradient(1100px 560px at 100% -10%, #fde7c9 0%, transparent 55%), radial-gradient(800px 460px at -10% 8%, #dbeafe 0%, transparent 50%), #eef2f8; color:var(--text); font-size:14px; min-height:100vh; }
-#loginScreen { position:fixed; inset:0; background:linear-gradient(135deg,#0f0c29,#302b63 50%,#24243e); display:flex; align-items:center; justify-content:center; z-index:9999; }
-.login-card { background:white; border-radius:24px; padding:40px 44px; width:100%; max-width:420px; box-shadow:0 32px 80px rgba(0,0,0,.5); }
-.login-logo { width:64px; height:64px; background:linear-gradient(135deg,#b9770e,#e67e22); border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:30px; margin:0 auto 20px; }
-.login-card h2 { text-align:center; font-size:1.4em; font-weight:800; color:#2d2d5e; margin-bottom:6px; }
-.login-card .login-sub { text-align:center; font-size:.85em; color:#888; margin-bottom:28px; }
-.login-field { margin-bottom:16px; }
-.login-field label { display:block; font-size:.8em; font-weight:700; color:#444; text-transform:uppercase; margin-bottom:6px; }
-.login-field input { width:100%; padding:11px 14px; border:1.5px solid #dde1f0; border-radius:10px; font-size:14px; }
-.login-btn { width:100%; padding:13px; background:linear-gradient(135deg,#b9770e,#e67e22); color:white; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; margin-top:8px; }
-.login-btn:disabled { opacity:.6; }
-#loginError { text-align:center; color:#c62828; font-size:13px; margin-top:12px; min-height:18px; }
-.header { background:linear-gradient(115deg,#7c4a03 0%,#b9770e 45%,#e67e22 100%); color:white; padding:20px 32px; display:flex; align-items:center; gap:16px; box-shadow:0 6px 24px rgba(124,74,3,.32); flex-wrap:wrap; }
-.header-icon { font-size:36px; filter:drop-shadow(0 2px 4px rgba(0,0,0,.3)); }
-.header h1 { font-size:21px; font-weight:700; }
-.header p { font-size:13px; opacity:.85; margin-top:2px; }
-.header-right { margin-left:auto; display:flex; align-items:center; gap:14px; font-size:13px; }
-.logout-btn { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.35); color:white; border-radius:16px; padding:5px 16px; font-size:12px; font-weight:600; cursor:pointer; }
-.topbar { padding:12px 32px; background:white; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
-.topbar-controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-.topbar-controls label { font-size:13px; font-weight:600; color:#555; }
-.topbar-controls select, .topbar-controls input.srch { border:1.5px solid #d0d7e8; border-radius:20px; padding:6px 14px; font-size:13px; font-weight:600; color:#333; background:white; }
-.btn-primary { padding:8px 18px; border-radius:10px; border:none; background:linear-gradient(135deg,#b9770e,#e67e22); color:white; font-size:13px; font-weight:700; cursor:pointer; }
-.btn-ghost { padding:7px 16px; border-radius:8px; border:1px solid var(--border); background:white; font-size:13px; cursor:pointer; color:var(--primary); font-weight:600; }
-.btn-ghost:hover { background:var(--bg); }
-.btn-del { background:#fdecea; border:1px solid #f5c6c0; color:var(--warn); border-radius:8px; padding:4px 9px; font-size:13px; cursor:pointer; }
-.kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; padding:22px 32px 8px; }
-.kpi { background:rgba(255,255,255,.92); backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,.7); border-radius:16px; padding:16px 18px; border-left:5px solid var(--primary); box-shadow:0 8px 22px rgba(124,74,3,.08); }
-.kpi.orange { border-color:var(--accent2); } .kpi.red { border-color:var(--warn); } .kpi.green { border-color:var(--success); }
-.kpi-label { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
-.kpi-value { font-size:23px; font-weight:700; color:var(--primary); margin-top:4px; }
-.kpi.orange .kpi-value { color:var(--accent2); } .kpi.red .kpi-value { color:var(--warn); }
-.kpi-sub { font-size:11px; color:var(--muted); margin-top:2px; }
-.section { padding:8px 32px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-.section-title { font-size:15px; font-weight:700; color:var(--primary); border-left:4px solid var(--primary-light); padding-left:10px; }
-.tbl-wrap { overflow-x:auto; background:rgba(255,255,255,.95); border-radius:16px; box-shadow:0 8px 22px rgba(124,74,3,.08); margin:0 32px 16px; }
-table.tbl { width:100%; border-collapse:collapse; min-width:820px; }
-table.tbl th { background:#f8f9fb; font-size:11px; font-weight:700; color:var(--muted); padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); text-transform:uppercase; }
-table.tbl th.num, table.tbl td.num { text-align:right; }
-table.tbl td { padding:7px 12px; font-size:13px; border-bottom:1px solid #f2f5f9; }
-table.tbl input { width:88px; padding:5px 8px; border:1.5px solid var(--border); border-radius:7px; font-size:13px; text-align:right; }
-table.tbl input.prod { width:220px; text-align:left; }
-tr.bajo td { background:#fff8e1; } tr.faltante td { background:#fdecea; }
-.pill { display:inline-block; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:700; }
-.pill.ok { background:#e8f5e9; color:#2e7d32; } .pill.low { background:#fff3e0; color:#e65100; } .pill.falt { background:#ffebee; color:#c62828; } .pill.sob { background:#e3f2fd; color:#1565c0; }
-.loading, .empty { display:none; text-align:center; padding:50px; color:var(--muted); }
-.msg { font-size:13px; padding:0 32px; min-height:18px; }
-.msg.ok { color:var(--success); font-weight:600; } .msg.err { color:var(--warn); font-weight:600; }
+/* Propio del inventario (el resto del diseño vive en /ui.css) */
+.ro-badge{background:var(--brand-tint);color:var(--brand-text);border-radius:10px;min-height:36px;
+  display:inline-flex;align-items:center;padding:0 14px;font-size:14px;font-weight:600}
+.envio-row{display:flex;align-items:center;gap:12px;padding:9px 2px;border-bottom:.5px solid var(--hair)}
+.envio-row:last-child{border-bottom:0}
+.envio-row .nm{flex:1;font-size:14px;min-width:0}
+.envio-row .stk{font-size:12px;color:var(--sec);white-space:nowrap}
+.envio-row input{width:84px;background:var(--fill);border:1.5px solid transparent;border-radius:8px;
+  padding:0 10px;min-height:36px;text-align:right;font-weight:600;color:var(--label);outline:none}
+.envio-row input:focus{border-color:var(--brand);background:var(--card)}
+.dif-neg{color:var(--red)} .dif-pos{color:var(--blue)} .dif-cero{color:var(--green)} .dif-na{color:var(--ter)}
 </style>
 </head>
 <body>
@@ -79,7 +45,7 @@ tr.bajo td { background:#fff8e1; } tr.faltante td { background:#fdecea; }
   <div class="topbar-controls">
     <label>🏢 Sede:</label><select id="sedeSel"></select>
     <input class="srch" id="buscar" placeholder="Buscar producto…" oninput="render()">
-    <span id="roBadge" style="display:none;background:#eef3fa;border:1.5px solid #d5dce8;border-radius:16px;padding:5px 12px;font-size:12px;font-weight:700;color:#1a5276;">👁 Solo consulta</span>
+    <span id="roBadge" class="ro-badge" style="display:none;">👁 Solo consulta</span>
   </div>
   <div class="topbar-controls" id="topbarControls">
     <label class="btn-ghost" for="fileInv" style="cursor:pointer;">📤 Cargar Excel</label>
@@ -101,26 +67,26 @@ tr.bajo td { background:#fff8e1; } tr.faltante td { background:#fdecea; }
   <thead><tr><th>Producto</th><th class="num">Precio</th><th class="num">Cantidad</th><th class="num">Mínima</th><th class="num">Conteo físico</th><th class="num">Diferencia</th><th>Estado</th><th></th></tr></thead>
   <tbody id="body"></tbody>
 </table></div>
-<div style="padding:0 32px 20px;" class="msg" id="hintTabla">💡 “Cantidad” = stock esperado. Ingrese el <b>conteo físico</b> para detectar faltantes; al guardar, el conteo reemplaza la cantidad. Productos bajo el mínimo se marcan en naranja.</div>
+<div class="msg" style="padding-bottom:20px;" id="hintTabla">💡 “Cantidad” = stock esperado. Ingrese el <b>conteo físico</b> para detectar faltantes; al guardar, el conteo reemplaza la cantidad. Productos bajo el mínimo se marcan en naranja.</div>
 
 <div class="section"><div class="section-title">🚚 Envíos de mercadería</div></div>
 <div class="tbl-wrap"><table class="tbl">
   <thead><tr><th>Fecha</th><th>Productos</th><th>Estado</th><th>Recibido</th><th></th></tr></thead>
   <tbody id="enviosBody"></tbody>
 </table></div>
-<div style="padding:0 32px 40px;" class="msg">El stock <b>no se suma</b> hasta que recepción acepte el envío en el módulo de Caja, indicando lo que realmente llegó.</div>
+<div class="msg" style="padding-bottom:40px;">El stock <b>no se suma</b> hasta que recepción acepte el envío en el módulo de Caja, indicando lo que realmente llegó.</div>
 
 <!-- Modal enviar mercadería -->
-<div id="envioModal" style="display:none;position:fixed;inset:0;background:rgba(15,20,35,.55);z-index:10000;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
-  <div style="background:white;border-radius:16px;width:100%;max-width:540px;box-shadow:0 32px 80px rgba(0,0,0,.4);overflow:hidden;margin:auto;">
-    <div style="background:linear-gradient(135deg,#b9770e,#e67e22);color:white;padding:16px 22px;font-size:16px;font-weight:800;">🚚 Enviar mercadería <span id="envioSedeLbl" style="font-weight:600;opacity:.9;"></span></div>
-    <div style="padding:18px 22px;max-height:64vh;overflow-y:auto;">
-      <div class="msg" style="margin-bottom:8px;">Indique cuánto se envía de cada producto. Recepción lo aceptará y confirmará lo que llegó.</div>
+<div class="modal-back" id="envioModal">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-head">🚚 Enviar mercadería <span id="envioSedeLbl" style="color:var(--sec);font-weight:400;"></span></div>
+    <div class="modal-body" style="max-height:64vh;overflow-y:auto;gap:10px;">
+      <div class="hint">Indique cuánto se envía de cada producto. Recepción lo aceptará y confirmará lo que llegó.</div>
       <div id="envioList"></div>
-      <div id="envioErr" style="color:var(--warn);font-size:13px;min-height:16px;margin-top:8px;"></div>
+      <div id="envioErr" style="color:var(--red);font-size:14px;min-height:18px;"></div>
     </div>
-    <div style="padding:14px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);">
-      <button class="btn-ghost" onclick="document.getElementById('envioModal').style.display='none'">Cancelar</button>
+    <div class="modal-foot">
+      <button class="btn-ghost" onclick="cerrarEnvioModal()">Cancelar</button>
       <button class="btn-primary" id="btnEnviar" onclick="crearEnvio()">🚚 Enviar</button>
     </div>
   </div>
@@ -226,7 +192,7 @@ function renderEnvios(){
   tb.innerHTML=envios.map(e=>{
     const prods=(e.items||[]).map(it=>`${esc(it.producto)} (${it.enviado})`).join(', ');
     const recibido=e.estado==='aceptado'?(e.items||[]).map(it=>`${esc(it.producto)}: ${it.recibido==null?'—':it.recibido}`).join(', '):'—';
-    const badge=e.estado==='aceptado'?'<span class="pill ok">aceptado</span>':'<span class="pill low" style="background:#fff3e0;color:#e65100;">pendiente</span>';
+    const badge=e.estado==='aceptado'?'<span class="pill ok">aceptado</span>':'<span class="pill low">pendiente</span>';
     // Solo se puede eliminar un envío que AÚN NO fue aceptado (por si se creó por error/confusión).
     const acciones=(e.estado==='aceptado'||soloLectura())?'':`<button class="btn-del" title="Eliminar envío pendiente" onclick="eliminarEnvio('${e.id}')">🗑</button>`;
     return `<tr><td>${new Date(e.created_at).toLocaleDateString('es-CR')}</td><td style="font-size:12px;max-width:300px;">${prods}</td><td>${badge}</td><td style="font-size:12px;">${recibido}${e.nota?'<br><span style="color:var(--warn);">'+esc(e.nota)+'</span>':''}</td><td style="text-align:right;">${acciones}</td></tr>`;
@@ -246,18 +212,19 @@ async function eliminarEnvio(id){
     loadEnvios();
   }catch(err){ alert('No se pudo eliminar: '+err.message); }
 }
+function cerrarEnvioModal(){ document.getElementById('envioModal').classList.remove('open'); }
 function openEnvioModal(){
   if(soloLectura())return;
   document.getElementById('envioSedeLbl').textContent='· '+currentSede;
   const prods=items.filter(it=>!it._del&&(it.producto||'').trim());
   document.getElementById('envioList').innerHTML = prods.length ? prods.map((p,i)=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid #f2f5f9;">
-      <span style="flex:1;font-size:13px;">${esc(p.producto)}</span>
-      <span style="font-size:11px;color:var(--muted);">stock ${p.cantidad||0}</span>
-      <input type="number" min="0" step="1" id="env_${i}" value="0" data-prod="${esc(p.producto)}" style="width:80px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:right;font-weight:700;">
-    </div>`).join('') : '<div style="color:var(--muted);">Agregue productos al inventario primero.</div>';
+    <div class="envio-row">
+      <span class="nm">${esc(p.producto)}</span>
+      <span class="stk num">stock ${p.cantidad||0}</span>
+      <input type="number" inputmode="numeric" min="0" step="1" id="env_${i}" value="0" data-prod="${esc(p.producto)}">
+    </div>`).join('') : '<div class="hint">Agregue productos al inventario primero.</div>';
   document.getElementById('envioErr').textContent='';
-  document.getElementById('envioModal').style.display='flex';
+  document.getElementById('envioModal').classList.add('open');
 }
 async function crearEnvio(){
   if(soloLectura())return;
@@ -268,7 +235,7 @@ async function crearEnvio(){
   const btn=document.getElementById('btnEnviar'); btn.disabled=true; btn.textContent='Enviando...';
   try{
     await supaFetch('/envios_mercaderia',{method:'POST',body:{sede:currentSede,estado:'pendiente',items:arr,created_by:currentEmail||null}});
-    document.getElementById('envioModal').style.display='none';
+    cerrarEnvioModal();
     document.getElementById('msg').className='msg ok'; document.getElementById('msg').textContent=`🚚 Envío creado (${arr.length} producto(s)). Pendiente de que recepción lo acepte.`;
     loadEnvios();
   }catch(e){ err.textContent='No se pudo enviar: '+e.message; }
@@ -309,7 +276,7 @@ function render(){
       <td class="num"><input type="number" step="1" value="${it.cantidad??0}" oninput="items[${i}].cantidad=this.value;items[${i}]._mod=true;render()"></td>
       <td class="num"><input type="number" step="1" value="${it.cantidad_minima??0}" oninput="items[${i}].cantidad_minima=this.value;items[${i}]._mod=true;render()"></td>
       <td class="num"><input type="number" step="1" placeholder="—" value="${it.conteo}" oninput="items[${i}].conteo=this.value;render()"></td>
-      <td class="num" style="font-weight:700;color:${e.dif==null?'#999':e.dif<0?'#c62828':e.dif>0?'#1565c0':'#2e7d32'};">${e.dif==null?'—':(e.dif>0?'+':'')+e.dif}</td>
+      <td class="num ${e.dif==null?'dif-na':e.dif<0?'dif-neg':e.dif>0?'dif-pos':'dif-cero'}" style="font-weight:700;">${e.dif==null?'—':(e.dif>0?'+':'')+e.dif}</td>
       <td><span class="pill ${e.pill}">${e.txt}</span></td>
       <td><button class="btn-del" onclick="items[${i}]._del=true;render()">🗑</button></td>
     </tr>`; }).join('')

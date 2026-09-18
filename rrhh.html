@@ -2,112 +2,26 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F2F2F7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icons/favicon-64.png">
 <title>Recursos Humanos</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="/ui.css">
 <style>
-:root {
-  --primary: #1a5276; --primary-light: #2e86c1; --accent: #148f77; --accent2: #e67e22;
-  --bg: #f0f4f8; --border: #d5dce8; --text: #1c2833; --muted: #6c757d; --warn: #c0392b; --success: #27ae60;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
-
-/* Login */
-#loginScreen { position: fixed; inset: 0; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-.login-card { background: white; border-radius: 24px; padding: 40px 44px; width: 100%; max-width: 420px; box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
-.login-logo { width: 64px; height: 64px; background: linear-gradient(135deg, #1a5276, #2e86c1); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 20px; }
-.login-card h2 { text-align: center; font-size: 1.4em; font-weight: 800; color: #2d2d5e; margin-bottom: 6px; }
-.login-card .login-sub { text-align: center; font-size: 0.85em; color: #888; margin-bottom: 28px; }
-.login-field { margin-bottom: 16px; }
-.login-field label { display: block; font-size: 0.8em; font-weight: 700; color: #444; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
-.login-field input { width: 100%; padding: 11px 14px; border: 1.5px solid #dde1f0; border-radius: 10px; font-size: 14px; }
-.login-field input:focus { outline: none; border-color: #2e86c1; box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
-.login-btn { width: 100%; padding: 13px; background: linear-gradient(135deg, #1a5276, #2e86c1); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
-.login-btn:disabled { opacity: .6; cursor: not-allowed; }
-#loginError { text-align: center; color: #c62828; font-size: 13px; margin-top: 12px; min-height: 18px; }
-
-/* Header */
-.header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: white; padding: 18px 32px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.25); flex-wrap: wrap; }
-.header-icon { font-size: 34px; }
-.header h1 { font-size: 21px; font-weight: 700; }
-.header p  { font-size: 13px; opacity: .85; margin-top: 2px; }
-.header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; color: white; font-size: 13px; }
-.logout-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35); color: white; border-radius: 16px; padding: 5px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
-
-.loading, .empty-state { display: none; text-align: center; padding: 60px 32px; color: var(--muted); }
-.spinner { width: 44px; height: 44px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.topbar { padding: 12px 32px; background: white; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
-.topbar-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.topbar-controls label { font-size: 13px; font-weight: 600; color: #555; }
-.topbar-controls select { border: 1.5px solid #d0d7e8; border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; color: #333; background: white; cursor: pointer; }
-.btn-primary { padding: 8px 18px; border-radius: 10px; border: none; background: linear-gradient(135deg, #1a5276, #2e86c1); color: white; font-size: 13px; font-weight: 700; cursor: pointer; }
-.btn-primary:disabled { opacity: .6; cursor: not-allowed; }
-.btn-ghost { padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 13px; cursor: pointer; color: var(--primary); font-weight: 600; }
-.btn-ghost:hover { background: var(--bg); }
-.btn-ok { background: #eaf7ee; border: 1px solid #b7e0c4; color: var(--success); border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
-.btn-no { background: #fdecea; border: 1px solid #f5c6c0; color: var(--warn); border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
-.btn-edit { background: #eaf2fb; border: 1px solid #c3ddf5; color: var(--primary-light); border-radius: 8px; padding: 4px 9px; font-size: 13px; cursor: pointer; }
-
-.tabs { display: flex; gap: 6px; padding: 12px 32px 0; background: white; }
-.tab { padding: 9px 18px; border-radius: 10px 10px 0 0; border: 1px solid transparent; border-bottom: none; font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; }
-.tab.active { color: var(--primary); background: var(--bg); border-color: var(--border); }
-.tab-panel { display: none; }
-.tab-panel.active { display: block; }
-
-.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; padding: 22px 32px 8px; }
-.kpi { background: white; border-radius: 12px; padding: 16px 18px; border-left: 4px solid var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-.kpi.green { border-color: var(--success); } .kpi.orange { border-color: var(--accent2); } .kpi.teal { border-color: var(--accent); }
-.kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
-.kpi-value { font-size: 23px; font-weight: 700; color: var(--primary); margin-top: 4px; }
-.kpi.green .kpi-value { color: var(--success); } .kpi.orange .kpi-value { color: var(--accent2); }
-.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
-
-.section { padding: 8px 32px; }
-.section-title { font-size: 15px; font-weight: 700; color: var(--primary); margin: 8px 0 12px; border-left: 4px solid var(--primary-light); padding-left: 10px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.section-note { font-weight: 400; font-size: 12px; color: var(--muted); }
-
-.tbl-wrap { overflow-x: auto; background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.07); margin: 0 32px 16px; }
-table.tbl { width: 100%; border-collapse: collapse; min-width: 820px; }
-table.tbl th { background: #f8f9fb; font-size: 11px; font-weight: 700; color: var(--muted); padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: .3px; }
-table.tbl th.num, table.tbl td.num { text-align: right; }
-table.tbl td { padding: 9px 12px; font-size: 13px; border-bottom: 1px solid #f2f5f9; }
-table.tbl tr:last-child td { border-bottom: none; }
-.tbl-empty { padding: 16px; color: var(--muted); font-size: 12px; }
-.pill { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
-.pill.pend { background: #fff3e0; color: #e65100; } .pill.apr { background: #e8f5e9; color: #2e7d32; } .pill.rec { background: #ffebee; color: #c62828; }
-.saldo-badge { font-weight: 800; }
-
-/* Portal */
+/* Propio de RRHH (el resto del diseño vive en /ui.css) */
 #portal { display: none; padding: 8px 0 24px; }
-.portal-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; padding: 22px 32px 8px; }
-.pcard { background: white; border-radius: 14px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); text-align: center; border-top: 4px solid var(--primary); }
-.pcard .pv { font-size: 30px; font-weight: 800; color: var(--primary); }
-.pcard.green .pv { color: var(--success); } .pcard.green { border-color: var(--success); }
-.pcard .pl { font-size: 12px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .4px; }
-
-/* Formularios */
-.form-card { background: white; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.07); padding: 20px 22px; margin: 0 32px 8px; }
-.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px 18px; }
-.f-field { display: flex; flex-direction: column; gap: 5px; }
-.f-field.full { grid-column: 1 / -1; }
-.f-field label { font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .3px; }
-.f-field label .req { color: var(--warn); }
-.f-field input, .f-field select, .f-field textarea { padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 9px; font-size: 13px; font-family: inherit; color: var(--text); background: white; width: 100%; }
-.f-field input:focus, .f-field select:focus, .f-field textarea:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
-.form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; align-items: center; }
-.form-msg { font-size: 13px; margin-right: auto; }
-.form-msg.ok { color: var(--success); font-weight: 600; } .form-msg.err { color: var(--warn); font-weight: 600; }
-
-/* Modal */
-.modal-back { display: none; position: fixed; inset: 0; background: rgba(20,24,40,.55); z-index: 10000; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
-.modal-back.open { display: flex; }
-.modal { background: white; border-radius: 16px; width: 100%; max-width: 620px; box-shadow: 0 32px 80px rgba(0,0,0,.4); overflow: hidden; margin: auto; }
-.modal-head { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; padding: 16px 22px; font-size: 16px; font-weight: 700; }
-.modal-body { padding: 20px 22px; }
-.modal-foot { padding: 14px 22px; display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid var(--border); }
+.modal { max-width: 620px; }
+/* La tabla de empleados tiene 12 columnas: que se desplace en vez de partir los nombres */
+#panelEmp table.tbl { min-width: 1080px; }
+#panelEmp table.tbl td:first-child { white-space: nowrap; font-weight: 600; }
+/* Desglose de la CCSS dentro del modal de empleado */
+.ccss-tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.ccss-tbl td { padding: 6px 10px; border-bottom: .5px solid var(--hair); }
+.ccss-tbl tr:last-child td { border-bottom: 0; }
+.ccss-tbl tr.tot td { background: var(--fill); font-weight: 700; }
 </style>
 </head>
 <body>
@@ -179,7 +93,7 @@ table.tbl tr:last-child td { border-bottom: none; }
 
   <div class="tab-panel" id="panelVac">
     <div class="section"><div class="section-title">🌴 Solicitudes de vacaciones / días libres
-      <select id="vacFiltro" onchange="renderSolicitudes()" style="margin-left:auto;border:1.5px solid var(--border);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;">
+      <select id="vacFiltro" class="ui" onchange="renderSolicitudes()" style="margin-left:auto;">
         <option value="pendiente">Pendientes</option><option value="all">Todas</option>
         <option value="aprobada">Aprobadas</option><option value="rechazada">Rechazadas</option>
       </select></div></div>
@@ -459,15 +373,15 @@ function renderEmpleados(){
     tr.innerHTML = `
       <td><strong>${esc(e.nombre)}</strong></td>
       <td>${esc(e.cedula)||'—'}</td>
-      <td style="color:var(--primary-light);font-size:12px;">${esc(e.correo)||'—'}</td>
+      <td style="color:var(--blue);font-size:13px;">${esc(e.correo)||'—'}</td>
       <td>${esc(e.telefono)||'—'}</td>
       <td>${esc(e.cuenta_bac)||'—'}</td>
       <td class="num">${fmtCRC(e.salario_mensual)}</td>
       <td class="num">${fmtCRC(e.salario_quincenal)}</td>
-      <td class="num">${aseguradoCCSS(e) ? fmtCRC(deduccionCCSS(e)) : '<span style="color:#999;">No aseg.</span>'}</td>
+      <td class="num">${aseguradoCCSS(e) ? fmtCRC(deduccionCCSS(e)) : '<span style="color:var(--ter);">No aseg.</span>'}</td>
       <td>${fmtFecha(e.fecha_ingreso)}</td>
-      <td class="num saldo-badge" style="color:${saldo<0?'#c62828':'#2e7d32'};">${saldo.toFixed(1)}</td>
-      <td>${e.user_id ? '<span class="pill apr">Activo</span>' : `<button class="btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="crearAcceso('${e.id}')">Crear acceso</button>`}</td>
+      <td class="num saldo-badge" style="color:${saldo<0?'var(--red)':'var(--green)'};">${saldo.toFixed(1)}</td>
+      <td>${e.user_id ? '<span class="pill apr">Activo</span>' : `<button class="btn-ghost" style="min-height:30px;padding:0 10px;font-size:13px;" onclick="crearAcceso('${e.id}')">Crear acceso</button>`}</td>
       <td style="white-space:nowrap;"><button class="btn-edit" title="Editar" onclick="openEmpleadoModal('${e.id}')">✏️</button> <button class="btn-edit" title="Calcular liquidación" onclick="openLiquidacion('${e.id}')">💰</button></td>`;
   });
 }
@@ -538,25 +452,25 @@ function renderCcssDesglose(){
   const cont = document.getElementById('ccssDesglose');
   const sm = Number(document.getElementById('eSalMensual').value) || 0;
   const aseg = document.getElementById('eAsegurado').checked;
-  if (!aseg) { cont.innerHTML = '<div style="font-size:12px;color:var(--muted);">Empleado no asegurado: sin deducción ni carga patronal.</div>'; return; }
-  if (!sm)   { cont.innerHTML = '<div style="font-size:12px;color:var(--muted);">Ingrese el salario mensual para ver el desglose CCSS.</div>'; return; }
+  if (!aseg) { cont.innerHTML = '<div class="hint">Empleado no asegurado: sin deducción ni carga patronal.</div>'; return; }
+  if (!sm)   { cont.innerHTML = '<div class="hint">Ingrese el salario mensual para ver el desglose CCSS.</div>'; return; }
   const fila = r => `<tr><td>${r.n}</td><td class="num">${r.p.toFixed(2)}%</td><td class="num">${fmtCRC(sm*r.p/100)}</td></tr>`;
   cont.innerHTML = `
-    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Desglose CCSS sobre ₡${Math.round(sm).toLocaleString('es-CR')} (referencial · verificar tasas vigentes):</div>
+    <div class="hint" style="margin-bottom:8px;">Desglose CCSS sobre ₡${Math.round(sm).toLocaleString('es-CR')} (referencial · verificar tasas vigentes):</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;">
       <div>
-        <div style="font-weight:700;color:var(--primary);font-size:13px;margin-bottom:4px;">📉 Deducción del trabajador</div>
-        <table class="tbl" style="min-width:auto;font-size:12px;"><tbody>
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px;">📉 Deducción del trabajador</div>
+        <table class="ccss-tbl"><tbody>
           ${RUBROS_TRABAJADOR.map(fila).join('')}
-          <tr style="font-weight:800;background:#eef3fa;"><td>Total ${sumaRubros(RUBROS_TRABAJADOR).toFixed(2)}%</td><td></td><td class="num">${fmtCRC(sm*CCSS_TRABAJADOR)}</td></tr>
-          <tr><td colspan="2">Salario neto</td><td class="num" style="font-weight:700;color:var(--success);">${fmtCRC(sm - sm*CCSS_TRABAJADOR)}</td></tr>
+          <tr class="tot"><td>Total ${sumaRubros(RUBROS_TRABAJADOR).toFixed(2)}%</td><td></td><td class="num">${fmtCRC(sm*CCSS_TRABAJADOR)}</td></tr>
+          <tr><td colspan="2">Salario neto</td><td class="num" style="font-weight:700;color:var(--green);">${fmtCRC(sm - sm*CCSS_TRABAJADOR)}</td></tr>
         </tbody></table>
       </div>
       <div>
-        <div style="font-weight:700;color:var(--primary);font-size:13px;margin-bottom:4px;">🏢 Aporte patronal (lo que pagamos)</div>
-        <table class="tbl" style="min-width:auto;font-size:12px;"><tbody>
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px;">🏢 Aporte patronal (lo que pagamos)</div>
+        <table class="ccss-tbl"><tbody>
           ${RUBROS_PATRONO.map(fila).join('')}
-          <tr style="font-weight:800;background:#eef3fa;"><td>Total ${sumaRubros(RUBROS_PATRONO).toFixed(2)}%</td><td></td><td class="num">${fmtCRC(sm*CCSS_PATRONO)}</td></tr>
+          <tr class="tot"><td>Total ${sumaRubros(RUBROS_PATRONO).toFixed(2)}%</td><td></td><td class="num">${fmtCRC(sm*CCSS_PATRONO)}</td></tr>
         </tbody></table>
       </div>
     </div>`;
@@ -783,7 +697,7 @@ function calcLiquidacion(){
         ${row('Cesantía', conCesantia ? `${cesDias.toFixed(2)} día(s) (tope 8 años)` : 'no aplica', montoCesantia)}
         ${row('Aguinaldo proporcional', `${mesesAgui.toFixed(1)} mes(es) del periodo`, montoAgui)}
         ${row('Vacaciones no disfrutadas', `${vacDias.toFixed(1)} día(s)`, montoVac)}
-        <tr style="background:#eef3fa;font-weight:800;"><td colspan="2">TOTAL A PAGAR</td><td class="num">${fmt(total)}</td></tr>
+        <tr style="background:var(--fill);font-weight:700;"><td colspan="2">TOTAL A PAGAR</td><td class="num">${fmt(total)}</td></tr>
       </tbody>
     </table>`;
 }
