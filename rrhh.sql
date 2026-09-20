@@ -17,8 +17,11 @@ create table if not exists empleados (
   direccion         text,
   cuenta_bac        text,                    -- número de cuenta BAC
   sede              text not null,           -- '3 Ríos' | 'Natación' | 'Pinares' | 'Sabanilla'
-  salario_mensual   numeric,
+  tipo_pago         text default 'mensual',  -- 'mensual' (planilla) | 'semanal' (servicios profesionales por horas)
+  salario_mensual   numeric,                 -- solo si tipo_pago = 'mensual'
   salario_quincenal numeric,                 -- por defecto mensual/2 (editable)
+  monto_hora        numeric,                 -- solo si tipo_pago = 'semanal'
+  horas_semana      numeric,                 -- solo si tipo_pago = 'semanal'; pago de la semana = horas_semana * monto_hora
   fecha_ingreso     date,
   vac_dias_por_mes  numeric default 1,       -- tasa de acumulación de vacaciones (días por mes trabajado)
   vac_ajuste        numeric default 0,       -- ajuste manual del saldo (+/- días)
@@ -28,8 +31,19 @@ create table if not exists empleados (
 );
 create index if not exists empleados_sede_idx on empleados (sede);
 create index if not exists empleados_user_idx on empleados (user_id);
--- Para tablas ya creadas antes de agregar la columna:
+-- Para tablas ya creadas antes de agregar las columnas:
 alter table empleados add column if not exists asegurado_ccss boolean default true;
+
+-- ── Pago semanal por horas (servicios profesionales) ──
+-- Instructores que facturan por servicios profesionales y cobran por semana:
+-- se pactan las horas de la semana y el monto por hora.
+alter table empleados add column if not exists tipo_pago    text default 'mensual';
+alter table empleados add column if not exists monto_hora   numeric;
+alter table empleados add column if not exists horas_semana numeric;
+update empleados set tipo_pago = 'mensual' where tipo_pago is null;
+do $$ begin
+  alter table empleados add constraint empleados_tipo_pago_chk check (tipo_pago in ('mensual','semanal'));
+exception when duplicate_object then null; end $$;
 
 -- 2) Solicitudes de vacaciones / días libres --------------------------------
 create table if not exists vacaciones_solicitudes (

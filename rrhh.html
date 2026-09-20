@@ -14,9 +14,14 @@
 /* Propio de RRHH (el resto del diseño vive en /ui.css) */
 #portal { display: none; padding: 8px 0 24px; }
 .modal { max-width: 620px; }
-/* La tabla de empleados tiene 12 columnas: que se desplace en vez de partir los nombres */
-#panelEmp table.tbl { min-width: 1080px; }
+/* La tabla de empleados tiene 13 columnas: que se desplace en vez de partir los nombres */
+#panelEmp table.tbl { min-width: 1220px; }
 #panelEmp table.tbl td:first-child { white-space: nowrap; font-weight: 600; }
+/* cédula, teléfono y cuenta no deben partirse en varias líneas */
+#panelEmp table.tbl td:nth-child(2),
+#panelEmp table.tbl td:nth-child(4),
+#panelEmp table.tbl td:nth-child(5) { white-space: nowrap; }
+.s-sub { font-size: 12px; color: var(--sec); margin-top: 3px; white-space: nowrap; }
 /* Desglose de la CCSS dentro del modal de empleado */
 .ccss-tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 .ccss-tbl td { padding: 6px 10px; border-bottom: .5px solid var(--hair); }
@@ -69,7 +74,8 @@
 
   <div class="kpi-row">
     <div class="kpi"><div class="kpi-label">Empleados activos</div><div class="kpi-value" id="kpiEmpleados">—</div><div class="kpi-sub" id="kpiEmpleadosSub">—</div></div>
-    <div class="kpi green"><div class="kpi-label">Planilla mensual</div><div class="kpi-value" id="kpiPlanilla">—</div><div class="kpi-sub">suma de salarios</div></div>
+    <div class="kpi green"><div class="kpi-label">Planilla mensual</div><div class="kpi-value" id="kpiPlanilla">—</div><div class="kpi-sub">salarios + equivalente por horas</div></div>
+    <div class="kpi blue"><div class="kpi-label">Pago semanal</div><div class="kpi-value" id="kpiSemanal">—</div><div class="kpi-sub" id="kpiSemanalSub">servicios profesionales</div></div>
     <div class="kpi teal"><div class="kpi-label">Carga patronal CCSS</div><div class="kpi-value" id="kpiCargaCCSS">—</div><div class="kpi-sub">aporte del mes (~26.67%)</div></div>
     <div class="kpi orange"><div class="kpi-label">Solicitudes pendientes</div><div class="kpi-value" id="kpiPend">—</div><div class="kpi-sub">por aprobar</div></div>
   </div>
@@ -84,7 +90,7 @@
       <button class="btn-primary" style="margin-left:auto;" onclick="openEmpleadoModal()">＋ Nuevo empleado</button></div></div>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr>
-        <th>Nombre</th><th>Cédula</th><th>Correo</th><th>Teléfono</th><th>Cuenta BAC</th>
+        <th>Nombre</th><th>Cédula</th><th>Correo</th><th>Teléfono</th><th>Cuenta BAC</th><th>Modalidad</th>
         <th class="num">Salario mensual</th><th class="num">Quincenal</th><th class="num">Deduc. CCSS</th><th>Ingreso</th><th class="num">Saldo vac.</th><th>Portal</th><th></th>
       </tr></thead>
       <tbody id="empBody"></tbody>
@@ -147,8 +153,16 @@
         <div class="f-field full"><label>Dirección</label><input type="text" id="eDireccion"></div>
         <div class="f-field"><label>Número de cuenta BAC</label><input type="text" id="eCuentaBac"></div>
         <div class="f-field"><label>Sede <span class="req">*</span></label><select id="eSede"></select></div>
-        <div class="f-field"><label>Salario mensual (₡)</label><input type="number" id="eSalMensual" min="0" step="1" oninput="autoQuincena();renderCcssDesglose()"></div>
-        <div class="f-field"><label>Salario quincenal (₡)</label><input type="number" id="eSalQuincena" min="0" step="1"></div>
+        <div class="f-field"><label>Modalidad de pago <span class="req">*</span></label>
+          <select id="eTipoPago" onchange="onTipoPagoChange(true)">
+            <option value="mensual">📅 Mensual (planilla)</option>
+            <option value="semanal">🕐 Semanal por horas (servicios profesionales)</option>
+          </select></div>
+        <div class="f-field pago-mensual"><label>Salario mensual (₡)</label><input type="number" id="eSalMensual" min="0" step="1" oninput="autoQuincena();renderCcssDesglose()"></div>
+        <div class="f-field pago-mensual"><label>Salario quincenal (₡)</label><input type="number" id="eSalQuincena" min="0" step="1"></div>
+        <div class="f-field pago-semanal"><label>Monto por hora (₡)</label><input type="number" id="eMontoHora" min="0" step="1" oninput="renderPagoSemanal();renderCcssDesglose()"></div>
+        <div class="f-field pago-semanal"><label>Horas por semana</label><input type="number" id="eHorasSemana" min="0" step="0.5" oninput="renderPagoSemanal();renderCcssDesglose()"></div>
+        <div class="f-field full pago-semanal"><label>Pago de la semana</label><div class="pay-box" id="pagoSemanalBox">Indique el monto por hora y las horas por semana.</div></div>
         <div class="f-field"><label>Fecha de ingreso</label><input type="date" id="eIngreso"></div>
         <div class="f-field"><label>Días de vac. por mes</label><input type="number" id="eVacTasa" min="0" step="0.01" value="1"></div>
         <div class="f-field"><label>Ajuste de saldo (± días)</label><input type="number" id="eVacAjuste" step="0.5" value="0"></div>
@@ -187,6 +201,7 @@
       <div style="margin-top:16px;" id="liqDesglose"></div>
       <div style="font-size:11px;color:var(--muted);margin-top:14px;line-height:1.5;">
         ⚠️ Cálculo estimado según el Código de Trabajo de Costa Rica (preaviso art. 28, cesantía art. 29 con tope de 8 años, aguinaldo proporcional y vacaciones no disfrutadas). Es una <b>referencia</b>; verifique el monto final con su contador o abogado laboral antes de pagar. Cesantía y preaviso solo aplican en despido con responsabilidad patronal.
+        <br><br>🕐 <b>Si cobra por servicios profesionales</b> (pago semanal por horas), en teoría factura y no tiene derecho a estos rubros. El cálculo se muestra igual, sobre el equivalente mensual, como <b>escenario si la relación se reclasificara como laboral</b>. Consúltelo con su abogado.
       </div>
     </div>
     <div class="modal-foot">
@@ -261,9 +276,22 @@ const sumaRubros = arr => arr.reduce((a,r)=>a+r.p,0);
 const CCSS_TRABAJADOR = sumaRubros(RUBROS_TRABAJADOR) / 100; // 10.83%
 const CCSS_PATRONO    = sumaRubros(RUBROS_PATRONO) / 100;    // 26.67% (solo CCSS; sin póliza de Riesgos del INS)
 const aseguradoCCSS = e => e.asegurado_ccss !== false;   // por defecto asegurado
-function deduccionCCSS(e){ return aseguradoCCSS(e) ? Number(e.salario_mensual||0) * CCSS_TRABAJADOR : 0; }
-function cargaPatronalCCSS(e){ return aseguradoCCSS(e) ? Number(e.salario_mensual||0) * CCSS_PATRONO : 0; }
-function salarioNeto(e){ return Number(e.salario_mensual||0) - deduccionCCSS(e); }
+
+/* ── Modalidad de pago ──────────────────────────────────────────────────────
+   'mensual' = planilla normal (salario mensual / quincenal).
+   'semanal' = servicios profesionales: se pactan HORAS POR SEMANA y un MONTO
+   POR HORA; el pago de la semana es horas × monto. Para la planilla, los KPIs,
+   la CCSS y la liquidación se usa el EQUIVALENTE MENSUAL (52 semanas / 12 meses
+   = 4,333 semanas por mes), que es la conversión estándar. */
+const SEMANAS_POR_MES = 52 / 12;
+const esSemanal = e => e?.tipo_pago === 'semanal';
+const pagoSemanal = e => esSemanal(e) ? Number(e.horas_semana||0) * Number(e.monto_hora||0) : 0;
+// Base mensual de cualquier empleado, sea de planilla o por horas.
+const baseMensual = e => esSemanal(e) ? pagoSemanal(e) * SEMANAS_POR_MES : Number(e?.salario_mensual||0);
+
+function deduccionCCSS(e){ return aseguradoCCSS(e) ? baseMensual(e) * CCSS_TRABAJADOR : 0; }
+function cargaPatronalCCSS(e){ return aseguradoCCSS(e) ? baseMensual(e) * CCSS_PATRONO : 0; }
+function salarioNeto(e){ return baseMensual(e) - deduccionCCSS(e); }
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function parseFecha(s){ if(!s) return null; const [y,m,d]=String(s).split('-').map(Number); return new Date(y,m-1,d); }
 function fmtFecha(s){ const d=parseFecha(s); return d ? d.toLocaleDateString('es-CR') : '—'; }
@@ -359,14 +387,20 @@ function renderKpis(){
   const activos = empleados.filter(e=>e.activo!==false);
   document.getElementById('kpiEmpleados').textContent = activos.length;
   document.getElementById('kpiEmpleadosSub').textContent = currentSede;
-  document.getElementById('kpiPlanilla').textContent = fmtCRC(activos.reduce((a,e)=>a+Number(e.salario_mensual||0),0));
+  document.getElementById('kpiPlanilla').textContent = fmtCRC(activos.reduce((a,e)=>a+baseMensual(e),0));
   document.getElementById('kpiCargaCCSS').textContent = fmtCRC(activos.reduce((a,e)=>a+cargaPatronalCCSS(e),0));
   document.getElementById('kpiPend').textContent = solicitudes.filter(s=>s.estado==='pendiente').length;
+  // Servicios profesionales: lo que hay que pagar esta semana
+  const semanales = activos.filter(esSemanal);
+  document.getElementById('kpiSemanal').textContent = semanales.length ? fmtCRC(semanales.reduce((a,e)=>a+pagoSemanal(e),0)) : '—';
+  document.getElementById('kpiSemanalSub').textContent = semanales.length
+    ? `${semanales.length} por horas · ${semanales.reduce((a,e)=>a+Number(e.horas_semana||0),0)} h/semana`
+    : 'sin pagos por horas';
 }
 
 function renderEmpleados(){
   const tb = document.getElementById('empBody'); tb.innerHTML='';
-  if (!empleados.length){ tb.innerHTML=`<tr><td colspan="12" class="tbl-empty">No hay empleados en esta sede. Agregue uno con “＋ Nuevo empleado”.</td></tr>`; return; }
+  if (!empleados.length){ tb.innerHTML=`<tr><td colspan="13" class="tbl-empty">No hay empleados en esta sede. Agregue uno con “＋ Nuevo empleado”.</td></tr>`; return; }
   empleados.forEach(e=>{
     const saldo = saldoVac(e);
     const tr = tb.insertRow();
@@ -376,8 +410,11 @@ function renderEmpleados(){
       <td style="color:var(--blue);font-size:13px;">${esc(e.correo)||'—'}</td>
       <td>${esc(e.telefono)||'—'}</td>
       <td>${esc(e.cuenta_bac)||'—'}</td>
-      <td class="num">${fmtCRC(e.salario_mensual)}</td>
-      <td class="num">${fmtCRC(e.salario_quincenal)}</td>
+      <td>${esSemanal(e)
+            ? `<span class="pill info">Semanal</span><div class="s-sub">${Number(e.horas_semana||0)} h × ${fmtCRC(e.monto_hora)} = <b>${fmtCRC(pagoSemanal(e))}</b>/sem</div>`
+            : '<span class="pill status">Mensual</span>'}</td>
+      <td class="num">${esSemanal(e) ? `<span title="Equivalente mensual del pago semanal">≈ ${fmtCRC(baseMensual(e))}</span>` : fmtCRC(e.salario_mensual)}</td>
+      <td class="num">${esSemanal(e) ? '<span style="color:var(--ter);">—</span>' : fmtCRC(e.salario_quincenal)}</td>
       <td class="num">${aseguradoCCSS(e) ? fmtCRC(deduccionCCSS(e)) : '<span style="color:var(--ter);">No aseg.</span>'}</td>
       <td>${fmtFecha(e.fecha_ingreso)}</td>
       <td class="num saldo-badge" style="color:${saldo<0?'var(--red)':'var(--green)'};">${saldo.toFixed(1)}</td>
@@ -437,26 +474,64 @@ function openEmpleadoModal(id){
   document.getElementById('eDireccion').value = e?.direccion || '';
   document.getElementById('eCuentaBac').value = e?.cuenta_bac || '';
   document.getElementById('eSede').value = e?.sede || currentSede;
+  document.getElementById('eTipoPago').value = e?.tipo_pago === 'semanal' ? 'semanal' : 'mensual';
   document.getElementById('eSalMensual').value = e?.salario_mensual ?? '';
   document.getElementById('eSalQuincena').value = e?.salario_quincenal ?? '';
+  document.getElementById('eMontoHora').value = e?.monto_hora ?? '';
+  document.getElementById('eHorasSemana').value = e?.horas_semana ?? '';
   document.getElementById('eIngreso').value = e?.fecha_ingreso || '';
   document.getElementById('eVacTasa').value = e?.vac_dias_por_mes ?? 1;
   document.getElementById('eVacAjuste').value = e?.vac_ajuste ?? 0;
   document.getElementById('eAsegurado').checked = e ? (e.asegurado_ccss !== false) : true;
   document.getElementById('empErr').textContent = '';
-  renderCcssDesglose();
+  onTipoPagoChange(false);   // false = no tocar los valores, solo mostrar los campos que tocan
   document.getElementById('empModal').classList.add('open');
+}
+
+/* Muestra los campos de la modalidad elegida.
+   aplicarDefaults=true solo cuando el usuario cambia el selector a mano: servicios
+   profesionales facturan, así que no cotizan CCSS ni acumulan vacaciones. */
+function onTipoPagoChange(aplicarDefaults){
+  const semanal = document.getElementById('eTipoPago').value === 'semanal';
+  document.querySelectorAll('.pago-mensual').forEach(el=>{ el.hidden = semanal; });
+  document.querySelectorAll('.pago-semanal').forEach(el=>{ el.hidden = !semanal; });
+  if (aplicarDefaults){
+    if (semanal){
+      document.getElementById('eAsegurado').checked = false;
+      document.getElementById('eVacTasa').value = 0;
+    } else {
+      document.getElementById('eAsegurado').checked = true;
+      if (Number(document.getElementById('eVacTasa').value) === 0) document.getElementById('eVacTasa').value = 1;
+    }
+  }
+  renderPagoSemanal();
+  renderCcssDesglose();
+}
+
+function renderPagoSemanal(){
+  const box = document.getElementById('pagoSemanalBox');
+  const mh = Number(document.getElementById('eMontoHora').value) || 0;
+  const hs = Number(document.getElementById('eHorasSemana').value) || 0;
+  if (!mh || !hs){ box.textContent = 'Indique el monto por hora y las horas por semana.'; return; }
+  const sem = mh * hs;
+  box.innerHTML = `<b>${hs} h × ${fmtCRC(mh)} = ${fmtCRC(sem)} por semana</b><br>`
+    + `Equivale a <b>${fmtCRC(sem * SEMANAS_POR_MES)} al mes</b> (52 semanas ÷ 12 meses). `
+    + `Así entra en la planilla, los totales y la liquidación.`;
 }
 
 function renderCcssDesglose(){
   const cont = document.getElementById('ccssDesglose');
-  const sm = Number(document.getElementById('eSalMensual').value) || 0;
+  const semanal = document.getElementById('eTipoPago').value === 'semanal';
+  // Base mensual según la modalidad: el salario, o el equivalente del pago semanal.
+  const sm = semanal
+    ? (Number(document.getElementById('eMontoHora').value)||0) * (Number(document.getElementById('eHorasSemana').value)||0) * SEMANAS_POR_MES
+    : (Number(document.getElementById('eSalMensual').value) || 0);
   const aseg = document.getElementById('eAsegurado').checked;
-  if (!aseg) { cont.innerHTML = '<div class="hint">Empleado no asegurado: sin deducción ni carga patronal.</div>'; return; }
-  if (!sm)   { cont.innerHTML = '<div class="hint">Ingrese el salario mensual para ver el desglose CCSS.</div>'; return; }
+  if (!aseg) { cont.innerHTML = `<div class="hint">${semanal ? 'Servicios profesionales: factura por su cuenta, sin deducción ni carga patronal.' : 'Empleado no asegurado: sin deducción ni carga patronal.'}</div>`; return; }
+  if (!sm)   { cont.innerHTML = `<div class="hint">Ingrese ${semanal ? 'el monto por hora y las horas' : 'el salario mensual'} para ver el desglose CCSS.</div>`; return; }
   const fila = r => `<tr><td>${r.n}</td><td class="num">${r.p.toFixed(2)}%</td><td class="num">${fmtCRC(sm*r.p/100)}</td></tr>`;
   cont.innerHTML = `
-    <div class="hint" style="margin-bottom:8px;">Desglose CCSS sobre ₡${Math.round(sm).toLocaleString('es-CR')} (referencial · verificar tasas vigentes):</div>
+    <div class="hint" style="margin-bottom:8px;">Desglose CCSS sobre ₡${Math.round(sm).toLocaleString('es-CR')}${semanal?' (equivalente mensual del pago semanal)':''} (referencial · verificar tasas vigentes):</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;">
       <div>
         <div style="font-weight:600;font-size:13px;margin-bottom:6px;">📉 Deducción del trabajador</div>
@@ -482,6 +557,12 @@ async function guardarEmpleado(){
   const err = document.getElementById('empErr');
   const nombre = document.getElementById('eNombre').value.trim();
   if (!nombre){ err.textContent='El nombre es obligatorio.'; return; }
+  const semanal = document.getElementById('eTipoPago').value === 'semanal';
+  const montoHora = Number(document.getElementById('eMontoHora').value) || null;
+  const horasSem  = Number(document.getElementById('eHorasSemana').value) || null;
+  if (semanal && (!montoHora || !horasSem)){
+    err.textContent = 'Para el pago semanal indique el monto por hora y las horas por semana.'; return;
+  }
   const payload = {
     nombre,
     cedula: document.getElementById('eCedula').value.trim() || null,
@@ -490,8 +571,13 @@ async function guardarEmpleado(){
     direccion: document.getElementById('eDireccion').value.trim() || null,
     cuenta_bac: document.getElementById('eCuentaBac').value.trim() || null,
     sede: document.getElementById('eSede').value,
-    salario_mensual: Number(document.getElementById('eSalMensual').value) || null,
-    salario_quincenal: Number(document.getElementById('eSalQuincena').value) || null,
+    tipo_pago: semanal ? 'semanal' : 'mensual',
+    // Solo se guardan los campos de la modalidad elegida; los de la otra quedan en null
+    // para que nadie lea un salario viejo de alguien que pasó a pago por horas.
+    salario_mensual:   semanal ? null : (Number(document.getElementById('eSalMensual').value) || null),
+    salario_quincenal: semanal ? null : (Number(document.getElementById('eSalQuincena').value) || null),
+    monto_hora:   semanal ? montoHora : null,
+    horas_semana: semanal ? horasSem  : null,
     fecha_ingreso: document.getElementById('eIngreso').value || null,
     vac_dias_por_mes: Number(document.getElementById('eVacTasa').value) || 0,
     vac_ajuste: Number(document.getElementById('eVacAjuste').value) || 0,
@@ -608,24 +694,63 @@ function exportPlanilla(){
   aoa.push([`Generado: ${new Date().toLocaleString('es-CR')}`]);
   aoa.push([]);
   aoa[1] = [`Generado: ${new Date().toLocaleString('es-CR')} · CCSS trabajador ${(CCSS_TRABAJADOR*100).toFixed(2)}% · patrono ${(CCSS_PATRONO*100).toFixed(2)}% (verificar tasas vigentes con la CCSS)`];
-  aoa.push(['Nombre','Cédula','Correo','Teléfono','Cuenta BAC','Salario mensual','Salario quincenal','Aseg. CCSS','Deducción CCSS','Salario neto','Carga patronal CCSS','Fecha ingreso','Saldo vacaciones']);
+  aoa.push(['Nombre','Cédula','Correo','Teléfono','Cuenta BAC','Modalidad','Monto/hora','Horas/semana','Pago semanal','Salario mensual','Salario quincenal','Aseg. CCSS','Deducción CCSS','Salario neto','Carga patronal CCSS','Fecha ingreso','Saldo vacaciones']);
   const numRows = [];
-  let totM=0, totQ=0, totDed=0, totNeto=0, totCarga=0;
+  let totSem=0, totM=0, totQ=0, totDed=0, totNeto=0, totCarga=0;
   activos.forEach(e=>{
-    const sm=Number(e.salario_mensual||0), sq=Number(e.salario_quincenal||0);
+    const sem=esSemanal(e);
+    const pagoSem=pagoSemanal(e), mensual=baseMensual(e), sq=sem?0:Number(e.salario_quincenal||0);
     const ded=deduccionCCSS(e), neto=salarioNeto(e), carga=cargaPatronalCCSS(e);
-    totM+=sm; totQ+=sq; totDed+=ded; totNeto+=neto; totCarga+=carga;
-    aoa.push([ e.nombre||'', e.cedula||'', e.correo||'', e.telefono||'', e.cuenta_bac||'', sm, sq, aseguradoCCSS(e)?'Sí':'No', Math.round(ded), Math.round(neto), Math.round(carga), e.fecha_ingreso||'', Number(saldoVac(e).toFixed(1)) ]);
+    totSem+=pagoSem; totM+=mensual; totQ+=sq; totDed+=ded; totNeto+=neto; totCarga+=carga;
+    aoa.push([ e.nombre||'', e.cedula||'', e.correo||'', e.telefono||'', e.cuenta_bac||'',
+      sem?'Semanal por horas':'Mensual', sem?Number(e.monto_hora||0):'', sem?Number(e.horas_semana||0):'', sem?Math.round(pagoSem):'',
+      Math.round(mensual), sq||'', aseguradoCCSS(e)?'Sí':'No', Math.round(ded), Math.round(neto), Math.round(carga),
+      e.fecha_ingreso||'', Number(saldoVac(e).toFixed(1)) ]);
     numRows.push(aoa.length-1);
   });
   aoa.push([]);
-  aoa.push(['','','','','TOTAL', totM, totQ, '', Math.round(totDed), Math.round(totNeto), Math.round(totCarga), '', '']);
+  aoa.push(['','','','','TOTAL','','','', Math.round(totSem), Math.round(totM), totQ, '', Math.round(totDed), Math.round(totNeto), Math.round(totCarga), '', '']);
   numRows.push(aoa.length-1);
+  aoa.push([]);
+  aoa.push(['El salario mensual de quien cobra por horas es el EQUIVALENTE: pago semanal × 52 ÷ 12 (4,333 semanas por mes).']);
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:24},{wch:14},{wch:24},{wch:14},{wch:16},{wch:15},{wch:15},{wch:11},{wch:15},{wch:15},{wch:18},{wch:14},{wch:15}];
-  numRows.forEach(r=>{ [5,6,8,9,10].forEach(c=>{ const ref=XLSX.utils.encode_cell({r,c}); if(ws[ref]&&typeof ws[ref].v==='number') ws[ref].z='#,##0'; }); });
+  ws['!cols'] = [{wch:24},{wch:14},{wch:24},{wch:14},{wch:16},{wch:18},{wch:12},{wch:13},{wch:14},{wch:15},{wch:15},{wch:11},{wch:15},{wch:15},{wch:18},{wch:14},{wch:15}];
+  numRows.forEach(r=>{ [6,8,9,10,12,13,14].forEach(c=>{ const ref=XLSX.utils.encode_cell({r,c}); if(ws[ref]&&typeof ws[ref].v==='number') ws[ref].z='#,##0'; }); });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Planilla');
+
+  // Hoja aparte con lo que se paga ESTA semana por servicios profesionales.
+  // Las horas quedan editables por si una semana difiere de lo pactado.
+  const semanales = activos.filter(esSemanal);
+  if (semanales.length){
+    const s = [];
+    s.push([`Pago semanal por servicios profesionales — ${currentSede}`]);
+    s.push([`Semana generada el ${new Date().toLocaleDateString('es-CR')} · si una semana tuvo más o menos horas, ajuste la columna "Horas" y el total se recalcula`]);
+    s.push([]);
+    s.push(['Nombre','Cédula','Cuenta BAC','Horas','Monto/hora','Total a pagar']);
+    const primera = s.length + 1;   // fila 1-indexada de la primera persona (para las fórmulas)
+    semanales.forEach(e=>{
+      s.push([ e.nombre||'', e.cedula||'', e.cuenta_bac||'', Number(e.horas_semana||0), Number(e.monto_hora||0), null ]);
+    });
+    const ultima = s.length;
+    s.push([]);
+    s.push(['','','','TOTAL','', null]);
+    const ws2 = XLSX.utils.aoa_to_sheet(s);
+    ws2['!cols'] = [{wch:26},{wch:14},{wch:18},{wch:9},{wch:12},{wch:15}];
+    // Total = horas × monto/hora como FÓRMULA, para que se recalcule al editar las horas.
+    // Se guarda también el valor ya calculado (v) para que se vea aunque el visor no recalcule.
+    let sumaSem = 0;
+    for (let r = primera; r <= ultima; r++){
+      const e = semanales[r - primera];
+      const val = Math.round(pagoSemanal(e)); sumaSem += val;
+      ws2[XLSX.utils.encode_cell({ r: r-1, c: 5 })] = { t:'n', f:`D${r}*E${r}`, v: val, z:'#,##0' };
+      const refE = XLSX.utils.encode_cell({ r: r-1, c: 4 }); if (ws2[refE]) ws2[refE].z = '#,##0';
+    }
+    const refTot = XLSX.utils.encode_cell({ r: s.length-1, c: 5 });
+    ws2[refTot] = { t:'n', f:`SUM(F${primera}:F${ultima})`, v: sumaSem, z:'#,##0' };
+    XLSX.utils.book_append_sheet(wb, ws2, 'Pago semanal');
+  }
+
   const slug = currentSede.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'_');
   XLSX.writeFile(wb, `planilla_${slug}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
@@ -653,10 +778,11 @@ function diasCesantia(meses){
 
 function openLiquidacion(id){
   liqEmp = empleados.find(e=>e.id===id); if(!liqEmp) return;
-  document.getElementById('liqNombre').textContent = liqEmp.nombre + ' · ' + liqEmp.sede;
+  document.getElementById('liqNombre').textContent = liqEmp.nombre + ' · ' + liqEmp.sede
+    + (esSemanal(liqEmp) ? ' · servicios profesionales (base = equivalente mensual)' : '');
   document.getElementById('lqFecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('lqTipo').value = 'patronal';
-  document.getElementById('lqSalario').value = liqEmp.salario_mensual || '';
+  document.getElementById('lqSalario').value = Math.round(baseMensual(liqEmp)) || '';
   document.getElementById('lqVac').value = Number(saldoALaFecha(liqEmp, new Date()).toFixed(1));
   calcLiquidacion();
   document.getElementById('liqModal').classList.add('open');
