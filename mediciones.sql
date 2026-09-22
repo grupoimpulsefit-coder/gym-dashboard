@@ -8,6 +8,9 @@
 --    admin / admin_sedes / admin_g → todo, en todas las sedes
 --
 --  Correr UNA vez en Supabase → SQL Editor.
+--
+--  Ver también mediciones_bloqueos.sql: bloqueo de espacios (permanente por
+--  día de la semana, o por una sola fecha). Va aparte y se corre después.
 -- ════════════════════════════════════════════════════════════════════════
 
 create table if not exists mediciones (

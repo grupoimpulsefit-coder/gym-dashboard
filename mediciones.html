@@ -124,6 +124,8 @@ main{max-width:1180px;margin:0 auto;padding:18px 16px calc(env(safe-area-inset-b
 .row .s{font-size:13px;color:var(--sec)}
 .row.libre .t{color:var(--ter)}
 .row.libre .add{color:var(--brand-text);font-size:15px;font-weight:600}
+.row.bloq{background:repeating-linear-gradient(135deg,transparent,transparent 7px,var(--fill) 7px,var(--fill) 14px)}
+.row.bloq .t{color:var(--sec);font-weight:600}
 button.row:active{background:var(--fill)}
 .row.ro{cursor:default}
 .chev{width:8px;height:14px;flex:none;stroke:var(--ter);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
@@ -161,6 +163,10 @@ td.slot{padding:3px}
 .cell.completa{background:var(--green-tint)} .cell.completa .st{color:var(--green)}
 .cell.incompleta{background:var(--red-tint)} .cell.incompleta .st{color:var(--red)}
 .cell.ro{cursor:default}
+.cell.bloq{display:block;text-align:left;padding:6px 9px;font-size:13px;color:var(--sec);
+  background:repeating-linear-gradient(135deg,var(--slot),var(--slot) 6px,var(--fill2) 6px,var(--fill2) 12px)}
+.cell.bloq .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell.bloq .st{font-size:12px;margin-top:1px;opacity:.85}
 td.pasado .cell{opacity:.55}
 .leyenda{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--sec);align-items:center;padding:0 4px}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
@@ -279,6 +285,7 @@ td.pasado .cell{opacity:.55}
       <span><span class="dot" style="background:var(--ter)"></span>Pendiente de rutina</span>
       <span><span class="dot" style="background:var(--green)"></span>Rutina completa</span>
       <span><span class="dot" style="background:var(--red)"></span>Rutina incompleta</span>
+      <span><span class="dot" style="background:var(--sec)"></span>🔒 Bloqueado <span id="leyBloq"></span></span>
       <span id="leyRol"></span>
     </div>
   </main>
@@ -337,6 +344,8 @@ function _sesionExpirada(motivo) {
 }
 
 let lunes=lunesDe(new Date()), citas={}, reqSeq=0, diaSel=diaHabilDeHoy();
+// Bloqueos: 'permanente' se repite cada semana ese día; 'unico' es una sola fecha.
+let bloqPerm={}, bloqUnico={};   // claves: 'dow|HH:MM'  y  'YYYY-MM-DD|HH:MM'
 // En pantallas angostas se muestra un día a la vez; en grandes, la semana completa.
 const mqAncho=window.matchMedia('(min-width:821px)');
 let vistaSemana=mqAncho.matches;
@@ -351,6 +360,9 @@ function diaDe(i){const d=new Date(lunes);d.setDate(d.getDate()+i);return d;}
 function diaHabilDeHoy(){const i=(new Date().getDay()+6)%7;return i<NDIAS?i:0;}  // sáb/dom caen en lunes
 const fechaCorta=d=>d.toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit'});
 const normHora=h=>String(h||'').slice(0,5);
+const dowDe=f=>{const [y,m,d]=String(f).split('-').map(Number);return (new Date(y,m-1,d).getDay()+6)%7;};  // lunes = 0
+// Un espacio está bloqueado si hay un bloqueo de ese día concreto, o uno permanente de ese día de la semana.
+const bloqueoDe=(f,h)=>bloqUnico[f+'|'+h] || bloqPerm[dowDe(f)+'|'+h] || null;
 const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(currentRole);
 const puedeAgendar=()=>esAdmin()||['recepcion','admin_sucursal','coordinador'].includes(currentRole);
 const puedeRutina=()=>esAdmin()||currentRole==='instructor';
@@ -442,17 +454,32 @@ async function cargar(){
   const desde=ymd(lunes), hastaD=diaDe(NDIAS-1), hasta=ymd(hastaD);
   document.getElementById('weekLabel').textContent=`${lunes.toLocaleDateString('es-CR',{day:'numeric',month:'short'})} — ${hastaD.toLocaleDateString('es-CR',{day:'numeric',month:'short'})}`;
   document.getElementById('contenido').innerHTML='<div class="sect"><div class="skel"></div></div>';
+  const sede=encodeURIComponent(currentSede);
   try{
-    const rows=(await supaFetch(`/mediciones?sede=eq.${encodeURIComponent(currentSede)}&fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.asc,hora.asc&select=*`))||[];
+    // Los bloqueos permanentes se traen siempre; los de una sola fecha, solo los de la semana visible.
+    const [rows,blos]=await Promise.all([
+      supaFetch(`/mediciones?sede=eq.${sede}&fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.asc,hora.asc&select=*`),
+      supaFetch(`/mediciones_bloqueos?sede=eq.${sede}&or=(tipo.eq.permanente,and(fecha.gte.${desde},fecha.lte.${hasta}))&select=*`).catch(()=>[])
+    ]);
     if(seq!==reqSeq)return;
-    citas={}; rows.forEach(r=>{citas[r.fecha+'|'+normHora(r.hora)]=r;});
+    citas={}; (rows||[]).forEach(r=>{citas[r.fecha+'|'+normHora(r.hora)]=r;});
+    cargarBloqueos(blos);
     render();
   }catch(e){
     if(seq!==reqSeq)return;
     aviso(/mediciones/.test(e.message)&&/relation|exist|schema cache/i.test(e.message)
       ? 'Falta crear la tabla: corra mediciones.sql en Supabase.' : 'No se pudo cargar: '+e.message);
-    citas={}; render();
+    citas={}; cargarBloqueos([]); render();
   }
+}
+
+function cargarBloqueos(rows){
+  bloqPerm={}; bloqUnico={};
+  (rows||[]).forEach(b=>{
+    const h=normHora(b.hora);
+    if(b.tipo==='permanente') bloqPerm[b.dia_semana+'|'+h]=b;
+    else if(b.fecha)          bloqUnico[b.fecha+'|'+h]=b;
+  });
 }
 
 // ── Render ──
@@ -466,11 +493,16 @@ function render(){
   document.getElementById('contenido').innerHTML = vistaSemana ? htmlSemana() : htmlDia();
   const list=Object.values(citas);
   const comp=list.filter(c=>c.rutina==='completa').length, inc=list.filter(c=>c.rutina==='incompleta').length;
+  // Espacios bloqueados de la semana visible (los permanentes cuentan una vez por día)
+  let nBloq=0;
+  for(let i=0;i<NDIAS;i++){ const f=ymd(diaDe(i));
+    SLOTS.forEach(m=>{ const h=hhmm(m); if(!citas[f+'|'+h] && bloqueoDe(f,h)) nBloq++; }); }
   document.getElementById('kAgend').textContent=list.length;
   document.getElementById('kComp').textContent=comp;
   document.getElementById('kInc').textContent=inc;
   document.getElementById('kPend').textContent=list.length-comp-inc;
-  document.getElementById('kLibres').textContent=(SLOTS.length*NDIAS)-list.length;
+  document.getElementById('kLibres').textContent=(SLOTS.length*NDIAS)-list.length-nBloq;
+  document.getElementById('leyBloq').textContent = nBloq ? `${nBloq} espacio(s) bloqueado(s) esta semana` : '';
 }
 
 function pintarSegDias(){
@@ -492,6 +524,13 @@ function htmlDia(){
         <span class="hr">${h}</span>
         <span class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}</span></span>
         ${rutinaPill(c.rutina)}${chev}</button>`;
+      const b=bloqueoDe(f,h);
+      if(b){
+        const det=`${b.tipo==='permanente'?'Todos los '+DIAS[b.dia_semana].toLowerCase():'Solo este día'}${b.motivo?' · '+esc(b.motivo):''}`;
+        return puedeAgendar()
+          ? `<button class="row bloq${pasado}" onclick="abrir('${f}','${h}')"><span class="hr">${h}</span><span class="main"><span class="t">🔒 Bloqueado</span><span class="s">${det}</span></span>${chev}</button>`
+          : `<div class="row bloq ro${pasado}"><span class="hr">${h}</span><span class="main"><span class="t">🔒 Bloqueado</span><span class="s">${det}</span></span></div>`;
+      }
       return puedeAgendar()
         ? `<button class="row libre${pasado}" onclick="abrir('${f}','${h}')"><span class="hr">${h}</span><span class="main"><span class="t">Libre</span></span><span class="add">Agendar</span></button>`
         : `<div class="row libre ro${pasado}"><span class="hr">${h}</span><span class="main"><span class="t">Libre</span></span></div>`;
@@ -523,9 +562,16 @@ function htmlSemana(){
         tr+=`<td class="slot${pasado}"><div class="cell taken ${est}" onclick="abrir('${f}','${h}')" title="${esc(c.nombre)}">
               <div class="nm">${esc(c.nombre)}</div><div class="st">${lbl}</div></div></td>`;
       }else{
-        tr+= puedeAgendar()
-          ? `<td class="slot${pasado}"><div class="cell" onclick="abrir('${f}','${h}')" title="Agendar ${h}">+</div></td>`
-          : `<td class="slot${pasado}"><div class="cell ro">·</div></td>`;
+        const b=bloqueoDe(f,h);
+        if(b){
+          const det=b.tipo==='permanente'?`Todos los ${DIAS[b.dia_semana].toLowerCase()}`:'Solo este día';
+          tr+=`<td class="slot${pasado}"><div class="cell bloq${puedeAgendar()?'':' ro'}" ${puedeAgendar()?`onclick="abrir('${f}','${h}')"`:''} title="Bloqueado — ${det}${b.motivo?': '+esc(b.motivo):''}">
+                <div class="nm">🔒 ${esc(b.motivo||'Bloqueado')}</div><div class="st">${det}</div></div></td>`;
+        }else{
+          tr+= puedeAgendar()
+            ? `<td class="slot${pasado}"><div class="cell" onclick="abrir('${f}','${h}')" title="Agendar ${h}">+</div></td>`
+            : `<td class="slot${pasado}"><div class="cell ro">·</div></td>`;
+        }
       }
     }
     return tr+'</tr>';
@@ -542,7 +588,7 @@ function htmlSemana(){
 }
 
 // ── Sheet de medición ──
-let mFecha=null,mHora=null,mRutina=null,mId=null;
+let mFecha=null,mHora=null,mRutina=null,mId=null,mModo='medicion',mTipoBloq='unico';
 function cerrar(){document.getElementById('modal').classList.remove('open');document.body.style.overflow='';}
 
 function abrir(f,h){
@@ -553,19 +599,60 @@ function abrir(f,h){
   document.getElementById('mErr').textContent='';
   const save=document.getElementById('mSave');
 
-  if(!c){
-    if(!puedeAgendar())return;
-    document.getElementById('mTitulo').textContent='Nueva medición';
+  const bloq=c?null:bloqueoDe(f,h);
+
+  if(bloq){
+    // Espacio bloqueado: se muestra el detalle y, si puede, la opción de desbloquear
+    document.getElementById('mTitulo').textContent='🔒 Espacio bloqueado';
+    const dia=DIAS[bloq.tipo==='permanente'?bloq.dia_semana:diaSel]||'';
     document.getElementById('mBody').innerHTML=`
       <div class="f-group">
-        <div class="f-row"><label>Nombre</label><input type="text" id="fNombre" placeholder="Obligatorio" autocomplete="off"></div>
-        <div class="f-row"><label>Teléfono</label><input type="tel" id="fTel" placeholder="8888-8888" autocomplete="off"></div>
-        <div class="f-row"><label>PIN</label><input type="text" id="fPin" placeholder="PIN del cliente" autocomplete="off"></div>
-        <div class="f-row"><label>Agendó</label><span class="v">${esc(currentNombre||currentEmail)}</span></div>
+        <div class="f-row"><label>Bloqueo</label><span class="v">${bloq.tipo==='permanente'?'Todos los '+esc(dia.toLowerCase()):'Solo esta fecha'}</span></div>
+        <div class="f-row"><label>Motivo</label><span class="v">${esc(bloq.motivo||'—')}</span></div>
+        <div class="f-row"><label>Bloqueó</label><span class="v">${esc(bloq.creado_por||'—')}</span></div>
       </div>
-      <div class="hint">La rutina (completa / incompleta) la marca el instructor.</div>`;
+      <div class="hint">${bloq.tipo==='permanente'
+        ? 'Este espacio queda bloqueado todas las semanas. Al desbloquearlo se libera en toda la agenda.'
+        : 'Solo afecta esta fecha; las demás semanas siguen libres.'}</div>`;
+    document.getElementById('mFoot').innerHTML = puedeAgendar()
+      ? `<button class="btn-destroy" onclick="desbloquear('${bloq.id}')">Desbloquear</button>` : '';
+    save.hidden=true;
+    document.getElementById('modal').classList.add('open');
+    document.body.style.overflow='hidden';
+    return;
+  }
+
+  if(!c){
+    if(!puedeAgendar())return;
+    mModo='medicion';
+    document.getElementById('mTitulo').textContent='Espacio libre';
+    document.getElementById('mBody').innerHTML=`
+      <div class="seg-rutina" id="segModo" style="grid-template-columns:repeat(2,1fr);">
+        <button data-m="medicion" onclick="setModo('medicion')">📏 Agendar</button>
+        <button data-m="bloqueo"  onclick="setModo('bloqueo')">🔒 Bloquear</button>
+      </div>
+      <div id="modoMedicion">
+        <div class="f-group">
+          <div class="f-row"><label>Nombre</label><input type="text" id="fNombre" placeholder="Obligatorio" autocomplete="off"></div>
+          <div class="f-row"><label>Teléfono</label><input type="tel" id="fTel" placeholder="8888-8888" autocomplete="off"></div>
+          <div class="f-row"><label>PIN</label><input type="text" id="fPin" placeholder="PIN del cliente" autocomplete="off"></div>
+          <div class="f-row"><label>Agendó</label><span class="v">${esc(currentNombre||currentEmail)}</span></div>
+        </div>
+        <div class="hint" style="margin-top:8px;">La rutina (completa / incompleta) la marca el instructor.</div>
+      </div>
+      <div id="modoBloqueo" hidden>
+        <div class="seg-rutina" id="segTipoBloq" style="grid-template-columns:repeat(2,1fr);">
+          <button data-b="unico"      onclick="setTipoBloq('unico')">Solo este día</button>
+          <button data-b="permanente" onclick="setTipoBloq('permanente')">Todos los ${esc(DIAS[dowDe(f)].toLowerCase())}</button>
+        </div>
+        <div class="f-group" style="margin-top:12px;">
+          <div class="f-row"><label>Motivo</label><input type="text" id="fMotivo" placeholder="Ej. clase grupal" autocomplete="off"></div>
+        </div>
+        <div class="hint" id="hintBloq" style="margin-top:8px;"></div>
+      </div>`;
     document.getElementById('mFoot').innerHTML='';
-    save.hidden=false; save.textContent='Agendar'; save.disabled=false; save.onclick=guardarNueva;
+    save.hidden=false; save.disabled=false;
+    setModo('medicion');
     setTimeout(()=>document.getElementById('fNombre').focus(),120);
   }else{
     mId=c.id; mRutina=c.rutina||'';
@@ -604,6 +691,54 @@ function abrir(f,h){
 function setRutina(v){mRutina=v;pintarSeg();}
 function pintarSeg(){document.querySelectorAll('#segRutina button').forEach(b=>b.classList.toggle('on',b.dataset.v===mRutina));}
 
+/* Espacio libre: se agenda una medición o se bloquea el espacio */
+function setModo(m){
+  mModo=m;
+  document.querySelectorAll('#segModo button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  document.getElementById('modoMedicion').hidden = m!=='medicion';
+  document.getElementById('modoBloqueo').hidden  = m!=='bloqueo';
+  const save=document.getElementById('mSave');
+  save.textContent = m==='bloqueo' ? 'Bloquear' : 'Agendar';
+  save.onclick     = m==='bloqueo' ? guardarBloqueo : guardarNueva;
+  document.getElementById('mErr').textContent='';
+  if(m==='bloqueo') setTipoBloq(mTipoBloq);
+}
+function setTipoBloq(t){
+  mTipoBloq=t;
+  document.querySelectorAll('#segTipoBloq button').forEach(b=>b.classList.toggle('on',b.dataset.b===t));
+  const d=DIAS[dowDe(mFecha)].toLowerCase();
+  document.getElementById('hintBloq').textContent = t==='permanente'
+    ? `Se bloquea las ${mHora} de todos los ${d}, en todas las semanas. Las mediciones ya agendadas en ese espacio no se borran.`
+    : `Se bloquea solo el ${new Date(mFecha+'T00:00:00').toLocaleDateString('es-CR',{day:'numeric',month:'long'})} a las ${mHora}.`;
+}
+
+async function guardarBloqueo(){
+  const err=document.getElementById('mErr'), btn=document.getElementById('mSave');
+  btn.disabled=true; btn.textContent='Bloqueando…'; err.textContent='';
+  const body={ sede:currentSede, tipo:mTipoBloq, hora:mHora,
+    motivo:document.getElementById('fMotivo').value.trim()||null,
+    ...(mTipoBloq==='permanente' ? {dia_semana:dowDe(mFecha)} : {fecha:mFecha}) };
+  try{
+    await supaFetch('/mediciones_bloqueos',{method:'POST',body});
+    cerrar(); aviso(`Espacio bloqueado · ${mHora}`,true); cargar();
+  }catch(e){
+    btn.disabled=false; btn.textContent='Bloquear';
+    err.textContent = /relation|exist|schema cache/i.test(e.message)
+      ? 'Falta crear la tabla: corra mediciones_bloqueos.sql en Supabase.'
+      : (/duplicate|unique/i.test(e.message) ? 'Ese espacio ya estaba bloqueado. Recargue.' : e.message);
+  }
+}
+
+async function desbloquear(id){
+  const perm=Object.values(bloqPerm).some(b=>b.id===id);
+  if(!confirm(perm
+      ? '¿Desbloquear este espacio en TODAS las semanas?'
+      : '¿Desbloquear este espacio en esta fecha?')) return;
+  try{ await supaFetch(`/mediciones_bloqueos?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});
+    cerrar(); aviso('Espacio desbloqueado.',true); cargar();
+  }catch(e){ aviso('No se pudo desbloquear: '+e.message); }
+}
+
 async function guardarNueva(){
   const err=document.getElementById('mErr'), btn=document.getElementById('mSave');
   const nombre=document.getElementById('fNombre').value.trim();
@@ -618,7 +753,9 @@ async function guardarNueva(){
     cerrar(); aviso(`Medición agendada: ${nombre} · ${mHora}`,true); cargar();
   }catch(e){
     btn.disabled=false;btn.textContent='Agendar';
-    err.textContent=/duplicate|unique/i.test(e.message)?'Ese espacio ya fue tomado por otra persona. Recargue.':e.message;
+    err.textContent = /bloqueado/i.test(e.message) ? 'Ese espacio acaba de ser bloqueado. Recargue la agenda.'
+                    : /duplicate|unique/i.test(e.message) ? 'Ese espacio ya fue tomado por otra persona. Recargue.'
+                    : e.message;
   }
 }
 
@@ -654,7 +791,9 @@ function imprimirSemana(){
   head+='</tr>';
   const fila=m=>{let tr=`<tr><td class="h">${hhmm(m)}</td>`;
     for(let i=0;i<NDIAS;i++){const f=ymd(diaDe(i)),h=hhmm(m),c=citas[f+'|'+h];
-      tr+=c?`<td class="${c.rutina||'pend'}"><b>${esc(c.nombre)}</b>${c.telefono?'<br><span class="tel">'+esc(c.telefono)+'</span>':''}${c.pin?'<br><span class="tel">PIN '+esc(c.pin)+'</span>':''}<br><span class="rt">${c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':'☐ Pendiente'}</span></td>`:'<td></td>';}
+      if(c){ tr+=`<td class="${c.rutina||'pend'}"><b>${esc(c.nombre)}</b>${c.telefono?'<br><span class="tel">'+esc(c.telefono)+'</span>':''}${c.pin?'<br><span class="tel">PIN '+esc(c.pin)+'</span>':''}<br><span class="rt">${c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':'☐ Pendiente'}</span></td>`; continue; }
+      const b=bloqueoDe(f,h);
+      tr+= b ? `<td class="bloq">🔒 ${esc(b.motivo||'Bloqueado')}</td>` : '<td></td>';}
     return tr+'</tr>';};
   let body=`<tr class="blk"><td colspan="${COLS}">MAÑANA · 8:00 a 10:45</td></tr>`;
   SLOTS_AM.forEach(m=>body+=fila(m));
@@ -669,6 +808,7 @@ function imprimirSemana(){
   tr.blk td{background:#e8eef6;font-weight:800;font-size:11px;letter-spacing:.3px;height:auto;}
   .tel{color:#555;font-size:9px;}.rt{font-size:9px;color:#333;}
   td.completa{background:#eafaf1;}td.incompleta{background:#fdecec;}td.pend{background:#fafafa;}
+  td.bloq{background:#ececec;color:#666;font-size:9px;}
   @page{size:landscape;margin:10mm;}@media print{.noprint{display:none;}}</style></head><body>
   <h1>📏 Mediciones — ${esc(currentSede)}</h1>
   <div class="sub">Semana del ${lunes.toLocaleDateString('es-CR',{day:'numeric',month:'long'})} al ${diaDe(NDIAS-1).toLocaleDateString('es-CR',{day:'numeric',month:'long',year:'numeric'})} · impreso ${new Date().toLocaleString('es-CR')}</div>

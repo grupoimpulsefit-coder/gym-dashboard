@@ -187,7 +187,7 @@
 
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-09-17a';
+const APP_VER='2026-09-22a';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -432,11 +432,12 @@ const MED_AM=[], MED_PM=[];
 for(let m=8*60;  m<=10*60+45; m+=15) MED_AM.push(m);
 for(let m=17*60; m<=19*60+45; m+=15) MED_PM.push(m);
 const MED_SLOTS=MED_AM.length+MED_PM.length;
+const MED_DIAS=['lunes','martes','miércoles','jueves','viernes'];
 const medHH=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 const medDow=s=>{const [y,m,d]=String(s).split('-').map(Number);return (new Date(y,m-1,d).getDay()+6)%7;};
 const medSuma=(s,n)=>{const [y,m,d]=String(s).split('-').map(Number);const x=new Date(y,m-1,d);x.setDate(x.getDate()+n);return ymd(x);};
 function medHabil(f,dir){ let g=0; while(medDow(f)>4 && g++<7) f=medSuma(f,dir||1); return f; }   // salta sábado y domingo
-let medFecha=medHabil(todayStr()), medRows=[], medSeq=0;
+let medFecha=medHabil(todayStr()), medRows=[], medSeq=0, medBloq={};   // medBloq: 'HH:MM' → bloqueo del día mostrado
 function medSetFecha(f){ if(!f) return; medFecha=medHabil(f); renderMedicionesMod(); }
 function medMover(n){ medFecha=medHabil(medSuma(medFecha,n), n>0?1:-1); renderMedicionesMod(); }
 const medPill=r=>r==='completa'?'<span class="pill ok">✓ Completa</span>'
@@ -452,16 +453,31 @@ async function renderMedicionesMod(){
     '<button class="act" onclick="abrirMediciones()">Semana</button>');
   const v=document.getElementById('view');
   v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
-  const seq=++medSeq;
-  try{ medRows=(await supaFetch(`/mediciones?sede=eq.${encodeURIComponent(detSede)}&fecha=eq.${medFecha}&order=hora.asc&select=*`))||[]; }
+  const seq=++medSeq, sedeQ=encodeURIComponent(detSede), dow=medDow(medFecha);
+  try{
+    const [rows,blos]=await Promise.all([
+      supaFetch(`/mediciones?sede=eq.${sedeQ}&fecha=eq.${medFecha}&order=hora.asc&select=*`),
+      // Bloqueos que aplican a este día: el permanente de su día de la semana, o el de esta fecha
+      supaFetch(`/mediciones_bloqueos?sede=eq.${sedeQ}&or=(and(tipo.eq.permanente,dia_semana.eq.${dow}),and(tipo.eq.unico,fecha.eq.${medFecha}))&select=*`).catch(()=>[])
+    ]);
+    medRows=rows||[];
+    medBloq={}; (blos||[]).forEach(b=>{ medBloq[String(b.hora||'').slice(0,5)]=b; });
+  }
   catch(e){ if(seq!==medSeq) return;
     v.innerHTML=`<div class="empty">${/relation|exist|schema cache/i.test(e.message)?'Falta crear la tabla: corra mediciones.sql en Supabase.':'No se pudo cargar: '+esc(e.message)}</div>`; return; }
   if(seq!==medSeq) return;
   const by={}; medRows.forEach(r=>{ by[String(r.hora||'').slice(0,5)]=r; });
   const comp=medRows.filter(r=>r.rutina==='completa').length, inc=medRows.filter(r=>r.rutina==='incompleta').length;
+  // Bloqueos que caen en un espacio sin cita (los que ya tienen cita no restan)
+  const nBloq=Object.keys(medBloq).filter(h=>!by[h]).length;
   const chevSvg='<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg>';
   const fila=m=>{ const h=medHH(m), c=by[h];
     if(c) return `<button class="cell" onclick="medAbrir('${h}')"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}</span></div>${medPill(c.rutina)}${chevSvg}</button>`;
+    const b=medBloq[h];
+    if(b){ const det=(b.tipo==='permanente'?'Todos los '+MED_DIAS[b.dia_semana]:'Solo este día')+(b.motivo?' · '+esc(b.motivo):'');
+      return puedeAgendarMed()
+        ? `<button class="cell" onclick="medAbrir('${h}')"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t">🔒 Bloqueado</span><span class="s">${det}</span></div>${chevSvg}</button>`
+        : `<div class="cell"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t">🔒 Bloqueado</span><span class="s">${det}</span></div></div>`; }
     return puedeAgendarMed()
       ? `<button class="cell" onclick="medAbrir('${h}')"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t" style="color:var(--ter)">Libre</span></div><span class="v" style="color:var(--brand-text);font-weight:600">Agendar</span></button>`
       : `<div class="cell"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t" style="color:var(--ter)">Libre</span></div></div>`;
@@ -469,7 +485,7 @@ async function renderMedicionesMod(){
   v.innerHTML=`
     <div class="tiles">
       <div class="tile"><span class="l">Agendadas</span><span class="n num">${medRows.length}</span></div>
-      <div class="tile"><span class="l">Libres</span><span class="n num">${MED_SLOTS-medRows.length}</span></div>
+      <div class="tile"><span class="l">Libres</span><span class="n num">${MED_SLOTS-medRows.length-nBloq}</span></div>
       <div class="tile"><span class="l">Completas</span><span class="n num" style="color:var(--green)">${comp}</span></div>
       <div class="tile"><span class="l">Incompletas</span><span class="n num" style="color:var(--red)">${inc}</span></div>
     </div>
@@ -483,6 +499,8 @@ let medHora=null, medRutina='';
 function medAbrir(h){
   const c=medRows.find(r=>String(r.hora||'').slice(0,5)===h)||null;
   if(!c && !puedeAgendarMed()) return;
+  const b=!c && medBloq[h];
+  if(b){ medHojaBloqueo(h,b); return; }
   medHora=h; medRutina=c?.rutina||'';
   const editable=puedeAgendarMed();
   const campo=(lab,id,val,ph,tipo)=>editable
@@ -511,9 +529,85 @@ function medAbrir(h){
           ${c.rutina_por?`<div class="ftr" style="padding:8px 0 0">Marcada por ${esc(c.rutina_por)}</div>`:''}`:''}
         <div class="err" id="medErr" style="text-align:left"></div>
         ${c&&editable?`<button class="btn plain" style="margin-top:14px;color:var(--red)" onclick="medBorrar('${c.id}')">Eliminar medición</button>`:''}
+        ${!c&&editable?`<button class="btn plain" style="margin-top:14px" onclick="medBloquearHoja('${h}')">🔒 Bloquear este espacio</button>`:''}
       </div></div>`;
   sh.hidden=false; document.body.style.overflow='hidden'; medPintarSeg();
 }
+/* Hoja de un espacio bloqueado: detalle + desbloquear */
+function medHojaBloqueo(h,b){
+  const det = b.tipo==='permanente' ? 'Todos los '+MED_DIAS[b.dia_semana] : 'Solo esta fecha';
+  const sh=document.getElementById('sheet');
+  sh.innerHTML=`<div class="sheet-bg" onclick="cerrarSheet()"></div>
+    <div class="sheet-panel" role="dialog" aria-label="Espacio bloqueado">
+      <div class="sheet-h"><button class="act" onclick="cerrarSheet()">Cerrar</button>
+        <span class="tt">🔒 Espacio bloqueado</span><span class="act" style="visibility:hidden">·</span></div>
+      <div class="sheet-body">
+        <div class="ftr" style="padding:0 0 10px">${esc(fechaLarga(medFecha))} · ${h} · ${esc(detSede)}</div>
+        <div class="group" style="margin:0">
+          <div class="cell"><div class="main"><span class="t">Bloqueo</span></div><span class="v">${esc(det)}</span></div>
+          <div class="cell"><div class="main"><span class="t">Motivo</span></div><span class="v">${esc(b.motivo||'—')}</span></div>
+          <div class="cell"><div class="main"><span class="t">Bloqueó</span></div><span class="v">${esc(b.creado_por||'—')}</span></div>
+        </div>
+        <div class="ftr" style="padding:10px 0 0">${b.tipo==='permanente'
+          ? 'Queda bloqueado todas las semanas. Al desbloquearlo se libera en toda la agenda.'
+          : 'Solo afecta esta fecha.'}</div>
+        ${puedeAgendarMed()?`<button class="btn plain" style="margin-top:14px;color:var(--red)" onclick="medDesbloquear('${b.id}','${b.tipo}')">Desbloquear</button>`:''}
+      </div></div>`;
+  sh.hidden=false; document.body.style.overflow='hidden';
+}
+async function medDesbloquear(id,tipo){
+  if(!confirm(tipo==='permanente' ? '¿Desbloquear este espacio en TODAS las semanas?' : '¿Desbloquear este espacio en esta fecha?')) return;
+  try{ await supaFetch(`/mediciones_bloqueos?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});
+    cerrarSheet(); toast('Espacio desbloqueado.'); renderMedicionesMod();
+  }catch(e){ toast('No se pudo desbloquear: '+e.message); }
+}
+/* Bloquear un espacio libre desde la app */
+function medBloquearHoja(h){
+  const dia=MED_DIAS[medDow(medFecha)];
+  const sh=document.getElementById('sheet');
+  sh.innerHTML=`<div class="sheet-bg" onclick="cerrarSheet()"></div>
+    <div class="sheet-panel" role="dialog" aria-label="Bloquear espacio">
+      <div class="sheet-h"><button class="act" onclick="medAbrir('${h}')">Atrás</button>
+        <span class="tt">🔒 Bloquear ${h}</span>
+        <button class="act" id="medBloqSave" onclick="medGuardarBloqueo('${h}')">Bloquear</button></div>
+      <div class="sheet-body">
+        <div class="ftr" style="padding:0 0 10px">${esc(fechaLarga(medFecha))} · ${h} · ${esc(detSede)}</div>
+        <div class="seg" id="medSegBloq">
+          <button data-b="unico" onclick="medSetTipoBloq('unico')">Solo este día</button>
+          <button data-b="permanente" onclick="medSetTipoBloq('permanente')">Todos los ${dia}</button>
+        </div>
+        <div class="group" style="margin:14px 0 0">
+          <div class="cell"><div class="main"><span class="t">Motivo</span></div><input class="qty" id="medMotivo" type="text" placeholder="Ej. clase grupal" style="width:58%;text-align:right;font-weight:400"></div>
+        </div>
+        <div class="ftr" id="medHintBloq" style="padding:10px 0 0"></div>
+        <div class="err" id="medErr" style="text-align:left"></div>
+      </div></div>`;
+  sh.hidden=false; document.body.style.overflow='hidden';
+  medSetTipoBloq('unico');
+}
+let medTipoBloq='unico';
+function medSetTipoBloq(t){
+  medTipoBloq=t;
+  document.querySelectorAll('#medSegBloq button').forEach(b=>b.classList.toggle('on',b.dataset.b===t));
+  const el=document.getElementById('medHintBloq'); if(!el) return;
+  el.textContent = t==='permanente'
+    ? `Se bloquea esa hora todos los ${MED_DIAS[medDow(medFecha)]}, en todas las semanas.`
+    : 'Se bloquea solo en esta fecha.';
+}
+async function medGuardarBloqueo(h){
+  const btn=document.getElementById('medBloqSave'), err=document.getElementById('medErr');
+  btn.disabled=true; btn.textContent='Bloqueando…'; err.textContent='';
+  const body={ sede:detSede, tipo:medTipoBloq, hora:h,
+    motivo:document.getElementById('medMotivo').value.trim()||null,
+    ...(medTipoBloq==='permanente' ? {dia_semana:medDow(medFecha)} : {fecha:medFecha}) };
+  try{
+    await supaFetch('/mediciones_bloqueos',{method:'POST',body});
+    cerrarSheet(); toast(`Espacio bloqueado · ${h}`); renderMedicionesMod();
+  }catch(e){ btn.disabled=false; btn.textContent='Bloquear';
+    err.textContent = /relation|exist|schema cache/i.test(e.message) ? 'Falta crear la tabla: corra mediciones_bloqueos.sql en Supabase.'
+                    : /duplicate|unique/i.test(e.message) ? 'Ese espacio ya estaba bloqueado. Recargá.' : e.message; }
+}
+
 function medSetRutina(v){ medRutina=v; medPintarSeg(); }
 function medPintarSeg(){ document.querySelectorAll('#medSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===medRutina)); }
 async function medGuardar(id){
@@ -532,7 +626,8 @@ async function medGuardar(id){
              agendado_por:auth.email||null, agendado_por_nombre:me.nombre||auth.email||null}});
     cerrarSheet(); toast(id?'Medición actualizada.':`Medición agendada · ${medHora}`); renderMedicionesMod();
   }catch(e){ btn.disabled=false; btn.textContent=id?'Guardar':'Agendar';
-    err.textContent=/duplicate|unique/i.test(e.message)?'Ese espacio ya fue tomado. Recargá.':e.message; }
+    err.textContent = /bloqueado/i.test(e.message) ? 'Ese espacio acaba de ser bloqueado. Recargá la agenda.'
+                    : /duplicate|unique/i.test(e.message) ? 'Ese espacio ya fue tomado. Recargá.' : e.message; }
 }
 async function medBorrar(id){
   if(!confirm('¿Eliminar esta medición? El espacio queda libre.')) return;
