@@ -29,7 +29,7 @@ create unique index if not exists instructores_nombre_uidx on instructores (lowe
 create table if not exists gastos (
   id              uuid primary key default gen_random_uuid(),
   sede            text not null,          -- '3 Ríos' | 'Natación' | 'Pinares' | 'Sabanilla'
-  categoria       text not null,          -- 'clases_grupales' | 'instructores_planta'
+  categoria       text not null,          -- 'clases_grupales' | 'instructores_planta' | 'staff' | 'parqueo' | 'mantenimiento' | 'otros' | 'deposito' (este último solo desde caja, no sale en el módulo de Gastos)
   fecha_clase     date not null,          -- día de la fecha de la clase
   mes             text not null,          -- 'Agosto 2026' (etiqueta para el resumen mensual)
   mes_orden       text,                   -- '2026-08' (para ordenar/filtrar)

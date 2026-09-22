@@ -15,6 +15,7 @@
 :root {
   --cat-grupales: #007AFF;
   --cat-planta:   #0E9F8E;
+  --cat-staff:    #5856D6;
   --cat-parqueo:  #AF52DE;
   --cat-mantenimiento: #FF9500;
   --cat-otros:    #8E8E93;
@@ -23,6 +24,7 @@
   :root {
     --cat-grupales: #0A84FF;
     --cat-planta:   #2DBFAC;
+    --cat-staff:    #7D7AFF;
     --cat-parqueo:  #BF5AF2;
     --cat-mantenimiento: #FF9F0A;
     --cat-otros:    #98989F;
@@ -120,6 +122,7 @@
         <select id="fCategoria">
           <option value="clases_grupales">🧘 Clases grupales</option>
           <option value="instructores_planta">🏋️ Instructores de planta</option>
+          <option value="staff">👥 Staff</option>
           <option value="parqueo">🅿️ Parqueo</option>
           <option value="mantenimiento">🔧 Mantenimiento</option>
           <option value="otros">📦 Otros</option>
@@ -252,6 +255,7 @@ const SEDE_META = {
 const CATEGORIAS = [
   { id: 'clases_grupales',     label: 'Clases grupales',        icon: '🧘', color: 'var(--cat-grupales)' },
   { id: 'instructores_planta', label: 'Instructores de planta', icon: '🏋️', color: 'var(--cat-planta)' },
+  { id: 'staff',               label: 'Staff',                  icon: '👥', color: 'var(--cat-staff)' },
   { id: 'parqueo',             label: 'Parqueo',                icon: '🅿️', color: 'var(--cat-parqueo)' },
   { id: 'mantenimiento',       label: 'Mantenimiento',          icon: '🔧', color: 'var(--cat-mantenimiento)' },
   { id: 'otros',               label: 'Otros',                  icon: '📦', color: 'var(--cat-otros)' },
