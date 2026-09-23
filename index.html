@@ -2,162 +2,246 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F2F2F7">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/icons/favicon-64.png">
     <title>Sistema de Gestión de Usuarios - Pinares</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+    <link rel="stylesheet" href="/ui.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); min-height: 100vh; padding: 24px; }
-        .container { max-width: 1500px; margin: 0 auto; background: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
+        /* ══ Panel administrativo — usa los tokens de /ui.css ══
+           Se conservan todos los nombres de clase originales: el JS genera
+           marcado con .stat-card, .value, .sub, .badge-*, .btn-*… y no se toca. */
+        body { padding: 0; }
+        .container { max-width: 1500px; margin: 0 auto; background: transparent; border-radius: 0; box-shadow: none; }
 
-        /* HEADER */
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 60%, #f64f59 100%); color: white; position: relative; overflow: hidden; }
-        .header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%); pointer-events: none; }
-        .header-inner { padding: 36px 40px 28px; position: relative; z-index: 1; }
-        .header-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
-        .header-brand { display: flex; align-items: center; gap: 16px; }
-        .header-icon { width: 56px; height: 56px; background: rgba(255,255,255,0.2); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 28px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.3); }
-        .header-titles h1 { font-size: 1.7em; font-weight: 800; letter-spacing: -0.5px; }
-        .header-titles p { font-size: 0.9em; opacity: 0.85; margin-top: 3px; }
-        .header-badge { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 30px; padding: 6px 16px; font-size: 0.78em; font-weight: 600; backdrop-filter: blur(10px); white-space: nowrap; }
-        .header-footer { margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: space-between; }
-        .header-footer .tagline { font-size: 0.82em; opacity: 0.75; }
-        .header-footer .jk { font-size: 0.82em; font-weight: 700; background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.25); }
+        /* ── Encabezado ── */
+        .header { position: sticky; top: 0; z-index: 30; background: var(--glass);
+            backdrop-filter: blur(22px) saturate(180%); -webkit-backdrop-filter: blur(22px) saturate(180%);
+            border-bottom: .5px solid var(--sep); color: var(--label); }
+        .header-inner { padding: 10px var(--gut) 6px; }
+        .header-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+        .header-brand { display: flex; align-items: center; gap: 12px; }
+        .header-icon { width: 34px; height: 34px; background: var(--brand-tint); border: 0; border-radius: 10px;
+            display: grid; place-items: center; font-size: 18px; flex: none; }
+        .header-titles h1 { font-size: 22px; font-weight: 700; letter-spacing: -.022em; }
+        .header-titles p { font-size: 13px; color: var(--sec); margin-top: 1px; }
+        .header-badge { background: var(--fill); border: 0; border-radius: 10px; padding: 0 12px; min-height: 30px;
+            display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; color: var(--sec); white-space: nowrap; }
+        .header-footer { display: none; }   /* el eslogan y el crédito viven en el pie */
 
-        /* TABS */
-        .tab-nav { display: flex; background: #f7f8fc; border-bottom: 2px solid #eaecf5; padding: 0 32px; }
-        .tab-btn { padding: 16px 24px; border: none; background: none; font-family: inherit; font-size: 0.9em; font-weight: 600; color: #888; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
-        .tab-btn:hover { color: #667eea; }
-        .tab-btn.active { color: #667eea; border-bottom-color: #667eea; }
+        /* ── Barra de usuario ── */
+        .user-toolbar { background: transparent; border-top: .5px solid var(--hair); padding: 5px var(--gut) 7px;
+            display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .user-info { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--sec); flex-wrap: wrap; }
+        .role-badge { background: var(--fill); border: 0; border-radius: 8px; padding: 2px 10px; font-size: 11px;
+            font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--sec); }
+        .user-toolbar select, .user-toolbar button { font-family: inherit; }
+
+        /* ── Pestañas (segmented control desplazable: son cinco) ── */
+        .tab-nav { display: flex; gap: 2px; background: var(--fill); border: 0; border-radius: 10px; padding: 2px;
+            margin: 14px var(--gut) 0; overflow-x: auto; scrollbar-width: none; }
+        .tab-nav::-webkit-scrollbar { display: none; }
+        .tab-btn { padding: 0 16px; min-height: 36px; border: 0; background: none; font-family: inherit; font-size: 14px;
+            font-weight: 600; color: var(--label); cursor: pointer; border-radius: 8px; margin: 0;
+            display: flex; align-items: center; gap: 6px; white-space: nowrap; flex: 1 0 auto; justify-content: center; }
+        .tab-btn.active { background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.14); color: var(--label); }
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
 
-        /* UPLOAD */
-        .upload-area { padding: 40px; text-align: center; border-bottom: 2px solid #f0f0f5; background: linear-gradient(180deg, #fafbff 0%, #ffffff 100%); }
-        .upload-box { border: 2px dashed #c5caff; border-radius: 20px; padding: 50px 40px; background: linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 100%); cursor: pointer; transition: all 0.3s ease; display: inline-block; width: 100%; max-width: 560px; }
-        .upload-box:hover { background: linear-gradient(135deg, #eff1ff 0%, #e8ebff 100%); border-color: #667eea; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(102,126,234,0.15); }
+        /* ── Carga de archivos ── */
+        .upload-area { padding: 18px var(--gut); text-align: center; border-bottom: .5px solid var(--hair); background: transparent; }
+        .upload-box { border: 1.5px dashed var(--sep); border-radius: 14px; padding: 28px 24px; background: var(--card);
+            cursor: pointer; transition: border-color .2s, background .2s; display: block; width: 100%; max-width: none; box-shadow: var(--shadow); }
+        .upload-box:hover { border-color: var(--brand); background: var(--brand-tint); }
         .upload-box input { display: none; }
-        .upload-icon-wrap { width: 72px; height: 72px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 18px; box-shadow: 0 8px 20px rgba(102,126,234,0.35); }
-        .upload-box h3 { font-size: 1.1em; font-weight: 700; color: #2d2d5e; margin-bottom: 8px; }
-        .upload-box .upload-hint { font-size: 0.85em; color: #888; }
-        #uploadStatus { margin-top: 18px; font-size: 0.95em; font-weight: 500; }
+        .upload-icon-wrap { width: 52px; height: 52px; background: var(--brand-tint); border-radius: 14px;
+            display: grid; place-items: center; font-size: 26px; margin: 0 auto 12px; box-shadow: none; }
+        .upload-box h3 { font-size: 16px; font-weight: 600; color: var(--label); margin-bottom: 4px; }
+        .upload-box .upload-hint { font-size: 13px; color: var(--sec); }
+        #uploadStatus { margin-top: 14px; font-size: 14px; font-weight: 500; }
 
-        /* CONTROLS */
-        .controls { padding: 24px 32px; background: #f7f8fc; border-bottom: 1px solid #eaecf5; }
-        .controls-title { font-size: 0.8em; font-weight: 700; color: #667eea; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
-        .filter-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 14px; }
-        .filter-item { display: flex; flex-direction: column; }
-        .filter-item label { font-weight: 600; margin-bottom: 6px; color: #444; font-size: 0.82em; text-transform: uppercase; letter-spacing: 0.4px; }
-        .filter-item select, .filter-item input[type="text"] { padding: 9px 13px; border: 1.5px solid #dde1f0; border-radius: 10px; font-size: 13.5px; font-family: inherit; background: white; color: #333; transition: border-color 0.2s; }
-        .filter-item select:focus, .filter-item input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.12); }
+        /* ── Filtros ── */
+        .controls, .reno-controls { padding: 18px var(--gut); background: transparent; border-bottom: .5px solid var(--hair); }
+        .controls-title { font-size: 13px; font-weight: 600; color: var(--sec); text-transform: uppercase;
+            letter-spacing: .04em; margin-bottom: 12px; }
+        .filter-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 14px; }
+        .filter-item { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+        .filter-item label { font-weight: 600; margin: 0; color: var(--sec); font-size: 12px;
+            text-transform: uppercase; letter-spacing: .04em; }
+        .filter-item select, .filter-item input[type="text"] {
+            appearance: none; -webkit-appearance: none; padding: 0 12px; min-height: 40px; border: 1.5px solid transparent;
+            border-radius: 10px; font-size: 15px; font-family: inherit; background: var(--fill); color: var(--label); outline: none; width: 100%; }
+        .filter-item select { padding-right: 30px;
+            background-image: linear-gradient(45deg, transparent 50%, var(--sec) 50%), linear-gradient(135deg, var(--sec) 50%, transparent 50%);
+            background-position: calc(100% - 16px) calc(50% + 1px), calc(100% - 11px) calc(50% + 1px);
+            background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+        .filter-item input::placeholder { color: var(--ter); }
+        .filter-item select:focus, .filter-item input:focus { border-color: var(--brand); background-color: var(--card); }
         .btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; }
-        .btn { border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-size: 13.5px; font-weight: 600; font-family: inherit; transition: all 0.2s; display: inline-flex; align-items: center; gap: 7px; }
-        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.18); }
-        .btn-green  { background: linear-gradient(135deg, #43a047, #2e7d32); color: white; }
-        .btn-purple { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
-        .btn-orange { background: linear-gradient(135deg, #ff9800, #e65100); color: white; }
-        .btn-red    { background: linear-gradient(135deg, #e53935, #b71c1c); color: white; }
-        .btn-teal   { background: linear-gradient(135deg, #00897b, #004d40); color: white; }
 
-        /* STATS */
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; padding: 24px 32px; background: #f7f8fc; border-bottom: 1px solid #eaecf5; }
-        .stat-card { background: white; padding: 22px; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.07); border: 1px solid #eef0fb; position: relative; overflow: hidden; transition: transform 0.2s; }
-        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
-        .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
-        .stat-card.purple::before { background: linear-gradient(90deg, #667eea, #764ba2); }
-        .stat-card.green::before  { background: linear-gradient(90deg, #43a047, #2e7d32); }
-        .stat-card.orange::before { background: linear-gradient(90deg, #ff9800, #e65100); }
-        .stat-card.blue::before   { background: linear-gradient(90deg, #1e88e5, #0d47a1); }
-        .stat-card.teal::before   { background: linear-gradient(90deg, #00897b, #004d40); }
-        .stat-card.red::before    { background: linear-gradient(90deg, #e53935, #b71c1c); }
-        .stat-card h3 { color: #888; font-size: 0.78em; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
-        .stat-card .value { font-size: 1.9em; font-weight: 800; color: #1a1a3e; letter-spacing: -1px; }
-        .stat-card .sub { font-size: 0.78em; color: #aaa; margin-top: 6px; }
+        /* ── Botones (se mantienen los nombres de color) ── */
+        .btn { border: 0; padding: 0 16px; min-height: 36px; border-radius: 10px; cursor: pointer; font-size: 14px;
+            font-weight: 600; font-family: inherit; display: inline-flex; align-items: center; gap: 6px;
+            white-space: nowrap; color: #fff; }
+        .btn:hover { filter: brightness(1.06); }
+        .btn:active { filter: brightness(.94); }
+        .btn-green  { background: var(--green); }
+        .btn-purple { background: var(--brand); }
+        .btn-orange { background: var(--fill); color: var(--brand-text); }
+        .btn-orange:hover { background: var(--fill2); filter: none; }
+        .btn-red    { background: var(--red); }
+        .btn-teal   { background: var(--indigo); }
 
-        /* SECTIONS */
-        .chart-section { padding: 28px 32px; background: white; border-bottom: 1px solid #eaecf5; }
-        .section-title { font-size: 1em; font-weight: 700; color: #2d2d5e; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
-        .section-title::after { content: ''; flex: 1; height: 2px; background: linear-gradient(90deg, #667eea22, transparent); border-radius: 2px; }
+        /* ── Tarjetas de indicadores ── */
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px;
+            padding: 18px var(--gut); background: transparent; border-bottom: 0; }
+        .stat-card { background: var(--card); padding: 14px 16px; border-radius: 12px; box-shadow: var(--shadow);
+            border: 0; position: relative; overflow: hidden; }
+        .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--fill2); }
+        .stat-card.purple::before { background: var(--brand); }
+        .stat-card.green::before  { background: var(--green); }
+        .stat-card.orange::before { background: var(--orange); }
+        .stat-card.blue::before   { background: var(--blue); }
+        .stat-card.teal::before   { background: var(--indigo); }
+        .stat-card.red::before    { background: var(--red); }
+        .stat-card h3 { color: var(--sec); font-size: 13px; margin-bottom: 2px; text-transform: none;
+            letter-spacing: 0; font-weight: 400; }
+        .stat-card .value { font-size: 26px; font-weight: 700; color: var(--label); letter-spacing: -.02em;
+            line-height: 1.15; font-variant-numeric: tabular-nums; }
+        .stat-card.purple .value { color: var(--brand-text); }
+        .stat-card.green  .value { color: var(--green); }
+        .stat-card.orange .value { color: var(--orange); }
+        .stat-card.blue   .value { color: var(--blue); }
+        .stat-card.teal   .value { color: var(--indigo); }
+        .stat-card.red    .value { color: var(--red); }
+        .stat-card .sub { font-size: 12px; color: var(--sec); margin-top: 2px; }
+
+        /* ── Secciones, gráficas y tablas ── */
+        .chart-section { padding: 18px var(--gut); background: transparent; border-bottom: 0; }
+        .section-title { font-size: 15px; font-weight: 600; color: var(--label); margin: 0 0 12px;
+            text-transform: none; letter-spacing: -.01em; padding: 0; border: 0; display: flex; align-items: center; gap: 8px; }
+        .section-title::after { content: ''; flex: 1; height: .5px; background: var(--sep); }
         .chart-section canvas { max-height: 380px; }
-        .table-section { padding: 24px 32px; background: white; }
-        .table-container { overflow-x: auto; max-height: 560px; overflow-y: auto; border-radius: 14px; border: 1px solid #eaecf5; }
-        table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-        th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid #f0f2f8; }
-        th { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; position: sticky; top: 0; cursor: pointer; font-size: 0.82em; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; white-space: nowrap; z-index: 2; }
-        th:hover { background: linear-gradient(135deg, #5a6fd6 0%, #6a3d9a 100%); }
-        tbody tr:hover td { background: #f8f9ff; }
-        .status-active   { color: #2e7d32; font-weight: 700; }
-        .status-inactive { color: #c62828; font-weight: 600; }
-        .price-edit-btn { background: linear-gradient(135deg, #ff9800, #e65100); color: white; border: none; padding: 5px 11px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 600; font-family: inherit; transition: all 0.2s; }
-        .price-edit-btn:hover { transform: scale(1.05); }
+        .chart-section > canvas { background: var(--card); border-radius: 12px; padding: 12px; box-shadow: var(--shadow); }
+        .table-section { padding: 8px var(--gut) 18px; background: transparent; }
+        .table-container { overflow-x: auto; max-height: 560px; overflow-y: auto; border-radius: 12px;
+            border: 0; background: var(--card); box-shadow: var(--shadow); }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+        th, td { padding: 10px 14px; text-align: left; border-bottom: .5px solid var(--hair); }
+        th { background: var(--card); color: var(--sec); position: sticky; top: 0; cursor: pointer; font-size: 12px;
+            text-transform: uppercase; letter-spacing: .04em; font-weight: 600; white-space: nowrap; z-index: 2;
+            border-bottom: .5px solid var(--sep); }
+        th:hover { color: var(--brand-text); background: var(--card); }
+        tbody tr:hover td { background: var(--fill); }
+        tbody tr:last-child td { border-bottom: 0; }
+        .status-active   { color: var(--green); font-weight: 600; }
+        .status-inactive { color: var(--red); font-weight: 600; }
+        .price-edit-btn { background: var(--fill); color: var(--brand-text); border: 0; padding: 0 10px; min-height: 28px;
+            border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; }
+        .price-edit-btn:hover { background: var(--fill2); }
 
-        /* TYPE BADGES */
-        .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; white-space: nowrap; }
-        .badge-nuevo     { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
-        .badge-renova    { background: #e3f2fd; color: #1565c0; border: 1px solid #90caf9; }
-        .badge-reingreso { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
-        .badge-otro      { background: #f3e5f5; color: #6a1b9a; border: 1px solid #ce93d8; }
+        /* ── Etiquetas de tipo ── */
+        .badge { display: inline-flex; align-items: center; gap: 5px; padding: 0 10px; height: 24px; border-radius: 12px;
+            font-size: 12px; font-weight: 600; white-space: nowrap; border: 0; }
+        .badge-nuevo     { background: var(--green-tint);  color: var(--green); }
+        .badge-renova    { background: var(--blue-tint);   color: var(--blue); }
+        .badge-reingreso { background: var(--orange-tint); color: var(--orange); }
+        .badge-otro      { background: var(--purple-tint); color: var(--purple); }
 
-        /* RENOVACIONES SECTION */
-        .reno-controls { padding: 20px 32px; background: #f7f8fc; border-bottom: 1px solid #eaecf5; }
+        /* ── Renovaciones ── */
         .reno-filter-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
         .reno-filter-row .filter-item { min-width: 160px; flex: 1; }
-        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 24px 32px; background: white; border-bottom: 1px solid #eaecf5; }
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 18px var(--gut);
+            background: transparent; border-bottom: 0; }
         @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
-        .chart-box { background: #f8f9ff; border-radius: 16px; padding: 20px; border: 1px solid #eaecf5; }
+        .chart-box { background: var(--card); border-radius: 12px; padding: 16px; border: 0; box-shadow: var(--shadow); }
         .chart-box canvas { max-height: 280px; }
 
-        /* FOOTER */
-        .page-footer { background: linear-gradient(135deg, #1a1a3e 0%, #2d2d5e 100%); color: rgba(255,255,255,0.6); text-align: center; padding: 18px; font-size: 0.82em; }
-        .page-footer strong { color: rgba(255,255,255,0.9); }
+        /* ── Pie de página ── */
+        .page-footer { background: transparent; color: var(--sec); text-align: center;
+            padding: 24px var(--gut) calc(env(safe-area-inset-bottom) + 28px); font-size: 13px;
+            border-top: .5px solid var(--hair); margin-top: 18px; }
+        .page-footer strong { color: var(--label); }
 
-        /* LOGIN */
-        #loginScreen { position: fixed; inset: 0; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-        .login-card { background: white; border-radius: 24px; padding: 40px 44px; width: 100%; max-width: 420px; box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
-        .login-logo { width: 64px; height: 64px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 20px; }
-        .login-card h2 { text-align: center; font-size: 1.4em; font-weight: 800; color: #2d2d5e; margin-bottom: 6px; }
-        .login-card .login-sub { text-align: center; font-size: 0.85em; color: #888; margin-bottom: 28px; }
-        .login-field { margin-bottom: 16px; }
-        .login-field label { display: block; font-size: 0.8em; font-weight: 700; color: #444; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
-        .login-field input { width: 100%; padding: 11px 14px; border: 1.5px solid #dde1f0; border-radius: 10px; font-size: 14px; font-family: inherit; color: #333; transition: border-color 0.2s; }
-        .login-field input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.12); }
-        .login-btn { width: 100%; padding: 13px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; margin-top: 8px; transition: opacity 0.2s, transform 0.1s; }
-        .login-btn:hover { opacity: 0.92; transform: translateY(-1px); }
-        .login-btn:active { transform: scale(0.99); }
-        #loginError { text-align: center; color: #c62828; font-size: 13px; margin-top: 12px; min-height: 18px; }
-
-        /* USER TOOLBAR */
-        .user-toolbar { background: rgba(255,255,255,0.12); border-top: 1px solid rgba(255,255,255,0.18); padding: 8px 40px; display: flex; align-items: center; justify-content: space-between; }
-        .user-info { display: flex; align-items: center; gap: 10px; font-size: 13px; color: rgba(255,255,255,0.9); }
-        .role-badge { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; padding: 3px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-        .logout-btn { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); color: white; border-radius: 8px; padding: 5px 14px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.2s; }
-        .logout-btn:hover { background: rgba(255,255,255,0.22); }
-
-        /* ROLE VISIBILITY */
+        /* ── Visibilidad por rol ── */
         .admin-only { display: none; }
 
-        /* MODALS */
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(15,12,41,0.7); backdrop-filter: blur(4px); }
-        .modal-content { background: white; margin: 10% auto; padding: 28px; border-radius: 18px; width: 90%; max-width: 500px; box-shadow: 0 24px 60px rgba(0,0,0,0.3); }
-        .modal-content h3 { font-size: 1.1em; font-weight: 700; color: #2d2d5e; margin-bottom: 16px; }
-        .modal-content p { margin-bottom: 10px; color: #555; font-size: 0.95em; }
-        .modal-content input[type="number"] { width: 100%; padding: 10px 14px; border: 1.5px solid #dde1f0; border-radius: 10px; font-size: 15px; font-family: inherit; margin-top: 10px; }
-        .modal-content input[type="number"]:focus { outline: none; border-color: #667eea; }
-        .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-        .summary-modal-content { background: white; margin: 4% auto; padding: 28px; border-radius: 18px; width: 96%; max-width: 860px; max-height: 88vh; overflow-y: auto; box-shadow: 0 24px 60px rgba(0,0,0,0.3); }
-        .summary-modal-content h3 { font-size: 1.15em; font-weight: 800; color: #2d2d5e; }
-        .summary-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13.5px; border-radius: 12px; overflow: hidden; }
-        .summary-table th { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 11px 14px; text-align: left; font-size: 0.82em; text-transform: uppercase; letter-spacing: 0.5px; }
-        .summary-table td { padding: 10px 14px; border-bottom: 1px solid #f0f2f8; }
-        .summary-table tbody tr:nth-child(even) td { background: #f8f9ff; }
-        .summary-table tbody tr:hover td { background: #f0f2ff; }
-        .summary-table tfoot td { font-weight: 800; background: linear-gradient(135deg, #f0f2ff, #e8ebff); border-top: 2px solid #667eea; color: #2d2d5e; }
+        /* ── Modales ── */
+        /* Ojo: en /ui.css `.modal` es la TARJETA del modal; aquí es el FONDO a pantalla
+           completa. Se reinicia lo que aquella define para que no lo deje angosto. */
+        .modal { display: none; position: fixed; z-index: 1000; inset: 0; background: rgba(0,0,0,.45);
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+            width: auto; max-width: none; margin: 0; border-radius: 0; box-shadow: none;
+            overflow-y: auto; overflow-x: hidden; }
+        .modal-content, .summary-modal-content { background: var(--bg); margin: 6vh auto; padding: 24px;
+            border-radius: 16px; width: calc(100% - 32px); max-width: 500px; box-shadow: 0 24px 64px rgba(0,0,0,.35); }
+        .summary-modal-content { max-width: 860px; max-height: 88vh; overflow-y: auto; }
+        .modal-content h3, .summary-modal-content h3 { font-size: 20px; font-weight: 700; color: var(--label);
+            letter-spacing: -.02em; margin-bottom: 12px; }
+        .modal-content p { margin-bottom: 8px; color: var(--sec); font-size: 15px; }
+        .modal-content input[type="number"], .summary-modal-content input, .summary-modal-content select {
+            width: 100%; padding: 0 12px; min-height: 42px; border: 1.5px solid transparent; border-radius: 10px;
+            font-size: 15px; font-family: inherit; background: var(--fill); color: var(--label); outline: none;
+            appearance: none; -webkit-appearance: none; }
+        .modal-content input[type="number"] { margin-top: 10px; }
+        .modal-content input:focus, .summary-modal-content input:focus, .summary-modal-content select:focus {
+            border-color: var(--brand); background: var(--card); }
+        .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+        .summary-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 14px; font-size: 14px;
+            border-radius: 12px; overflow: hidden; background: var(--card); }
+        .summary-table th { background: var(--card); color: var(--sec); padding: 10px 14px; text-align: left;
+            font-size: 12px; text-transform: uppercase; letter-spacing: .04em; border-bottom: .5px solid var(--sep); }
+        .summary-table td { padding: 10px 14px; border-bottom: .5px solid var(--hair); }
+        .summary-table tbody tr:nth-child(even) td { background: transparent; }
+        .summary-table tbody tr:hover td { background: var(--fill); }
+        .summary-table tfoot td { font-weight: 700; background: var(--fill); border-top: .5px solid var(--sep);
+            border-bottom: 0; color: var(--label); }
 
-        @media (max-width: 768px) { .stats { grid-template-columns: 1fr 1fr; } .filter-group, .reno-filter-row { grid-template-columns: 1fr; } th, td { font-size: 11px; padding: 8px; } .header-titles h1 { font-size: 1.2em; } .tab-btn { padding: 12px 14px; font-size: 0.82em; } }
+        /* ── Tarjetas del selector de sede / módulos ── */
+        .pick-card { cursor: pointer; background: var(--card); border: 0; border-radius: 16px; padding: 24px 28px;
+            min-width: 168px; text-align: center; box-shadow: var(--shadow); transition: transform .15s, box-shadow .15s; }
+        .pick-card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,.14); }
+        .pick-card .ic { width: 52px; height: 52px; margin: 0 auto 12px; border-radius: 15px; display: grid;
+            place-items: center; font-size: 26px; background: var(--fill); }
+        .pick-card .tt { font-size: 17px; font-weight: 600; letter-spacing: -.01em; color: var(--label); }
+        .pick-card .s1 { font-size: 13px; color: var(--sec); margin-top: 4px; }
+        .pick-card .s2 { font-size: 12px; color: var(--ter); margin-top: 3px; }
+        .pick-card.sel { box-shadow: 0 0 0 2px var(--brand), var(--shadow); }
+        /* Tonos de las tarjetas (el JS elige la clase según el color que ya pasaba) */
+        .ic.t-brand  { background: var(--brand-tint); }   .tt.t-brand  { color: var(--brand-text); }
+        .ic.t-orange { background: var(--orange-tint); }  .tt.t-orange { color: var(--orange); }
+        .ic.t-blue   { background: var(--blue-tint); }    .tt.t-blue   { color: var(--blue); }
+        .ic.t-green  { background: var(--green-tint); }   .tt.t-green  { color: var(--green); }
+        .ic.t-purple { background: var(--purple-tint); }  .tt.t-purple { color: var(--purple); }
+        .ic.t-indigo { background: rgba(88,86,214,.14); } .tt.t-indigo { color: var(--indigo); }
+        .ic.t-gris   { background: var(--fill); }         .tt.t-gris   { color: var(--sec); }
+        .pick-card.punteada { border: 1.5px dashed var(--sep); box-shadow: none; background: transparent; }
+        .pick-card.punteada:hover { background: var(--card); box-shadow: var(--shadow); }
+        .pick-card.mes { padding: 18px 26px; min-width: 150px; }
+        .pick-card.mes .tt { font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
+
+        @media (max-width: 768px) {
+            /* En el teléfono la barra de usuario se parte en varias filas: fija ocuparía
+               casi un tercio de la pantalla, así que se deja desplazar con la página. */
+            .header { position: static; }
+            .header-titles h1 { font-size: 20px; }
+            .header-titles p, .header-badge { display: none; }
+            .stats { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+            .stat-card .value { font-size: 22px; }
+            .filter-group { grid-template-columns: 1fr; }
+            .reno-filter-row { flex-direction: column; align-items: stretch; }
+            th, td { font-size: 12px; padding: 8px 10px; }
+            .btn-row { justify-content: stretch; }
+            .btn-row .btn { flex: 1; justify-content: center; }
+            .modal-content, .summary-modal-content { margin: 0; width: 100%; border-radius: 18px 18px 0 0;
+                position: absolute; bottom: 0; left: 0; max-height: 94vh; }
+        }
     </style>
 </head>
 <body>
@@ -206,11 +290,11 @@
                 <span>👤</span>
                 <span id="userNombre">—</span>
                 <span class="role-badge" id="userRolBadge">—</span>
-                <button id="btnCambiarSede" onclick="volverAlMenu()" style="display:none;margin-left:12px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:white;border-radius:16px;padding:4px 14px;font-size:12px;font-weight:600;cursor:pointer;">← Cambiar sede</button>
-                <select id="mesDashSelector" onchange="cambiarMesDashboard(this.value)" style="display:none;margin-left:8px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);color:white;border-radius:16px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;"></select>
+                <button id="btnCambiarSede" class="logout-btn" onclick="volverAlMenu()" style="display:none;margin-left:6px;">← Cambiar sede</button>
+                <select id="mesDashSelector" class="ui" onchange="cambiarMesDashboard(this.value)" style="display:none;margin-left:6px;"></select>
             </div>
             <div style="display:flex;gap:10px;align-items:center;">
-                <button id="btnCargarDatos" onclick="mostrarCarga()" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.35);color:white;border-radius:16px;padding:4px 14px;font-size:12px;font-weight:600;cursor:pointer;">📤 Cargar datos</button>
+                <button id="btnCargarDatos" class="logout-btn" onclick="mostrarCarga()" style="display:none;">📤 Cargar datos</button>
                 <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
             </div>
         </div>
@@ -220,11 +304,11 @@
     <div class="upload-area admin-only" id="uploadSection" style="display:flex;gap:24px;flex-wrap:wrap;justify-content:center;align-items:flex-start;">
 
         <!-- Selector de sede -->
-        <div style="width:100%;display:flex;align-items:center;gap:16px;padding:16px 24px;background:#f0f4ff;border-radius:14px;border:1.5px solid #c7d2fe;">
-            <span style="font-size:1.3em;">🏢</span>
+        <div style="width:100%;display:flex;align-items:center;gap:16px;padding:14px 18px;background:var(--card);border-radius:12px;border:0;box-shadow:var(--shadow);flex-wrap:wrap;text-align:left;">
+            <span style="font-size:22px;">🏢</span>
             <div>
-                <div style="font-size:0.8em;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Sede a cargar</div>
-                <select id="sedeSelector" onchange="onSedeSelected()" style="font-size:1em;font-weight:600;color:#302b63;border:none;background:transparent;cursor:pointer;outline:none;padding:2px 8px 2px 0;">
+                <div style="font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Sede a cargar</div>
+                <select id="sedeSelector" class="ui" onchange="onSedeSelected()">
                     <option value="">— Selecciona una sede —</option>
                     <option value="Pinares">🌲 Pinares</option>
                     <option value="Sabanilla">🏙️ Sabanilla</option>
@@ -232,50 +316,50 @@
                     <option value="Natación">🏊 Natación</option>
                 </select>
             </div>
-            <div style="border-left:1.5px solid #c7d2fe;padding-left:16px;">
-                <div style="font-size:0.8em;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">📅 Mes destino</div>
-                <select id="mesDestinoSelector" style="font-size:1em;font-weight:600;color:#302b63;border:none;background:transparent;cursor:pointer;outline:none;padding:2px 8px 2px 0;">
+            <div style="border-left:.5px solid var(--sep);padding-left:16px;">
+                <div style="font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">📅 Mes destino</div>
+                <select id="mesDestinoSelector" class="ui">
                     <option value="">Automático (según fecha del archivo)</option>
                 </select>
             </div>
-            <div id="sedeSeleccionadaBadge" style="display:none;margin-left:auto;background:#4338ca;color:white;border-radius:20px;padding:4px 16px;font-size:0.85em;font-weight:700;"></div>
+            <div id="sedeSeleccionadaBadge" style="display:none;margin-left:auto;background:var(--brand);color:#fff;border-radius:10px;padding:5px 14px;line-height:20px;font-size:14px;font-weight:600;"></div>
         </div>
 
-        <div style="flex:1;min-width:280px;max-width:480px;">
+        <div style="flex:1;min-width:260px;max-width:420px;">
             <div class="upload-box" id="uploadBoxU">
                 <div class="upload-icon-wrap">👥</div>
                 <h3>Informe de Usuarios</h3>
                 <p class="upload-hint">Exportar desde el sistema → "Informe de Usuarios"</p>
                 <input type="file" id="fileInputU" accept=".xlsx,.xls">
             </div>
-            <div id="uploadStatusU" style="margin-top:10px;font-size:0.9em;font-weight:500;text-align:center;"></div>
+            <div id="uploadStatusU" style="margin-top:10px;font-size:14px;font-weight:500;text-align:center;"></div>
         </div>
-        <div style="flex:1;min-width:280px;max-width:480px;">
+        <div style="flex:1;min-width:260px;max-width:420px;">
             <div class="upload-box" id="uploadBoxR">
                 <div class="upload-icon-wrap">🔄</div>
                 <h3>Ventas por Producto</h3>
                 <p class="upload-hint">Exportar desde el sistema → "Ventas por Producto"</p>
                 <input type="file" id="fileInputR" accept=".xlsx,.xls">
             </div>
-            <div id="uploadStatusR" style="margin-top:10px;font-size:0.9em;font-weight:500;text-align:center;"></div>
+            <div id="uploadStatusR" style="margin-top:10px;font-size:14px;font-weight:500;text-align:center;"></div>
         </div>
-        <div style="flex:1;min-width:280px;max-width:480px;">
+        <div style="flex:1;min-width:260px;max-width:420px;">
             <div class="upload-box" id="uploadBoxFE">
                 <div class="upload-icon-wrap">🧾</div>
                 <h3>Comprobantes Electrónicos</h3>
                 <p class="upload-hint">Exportar desde el sistema → "Informe de Comprobantes Electrónicos"</p>
                 <input type="file" id="fileInputFE" accept=".xlsx,.xls">
             </div>
-            <div id="uploadStatusFE" style="margin-top:10px;font-size:0.9em;font-weight:500;text-align:center;"></div>
+            <div id="uploadStatusFE" style="margin-top:10px;font-size:14px;font-weight:500;text-align:center;"></div>
         </div>
     </div>
 
     <!-- ══════════════════ SEDE PICKER (colaborador) ══════════════════ -->
-    <div id="sedePicker" style="display:none; padding:48px 32px; text-align:center;">
-        <h2 style="font-size:1.5em; font-weight:700; color:#302b63; margin-bottom:8px;">Selecciona una sede</h2>
-        <p style="color:#888; margin-bottom:36px;">Haz clic para ver los datos más recientes</p>
-        <div id="sedeCards" style="display:flex; gap:24px; justify-content:center; flex-wrap:wrap;"></div>
-        <p id="sedePickerStatus" style="margin-top:24px; color:#888; font-size:0.9em;"></p>
+    <div id="sedePicker" style="display:none;padding:40px var(--gut);text-align:center;">
+        <h2 style="font-size:26px;font-weight:700;letter-spacing:-.02em;color:var(--label);margin-bottom:6px;">Selecciona una sede</h2>
+        <p style="color:var(--sec);margin-bottom:28px;font-size:15px;">Haz clic para ver los datos más recientes</p>
+        <div id="sedeCards" style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;"></div>
+        <p id="sedePickerStatus" style="margin-top:22px;color:var(--sec);font-size:14px;"></p>
     </div>
 
     <!-- ══════════════════ DASHBOARD ══════════════════ -->
@@ -415,7 +499,7 @@
                         <tbody id="renoTableBody"></tbody>
                     </table>
                 </div>
-                <div id="renoTableInfo" style="padding:12px 0; font-size:13px; color:#888;"></div>
+                <div id="renoTableInfo" style="padding:12px 0;font-size:13px;color:var(--sec);"></div>
             </div>
 
             <!-- Tabla clases sueltas (independiente del total de membresías) -->
@@ -433,7 +517,7 @@
                         <tbody id="clasesSueltasTableBody"></tbody>
                     </table>
                 </div>
-                <div id="clasesSueltasInfo" style="padding:12px 0; font-size:13px; color:#888;"></div>
+                <div id="clasesSueltasInfo" style="padding:12px 0;font-size:13px;color:var(--sec);"></div>
             </div>
 
             <!-- Tabla sin clasificar (productos que no calzan con ningún filtro, para no perder ventas) -->
@@ -451,7 +535,7 @@
                         <tbody id="sinClasificarTableBody"></tbody>
                     </table>
                 </div>
-                <div id="sinClasificarInfo" style="padding:12px 0; font-size:13px; color:#888;"></div>
+                <div id="sinClasificarInfo" style="padding:12px 0;font-size:13px;color:var(--sec);"></div>
             </div>
         </div><!-- /tab-renovaciones -->
 
@@ -502,7 +586,7 @@
                         <tbody id="valTableBody"></tbody>
                     </table>
                 </div>
-                <div id="valTableInfo" style="padding:12px 0; font-size:13px; color:#888;"></div>
+                <div id="valTableInfo" style="padding:12px 0;font-size:13px;color:var(--sec);"></div>
             </div>
         </div><!-- /tab-validacion -->
 
@@ -552,7 +636,7 @@
                         <tbody id="segTableBody"></tbody>
                     </table>
                 </div>
-                <div id="segTableInfo" style="padding:12px 0; font-size:13px; color:#888;"></div>
+                <div id="segTableInfo" style="padding:12px 0;font-size:13px;color:var(--sec);"></div>
             </div>
         </div><!-- /tab-seguimiento -->
 
@@ -569,7 +653,7 @@
                         <button class="btn btn-red" onclick="clearAllSnapshots()" style="margin-top:auto;">🗑 Limpiar todo</button></div>
                 </div>
             </div>
-            <div id="historialContent" style="padding:24px 32px;"></div>
+            <div id="historialContent" style="padding:8px var(--gut) 24px;"></div>
         </div><!-- /tab-historial -->
 
     </div><!-- /dashboard -->
@@ -584,8 +668,8 @@
 <div id="summaryModal" class="modal">
     <div class="summary-modal-content">
         <h3>📊 Resumen Global de Planes — Ingresos Mensuales</h3>
-        <p style="color:#888;margin-top:6px;font-size:13px;">Basado en usuarios activos con precio definido (según filtros activos)</p>
-        <div id="summaryTableContainer" style="margin-top:16px;"></div>
+        <p style="color:var(--sec);margin-top:-6px;margin-bottom:6px;font-size:14px;">Basado en usuarios activos con precio definido (según filtros activos)</p>
+        <div id="summaryTableContainer" style="margin-top:14px;"></div>
         <div class="modal-buttons" style="margin-top:20px;">
             <button class="btn btn-green"  onclick="exportSummaryCSV()">📥 CSV</button>
             <button class="btn btn-red"    onclick="exportSummaryPDF()">📄 PDF</button>
@@ -598,16 +682,16 @@
 <div id="crearCuentaModal" class="modal">
     <div class="summary-modal-content" style="max-width:460px;">
         <h3>👤➕ Crear cuenta de acceso</h3>
-        <p style="color:#888;margin-top:6px;font-size:13px;">Crea el usuario y le asigna rol y sede en un solo paso.</p>
+        <p style="color:var(--sec);margin-top:-6px;margin-bottom:6px;font-size:14px;">Crea el usuario y le asigna rol y sede en un solo paso.</p>
         <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px;">
-            <div><label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Nombre</label>
-                <input type="text" id="ccNombre" placeholder="Nombre de la persona" style="width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:14px;"></div>
-            <div><label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Correo electrónico *</label>
-                <input type="email" id="ccEmail" placeholder="correo@ejemplo.com" autocomplete="off" style="width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:14px;"></div>
-            <div><label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Contraseña temporal *</label>
-                <input type="text" id="ccPassword" placeholder="Mínimo 6 caracteres" autocomplete="off" style="width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:14px;"></div>
-            <div><label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Rol *</label>
-                <select id="ccRole" onchange="ccToggleSede()" style="width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:14px;background:white;">
+            <div><label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Nombre</label>
+                <input type="text" id="ccNombre" placeholder="Nombre de la persona" ></div>
+            <div><label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Correo electrónico *</label>
+                <input type="email" id="ccEmail" placeholder="correo@ejemplo.com" autocomplete="off" ></div>
+            <div><label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Contraseña temporal *</label>
+                <input type="text" id="ccPassword" placeholder="Mínimo 6 caracteres" autocomplete="off" ></div>
+            <div><label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Rol *</label>
+                <select id="ccRole" onchange="ccToggleSede()" >
                     <option value="recepcion">🧾 Recepción (una sede)</option>
                     <option value="admin_sucursal">🏪 Admin de sucursal (una sede)</option>
                     <option value="instructor">🏋️ Instructor (una sede · solo mediciones)</option>
@@ -616,8 +700,8 @@
                     <option value="admin_sedes">🏢 Admin Sedes</option>
                     <option value="admin">⚙ Admin</option>
                 </select></div>
-            <div id="ccSedeWrap"><label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Sede *</label>
-                <select id="ccSede" style="width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:14px;background:white;">
+            <div id="ccSedeWrap"><label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Sede *</label>
+                <select id="ccSede" >
                     <option value="3 Ríos">🌊 3 Ríos</option>
                     <option value="Natación">🏊 Natación</option>
                     <option value="Pinares">🌲 Pinares</option>
@@ -636,14 +720,14 @@
 <div id="sedesUsuarioModal" class="modal">
     <div class="summary-modal-content" style="max-width:460px;">
         <h3>🏢🔀 Sedes de un usuario</h3>
-        <p style="color:#888;margin-top:6px;font-size:13px;">Habilita sedes adicionales para recepción / admin de sucursal (por ejemplo, cubrir un turno en otra sede). No cambia su sede principal.</p>
+        <p style="color:var(--sec);margin-top:-6px;margin-bottom:6px;font-size:14px;">Habilita sedes adicionales para recepción / admin de sucursal (por ejemplo, cubrir un turno en otra sede). No cambia su sede principal.</p>
         <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px;">
-            <div><label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Usuario</label>
-                <select id="suUser" onchange="suRenderSedes()" style="width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:14px;background:white;"><option value="">— Seleccione —</option></select></div>
+            <div><label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Usuario</label>
+                <select id="suUser" onchange="suRenderSedes()" ><option value="">— Seleccione —</option></select></div>
             <div id="suSedesWrap" style="display:none;">
-                <label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:6px;">Sedes habilitadas</label>
+                <label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Sedes habilitadas</label>
                 <div id="suSedes" style="display:flex;flex-direction:column;gap:8px;"></div>
-                <div style="font-size:12px;color:#888;margin-top:8px;">La sede principal siempre queda marcada. Marque las adicionales.</div>
+                <div style="font-size:13px;color:var(--sec);margin-top:8px;">La sede principal siempre queda marcada. Marque las adicionales.</div>
             </div>
             <div id="suMsg" style="font-size:13px;min-height:18px;"></div>
         </div>
@@ -730,6 +814,25 @@ function onSedeSelected() {
 }
 
 // ── SUPABASE CONSTANTS (deben ir antes de auth) ──
+/* ── Gráficas en modo claro/oscuro ──────────────────────────────────────────
+   Chart.js pinta ejes, leyendas y rejilla con un gris fijo que se pierde sobre
+   fondo negro. Se toman los colores del sistema de diseño y se repintan las
+   gráficas vivas cuando el dispositivo cambia de tema. */
+const _mqOscuro = window.matchMedia('(prefers-color-scheme: dark)');
+function aplicarTemaGraficas() {
+    if (typeof Chart === 'undefined') return;
+    const css = getComputedStyle(document.documentElement);
+    Chart.defaults.color = css.getPropertyValue('--sec').trim() || '#6c757d';
+    Chart.defaults.borderColor = css.getPropertyValue('--hair').trim() || '#f0f2f8';
+    Chart.defaults.font.family = '-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif';
+}
+aplicarTemaGraficas();
+_mqOscuro.addEventListener('change', () => {
+    aplicarTemaGraficas();
+    [revenueChart, renoTypePieChart, renoPlanBarChart]
+        .forEach(c => { try { c && c.update(); } catch (_) {} });
+});
+
 const SUPA_URL = '__SUPA_URL__';
 const SUPA_KEY = '__SUPA_KEY__';
 
@@ -853,11 +956,11 @@ async function crearCuenta() {
     const password = document.getElementById('ccPassword').value;
     const role = document.getElementById('ccRole').value;
     const sede = ['recepcion','admin_sucursal','instructor'].includes(role) ? document.getElementById('ccSede').value : null;
-    if (!email || !password) { msg.style.color='#c62828'; msg.textContent='Correo y contraseña son obligatorios.'; return; }
-    if (password.length < 6) { msg.style.color='#c62828'; msg.textContent='La contraseña debe tener al menos 6 caracteres.'; return; }
+    if (!email || !password) { msg.style.color='var(--red)'; msg.textContent='Correo y contraseña son obligatorios.'; return; }
+    if (password.length < 6) { msg.style.color='var(--red)'; msg.textContent='La contraseña debe tener al menos 6 caracteres.'; return; }
     const btn = document.getElementById('ccBtn');
     btn.disabled = true; btn.textContent = 'Creando...';
-    msg.style.color = '#666'; msg.textContent = 'Creando cuenta...';
+    msg.style.color = 'var(--sec)'; msg.textContent = 'Creando cuenta...';
     try {
         const res = await fetch(`${SUPA_URL}/functions/v1/crear-usuario`, {
             method: 'POST',
@@ -866,13 +969,13 @@ async function crearCuenta() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || ('Error ' + res.status));
-        msg.style.color = '#2e7d32';
+        msg.style.color = 'var(--green)';
         msg.textContent = `✅ Cuenta creada: ${email}` + (sede ? ` · ${sede}` : '') + ` · rol ${role}`;
         document.getElementById('ccEmail').value = '';
         document.getElementById('ccPassword').value = '';
         document.getElementById('ccNombre').value = '';
     } catch(e) {
-        msg.style.color = '#c62828';
+        msg.style.color = 'var(--red)';
         msg.textContent = '⚠️ ' + e.message;
     } finally {
         btn.disabled = false; btn.textContent = '✅ Crear cuenta';
@@ -889,7 +992,7 @@ async function openSedesUsuarioModal() {
     document.getElementById('sedesUsuarioModal').style.display = 'block';
     try {
         _suUsers = await supaFetch('/user_roles?role=in.(recepcion,admin_sucursal)&select=id,nombre,sede,sedes_extra&order=nombre.asc', { userToken: currentToken }) || [];
-    } catch(e) { _suUsers = []; msg.style.color = '#c62828'; msg.textContent = 'No se pudieron cargar los usuarios: ' + e.message; }
+    } catch(e) { _suUsers = []; msg.style.color = 'var(--red)'; msg.textContent = 'No se pudieron cargar los usuarios: ' + e.message; }
     sel.innerHTML = '<option value="">— Seleccione —</option>' +
         _suUsers.map(u => `<option value="${_suEsc(u.id)}">${_suEsc(u.nombre || '(sin nombre)')} · ${_suEsc(u.sede || 'sin sede')}</option>`).join('');
 }
@@ -905,7 +1008,7 @@ function suRenderSedes() {
         const isPrimary = (s === u.sede);
         const checked = isPrimary || extra.includes(s);
         return `<label style="display:flex;align-items:center;gap:8px;font-size:14px;${isPrimary?'opacity:.65;':''}">
-            <input type="checkbox" value="${_suEsc(s)}" ${checked?'checked':''} ${isPrimary?'disabled':''}> ${_suEsc(s)}${isPrimary?' <span style="font-size:11px;color:#1a5276;font-weight:700;">(principal)</span>':''}</label>`;
+            <input type="checkbox" value="${_suEsc(s)}" ${checked?'checked':''} ${isPrimary?'disabled':''}> ${_suEsc(s)}${isPrimary?' <span style="font-size:11px;color:var(--blue);font-weight:700;">(principal)</span>':''}</label>`;
     }).join('');
     wrap.style.display = '';
 }
@@ -913,20 +1016,20 @@ async function guardarSedesUsuario() {
     const msg = document.getElementById('suMsg');
     const id = document.getElementById('suUser').value;
     const u = _suUsers.find(x => x.id === id);
-    if (!u) { msg.style.color = '#c62828'; msg.textContent = 'Seleccione un usuario.'; return; }
+    if (!u) { msg.style.color = 'var(--red)'; msg.textContent = 'Seleccione un usuario.'; return; }
     const marcadas = [...document.querySelectorAll('#suSedes input[type=checkbox]:checked')].map(c => c.value);
     const extra = marcadas.filter(s => s !== u.sede);   // la principal no va en sedes_extra
     const btn = document.getElementById('suBtn'); btn.disabled = true; btn.textContent = 'Guardando…';
-    msg.style.color = '#666'; msg.textContent = 'Guardando…';
+    msg.style.color = 'var(--sec)'; msg.textContent = 'Guardando…';
     try {
         await supaFetch('/rpc/set_user_sedes', { method: 'POST', userToken: currentToken, body: { p_id: id, p_extra: extra } });
         u.sedes_extra = extra;
-        msg.style.color = '#2e7d32';
+        msg.style.color = 'var(--green)';
         msg.textContent = extra.length
             ? `✅ ${u.nombre || 'Usuario'} ahora también puede: ${extra.join(', ')} (además de ${u.sede}). Debe cerrar sesión y volver a entrar.`
             : `✅ ${u.nombre || 'Usuario'}: sin sedes adicionales (solo ${u.sede}).`;
     } catch(e) {
-        msg.style.color = '#c62828'; msg.textContent = '⚠️ ' + e.message;
+        msg.style.color = 'var(--red)'; msg.textContent = '⚠️ ' + e.message;
     } finally {
         btn.disabled = false; btn.textContent = '💾 Guardar sedes';
     }
@@ -966,10 +1069,20 @@ function mostrarCarga() {
 }
 
 const SEDE_ICONS = {
-    'Pinares':   { emoji: '🌲', color: '#2e7d32', bg: '#e8f5e9' },
-    'Sabanilla': { emoji: '🏙️', color: '#1565c0', bg: '#e3f2fd' },
-    '3 Ríos':   { emoji: '🌊', color: '#00838f', bg: '#e0f7fa' },
-    'Natación':  { emoji: '🏊', color: '#6a1b9a', bg: '#f3e5f5' },
+    'Pinares':   { emoji: '🌲', color: '#2e7d32', bg: '#e8f5e9', tono: 'green'  },
+    'Sabanilla': { emoji: '🏙️', color: '#1565c0', bg: '#e3f2fd', tono: 'blue'   },
+    '3 Ríos':   { emoji: '🌊', color: '#00838f', bg: '#e0f7fa', tono: 'brand'  },
+    'Natación':  { emoji: '🏊', color: '#6a1b9a', bg: '#f3e5f5', tono: 'purple' },
+};
+
+// El hex que ya recibían las tarjetas se traduce a un tono del sistema de diseño,
+// así las llamadas existentes de makeHandoffCard no cambian.
+const CARD_TONO = {
+    '#e67e22':'orange', '#b9770e':'orange',
+    '#148f77':'brand',  '#00838f':'brand',
+    '#1a5276':'blue',   '#1565c0':'blue',
+    '#2e7d32':'green',
+    '#7030A0':'purple', '#6a1b9a':'purple',
 };
 
 function volverAlMenu() {
@@ -989,17 +1102,18 @@ async function showSedePicker() {
     const cardsEl  = document.getElementById('sedeCards');
     cardsEl.innerHTML = '';
 
-    // Helper: card que traspasa la sesión (SSO) a un reporte/módulo
+    // Helper: card que traspasa la sesión (SSO) a un reporte/módulo.
+    // Se conserva la firma (bg y color siguen siendo hex) para no tocar las ~20 llamadas:
+    // el hex solo se usa para elegir el tono del sistema de diseño.
     const makeHandoffCard = (emoji, title, sub, sub2, bg, color, path) => {
         const c = document.createElement('div');
-        c.style.cssText = `cursor:pointer;background:${bg};border:2px solid ${color}33;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;
+        c.className = 'pick-card';
+        const tono = CARD_TONO[color] || 'brand';
         c.innerHTML = `
-            <div style="font-size:3em;margin-bottom:12px;">${emoji}</div>
-            <div style="font-size:1.2em;font-weight:700;color:${color};">${title}</div>
-            <div style="font-size:0.85em;color:#666;margin-top:6px;">${sub}</div>
-            <div style="font-size:0.8em;color:#999;margin-top:4px;">${sub2}</div>`;
-        c.onmouseenter = () => { c.style.transform='translateY(-4px)'; c.style.boxShadow=`0 12px 32px ${color}33`; };
-        c.onmouseleave = () => { c.style.transform=''; c.style.boxShadow=''; };
+            <div class="ic t-${tono}">${emoji}</div>
+            <div class="tt t-${tono}">${title}</div>
+            <div class="s1">${sub}</div>
+            <div class="s2">${sub2}</div>`;
         c.onclick = () => {
             sessionStorage.setItem('gymAuth', JSON.stringify({
                 token: currentToken, role: currentRole,
@@ -1074,15 +1188,14 @@ async function showSedePicker() {
             const icon = SEDE_ICONS[snap.sede] || { emoji: '🏋️', color: '#555', bg: '#f5f5f5' };
             const fecha = new Date(snap.updated_at).toLocaleString('es-CR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
             const card = document.createElement('div');
-            card.style.cssText = `cursor:pointer;background:${icon.bg};border:2px solid ${icon.color}33;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;
+            const tono = icon.tono || 'gris';
+            card.className = 'pick-card';
             card.innerHTML = `
-                <div style="font-size:3em;margin-bottom:12px;">${icon.emoji}</div>
-                <div style="font-size:1.2em;font-weight:700;color:${icon.color};">${snap.sede}</div>
-                <div style="font-size:0.85em;color:#666;margin-top:6px;">📅 ${snap.mes}</div>
-                <div style="font-size:0.8em;color:#999;margin-top:4px;">👥 ${snap.activos} activos</div>
-                <div style="font-size:0.75em;color:#bbb;margin-top:4px;">Actualizado: ${fecha}</div>`;
-            card.onmouseenter = () => { card.style.transform='translateY(-4px)'; card.style.boxShadow=`0 12px 32px ${icon.color}33`; };
-            card.onmouseleave = () => { card.style.transform=''; card.style.boxShadow=''; };
+                <div class="ic t-${tono}">${icon.emoji}</div>
+                <div class="tt t-${tono}">${snap.sede}</div>
+                <div class="s1">📅 ${snap.mes}</div>
+                <div class="s1">👥 ${snap.activos} activos</div>
+                <div class="s2">Actualizado: ${fecha}</div>`;
             card.onclick = () => selectMesForSede(snap.sede, snaps);
             cardsEl.appendChild(card);
         });
@@ -1098,26 +1211,22 @@ async function showSedePicker() {
             cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agenda por sede','Citas cada 15 min y estado de rutina','#e8f4fd','#1a5276','/mediciones'));
             // Crear cuenta de acceso — abre modal (no navega)
             const cc = document.createElement('div');
-            cc.style.cssText = `cursor:pointer;background:#eef7ee;border:2px dashed #2e7d3266;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;
+            cc.className = 'pick-card punteada';
             cc.innerHTML = `
-                <div style="font-size:3em;margin-bottom:12px;">👤➕</div>
-                <div style="font-size:1.2em;font-weight:700;color:#2e7d32;">Crear cuenta</div>
-                <div style="font-size:0.85em;color:#666;margin-top:6px;">Recepción / colaborador</div>
-                <div style="font-size:0.8em;color:#999;margin-top:4px;">Asigna rol y sede</div>`;
-            cc.onmouseenter = () => { cc.style.transform='translateY(-4px)'; cc.style.boxShadow='0 12px 32px #2e7d3233'; };
-            cc.onmouseleave = () => { cc.style.transform=''; cc.style.boxShadow=''; };
+                <div class="ic t-green">👤➕</div>
+                <div class="tt t-green">Crear cuenta</div>
+                <div class="s1">Recepción / colaborador</div>
+                <div class="s2">Asigna rol y sede</div>`;
             cc.onclick = openCrearCuentaModal;
             cardsEl.appendChild(cc);
             // Sedes de usuarios — habilitar sedes adicionales (multi-sede)
             const su = document.createElement('div');
-            su.style.cssText = `cursor:pointer;background:#eef2fb;border:2px dashed #1a527666;border-radius:20px;padding:32px 40px;min-width:180px;transition:transform .15s,box-shadow .15s;text-align:center;`;
+            su.className = 'pick-card punteada';
             su.innerHTML = `
-                <div style="font-size:3em;margin-bottom:12px;">🏢🔀</div>
-                <div style="font-size:1.2em;font-weight:700;color:#1a5276;">Sedes de usuarios</div>
-                <div style="font-size:0.85em;color:#666;margin-top:6px;">Recepción multi-sede</div>
-                <div style="font-size:0.8em;color:#999;margin-top:4px;">Habilita sedes adicionales</div>`;
-            su.onmouseenter = () => { su.style.transform='translateY(-4px)'; su.style.boxShadow='0 12px 32px #1a527633'; };
-            su.onmouseleave = () => { su.style.transform=''; su.style.boxShadow=''; };
+                <div class="ic t-blue">🏢🔀</div>
+                <div class="tt t-blue">Sedes de usuarios</div>
+                <div class="s1">Recepción multi-sede</div>
+                <div class="s2">Habilita sedes adicionales</div>`;
             su.onclick = openSedesUsuarioModal;
             cardsEl.appendChild(su);
         }
@@ -1140,25 +1249,22 @@ function selectMesForSede(sede, allSnaps) {
     const statusEl = document.getElementById('sedePickerStatus');
     statusEl.textContent = '';
     cardsEl.innerHTML = `
-        <div style="width:100%;text-align:center;margin-bottom:16px;">
-            <div style="font-size:1.1em;font-weight:700;color:#667eea;margin-bottom:4px;">📅 Seleccioná el mes a visualizar — ${sede}</div>
-            <div style="font-size:0.85em;color:#888;">Se guardan los últimos ${meses.length} períodos disponibles</div>
+        <div style="width:100%;text-align:center;margin-bottom:10px;">
+            <div style="font-size:17px;font-weight:600;color:var(--label);margin-bottom:4px;">📅 Seleccioná el mes a visualizar — ${sede}</div>
+            <div style="font-size:14px;color:var(--sec);">Se guardan los últimos ${meses.length} períodos disponibles</div>
         </div>
         ${meses.map(s => {
             const fecha = new Date(s.updated_at).toLocaleString('es-CR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
             const esMasReciente = s === meses[0];
-            return `<div onclick="loadSedeForColaborador('${sede.replace(/'/g,"\\'")}','${s.mes.replace(/'/g,"\\'")}')
-                " style="cursor:pointer;background:${esMasReciente?'#eef2ff':'#fff'};border:2px solid ${esMasReciente?'#667eea':'#d0d7e8'};border-radius:14px;padding:20px 32px;min-width:160px;text-align:center;transition:transform .15s,box-shadow .15s;"
-                onmouseenter="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px #667eea33'"
-                onmouseleave="this.style.transform='';this.style.boxShadow=''">
-                <div style="font-size:1.3em;font-weight:700;color:#667eea;">${s.mes}</div>
-                <div style="font-size:0.8em;color:#888;margin-top:4px;">👥 ${s.activos} activos</div>
-                <div style="font-size:0.75em;color:#bbb;margin-top:2px;">Actualizado: ${fecha}</div>
-                ${esMasReciente ? '<div style="font-size:0.7em;color:#667eea;font-weight:600;margin-top:4px;">● Más reciente</div>' : ''}
+            return `<div class="pick-card mes${esMasReciente?' sel':''}" onclick="loadSedeForColaborador('${sede.replace(/'/g,"\\'")}','${s.mes.replace(/'/g,"\\'")}')">
+                <div class="tt">${s.mes}</div>
+                <div class="s1">👥 ${s.activos} activos</div>
+                <div class="s2">Actualizado: ${fecha}</div>
+                ${esMasReciente ? '<div class="s2" style="color:var(--brand-text);font-weight:600;">● Más reciente</div>' : ''}
             </div>`;
         }).join('')}
         <div style="width:100%;text-align:center;margin-top:8px;">
-            <button onclick="showSedePicker()" style="background:none;border:none;color:#888;cursor:pointer;font-size:0.9em;">← Volver a sedes</button>
+            <button onclick="showSedePicker()" style="background:none;border:none;color:var(--brand-text);cursor:pointer;font-size:15px;font-weight:600;font-family:inherit;min-height:44px;">← Volver a sedes</button>
         </div>`;
 }
 
@@ -1225,12 +1331,12 @@ async function cambiarMesDashboard(mes) {
 // ── VALIDACIÓN DESCUENTOS ──
 const LEALTAD_RE = /lealtad|fidelidad/i;
 const ESTADO_VALIDACION = {
-    vencido_sin_pago:    { label: '🔴 Vencido sin pago',        color: '#e53935' },
-    por_vencer_sin_pago: { label: '🟠 Por vencer sin pago',     color: '#e65100' },
-    sin_descuento:       { label: '⚠️ Sin descuento aplicado',  color: '#f9a825' },
-    monto_diferente:     { label: '⚠️ Monto diferente',         color: '#f9a825' },
-    ok:                  { label: '✅ Descuento OK',             color: '#2e7d32' },
-    al_dia:              { label: '🟢 Al día',                   color: '#1565c0' },
+    vencido_sin_pago:    { label: '🔴 Vencido sin pago',        color: 'var(--red)' },
+    por_vencer_sin_pago: { label: '🟠 Por vencer sin pago',     color: 'var(--orange)' },
+    sin_descuento:       { label: '⚠️ Sin descuento aplicado',  color: 'var(--orange)' },
+    monto_diferente:     { label: '⚠️ Monto diferente',         color: 'var(--orange)' },
+    ok:                  { label: '✅ Descuento OK',             color: 'var(--green)' },
+    al_dia:              { label: '🟢 Al día',                   color: 'var(--blue)' },
 };
 let allValidacion = [];
 
@@ -1463,7 +1569,7 @@ function processLegacyFile(wb, filename) {
     usersData.forEach(u => u.ValorPlan = getPlanPrice(u.ÚltimoProducto, u.PIN));
     usuariosLoaded = true;
     document.getElementById('uploadStatusU').innerHTML =
-        `<span style="color:#2e7d32;font-weight:600;">✅ ${usersData.length} usuarios cargados — ${currentSedeName}</span>`;
+        `<span style="color:var(--green);font-weight:600;">✅ ${usersData.length} usuarios cargados — ${currentSedeName}</span>`;
 
     // renovaciones → hoja "renovaciones" (fila 0 = encabezados, fila 1+ = datos)
     const wsR = wb.Sheets['renovaciones'];
@@ -1494,7 +1600,7 @@ function processLegacyFile(wb, filename) {
         }
         renoLoaded = true;
         document.getElementById('uploadStatusR').innerHTML =
-            `<span style="color:#2e7d32;font-weight:600;">✅ ${renovacionesData.length} renovaciones cargadas (formato combinado)</span>`;
+            `<span style="color:var(--green);font-weight:600;">✅ ${renovacionesData.length} renovaciones cargadas (formato combinado)</span>`;
     }
 
     rebuildDashboard();
@@ -1508,7 +1614,7 @@ async function processUsuariosFile(data, filename) {
             currentSedeName = detectSede(currentFileName);
         }
         applySedeUI();
-        document.getElementById('uploadStatusU').innerHTML = '<span style="color:#667eea;font-weight:600;">⏳ Procesando usuarios...</span>';
+        document.getElementById('uploadStatusU').innerHTML = '<span style="color:var(--brand-text);font-weight:600;">⏳ Procesando usuarios...</span>';
         await loadPricesForSede(currentSedeName);
 
         const wb  = XLSX.read(data, { type:'array' });
@@ -1551,19 +1657,19 @@ async function processUsuariosFile(data, filename) {
 
         usuariosLoaded = true;
         document.getElementById('uploadStatusU').innerHTML =
-            `<span style="color:#2e7d32;font-weight:600;">✅ ${usersData.length} usuarios cargados — ${currentSedeName}</span>`;
+            `<span style="color:var(--green);font-weight:600;">✅ ${usersData.length} usuarios cargados — ${currentSedeName}</span>`;
 
         rebuildDashboard();
     } catch(e) {
         console.error(e);
-        document.getElementById('uploadStatusU').innerHTML = `<span style="color:#c62828;">❌ Error: ${e.message}</span>`;
+        document.getElementById('uploadStatusU').innerHTML = `<span style="color:var(--red);">❌ Error: ${e.message}</span>`;
     }
 }
 
 // ── RENOVACIONES (Ventas_por_Producto.xlsx → "Page 1") ──
 async function processRenovacionesFile(data, filename) {
     try {
-        document.getElementById('uploadStatusR').innerHTML = '<span style="color:#667eea;font-weight:600;">⏳ Procesando renovaciones...</span>';
+        document.getElementById('uploadStatusR').innerHTML = '<span style="color:var(--brand-text);font-weight:600;">⏳ Procesando renovaciones...</span>';
 
         // Detect sede from filename only if not selected manually and usuarios not loaded
         if (!usuariosLoaded && filename && !document.getElementById('sedeSelector')?.value) {
@@ -1656,12 +1762,12 @@ async function processRenovacionesFile(data, filename) {
 
         renoLoaded = true;
         document.getElementById('uploadStatusR').innerHTML =
-            `<span style="color:#2e7d32;font-weight:600;">✅ ${renovacionesData.length} transacciones de membresía cargadas</span>`;
+            `<span style="color:var(--green);font-weight:600;">✅ ${renovacionesData.length} transacciones de membresía cargadas</span>`;
 
         rebuildDashboard();
     } catch(e) {
         console.error(e);
-        document.getElementById('uploadStatusR').innerHTML = `<span style="color:#c62828;">❌ Error: ${e.message}</span>`;
+        document.getElementById('uploadStatusR').innerHTML = `<span style="color:var(--red);">❌ Error: ${e.message}</span>`;
     }
 }
 
@@ -1787,10 +1893,10 @@ function renderTable() {
         let r = tbody.insertRow();
         const isAdmin = esRolAdmin();
         const priceCols = isAdmin ? `
-        <td style="font-weight:600;">${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString():'<span style="color:#aaa;">Sin definir</span>'}
-          ${manualPrices[`${u.ÚltimoProducto}|${u.PIN}`]?'<span style="color:#ff9800;font-size:11px;"> ✏️</span>':''}</td>
+        <td style="font-weight:600;">${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString():'<span style="color:var(--ter);">Sin definir</span>'}
+          ${manualPrices[`${u.ÚltimoProducto}|${u.PIN}`]?'<span style="color:var(--orange);font-size:11px;"> ✏️</span>':''}</td>
         <td><button class="price-edit-btn" onclick='openPriceModal({PIN:"${u.PIN}",Nombre:"${u.Nombre.replace(/"/g,'&quot;')}",ÚltimoProducto:"${u.ÚltimoProducto.replace(/"/g,'&quot;')}",ValorPlan:${u.ValorPlan}})'>Editar precio</button></td>` : '';
-        r.innerHTML=`<td>${u.PIN}</td><td><strong>${u.Nombre}</strong></td><td style="color:#667eea;">${u.Email||'-'}</td>
+        r.innerHTML=`<td>${u.PIN}</td><td><strong>${u.Nombre}</strong></td><td style="color:var(--brand-text);">${u.Email||'-'}</td>
         <td class="${u.Activo==='Sí'?'status-active':'status-inactive'}">${u.Activo==='Sí'?'✓ Activo':'✗ Inactivo'}</td>
         <td>${u.Expira||'-'}</td><td>${u.ÚltimoProducto||'-'}</td><td>${u.Ingreso||'-'}</td>${priceCols}`;
     });
@@ -1809,16 +1915,17 @@ function updateStats(filtered) {
         <div class="stat-card orange"><h3>⚠️ Expiran en 30 días</h3><div class="value">${expSoon.length.toLocaleString()}</div><div class="sub">Posibles renovaciones</div></div>
         <div class="stat-card blue"><h3>💰 Ingresos Mensuales</h3><div class="value" style="font-size:1.35em;">₡${monthly.toLocaleString()}</div><div class="sub">Usuarios activos con precio</div></div>
         <div class="stat-card teal"><h3>📈 Proyección 30 días</h3><div class="value" style="font-size:1.35em;">₡${projected.toLocaleString()}</div><div class="sub">Renovaciones esperadas</div></div>
-        ${undef.length>0?`<div class="stat-card red"><h3>⚠️ Sin precio definido</h3><div class="value" style="color:#c62828;">${undef.length}</div><div class="sub">Activos sin precio asignado</div></div>`:''}`;
+        ${undef.length>0?`<div class="stat-card red"><h3>⚠️ Sin precio definido</h3><div class="value" style="color:var(--red);">${undef.length}</div><div class="sub">Activos sin precio asignado</div></div>`:''}`;
     updateChart(active);
 }
 
 function updateChart(active) {
+    aplicarTemaGraficas();
     let pr={}; active.forEach(u=>{ if(u.ValorPlan>0) pr[u.ÚltimoProducto]=(pr[u.ÚltimoProducto]||0)+u.ValorPlan; });
     let sorted=Object.entries(pr).sort((a,b)=>b[1]-a[1]).slice(0,10);
     let ctx=document.getElementById('revenueChart').getContext('2d');
     if (revenueChart) revenueChart.destroy();
-    if (sorted.length) revenueChart=new Chart(ctx,{ type:'bar', data:{ labels:sorted.map(i=>i[0]), datasets:[{ label:'Ingresos (₡)', data:sorted.map(i=>i[1]), backgroundColor:sorted.map((_,i)=>`hsla(${230+i*12},70%,${55+i*2}%,0.85)`), borderRadius:8, borderSkipped:false }]}, options:{ responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ ticks:{ callback:v=>'₡'+v.toLocaleString() }, grid:{ color:'#f0f2f8' } }, x:{ grid:{ display:false } } } } });
+    if (sorted.length) revenueChart=new Chart(ctx,{ type:'bar', data:{ labels:sorted.map(i=>i[0]), datasets:[{ label:'Ingresos (₡)', data:sorted.map(i=>i[1]), backgroundColor:sorted.map((_,i)=>`hsla(${230+i*12},70%,${55+i*2}%,0.85)`), borderRadius:8, borderSkipped:false }]}, options:{ responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ ticks:{ callback:v=>'₡'+v.toLocaleString() }, grid:{} }, x:{ grid:{ display:false } } } } });
 }
 
 function exportToCSV() {
@@ -1907,7 +2014,7 @@ function printRenewalSummary() {
             <td><strong>${plan}</strong></td>
             <td style="text-align:center;">${d.count}</td>
             <td style="text-align:right;">${d.total > 0 ? '₡'+d.total.toLocaleString() : '—'}</td>
-            <td style="text-align:center;color:${d.sinPrecio > 0 ? '#c62828' : '#555'}">${d.sinPrecio > 0 ? d.sinPrecio + ' sin precio' : '✓'}</td>
+            <td style="text-align:center;color:${d.sinPrecio > 0 ? 'var(--red)' : 'var(--sec)'}">${d.sinPrecio > 0 ? d.sinPrecio + ' sin precio' : '✓'}</td>
         </tr>`).join('');
 
     const totalClientes = f.length;
@@ -2018,13 +2125,13 @@ function updateRenoStats() {
     let granTotal = totalCRC + clasesTotal + sinClasifTotal;
     document.getElementById('renoStatsContainer').innerHTML=`
         <div class="stat-card purple"><h3>📋 Total Membresías</h3><div class="value">${all.length}</div><div class="sub">Transacciones registradas</div></div>
-        <div class="stat-card green"><h3>🆕 Nuevos</h3><div class="value" style="color:#2e7d32;">${nuevos}</div><div class="sub">${all.length?Math.round(nuevos/all.length*100):0}% del total</div></div>
-        <div class="stat-card blue"><h3>✅ Renovaciones</h3><div class="value" style="color:#1565c0;">${renova}</div><div class="sub">${all.length?Math.round(renova/all.length*100):0}% del total</div></div>
-        <div class="stat-card orange"><h3>🔄 Reingresos</h3><div class="value" style="color:#e65100;">${reing}</div><div class="sub">Inactivos +10 días que volvieron</div></div>
+        <div class="stat-card green"><h3>🆕 Nuevos</h3><div class="value" style="color:var(--green);">${nuevos}</div><div class="sub">${all.length?Math.round(nuevos/all.length*100):0}% del total</div></div>
+        <div class="stat-card blue"><h3>✅ Renovaciones</h3><div class="value" style="color:var(--blue);">${renova}</div><div class="sub">${all.length?Math.round(renova/all.length*100):0}% del total</div></div>
+        <div class="stat-card orange"><h3>🔄 Reingresos</h3><div class="value" style="color:var(--orange);">${reing}</div><div class="sub">Inactivos +10 días que volvieron</div></div>
         <div class="stat-card teal"><h3>💰 Total General</h3><div class="value" style="font-size:1.3em;">₡${granTotal.toLocaleString()}</div><div class="sub">Suma del 100% del reporte · En ${dias} día(s)</div></div>
         <div class="stat-card purple"><h3>🏋️ Planes / Membresías</h3><div class="value" style="font-size:1.1em;">₡${totalCRC.toLocaleString()}</div><div class="sub">${all.length} transacciones</div></div>
-        <div class="stat-card" style="border-left:4px solid #888;"><h3>🤸 Clases Sueltas</h3><div class="value" style="font-size:1.1em;color:#555;">₡${clasesTotal.toLocaleString()}</div><div class="sub">${clasesSueltasData.length} clases/sesiones</div></div>
-        <div class="stat-card" style="border-left:4px solid #c62828;"><h3>❓ Sin Clasificar</h3><div class="value" style="font-size:1.1em;color:#c62828;">₡${sinClasifTotal.toLocaleString()}</div><div class="sub">${sinClasificarData.length} producto(s) no reconocido(s)</div></div>`;
+        <div class="stat-card" style="border-left:4px solid var(--sec);"><h3>🤸 Clases Sueltas</h3><div class="value" style="font-size:1.1em;color:var(--sec);">₡${clasesTotal.toLocaleString()}</div><div class="sub">${clasesSueltasData.length} clases/sesiones</div></div>
+        <div class="stat-card" style="border-left:4px solid var(--red);"><h3>❓ Sin Clasificar</h3><div class="value" style="font-size:1.1em;color:var(--red);">₡${sinClasifTotal.toLocaleString()}</div><div class="sub">${sinClasificarData.length} producto(s) no reconocido(s)</div></div>`;
 }
 
 function renderRenovaciones() {
@@ -2044,8 +2151,8 @@ function renderRenovaciones() {
         : (dFromVal || dToVal) ? `${dFromVal||'…'} a ${dToVal||'…'}` : 'según filtros activos';
     document.getElementById('renoFilteredStatsContainer').innerHTML = !filtroActivo ? '' : `
         <div class="stat-card green"><h3>💰 Membresías Vendidas (${rangoTexto})</h3><div class="value" style="font-size:1.3em;">₡${totalMembresiasFiltrado.toLocaleString()}</div><div class="sub">${filtered.length} transacción(es) · compara contra la meta de Proyecciones</div></div>
-        <div class="stat-card" style="border-left:4px solid #888;"><h3>🤸 Clases Sueltas (filtrado)</h3><div class="value" style="font-size:1.1em;color:#555;">₡${totalClasesFiltrado.toLocaleString()}</div><div class="sub">${filteredClases.length} clase(s)/sesión(es)</div></div>
-        <div class="stat-card" style="border-left:4px solid #c62828;"><h3>❓ Sin Clasificar (filtrado)</h3><div class="value" style="font-size:1.1em;color:#c62828;">₡${totalSinClasifFiltrado.toLocaleString()}</div><div class="sub">${filteredSinClasif.length} producto(s)</div></div>`;
+        <div class="stat-card" style="border-left:4px solid var(--sec);"><h3>🤸 Clases Sueltas (filtrado)</h3><div class="value" style="font-size:1.1em;color:var(--sec);">₡${totalClasesFiltrado.toLocaleString()}</div><div class="sub">${filteredClases.length} clase(s)/sesión(es)</div></div>
+        <div class="stat-card" style="border-left:4px solid var(--red);"><h3>❓ Sin Clasificar (filtrado)</h3><div class="value" style="font-size:1.1em;color:var(--red);">₡${totalSinClasifFiltrado.toLocaleString()}</div><div class="sub">${filteredSinClasif.length} producto(s)</div></div>`;
 
     // ── Charts ──
     // Pie
@@ -2053,8 +2160,9 @@ function renderRenovaciones() {
     let rv=filtered.filter(r=>r.Tipo==='Renovación').length;
     let ri=filtered.filter(r=>r.Tipo==='Reingreso').length;
     let ctxPie=document.getElementById('renoTypePie').getContext('2d');
+    aplicarTemaGraficas();
     if (renoTypePieChart) renoTypePieChart.destroy();
-    renoTypePieChart=new Chart(ctxPie,{ type:'doughnut', data:{ labels:['Nuevo','Renovación','Reingreso'], datasets:[{ data:[nv,rv,ri], backgroundColor:['#43a047','#1e88e5','#ff9800'], borderWidth:2, borderColor:'#f8f9ff' }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom' } } } });
+    renoTypePieChart=new Chart(ctxPie,{ type:'doughnut', data:{ labels:['Nuevo','Renovación','Reingreso'], datasets:[{ data:[nv,rv,ri], backgroundColor:['#43a047','#1e88e5','#ff9800'], borderWidth:2, borderColor:getComputedStyle(document.documentElement).getPropertyValue('--card').trim()||'#fff' }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom' } } } });
 
     // Bar by plan
     let planTot={};
@@ -2062,28 +2170,28 @@ function renderRenovaciones() {
     let barSorted=Object.entries(planTot).sort((a,b)=>b[1]-a[1]).slice(0,8);
     let ctxBar=document.getElementById('renoPlanBar').getContext('2d');
     if (renoPlanBarChart) renoPlanBarChart.destroy();
-    if (barSorted.length) renoPlanBarChart=new Chart(ctxBar,{ type:'bar', data:{ labels:barSorted.map(i=>i[0]), datasets:[{ label:'CRC Recaudado', data:barSorted.map(i=>i[1]), backgroundColor:barSorted.map((_,i)=>`hsla(${200+i*18},65%,50%,0.82)`), borderRadius:6, borderSkipped:false }] }, options:{ responsive:true, plugins:{ legend:{display:false} }, scales:{ y:{ ticks:{ callback:v=>'₡'+v.toLocaleString() }, grid:{color:'#f0f2f8'} }, x:{grid:{display:false}} } } });
+    if (barSorted.length) renoPlanBarChart=new Chart(ctxBar,{ type:'bar', data:{ labels:barSorted.map(i=>i[0]), datasets:[{ label:'CRC Recaudado', data:barSorted.map(i=>i[1]), backgroundColor:barSorted.map((_,i)=>`hsla(${200+i*18},65%,50%,0.82)`), borderRadius:6, borderSkipped:false }] }, options:{ responsive:true, plugins:{ legend:{display:false} }, scales:{ y:{ ticks:{ callback:v=>'₡'+v.toLocaleString() }, grid:{} }, x:{grid:{display:false}} } } });
 
     // ── Table ──
     let tbody=document.getElementById('renoTableBody'); tbody.innerHTML='';
     filtered.sort((a,b)=>(b.TxDate?.getTime()||0)-(a.TxDate?.getTime()||0));
     filtered.forEach(r => {
         let tr=tbody.insertRow();
-        let gap=r.GapDias!==null&&r.GapDias!==undefined?`<span style="color:#e65100;font-weight:700;">${r.GapDias} días</span>`:'<span style="color:#aaa;">—</span>';
-        let ingreso=r.User?.Ingreso||'<span style="color:#aaa;">No encontrado</span>';
-        let expira =r.User?.Expira||'<span style="color:#aaa;">—</span>';
+        let gap=r.GapDias!==null&&r.GapDias!==undefined?`<span style="color:var(--orange);font-weight:700;">${r.GapDias} días</span>`:'<span style="color:var(--ter);">—</span>';
+        let ingreso=r.User?.Ingreso||'<span style="color:var(--ter);">No encontrado</span>';
+        let expira =r.User?.Expira||'<span style="color:var(--ter);">—</span>';
         let clienteDisplay=r.User?`<strong>${r.Cliente}</strong>`:
-            `<strong>${r.Cliente}</strong> <span style="background:#fff3e0;color:#e65100;font-size:11px;padding:2px 6px;border-radius:10px;">¿nuevo?</span>`;
+            `<strong>${r.Cliente}</strong> <span style="background:var(--orange-tint);color:var(--orange);font-size:11px;padding:2px 6px;border-radius:10px;">¿nuevo?</span>`;
         tr.innerHTML=`
-            <td style="white-space:nowrap;font-size:12px;color:#666;">${r.FechaStr}</td>
+            <td style="white-space:nowrap;font-size:12px;color:var(--sec);">${r.FechaStr}</td>
             <td>${clienteDisplay}</td>
             <td style="font-size:12.5px;">${r.Producto}</td>
             <td><span class="badge ${r.Badge}">${r.Icon} ${r.Tipo}</span></td>
-            <td style="font-weight:700;color:#2d2d5e;">₡${r.Total.toLocaleString()}</td>
+            <td style="font-weight:700;color:var(--label);">₡${r.Total.toLocaleString()}</td>
             <td>${gap}</td>
             <td style="font-size:12px;">${ingreso}</td>
             <td style="font-size:12px;">${expira}</td>
-            <td style="font-size:12px;color:#888;">${r.RegistradoPor}</td>`;
+            <td style="font-size:12px;color:var(--sec);">${r.RegistradoPor}</td>`;
     });
     document.getElementById('renoTableInfo').textContent = `Mostrando ${filtered.length} transacciones — Nuevos: ${nv} · Renovaciones: ${rv} · Reingresos: ${ri} · Total: ₡${filtered.reduce((s,r)=>s+r.Total,0).toLocaleString()}`;
 
@@ -2093,11 +2201,11 @@ function renderRenovaciones() {
     clasesSorted.forEach(c => {
         let tr = csBody.insertRow();
         tr.innerHTML = `
-            <td style="white-space:nowrap;font-size:12px;color:#666;">${c.FechaStr}</td>
+            <td style="white-space:nowrap;font-size:12px;color:var(--sec);">${c.FechaStr}</td>
             <td>${c.Cliente}</td>
             <td style="font-size:12.5px;">${c.Producto}</td>
-            <td style="font-weight:700;color:#2d2d5e;">₡${c.Total.toLocaleString()}</td>
-            <td style="font-size:12px;color:#888;">${c.RegistradoPor}</td>`;
+            <td style="font-weight:700;color:var(--label);">₡${c.Total.toLocaleString()}</td>
+            <td style="font-size:12px;color:var(--sec);">${c.RegistradoPor}</td>`;
     });
     document.getElementById('clasesSueltasInfo').textContent =
         `Mostrando ${filteredClases.length} clases/sesiones sueltas — Total: ₡${totalClasesFiltrado.toLocaleString()} (no se suma al total de membresías)`;
@@ -2108,11 +2216,11 @@ function renderRenovaciones() {
     sinClasifSorted.forEach(c => {
         let tr = scBody.insertRow();
         tr.innerHTML = `
-            <td style="white-space:nowrap;font-size:12px;color:#666;">${c.FechaStr}</td>
+            <td style="white-space:nowrap;font-size:12px;color:var(--sec);">${c.FechaStr}</td>
             <td>${c.Cliente}</td>
             <td style="font-size:12.5px;">${c.Producto}</td>
-            <td style="font-weight:700;color:#c62828;">₡${c.Total.toLocaleString()}</td>
-            <td style="font-size:12px;color:#888;">${c.RegistradoPor}</td>`;
+            <td style="font-weight:700;color:var(--red);">₡${c.Total.toLocaleString()}</td>
+            <td style="font-size:12px;color:var(--sec);">${c.RegistradoPor}</td>`;
     });
     document.getElementById('sinClasificarInfo').textContent =
         `Mostrando ${filteredSinClasif.length} transacciones sin clasificar — Total: ₡${totalSinClasifFiltrado.toLocaleString()} (revisar nombres de producto, no calzan con ningún plan ni clase conocida)`;
@@ -2193,8 +2301,8 @@ function openSummaryModal() {
     let rows=buildPlanSummary();
     let tU=rows.reduce((s,r)=>s+r.usuarios,0), tC=rows.reduce((s,r)=>s+r.conPrecio,0), tS=rows.reduce((s,r)=>s+r.sinPrecio,0), tI=rows.reduce((s,r)=>s+r.total,0);
     let html=`<table class="summary-table"><thead><tr><th>Plan</th><th>Usuarios Activos</th><th>Con Precio</th><th>Sin Precio</th><th>Precio Unitario</th><th>Total Mensual</th></tr></thead><tbody>`;
-    rows.forEach(r=>{ html+=`<tr><td><strong>${r.plan}</strong></td><td>${r.usuarios}</td><td>${r.conPrecio}</td><td>${r.sinPrecio>0?'<span style="color:#c62828;font-weight:700;">'+r.sinPrecio+'</span>':'0'}</td><td>${r.precio>0?'₡'+r.precio.toLocaleString():'<span style="color:#aaa;">—</span>'}</td><td style="font-weight:700;">${r.total>0?'₡'+r.total.toLocaleString():'<span style="color:#aaa;">—</span>'}</td></tr>`; });
-    html+=`</tbody><tfoot><tr><td>TOTAL GENERAL</td><td>${tU}</td><td>${tC}</td><td>${tS>0?'<span style="color:#c62828;">'+tS+'</span>':'0'}</td><td>—</td><td style="color:#667eea;">₡${tI.toLocaleString()}</td></tr></tfoot></table>`;
+    rows.forEach(r=>{ html+=`<tr><td><strong>${r.plan}</strong></td><td>${r.usuarios}</td><td>${r.conPrecio}</td><td>${r.sinPrecio>0?'<span style="color:var(--red);font-weight:700;">'+r.sinPrecio+'</span>':'0'}</td><td>${r.precio>0?'₡'+r.precio.toLocaleString():'<span style="color:var(--ter);">—</span>'}</td><td style="font-weight:700;">${r.total>0?'₡'+r.total.toLocaleString():'<span style="color:var(--ter);">—</span>'}</td></tr>`; });
+    html+=`</tbody><tfoot><tr><td>TOTAL GENERAL</td><td>${tU}</td><td>${tC}</td><td>${tS>0?'<span style="color:var(--red);">'+tS+'</span>':'0'}</td><td>—</td><td style="color:var(--brand-text);">₡${tI.toLocaleString()}</td></tr></tfoot></table>`;
     document.getElementById('summaryTableContainer').innerHTML=html;
     document.getElementById('summaryModal').style.display='block';
 }
@@ -2328,17 +2436,17 @@ function renderValTable(rows) {
         const cfg = ESTADO_VALIDACION[r.estado];
         const tr = tbody.insertRow();
         if (r.estado === 'vencido_sin_pago' || r.estado === 'por_vencer_sin_pago') tr.style.background = 'rgba(229,57,53,0.06)';
-        const pagoCell = r.pago ? `<strong>₡${r.pago.Total.toLocaleString()}</strong>` : `<span style="color:#aaa;">—</span>`;
+        const pagoCell = r.pago ? `<strong>₡${r.pago.Total.toLocaleString()}</strong>` : `<span style="color:var(--ter);">—</span>`;
         let fechaCell = r.pago ? r.pago.FechaStr.split(/\s+/)[0] : '—';
-        if (r.pagoTardio) fechaCell += ` <span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:4px;">⏰ +${r.pagoTardio}d</span>`;
+        if (r.pagoTardio) fechaCell += ` <span style="background:var(--orange-tint);color:var(--orange);font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:4px;">⏰ +${r.pagoTardio}d</span>`;
         const venceCell = r.expira
-            ? `${r.expiraStr}${r.dias != null ? ` <span style="color:#aaa;font-size:11px;">(${r.dias < 0 ? r.dias : '+' + r.dias}d)</span>` : ''}`
+            ? `${r.expiraStr}${r.dias != null ? ` <span style="color:var(--ter);font-size:11px;">(${r.dias < 0 ? r.dias : '+' + r.dias}d)</span>` : ''}`
             : '—';
         tr.innerHTML = `
             <td>${r.pin}</td>
             <td><strong>${r.cliente}</strong></td>
             <td style="font-size:12.5px;">${r.plan}</td>
-            <td>${r.precioEsperado != null ? '₡' + r.precioEsperado.toLocaleString() : '<span style="color:#aaa;">—</span>'}</td>
+            <td>${r.precioEsperado != null ? '₡' + r.precioEsperado.toLocaleString() : '<span style="color:var(--ter);">—</span>'}</td>
             <td>${pagoCell}</td>
             <td style="font-size:12px;">${fechaCell}</td>
             <td style="font-size:12px;">${venceCell}</td>
@@ -2413,12 +2521,12 @@ function renderSeguimiento() {
         tr.innerHTML = `
             <td>${u.PIN}</td>
             <td><strong>${u.Nombre}</strong></td>
-            <td style="font-size:12.5px;white-space:nowrap;">${u.Telefono||'<span style="color:#aaa;">—</span>'}</td>
-            <td style="color:#667eea;font-size:12px;">${u.Email||'-'}</td>
+            <td style="font-size:12.5px;white-space:nowrap;">${u.Telefono||'<span style="color:var(--ter);">—</span>'}</td>
+            <td style="color:var(--brand-text);font-size:12px;">${u.Email||'-'}</td>
             <td style="font-size:12.5px;">${u.ÚltimoProducto||'-'}</td>
             <td>${u.Expira||'-'}</td>
-            <td style="font-weight:700;color:${diasVencido>60?'#c62828':'#e65100'};">${diasVencido} días</td>
-            <td>${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString():'<span style="color:#aaa;">—</span>'}</td>`;
+            <td style="font-weight:700;color:${diasVencido>60?'var(--red)':'var(--orange)'};">${diasVencido} días</td>
+            <td>${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString():'<span style="color:var(--ter);">—</span>'}</td>`;
     });
     document.getElementById('segTableInfo').textContent =
         `Mostrando ${rows.length} de ${todos.length} clientes vencidos sin renovar — Valor en riesgo: ₡${valorRiesgo.toLocaleString()}`;
@@ -2660,10 +2768,10 @@ async function autoSaveToSupabase() {
                 method: 'POST', prefer: 'return=minimal', body: record
             });
         }
-        statusEl.innerHTML += ` &nbsp;<span style="color:#1565c0;font-size:13px;">☁️ Historial actualizado (${mes})</span>`;
+        statusEl.innerHTML += ` &nbsp;<span style="color:var(--blue);font-size:13px;">☁️ Historial actualizado (${mes})</span>`;
     } catch(e) {
         console.error('Supabase save error:', e);
-        statusEl.innerHTML += ` &nbsp;<span style="color:#c62828;font-size:13px;">⚠️ Error nube: ${e.message}</span>`;
+        statusEl.innerHTML += ` &nbsp;<span style="color:var(--red);font-size:13px;">⚠️ Error nube: ${e.message}</span>`;
     }
 }
 
@@ -2689,11 +2797,11 @@ async function clearAllSnapshots() {
 
 async function loadAndRenderHistorial() {
     const container = document.getElementById('historialContent');
-    container.innerHTML = `<div style="text-align:center;padding:40px;color:#aaa;">⏳ Cargando historial...</div>`;
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--ter);">⏳ Cargando historial...</div>`;
     try {
         histSnapshots = await supaFetch('/gym_snapshots?order=mes_orden.desc,sede.asc&select=*') || [];
     } catch(e) {
-        container.innerHTML = `<div style="text-align:center;padding:40px;color:#c62828;">❌ No se pudo conectar a la base de datos.<br><small>${e.message}</small></div>`;
+        container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--red);">❌ No se pudo conectar a la base de datos.<br><small>${e.message}</small></div>`;
         return;
     }
     updateHistSedeFilter();
@@ -2715,9 +2823,9 @@ function renderHistorial() {
     const container = document.getElementById('historialContent');
 
     if (!snaps.length) {
-        container.innerHTML = `<div style="text-align:center;padding:60px 20px;color:#aaa;">
+        container.innerHTML = `<div style="text-align:center;padding:60px 20px;color:var(--ter);">
             <div style="font-size:48px;margin-bottom:16px;">📭</div>
-            <div style="font-size:1.1em;font-weight:600;color:#666;">No hay datos en el historial aún</div>
+            <div style="font-size:1.1em;font-weight:600;color:var(--sec);">No hay datos en el historial aún</div>
             <div style="font-size:13px;margin-top:8px;">Cada vez que cargues un Excel se guardará automáticamente aquí.</div>
         </div>`;
         return;
@@ -2733,24 +2841,24 @@ function renderHistorial() {
             const reno   = s.renovaciones || {};
             const upd    = s.updated_at ? new Date(s.updated_at).toLocaleDateString('es-CR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
             return `<tr>
-                <td><strong>${s.mes}</strong><br><span style="color:#aaa;font-size:11px;">Actualizado: ${upd}</span></td>
-                <td style="text-align:center;">${(s.activos||0).toLocaleString()} <span style="color:#aaa;font-size:11px;">/ ${(s.total_usuarios||0).toLocaleString()}</span></td>
-                <td style="text-align:right;color:#2e7d32;font-weight:700;">₡${(proj30?.revenue||0).toLocaleString()}<br><span style="color:#aaa;font-size:11px;">${proj30?.count||0} miembros</span></td>
-                <td style="text-align:right;color:#1565c0;font-weight:700;">₡${(proj60?.revenue||0).toLocaleString()}<br><span style="color:#aaa;font-size:11px;">${proj60?.count||0} miembros</span></td>
+                <td><strong>${s.mes}</strong><br><span style="color:var(--ter);font-size:11px;">Actualizado: ${upd}</span></td>
+                <td style="text-align:center;">${(s.activos||0).toLocaleString()} <span style="color:var(--ter);font-size:11px;">/ ${(s.total_usuarios||0).toLocaleString()}</span></td>
+                <td style="text-align:right;color:var(--green);font-weight:700;">₡${(proj30?.revenue||0).toLocaleString()}<br><span style="color:var(--ter);font-size:11px;">${proj30?.count||0} miembros</span></td>
+                <td style="text-align:right;color:var(--blue);font-weight:700;">₡${(proj60?.revenue||0).toLocaleString()}<br><span style="color:var(--ter);font-size:11px;">${proj60?.count||0} miembros</span></td>
                 <td style="text-align:right;font-weight:700;">₡${(reno.total||0).toLocaleString()}</td>
                 <td style="text-align:center;">
-                    <span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${reno.nuevos||0} N</span>
-                    <span style="background:#e3f2fd;color:#1565c0;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${reno.renovaciones||0} R</span>
-                    <span style="background:#fff3e0;color:#e65100;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${reno.reingresos||0} Re</span>
+                    <span style="background:#e8f5e9;color:var(--green);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${reno.nuevos||0} N</span>
+                    <span style="background:#e3f2fd;color:var(--blue);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${reno.renovaciones||0} R</span>
+                    <span style="background:var(--orange-tint);color:var(--orange);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${reno.reingresos||0} Re</span>
                 </td>
                 <td>
-                    <button onclick="showSnapshotDetail(${s.id})" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;padding:5px 11px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;">Ver detalle</button>
-                    <button onclick="deleteSnapshot(${s.id})" style="background:linear-gradient(135deg,#e53935,#b71c1c);color:white;border:none;padding:5px 9px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;margin-left:4px;">🗑</button>
+                    <button onclick="showSnapshotDetail(${s.id})" style="background:linear-gradient(135deg,var(--brand-text),var(--purple));color:white;border:none;padding:5px 11px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;">Ver detalle</button>
+                    <button onclick="deleteSnapshot(${s.id})" style="background:linear-gradient(135deg,var(--red),#b71c1c);color:white;border:none;padding:5px 9px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;margin-left:4px;">🗑</button>
                 </td>
             </tr>`;
         }).join('');
         return `<div style="margin-bottom:32px;">
-            <div class="section-title">🏢 ${sede} <span style="font-size:13px;font-weight:400;color:#888;">(${items.length} mes${items.length>1?'es':''})</span></div>
+            <div class="section-title">🏢 ${sede} <span style="font-size:13px;font-weight:400;color:var(--sec);">(${items.length} mes${items.length>1?'es':''})</span></div>
             <div class="table-container"><table>
                 <thead><tr>
                     <th>Mes</th>
@@ -2775,7 +2883,7 @@ function showSnapshotDetail(id) {
         `<tr><td>${p.label}</td><td style="text-align:center;">${p.count}</td><td style="text-align:right;font-weight:700;">₡${(p.revenue||0).toLocaleString()}</td></tr>`
     ).join('');
     document.getElementById('summaryTableContainer').innerHTML = `
-        <div style="font-size:14px;color:#555;margin-bottom:18px;">
+        <div style="font-size:14px;color:var(--sec);margin-bottom:18px;">
             <strong>${snap.sede}</strong> · ${snap.mes} · ${snap.activos} activos de ${snap.total_usuarios} totales
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
