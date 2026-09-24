@@ -104,29 +104,44 @@ table.denom tfoot td:last-child { border-radius:0 0 10px 0; }
 .line-total { display:flex; justify-content:space-between; font-weight:700; color:var(--label);
   border-top:.5px solid var(--sep); padding-top:10px; margin-top:8px; font-variant-numeric:tabular-nums; }
 
-/* ── Resumen del cierre (tarjeta destacada) ── */
-.hero { background:var(--card); color:var(--label); border:0; box-shadow:var(--shadow);
-  position:relative; overflow:hidden; }
+/* ── Resumen del cierre ──────────────────────────────────────────────────
+   Es la tarjeta que más se mira al cuadrar, así que pesa más que las demás:
+   elevación mayor, un banner de estado sólido y el efectivo final en grande.
+   La jerarquía sale del tamaño y del color, no de un degradado. */
+.hero { background:var(--card); color:var(--label); border:0;
+  box-shadow:0 8px 28px rgba(0,0,0,.10), 0 1px 3px rgba(0,0,0,.06);
+  padding:20px 20px 18px; position:relative; overflow:hidden; }
+@media (prefers-color-scheme: dark){
+  .hero { box-shadow:0 8px 28px rgba(0,0,0,.5); background:#232325; }
+}
 .hero::after { display:none; }
-.hero h3 { color:var(--sec); position:relative; }
-.hero-status { display:flex; justify-content:center; margin:2px 0 14px; position:relative; }
-.badge-ok, .badge-dif { display:inline-flex; align-items:center; gap:8px; font-weight:600; font-size:16px;
-  padding:10px 20px; border-radius:14px; box-shadow:none; text-align:center; }
-.badge-ok { background:var(--green-tint); color:var(--green); }
-.badge-dif { background:var(--red-tint); color:var(--red); }
-.hero-tiles { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:14px; position:relative; }
-.tile { background:var(--fill); border:0; border-radius:12px; padding:12px 10px; text-align:center; }
+.hero h3 { color:var(--sec); position:relative; margin-bottom:10px; }
+
+/* Banner de estado: relleno sólido, ancho completo — se lee de un vistazo */
+.hero-status { display:block; margin:0 0 16px; position:relative; }
+.badge-ok, .badge-dif { display:flex; align-items:center; justify-content:center; gap:8px;
+  width:100%; min-height:50px; padding:10px 18px; border-radius:13px; box-shadow:none;
+  text-align:center; font-size:17px; font-weight:600; letter-spacing:-.01em; color:#fff; }
+.badge-ok  { background:var(--green); }
+.badge-dif { background:var(--red); }
+
+/* El efectivo final manda: ocupa toda la fila y va primero */
+.hero-tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-bottom:16px; position:relative; }
+.tile { background:var(--fill); border:0; border-radius:12px; padding:11px 8px; text-align:center; min-width:0; }
 .tile .tl { font-size:12px; text-transform:none; letter-spacing:0; color:var(--sec); }
-.tile .tv { font-size:22px; font-weight:700; margin-top:3px; letter-spacing:-.02em;
+.tile .tv { font-size:18px; font-weight:600; margin-top:3px; letter-spacing:-.01em;
   font-variant-numeric:tabular-nums; color:var(--label); }
-.tile.acc { background:var(--brand-tint); }
-.tile.acc .tv { color:var(--brand-text); }
+.tile.acc { grid-column:1/-1; order:-1; background:var(--brand-tint); padding:16px 14px; }
+.tile.acc .tl { font-size:13px; font-weight:600; color:var(--brand-text); opacity:.85; }
+.tile.acc .tv { font-size:40px; font-weight:700; letter-spacing:-.03em; margin-top:2px; color:var(--brand-text); }
+
 .hero-break { background:transparent; border-radius:0; padding:0; position:relative; }
 .hb { display:flex; justify-content:space-between; padding:8px 0; font-size:15px; color:var(--label);
   border-bottom:.5px solid var(--hair); font-variant-numeric:tabular-nums; }
 .hb span:first-child { color:var(--sec); }
 .hb:last-child { border-bottom:none; }
-.hb.strong { font-weight:700; font-size:16px; color:var(--label); border-top:.5px solid var(--sep); margin-top:2px; }
+.hb.strong { font-weight:700; font-size:18px; color:var(--label); border-top:.5px solid var(--sep);
+  margin-top:4px; padding-top:12px; letter-spacing:-.01em; }
 .hb.strong span:first-child { color:var(--label); }
 
 /* ── Píldoras y avisos ── */
@@ -824,7 +839,7 @@ function calc(){
     ? '<span class="badge-ok">✓ Caja cuadra</span>'
     : (difR>0
         ? `<span class="badge-dif">⚠ Faltante ${fmt(Math.abs(difR))} (de menos vs facturado)</span>`
-        : `<span class="badge-dif" style="background:var(--blue-tint);color:var(--blue);">⚠ Sobrante ${fmt(Math.abs(difR))} (de más vs facturado)</span>`);
+        : `<span class="badge-dif" style="background:var(--blue);">⚠ Sobrante ${fmt(Math.abs(difR))} (de más vs facturado)</span>`);
   // Efectivo final: solo se descuenta la minita cuando el sobre se retira hoy ('retira').
   const efectivoFinal=(sobreModo==='retira')?(efectivo-minita):efectivo;
   document.getElementById('rEfectivoFinal').textContent=fmt(efectivoFinal);
