@@ -51,8 +51,11 @@
     <label class="btn-ghost" for="fileInv" style="cursor:pointer;">📤 Cargar Excel</label>
     <input type="file" id="fileInv" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarExcel(this.files[0])">
     <button class="btn-ghost" onclick="addProducto()">＋ Producto</button>
-    <button class="btn-ghost" onclick="openEnvioModal()">🚚 Enviar mercadería</button>
     <button class="btn-primary" onclick="guardarConteo()">💾 Guardar conteo/cambios</button>
+  </div>
+  <!-- Enviar mercadería va aparte: el coordinador puede hacerlo aunque no edite el resto -->
+  <div class="topbar-controls" id="envioControls" style="display:none;">
+    <button class="btn-primary" onclick="openEnvioModal()">🚚 Enviar mercadería</button>
   </div>
 </div>
 <div class="kpi-row">
@@ -71,7 +74,7 @@
 
 <div class="section"><div class="section-title">🚚 Envíos de mercadería</div></div>
 <div class="tbl-wrap"><table class="tbl">
-  <thead><tr><th>Fecha</th><th>Productos</th><th>Estado</th><th>Recibido</th><th></th></tr></thead>
+  <thead><tr><th>Fecha</th><th>Enviado por</th><th>Productos</th><th>Estado</th><th>Recibido</th><th>Aceptado por</th><th></th></tr></thead>
   <tbody id="enviosBody"></tbody>
 </table></div>
 <div class="msg" style="padding-bottom:40px;">El stock <b>no se suma</b> hasta que recepción acepte el envío en el módulo de Caja, indicando lo que realmente llegó.</div>
@@ -81,7 +84,7 @@
   <div class="modal" style="max-width:540px;">
     <div class="modal-head">🚚 Enviar mercadería <span id="envioSedeLbl" style="color:var(--sec);font-weight:400;"></span></div>
     <div class="modal-body" style="max-height:64vh;overflow-y:auto;gap:10px;">
-      <div class="hint">Indique cuánto se envía de cada producto. Recepción lo aceptará y confirmará lo que llegó.</div>
+      <div class="hint" id="envioNota">Indique cuánto se envía de cada producto. Recepción lo aceptará y confirmará lo que llegó.</div>
       <div id="envioList"></div>
       <div id="envioErr" style="color:var(--red);font-size:14px;min-height:18px;"></div>
     </div>
@@ -116,8 +119,11 @@ async function supaFetch(path,opts={}){
 }
 const ROLES_PERMITIDOS=['admin','admin_sedes','admin_g','coordinador'];
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
-// El coordinador SOLO consulta: no edita, no agrega, no borra, no envía mercadería.
+// El coordinador no edita el inventario: no cambia cantidades, no agrega ni borra productos.
 const soloLectura=()=>currentRole==='coordinador';
+// Pero SÍ puede enviar mercadería a su sede. Un envío nunca baja el stock:
+// solo suma cuando recepción lo acepta en Caja, así que únicamente puede aumentar.
+const puedeEnviar=()=>!soloLectura()||currentRole==='coordinador';
 // Sedes que puede consultar: admins todas; coordinador sin sede asignada todas, con sede solo la suya (+ extras).
 function sedesDisponibles(){
   if(!soloLectura()||!currentSede) return SEDES;
@@ -161,14 +167,15 @@ function init(){
   sel.innerHTML=opciones.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
   sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;load();};
   document.getElementById('sedeTitle').textContent='· '+currentSede;
-  // Coordinador: se ocultan todos los controles de escritura y se marca la vista como consulta
+  // Coordinador: se ocultan los controles que EDITAN el inventario, pero conserva el envío de mercadería
   if(soloLectura()){
     const tc=document.getElementById('topbarControls'); if(tc)tc.style.display='none';
     const b=document.getElementById('roBadge'); if(b)b.style.display='';
     const h=document.getElementById('hintTabla');
-    if(h)h.innerHTML='👁 Vista de <b>solo consulta</b>: “Cantidad” es el stock actual del sistema. Los productos bajo el mínimo se marcan en naranja.';
+    if(h)h.innerHTML='👁 No edita el inventario: “Cantidad” es el stock actual del sistema. Para reponer, use <b>🚚 Enviar mercadería</b>: recepción lo acepta en Caja y ahí se suma al stock.';
     const kf=document.getElementById('kFalt'); if(kf&&kf.parentElement)kf.parentElement.style.display='none';
   }
+  const ec=document.getElementById('envioControls'); if(ec)ec.style.display=puedeEnviar()?'':'none';
   load();
 }
 async function load(){
@@ -188,14 +195,23 @@ async function loadEnvios(){
 }
 function renderEnvios(){
   const tb=document.getElementById('enviosBody'); if(!tb)return;
-  if(!envios.length){ tb.innerHTML='<tr><td colspan="5" style="padding:14px;color:var(--muted);">Sin envíos.</td></tr>'; return; }
+  if(!envios.length){ tb.innerHTML='<tr><td colspan="7" style="padding:14px;color:var(--muted);">Sin envíos.</td></tr>'; return; }
   tb.innerHTML=envios.map(e=>{
     const prods=(e.items||[]).map(it=>`${esc(it.producto)} (${it.enviado})`).join(', ');
     const recibido=e.estado==='aceptado'?(e.items||[]).map(it=>`${esc(it.producto)}: ${it.recibido==null?'—':it.recibido}`).join(', '):'—';
     const badge=e.estado==='aceptado'?'<span class="pill ok">aceptado</span>':'<span class="pill low">pendiente</span>';
     // Solo se puede eliminar un envío que AÚN NO fue aceptado (por si se creó por error/confusión).
     const acciones=(e.estado==='aceptado'||soloLectura())?'':`<button class="btn-del" title="Eliminar envío pendiente" onclick="eliminarEnvio('${e.id}')">🗑</button>`;
-    return `<tr><td>${new Date(e.created_at).toLocaleDateString('es-CR')}</td><td style="font-size:12px;max-width:300px;">${prods}</td><td>${badge}</td><td style="font-size:12px;">${recibido}${e.nota?'<br><span style="color:var(--warn);">'+esc(e.nota)+'</span>':''}</td><td style="text-align:right;">${acciones}</td></tr>`;
+    const fecha=new Date(e.created_at).toLocaleDateString('es-CR');
+    const aceptado=e.estado==='aceptado'
+      ? `${esc(e.aceptado_por||'—')}${e.aceptado_at?'<br><span style="color:var(--sec);">'+new Date(e.aceptado_at).toLocaleDateString('es-CR')+'</span>':''}` : '—';
+    return `<tr><td style="white-space:nowrap;">${fecha}</td>
+      <td style="font-size:12px;">${esc(e.created_by||'—')}</td>
+      <td style="font-size:12px;max-width:280px;">${prods}</td>
+      <td>${badge}</td>
+      <td style="font-size:12px;">${recibido}${e.nota?'<br><span style="color:var(--red);">'+esc(e.nota)+'</span>':''}</td>
+      <td style="font-size:12px;">${aceptado}</td>
+      <td style="text-align:right;">${acciones}</td></tr>`;
   }).join('');
 }
 async function eliminarEnvio(id){
@@ -214,8 +230,12 @@ async function eliminarEnvio(id){
 }
 function cerrarEnvioModal(){ document.getElementById('envioModal').classList.remove('open'); }
 function openEnvioModal(){
-  if(soloLectura())return;
+  if(!puedeEnviar())return;
   document.getElementById('envioSedeLbl').textContent='· '+currentSede;
+  const nota=document.getElementById('envioNota');
+  if(nota) nota.innerHTML = soloLectura()
+    ? `Cantidades que <b>entran</b> a ${esc(currentSede)}. Recepción confirma en Caja lo que realmente llegó y ahí se suma al stock. Queda registrado que lo enviaste vos.`
+    : 'Indique cuánto se envía de cada producto. Recepción lo aceptará y confirmará lo que llegó.';
   const prods=items.filter(it=>!it._del&&(it.producto||'').trim());
   document.getElementById('envioList').innerHTML = prods.length ? prods.map((p,i)=>`
     <div class="envio-row">
@@ -227,10 +247,11 @@ function openEnvioModal(){
   document.getElementById('envioModal').classList.add('open');
 }
 async function crearEnvio(){
-  if(soloLectura())return;
+  if(!puedeEnviar())return;
   const err=document.getElementById('envioErr');
   const inputs=[...document.querySelectorAll('#envioList input[id^="env_"]')];
-  const arr=inputs.map(inp=>({producto:inp.getAttribute('data-prod'),enviado:Number(inp.value)||0,recibido:null})).filter(x=>x.enviado>0);
+  // Solo cantidades positivas: un envío suma stock, nunca lo resta.
+  const arr=inputs.map(inp=>({producto:inp.getAttribute('data-prod'),enviado:Math.floor(Number(inp.value)||0),recibido:null})).filter(x=>x.enviado>0);
   if(!arr.length){ err.textContent='Indique la cantidad a enviar de al menos un producto.'; return; }
   const btn=document.getElementById('btnEnviar'); btn.disabled=true; btn.textContent='Enviando...';
   try{

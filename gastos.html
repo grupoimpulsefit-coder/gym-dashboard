@@ -267,6 +267,9 @@ let instructores = [];   // directorio
 let gastos = [];         // gastos de la sede actual (todos los meses)
 
 const esAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes' || currentRole === 'admin_g';
+// Editar un gasto ya registrado: los admins en cualquier sede, el coordinador en la suya.
+// Eliminar sigue siendo exclusivo de los admins.
+const puedeEditarGasto = () => esAdmin() || currentRole === 'coordinador';
 const fmtCRC  = n => '₡' + Math.round(n||0).toLocaleString('es-CR');
 function mesEtiqueta(d) { return MESES_ES[d.getMonth()] + ' ' + d.getFullYear(); }
 function mesOrden(d)    { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
@@ -435,7 +438,9 @@ function renderGastos() {
   document.getElementById('kpiCount').textContent    = delMes.length;
 
   const cont = document.getElementById('gastosContainer');
-  const adm = esAdmin();   // solo admin/admin_sedes pueden eliminar
+  const adm = esAdmin();          // eliminar sigue siendo solo de admin
+  const edit = puedeEditarGasto(); // editar: admins y coordinador (su sede)
+  const acc = adm || edit;         // ¿hay columna de acciones?
   cont.innerHTML = CATEGORIAS.map(cat => {
     const rows = porCat[cat.id] || [];
     const subtot = rows.reduce((s,g)=>s+Number(g.monto||0),0);
@@ -447,9 +452,9 @@ function renderGastos() {
         <td>${g.numero_factura ? esc(g.numero_factura) : '—'}</td>
         <td>${g.banco_pago ? esc(g.banco_pago) : '—'}${g.cuenta_pago ? '<br><span style="font-size:11px;color:var(--muted);">'+esc(g.cuenta_pago)+'</span>' : ''}</td>
         <td class="num">${fmtCRC(g.monto)}</td>
-        ${adm ? `<td class="num" style="white-space:nowrap;"><button class="btn-edit" title="Editar factura" onclick="editarGasto('${g.id}')">✏️</button> <button class="btn-del" title="Eliminar gasto" onclick="deleteGasto('${g.id}')">🗑</button></td>` : ''}
+        ${acc ? `<td class="num" style="white-space:nowrap;">${edit ? `<button class="btn-edit" title="Editar factura" onclick="editarGasto('${g.id}')">✏️</button>` : ''}${adm ? ` <button class="btn-del" title="Eliminar gasto" onclick="deleteGasto('${g.id}')">🗑</button>` : ''}</td>` : ''}
       </tr>`).join('')
-      : `<tr><td colspan="${adm?7:6}" class="g-empty">Sin gastos de esta categoría en el mes.</td></tr>`;
+      : `<tr><td colspan="${acc?7:6}" class="g-empty">Sin gastos de esta categoría en el mes.</td></tr>`;
     return `
       <div class="cat-block">
         <div class="cat-head">
@@ -523,12 +528,12 @@ function onMetodoChange() {
 }
 
 // ── Guardar gasto (crear / editar) ───────────────────────────────────────
-let editandoGastoId = null;   // null = crear; id = editar factura existente (solo admin)
+let editandoGastoId = null;   // null = crear; id = editar factura existente
 
 async function guardarGasto() {
   const msg = document.getElementById('formMsg');
   const editar = !!editandoGastoId;
-  if (editar && !esAdmin()) { msg.className='form-msg err'; msg.textContent='Solo un administrador puede editar facturas.'; return; }
+  if (editar && !puedeEditarGasto()) { msg.className='form-msg err'; msg.textContent='Su cuenta no puede editar facturas ya registradas.'; return; }
   const categoria = document.getElementById('fCategoria').value;
   const fecha     = document.getElementById('fFecha').value;
   const emisor    = document.getElementById('fEmisor').value.trim();
@@ -585,7 +590,7 @@ async function guardarGasto() {
 }
 
 function editarGasto(id) {
-  if (!esAdmin()) return;
+  if (!puedeEditarGasto()) return;
   const g = gastos.find(x => x.id === id);
   if (!g) return;
   editandoGastoId = id;
