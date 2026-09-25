@@ -1289,7 +1289,8 @@ async function descontarInventario(soldByBase, origName, D){
     const delta=unidadesHoy-yaDesc;                        // solo lo nuevo de esta carga
     if(delta===0 && mismaFecha) continue;                   // ya está al día → no re-descuenta
     const nuevoStock=(Number(p.cantidad)||0)-delta;
-    try{ await supaFetch(`/inventario?id=eq.${p.id}`,{method:'PATCH',body:{cantidad:nuevoStock,desc_dia:D,desc_hoy:unidadesHoy,updated_at:new Date().toISOString()}});
+    // mov_motivo: pista para el kardex (ver inventario_movimientos.sql). El trigger la consume y la limpia.
+    try{ await supaFetch(`/inventario?id=eq.${p.id}`,{method:'PATCH',body:{cantidad:nuevoStock,desc_dia:D,desc_hoy:unidadesHoy,updated_at:new Date().toISOString(),mov_motivo:`venta: informe de ventas del ${D}`}});
       if(delta!==0){ unidadesDesc+=delta; prodsTocados++; detalle.push({producto:p.producto,delta,hoy:unidadesHoy,stock:nuevoStock}); } }catch(_){}
   }
   const noCalzan=Object.keys(soldByBase).filter(k=>!invByName[k]&&soldByBase[k]>0).map(k=>origName[k]||k);
@@ -1466,7 +1467,7 @@ async function aceptarEnvio(){
     const byName={}; inv.forEach(p=>byName[normP(p.producto)]=p);
     const noExiste=[];
     for(const it of items){ if(!(it.recibido>0))continue; const p=byName[normP(it.producto)];
-      if(p) await supaFetch(`/inventario?id=eq.${p.id}`,{method:'PATCH',body:{cantidad:(Number(p.cantidad)||0)+it.recibido,updated_at:new Date().toISOString()}});
+      if(p) await supaFetch(`/inventario?id=eq.${p.id}`,{method:'PATCH',body:{cantidad:(Number(p.cantidad)||0)+it.recibido,updated_at:new Date().toISOString(),mov_motivo:`entrada: envío aceptado (enviado por ${env.created_by||'—'})`}});
       else noExiste.push(it.producto); }
     await supaFetch(`/envios_mercaderia?id=eq.${env.id}`,{method:'PATCH',body:{estado:'aceptado',items,nota,aceptado_por:currentEmail||null,aceptado_at:new Date().toISOString()}});
     document.getElementById('recibirModal').style.display='none';
