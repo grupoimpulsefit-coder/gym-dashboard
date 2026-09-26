@@ -185,13 +185,32 @@
         .modal-content h3, .summary-modal-content h3 { font-size: 20px; font-weight: 700; color: var(--label);
             letter-spacing: -.02em; margin-bottom: 12px; }
         .modal-content p { margin-bottom: 8px; color: var(--sec); font-size: 15px; }
-        .modal-content input[type="number"], .summary-modal-content input, .summary-modal-content select {
+        /* Ojo con el :not(): sin él esta regla también agarra los checkbox y los
+           convierte en cajas vacías de 42px (pasaba en "Sedes de un usuario"). */
+        .modal-content input[type="number"],
+        .summary-modal-content input:not([type="checkbox"]):not([type="radio"]),
+        .summary-modal-content select {
             width: 100%; padding: 0 12px; min-height: 42px; border: 1.5px solid transparent; border-radius: 10px;
             font-size: 15px; font-family: inherit; background: var(--fill); color: var(--label); outline: none;
             appearance: none; -webkit-appearance: none; }
         .modal-content input[type="number"] { margin-top: 10px; }
-        .modal-content input:focus, .summary-modal-content input:focus, .summary-modal-content select:focus {
+        .modal-content input:focus,
+        .summary-modal-content input:not([type="checkbox"]):not([type="radio"]):focus,
+        .summary-modal-content select:focus {
             border-color: var(--brand); background: var(--card); }
+        /* Checkbox y radio: control nativo, con el color de la marca */
+        .modal-content input[type="checkbox"], .modal-content input[type="radio"],
+        .summary-modal-content input[type="checkbox"], .summary-modal-content input[type="radio"] {
+            appearance: auto; -webkit-appearance: auto; width: auto; min-height: 0; padding: 0;
+            background: none; border: 0; accent-color: var(--brand); transform: scale(1.2);
+            margin: 0 4px 0 2px; flex: none; }
+        /* Filas de selección (ej. sedes de un usuario) */
+        .chk-row { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 14px;
+            background: var(--card); border-radius: 10px; font-size: 15px; cursor: pointer; }
+        .chk-row:hover { background: var(--fill); }
+        .chk-row.fija { cursor: default; color: var(--sec); }
+        .chk-row .tag { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--brand-text);
+            background: var(--brand-tint); border-radius: 8px; padding: 3px 9px; }
         .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
         .summary-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 14px; font-size: 14px;
             border-radius: 12px; overflow: hidden; background: var(--card); }
@@ -1007,8 +1026,9 @@ function suRenderSedes() {
     box.innerHTML = SED.map(s => {
         const isPrimary = (s === u.sede);
         const checked = isPrimary || extra.includes(s);
-        return `<label style="display:flex;align-items:center;gap:8px;font-size:14px;${isPrimary?'opacity:.65;':''}">
-            <input type="checkbox" value="${_suEsc(s)}" ${checked?'checked':''} ${isPrimary?'disabled':''}> ${_suEsc(s)}${isPrimary?' <span style="font-size:11px;color:var(--blue);font-weight:700;">(principal)</span>':''}</label>`;
+        return `<label class="chk-row${isPrimary?' fija':''}">
+            <input type="checkbox" value="${_suEsc(s)}" ${checked?'checked':''} ${isPrimary?'disabled':''}>
+            <span>${_suEsc(s)}</span>${isPrimary?'<span class="tag">principal</span>':''}</label>`;
     }).join('');
     wrap.style.display = '';
 }
