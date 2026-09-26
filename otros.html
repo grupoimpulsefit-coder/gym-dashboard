@@ -2,138 +2,85 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rentabilidad de Productos — Otros</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F2F2F7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icons/favicon-64.png">
+<title>Rentabilidad de Productos</title>
+<link rel="stylesheet" href="/ui.css">
 <style>
-:root {
-  --primary: #1a5276;
-  --primary-light: #2e86c1;
-  --accent: #148f77;
-  --accent2: #e67e22;
-  --bg: #f0f4f8;
-  --border: #d5dce8;
-  --text: #1c2833;
-  --muted: #6c757d;
-  --warn: #c0392b;
-  --success: #27ae60;
+/* Colores de sede (los mismos de index.html) y de categoría */
+:root { --s-3rios:var(--brand); --s-nat:var(--purple); --s-pin:var(--green); --s-sab:var(--blue);
+  --cat-minita:var(--orange); --cat-energeticos:var(--purple); --cat-galletas:#A2845E;
+  --cat-gorras:#30B0C7; --cat-everlast:var(--indigo); --cat-otros:#8E8E93; }
+@media (prefers-color-scheme: dark) { :root { --cat-galletas:#AC8E68; --cat-gorras:#40C8E0; } }
 
-  --c-tresrios:   #00838f;
-  --c-natacion:   #6a1b9a;
-  --c-pinares:    #2e7d32;
-  --c-sabanilla:  #1565c0;
+#dashboard { display:none; padding-bottom:32px; }
+.topbar-controls .btn-ghost { min-height:36px; }
 
-  /* Categorías */
-  --cat-minita:     #e67e22;
-  --cat-energeticos:#7030A0;
-  --cat-galletas:   #b9770e;
-  --cat-gorras:     #16a085;
-  --cat-everlast:   #6a1b9a;
-  --cat-otros:      #7f8c8d;
+/* ── Resumen: anillo de margen + cifras ── */
+.hero { display:flex; align-items:center; gap:28px; background:var(--card); border-radius:16px; box-shadow:var(--shadow);
+  margin:18px var(--gut) 4px; padding:22px 26px; flex-wrap:wrap; }
+.ring { --p:0; --c:var(--sec); width:132px; height:132px; border-radius:50%; flex:none; position:relative;
+  background:conic-gradient(var(--c) calc(var(--p) * 1%), var(--fill2) 0); display:grid; place-items:center; }
+.ring::before { content:''; position:absolute; inset:14px; border-radius:50%; background:var(--card); }
+.ring > div { position:relative; text-align:center; line-height:1.1; }
+.ring b { display:block; font-size:28px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.ring span { font-size:12px; color:var(--sec); }
+.ring.sm { width:56px; height:56px; }
+.ring.sm::before { inset:6px; }
+.ring.sm b { font-size:13px; }
+.hero-stats { flex:1; min-width:260px; display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:18px; }
+.hs .l { display:block; font-size:13px; color:var(--sec); }
+.hs .v { display:block; font-size:26px; font-weight:700; letter-spacing:-.02em; margin-top:2px; font-variant-numeric:tabular-nums; }
+.hs .s { display:block; font-size:12px; color:var(--sec); margin-top:2px; }
+.hs.orange .v { color:var(--orange); }
+.hs.green .v { color:var(--green); }
+.hs .s.warn { color:var(--orange); font-weight:600; }
+
+/* ── Tarjetas por sede ── */
+.sede-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; padding:0 var(--gut) 4px; }
+.sede-card { background:var(--card); border-radius:14px; box-shadow:var(--shadow); padding:16px 18px; display:flex; flex-direction:column; gap:12px; }
+.sede-card.no-data { opacity:.6; }
+.sc-head { display:flex; align-items:center; gap:10px; }
+.sc-dot { width:30px; height:30px; border-radius:9px; display:grid; place-items:center; font-size:16px; flex:none; }
+.sc-name { font-size:17px; font-weight:600; }
+.sc-head .ring { margin-left:auto; }
+.sc-big { font-size:26px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.1; }
+.sc-of { font-size:13px; color:var(--sec); margin-top:2px; }
+.list { border-radius:10px; background:var(--fill); padding:2px 12px; }
+.li { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:.5px solid var(--hair); font-size:14px; }
+.li:last-child { border-bottom:0; }
+.li .l { color:var(--sec); display:flex; align-items:center; gap:7px; min-width:0; }
+.li .l i { width:8px; height:8px; border-radius:50%; flex:none; }
+.li .v { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; }
+.li .v small { display:block; color:var(--sec); font-weight:400; font-size:11px; }
+.gain { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.gain .l { font-size:14px; font-weight:600; }
+.gain .v { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; }
+
+/* ── Tablas por categoría ── */
+.save-hint { padding:0 var(--gut) 6px; }
+.cat-block .tbl-wrap { margin:0 0 12px; }
+table.tbl tr.cat-total td { background:var(--fill); font-weight:700; border-bottom:0; }
+table.tbl tr.cat-total:hover td { background:var(--fill); }
+.prod-name { font-weight:600; white-space:nowrap; }
+table.tbl tr.cat-total td:first-child { white-space:nowrap; }
+.prod-sedes { font-size:11px; color:var(--sec); margin-top:2px; letter-spacing:2px; }
+table.tbl input.cost-input { width:96px; }
+table.tbl input.cost-input.saved { border-color:var(--green); background:var(--green-tint); }
+.gain-pos { color:var(--green); font-weight:700; }
+.gain-neg { color:var(--red); font-weight:700; }
+.dim { color:var(--sec); }
+
+@media (max-width:760px) {
+  .hero { padding:18px; gap:18px; justify-content:center; }
+  .hero-stats { grid-template-columns:1fr; gap:12px; min-width:0; flex-basis:100%; }
+  .hs { display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .hs .v { font-size:22px; margin:0; }
+  .hs .s { width:100%; margin:0; }
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
-
-/* ── Login ── */
-#loginScreen { position: fixed; inset: 0; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-.login-card { background: white; border-radius: 24px; padding: 40px 44px; width: 100%; max-width: 420px; box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
-.login-logo { width: 64px; height: 64px; background: linear-gradient(135deg, #1a5276, #2e86c1); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 20px; }
-.login-card h2 { text-align: center; font-size: 1.4em; font-weight: 800; color: #2d2d5e; margin-bottom: 6px; }
-.login-card .login-sub { text-align: center; font-size: 0.85em; color: #888; margin-bottom: 28px; }
-.login-field { margin-bottom: 16px; }
-.login-field label { display: block; font-size: 0.8em; font-weight: 700; color: #444; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
-.login-field input { width: 100%; padding: 11px 14px; border: 1.5px solid #dde1f0; border-radius: 10px; font-size: 14px; font-family: inherit; color: #333; }
-.login-field input:focus { outline: none; border-color: #2e86c1; box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
-.login-btn { width: 100%; padding: 13px; background: linear-gradient(135deg, #1a5276, #2e86c1); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
-.login-btn:disabled { opacity: .6; cursor: not-allowed; }
-#loginError { text-align: center; color: #c62828; font-size: 13px; margin-top: 12px; min-height: 18px; }
-
-/* ── Header ── */
-.header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: white; padding: 18px 32px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.25); flex-wrap: wrap; }
-.header-icon { font-size: 34px; }
-.header h1 { font-size: 21px; font-weight: 700; }
-.header p  { font-size: 13px; opacity: .85; margin-top: 2px; }
-.header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; color: white; font-size: 13px; }
-.logout-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35); color: white; border-radius: 16px; padding: 5px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
-
-/* ── Loading / empty ── */
-.loading, .empty-state { display: none; text-align: center; padding: 60px 32px; color: var(--muted); }
-.spinner { width: 44px; height: 44px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── Dashboard ── */
-#dashboard { display: none; }
-.dash-topbar { padding: 12px 32px; background: white; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
-.dash-title { font-size: 15px; font-weight: 700; color: var(--primary); }
-.dash-period { font-size: 12px; color: var(--muted); }
-.topbar-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.topbar-controls select { border: 1.5px solid #d0d7e8; border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; color: #333; cursor: pointer; background: white; }
-.btn-back { padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 13px; cursor: pointer; color: var(--primary); font-weight: 600; }
-.btn-back:hover { background: var(--bg); }
-
-.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; padding: 22px 32px 8px; }
-.kpi { background: white; border-radius: 12px; padding: 16px 18px; border-left: 4px solid var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-.kpi.green  { border-color: var(--success); }
-.kpi.orange { border-color: var(--accent2); }
-.kpi.red    { border-color: var(--warn); }
-.kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
-.kpi-value { font-size: 23px; font-weight: 700; color: var(--primary); margin-top: 4px; line-height: 1.1; }
-.kpi.green  .kpi-value { color: var(--success); }
-.kpi.orange .kpi-value { color: var(--accent2); }
-.kpi.red    .kpi-value { color: var(--warn); }
-.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
-
-.section { padding: 8px 32px; }
-.section-title { font-size: 15px; font-weight: 700; color: var(--primary); margin-bottom: 14px; border-left: 4px solid var(--primary-light); padding-left: 10px; }
-.section-note { font-weight: 400; font-size: 12px; color: var(--muted); }
-
-/* Cards por sede */
-.sede-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; padding: 8px 32px 16px; }
-.sede-card { background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-.sede-card.no-data { opacity: .55; }
-.sede-card-header { padding: 14px 18px; color: white; display: flex; align-items: center; gap: 10px; }
-.sede-card-header .s-icon { font-size: 22px; }
-.sede-card-header .s-name { font-size: 15px; font-weight: 700; }
-.sede-card-header .s-total { margin-left: auto; font-size: 17px; font-weight: 700; }
-.sede-card-body { padding: 14px 18px; }
-.sede-row-c { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f0f4f8; }
-.sede-row-c:last-child { border-bottom: none; }
-.sede-row-label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
-.sede-row-val   { font-size: 13px; font-weight: 600; color: var(--text); }
-.sede-row-pct   { font-size: 11px; color: var(--muted); margin-left: 6px; }
-.cat-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
-.progress-bar { height: 7px; border-radius: 4px; background: #e8edf4; margin-top: 12px; overflow: hidden; }
-.progress-fill { height: 100%; border-radius: 4px; transition: width .3s; }
-.sede-gain { margin-top: 10px; padding-top: 10px; border-top: 2px solid #eef3fa; display: flex; justify-content: space-between; align-items: baseline; }
-.sede-gain .g-label { font-size: 12px; font-weight: 700; color: var(--primary); }
-.sede-gain .g-val   { font-size: 16px; font-weight: 800; color: var(--success); }
-
-/* Tablas por categoría */
-.cat-section { padding: 8px 32px 8px; }
-.cat-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.cat-badge { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: white; padding: 6px 14px; border-radius: 20px; }
-.cat-summary { font-size: 12px; color: var(--muted); }
-.cat-summary b { color: var(--text); }
-.prod-wrap { overflow-x: auto; background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-.prod-table { width: 100%; border-collapse: collapse; min-width: 760px; }
-.prod-table th { background: #f8f9fb; font-size: 11px; font-weight: 700; color: var(--muted); padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: .3px; }
-.prod-table th.num, .prod-table td.num { text-align: right; }
-.prod-table td { padding: 9px 12px; font-size: 13px; border-bottom: 1px solid #f2f5f9; }
-.prod-table tr:last-child td { border-bottom: none; }
-.prod-table tr.cat-total td { background: #eef3fa; font-weight: 800; border-top: 2px solid var(--primary); }
-.prod-name { font-weight: 600; }
-.prod-sedes { font-size: 10px; color: var(--muted); margin-top: 2px; }
-.cost-input { width: 92px; padding: 6px 8px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-family: inherit; text-align: right; color: var(--text); }
-.cost-input:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
-.cost-input.saved { border-color: var(--success); }
-.margin-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; }
-.m-alto  { background: #e8f5e9; color: #2e7d32; }
-.m-medio { background: #fff3e0; color: #e65100; }
-.m-bajo  { background: #ffebee; color: #c62828; }
-.m-nd    { background: #eceff1; color: #90a4ae; }
-.gain-pos { color: var(--success); font-weight: 700; }
-.gain-neg { color: var(--warn); font-weight: 700; }
-.cat-empty { padding: 16px; color: var(--muted); font-size: 12px; }
-.save-hint { font-size: 11px; color: var(--muted); font-style: italic; padding: 0 32px 4px; }
 </style>
 </head>
 <body>
@@ -154,8 +101,8 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 <div class="header">
   <div class="header-icon">📦</div>
   <div>
-    <h1>Rentabilidad de Productos — Otros</h1>
-    <p>Ventas, costo, ganancia y margen por sede y producto</p>
+    <h1>Rentabilidad de Productos</h1>
+    <p>Ventas, costo, ganancia y margen de la categoría "Otros" por sede y producto</p>
   </div>
   <div class="header-right">
     <span>👤 <span id="userNombre">—</span></span>
@@ -174,44 +121,30 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 
   <div class="dash-topbar">
     <div>
-      <div class="dash-title">📦 Rentabilidad de la categoría "Otros"</div>
+      <div class="dash-title">Periodo</div>
       <div class="dash-period" id="dashPeriod"></div>
     </div>
     <div class="topbar-controls">
-      <label style="font-size:13px;font-weight:600;color:#555;">📅 Mes:</label>
+      <label for="mesSelector">Mes</label>
       <select id="mesSelector" onchange="loadMes(this.value)"></select>
-      <button class="btn-back" onclick="loadMes(document.getElementById('mesSelector').value)">↻ Actualizar</button>
+      <button class="btn-ghost" onclick="loadMes(document.getElementById('mesSelector').value)">↻ Actualizar</button>
     </div>
   </div>
 
-  <div class="kpi-row">
-    <div class="kpi">
-      <div class="kpi-label">Ingresos (Otros)</div>
-      <div class="kpi-value" id="kpiIngresos">—</div>
-      <div class="kpi-sub" id="kpiIngresosSub">—</div>
-    </div>
-    <div class="kpi orange">
-      <div class="kpi-label">Costo estimado</div>
-      <div class="kpi-value" id="kpiCosto">—</div>
-      <div class="kpi-sub" id="kpiCostoSub">según costos ingresados</div>
-    </div>
-    <div class="kpi green">
-      <div class="kpi-label">Ganancia del mes</div>
-      <div class="kpi-value" id="kpiGanancia">—</div>
-      <div class="kpi-sub">ingresos − costo</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Margen promedio</div>
-      <div class="kpi-value" id="kpiMargen">—</div>
-      <div class="kpi-sub">ganancia / ingresos</div>
+  <div class="hero">
+    <div class="ring" id="ringMargen"><div><b id="kpiMargen">—</b><span>margen</span></div></div>
+    <div class="hero-stats">
+      <div class="hs"><span class="l">Ingresos</span><span class="v" id="kpiIngresos">—</span><span class="s" id="kpiIngresosSub">—</span></div>
+      <div class="hs orange"><span class="l">Costo estimado</span><span class="v" id="kpiCosto">—</span><span class="s" id="kpiCostoSub">según costos ingresados</span></div>
+      <div class="hs green"><span class="l">Ganancia del mes</span><span class="v" id="kpiGanancia">—</span><span class="s">ingresos − costo</span></div>
     </div>
   </div>
 
-  <div class="section"><div class="section-title">Resumen por Sede <span class="section-note">— ganancia de productos "Otros" en cada sede</span></div></div>
+  <div class="section"><div class="section-title">Resumen por sede <span class="section-note">Ganancia de productos "Otros" en cada sede</span></div></div>
   <div class="sede-grid" id="sedeGrid"></div>
 
-  <div class="section"><div class="section-title">Detalle por Producto <span class="section-note">— escriba el costo unitario de cada producto para ver el margen y la ganancia</span></div></div>
-  <div class="save-hint" id="saveHint">💾 Los costos se guardan automáticamente en la nube al salir de cada casilla.</div>
+  <div class="section"><div class="section-title">Detalle por producto <span class="section-note">Escriba el costo unitario de cada producto para ver el margen y la ganancia</span></div></div>
+  <div class="save-hint hint" id="saveHint">💾 Los costos se guardan automáticamente en la nube al salir de cada casilla.</div>
   <div id="catSections"></div>
 
 </div>
@@ -317,10 +250,10 @@ async function doLogout(silent) { Sesion.cerrar();
 
 // ── Config de sedes ─────────────────────────────────────────────────────────
 const SEDE_META = {
-  '3 Ríos':   { icon: '🌊', color: '#00838f' },
-  'Natación': { icon: '🏊', color: '#6a1b9a' },
-  'Pinares':  { icon: '🌲', color: '#2e7d32' },
-  'Sabanilla':{ icon: '🏙️', color: '#1565c0' },
+  '3 Ríos':   { icon: '🌊', color: 'var(--s-3rios)' },
+  'Natación': { icon: '🏊', color: 'var(--s-nat)' },
+  'Pinares':  { icon: '🌲', color: 'var(--s-pin)' },
+  'Sabanilla':{ icon: '🏙️', color: 'var(--s-sab)' },
 };
 const SEDES = ['3 Ríos','Natación','Pinares','Sabanilla'];
 
@@ -561,55 +494,51 @@ function render() {
   document.getElementById('kpiIngresos').textContent = fmt(tIngresos);
   document.getElementById('kpiIngresosSub').textContent = `${productos.length} productos vendidos`;
   document.getElementById('kpiCosto').textContent = fmt(tCosto);
-  document.getElementById('kpiCostoSub').textContent = algunSinCosto ? '⚠️ hay productos sin costo asignado' : 'todos con costo asignado';
+  const subCosto = document.getElementById('kpiCostoSub');
+  subCosto.textContent = algunSinCosto ? '⚠️ hay productos sin costo asignado' : 'todos con costo asignado';
+  subCosto.classList.toggle('warn', algunSinCosto);
   document.getElementById('kpiGanancia').textContent = fmt(tGanancia);
   document.getElementById('kpiMargen').textContent = tMargen.toFixed(1) + '%';
+  const ring = document.getElementById('ringMargen');
+  ring.style.setProperty('--p', Math.max(0, Math.min(tMargen, 100)).toFixed(1));
+  ring.style.setProperty('--c', tonoMargen(tMargen));
 
   renderSedeCards(sedeTot);
   renderCatSections();
 }
 
-function marginCls(m, tieneCosto) {
-  if (!tieneCosto) return 'm-nd';
-  return m >= 50 ? 'm-alto' : m >= 25 ? 'm-medio' : 'm-bajo';
+// Tono del margen: verde ≥50%, naranja ≥25%, rojo por debajo
+const tonoMargen = m => m >= 50 ? 'var(--green)' : m >= 25 ? 'var(--orange)' : 'var(--red)';
+function marginPill(m, tieneCosto) {
+  if (!tieneCosto) return '<span class="pill">N/D</span>';
+  return `<span class="pill ${m >= 50 ? 'ok' : m >= 25 ? 'low' : 'falt'}">${m.toFixed(1)}%</span>`;
 }
 
 function renderSedeCards(sedeTot) {
-  const grid = document.getElementById('sedeGrid');
-  grid.innerHTML = '';
-  SEDES.forEach(s => {
+  const cabeza = (s, m, extra = '') => `<div class="sc-head">
+      <span class="sc-dot" style="background:color-mix(in srgb, ${m.color} 18%, transparent)">${m.icon}</span>
+      <span class="sc-name">${s}</span>${extra}</div>`;
+  document.getElementById('sedeGrid').innerHTML = SEDES.map(s => {
     const m = SEDE_META[s];
     const d = sedeTot[s];
-    if (!d || d.ingresos === 0) {
-      grid.innerHTML += `<div class="sede-card no-data">
-        <div class="sede-card-header" style="background:${m.color}"><span class="s-icon">${m.icon}</span><span class="s-name">${s}</span></div>
-        <div class="sede-card-body"><div class="sede-row-label">Sin ventas de "Otros" este mes</div></div>
-      </div>`;
-      return;
-    }
+    if (!d || d.ingresos === 0)
+      return `<div class="sede-card no-data">${cabeza(s, m)}<div class="sc-of">Sin ventas de "Otros" este mes</div></div>`;
     const ganancia = d.ingresos - d.costo;
     const margen = d.ingresos > 0 ? ganancia / d.ingresos * 100 : 0;
-    const cats = CAT_ORDER.filter(cid => d.porCat[cid]);
-    const rows = cats.map(cid => {
+    const rows = CAT_ORDER.filter(cid => d.porCat[cid]).map(cid => {
       const cc = CAT_BY_ID[cid];
       const v = d.porCat[cid];
-      return `<div class="sede-row-c">
-        <span class="sede-row-label"><span class="cat-dot" style="background:${cc.color}"></span>${cc.icon} ${cc.label.split(' ')[0]}</span>
-        <span class="sede-row-val">${fmt(v.ingresos)} <span class="sede-row-pct">gan ${fmt(v.ganancia)}</span></span>
-      </div>`;
+      return `<div class="li"><span class="l"><i style="background:${cc.color}"></i>${cc.icon} ${cc.label.split(' ')[0]}</span>
+        <span class="v">${fmt(v.ingresos)}<small>gan. ${fmt(v.ganancia)}</small></span></div>`;
     }).join('');
-    grid.innerHTML += `<div class="sede-card">
-      <div class="sede-card-header" style="background:${m.color}">
-        <span class="s-icon">${m.icon}</span><span class="s-name">${s}</span>
-        <span class="s-total">${fmt(d.ingresos)}</span>
-      </div>
-      <div class="sede-card-body">
-        ${rows}
-        <div class="progress-bar"><div class="progress-fill" style="width:${Math.max(0,Math.min(margen,100))}%;background:${m.color}"></div></div>
-        <div class="sede-gain"><span class="g-label">Ganancia (${margen.toFixed(0)}% margen)</span><span class="g-val" style="color:${ganancia>=0?'var(--success)':'var(--warn)'}">${fmt(ganancia)}</span></div>
-      </div>
+    const anillo = `<span class="ring sm" style="--p:${Math.max(0, Math.min(margen, 100)).toFixed(1)};--c:${tonoMargen(margen)}"><div><b>${Math.round(margen)}%</b></div></span>`;
+    return `<div class="sede-card">
+      ${cabeza(s, m, anillo)}
+      <div><div class="sc-big">${fmt(d.ingresos)}</div><div class="sc-of">en ventas de "Otros"</div></div>
+      <div class="list">${rows}</div>
+      <div class="gain"><span class="l">Ganancia</span><span class="v" style="color:${ganancia >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(ganancia)}</span></div>
     </div>`;
-  });
+  }).join('');
 }
 
 function renderCatSections() {
@@ -635,25 +564,25 @@ function renderCatSections() {
         <td class="num">${fmtN(p.units)}</td>
         <td class="num">${fmt(c.precioProm)}</td>
         <td class="num">${c.margenFijo
-             ? `<span style="color:var(--muted)" title="Costo implícito (${(100-c.margen).toFixed(0)}% del precio)">${fmt(c.costoUnit)}</span>`
+             ? `<span class="dim" title="Costo implícito (${(100-c.margen).toFixed(0)}% del precio)">${fmt(c.costoUnit)}</span>`
              : `<input class="cost-input" type="number" min="0" step="1" value="${costVal}" placeholder="—" onchange="onCostChange(this, '${escapeAttr(p.base)}', '${cid}')">`}</td>
         <td class="num">${fmt(p.revenue)}</td>
-        <td class="num">${c.tieneCosto ? fmt(c.costoTotal) : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="num">${c.tieneCosto ? fmt(c.costoTotal) : '<span class="dim">—</span>'}</td>
         <td class="num"><span class="${c.ganancia>=0?'gain-pos':'gain-neg'}">${c.tieneCosto ? fmt(c.ganancia) : '—'}</span></td>
-        <td class="num"><span class="margin-badge ${marginCls(c.margen, c.tieneCosto)}">${c.tieneCosto ? c.margen.toFixed(1)+'%' : 'N/D'}</span></td>
+        <td class="num">${marginPill(c.margen, c.tieneCosto)}</td>
       </tr>`;
     }).join('');
 
     const cGan = cIng - cCosto;
     const cMar = cIng > 0 ? cGan / cIng * 100 : 0;
 
-    cont.innerHTML += `<div class="cat-section">
+    cont.innerHTML += `<div class="cat-block">
       <div class="cat-head">
         <span class="cat-badge" style="background:${cc.color}">${cc.icon} ${cc.label}</span>
         <span class="cat-summary"><b>${items.length}</b> productos · <b>${fmtN(cUnits)}</b> unidades · <b>${fmt(cIng)}</b> en ventas${cc.margenFijo != null ? ` · <b style="color:${cc.color}">margen fijo ${cc.margenFijo}%</b>` : ''}</span>
       </div>
-      <div class="prod-wrap">
-        <table class="prod-table">
+      <div class="tbl-wrap">
+        <table class="tbl">
           <thead><tr>
             <th>Producto</th>
             <th class="num">Unid.</th>
@@ -667,14 +596,14 @@ function renderCatSections() {
           <tbody>
             ${rows}
             <tr class="cat-total">
-              <td>TOTAL ${escapeHtml(cc.label)}</td>
+              <td>Total ${escapeHtml(cc.label)}</td>
               <td class="num">${fmtN(cUnits)}</td>
               <td class="num">—</td>
               <td class="num">—</td>
               <td class="num">${fmt(cIng)}</td>
               <td class="num">${fmt(cCosto)}</td>
               <td class="num"><span class="${cGan>=0?'gain-pos':'gain-neg'}">${fmt(cGan)}</span></td>
-              <td class="num"><span class="margin-badge ${cMar>=50?'m-alto':cMar>=25?'m-medio':'m-bajo'}">${cMar.toFixed(1)}%</span></td>
+              <td class="num">${marginPill(cMar, true)}</td>
             </tr>
           </tbody>
         </table>

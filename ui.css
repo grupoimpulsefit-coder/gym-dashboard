@@ -8,6 +8,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 :root{
+  color-scheme:light dark;   /* barras de desplazamiento y controles nativos siguen el tema */
   /* Colores del sistema iOS */
   --bg:#F2F2F7; --card:#FFFFFF; --label:#000; --sec:rgba(60,60,67,.6); --ter:rgba(60,60,67,.3);
   --sep:rgba(60,60,67,.29); --hair:rgba(60,60,67,.14);
@@ -221,6 +222,7 @@ tr.faltante td{background:var(--red-tint)!important}
 .tab{padding:0 18px;min-height:36px;display:flex;align-items:center;justify-content:center;
   border:0;border-radius:8px;font-size:14px;font-weight:600;color:var(--label);cursor:pointer;white-space:nowrap}
 .tab.active{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.14)}
+@media (prefers-color-scheme: dark){.tab.active{background:#636366}}   /* en oscuro, --card casi no se distingue del relleno */
 .tab-panel{display:none}
 .tab-panel.active{display:block}
 
