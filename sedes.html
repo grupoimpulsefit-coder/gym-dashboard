@@ -2,136 +2,90 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reporte de Sedes — Facturación</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F2F2F7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icons/favicon-64.png">
+<title>Reporte de Sedes</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="/ui.css">
 <style>
-:root {
-  --primary: #1a5276;
-  --primary-light: #2e86c1;
-  --accent: #148f77;
-  --accent2: #e67e22;
-  --bg: #f0f4f8;
-  --white: #ffffff;
-  --border: #d5dce8;
-  --text: #1c2833;
-  --muted: #6c757d;
-  --warn: #c0392b;
-  --success: #27ae60;
+/* Colores de sede (los mismos de index.html) y de categoría de venta */
+:root { --s-3rios:var(--brand); --s-nat:var(--purple); --s-pin:var(--green); --s-sab:var(--blue);
+  --k-memb:var(--blue); --k-min:var(--orange); --k-pt:var(--purple); --k-acc:#A2845E; }
+@media (prefers-color-scheme: dark) { :root { --k-acc:#AC8E68; } }
 
-  --c-tresrios:   #00838f;
-  --c-natacion:   #6a1b9a;
-  --c-pinares:    #2e7d32;
-  --c-sabanilla:  #1565c0;
+#dashboard { display:none; padding-bottom:32px; }
+.topbar-controls .btn-ghost { min-height:36px; }
+
+/* ── Resumen: total + composición ── */
+.hero { background:var(--card); border-radius:16px; box-shadow:var(--shadow); margin:18px var(--gut) 4px; padding:22px 24px;
+  display:grid; grid-template-columns:minmax(200px, 280px) 1fr; gap:14px 32px; align-items:center; }
+.hero-l .l { font-size:13px; color:var(--sec); }
+.hero-l .v { font-size:38px; font-weight:700; letter-spacing:-.025em; line-height:1.1; font-variant-numeric:tabular-nums; }
+.hero-l .s { font-size:13px; color:var(--sec); margin-top:2px; }
+.stack { display:flex; height:12px; border-radius:6px; overflow:hidden; background:var(--fill2); gap:2px; }
+.stack i { display:block; height:100%; min-width:0; }
+.stack.sm { height:8px; border-radius:4px; }
+.cats { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; margin-top:14px; }
+.cat .l { font-size:13px; color:var(--sec); display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.cat .l i { width:8px; height:8px; border-radius:50%; flex:none; }
+.cat .v { font-size:20px; font-weight:700; letter-spacing:-.015em; font-variant-numeric:tabular-nums; margin-top:1px; }
+.cat .s { font-size:12px; color:var(--sec); }
+
+/* ── Tarjetas por sede ── */
+.sede-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; padding:0 var(--gut) 4px; }
+.sede-card { background:var(--card); border-radius:14px; box-shadow:var(--shadow); padding:16px 18px; display:flex; flex-direction:column; gap:12px; }
+.sede-card.no-data { opacity:.6; }
+.sc-head { display:flex; align-items:center; gap:10px; }
+.sc-dot { width:30px; height:30px; border-radius:9px; display:grid; place-items:center; font-size:16px; flex:none; }
+.sc-name { font-size:17px; font-weight:600; }
+.sc-mes { font-size:12px; color:var(--sec); }
+.sc-big { font-size:26px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.1; }
+.list { border-radius:10px; background:var(--fill); padding:2px 12px; }
+.li { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:.5px solid var(--hair); font-size:14px; }
+.li:last-child { border-bottom:0; }
+.li .l { color:var(--sec); display:flex; align-items:center; gap:7px; }
+.li .l i { width:8px; height:8px; border-radius:50%; flex:none; }
+.li .v { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.li .v small { color:var(--sec); font-weight:400; font-size:12px; margin-left:4px; }
+.li.sub { font-size:12px; padding-top:0; }
+.li .red { color:var(--red); }
+.li.muted .l { font-style:italic; }
+.top { display:flex; align-items:center; gap:10px; }
+.top .medal { font-size:22px; }
+.top .n { font-size:15px; font-weight:600; }
+.top .a { font-size:12px; color:var(--sec); }
+.no-vend-note { font-size:13px; color:var(--sec); font-style:italic; }
+
+/* ── Gráficas ── */
+.charts-row { display:grid; grid-template-columns:3fr 2fr; gap:12px; padding:0 var(--gut) 4px; }
+.chart-box { background:var(--card); border-radius:14px; box-shadow:var(--shadow); padding:16px 18px; min-width:0; }
+.chart-box h3 { font-size:15px; font-weight:600; margin-bottom:12px; }
+.chart-box .cv { position:relative; height:260px; }
+
+/* ── Vendedores ── */
+.vend-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; padding:0 var(--gut); }
+.vend-card { background:var(--card); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; }
+.vend-card-hdr { display:flex; align-items:center; gap:10px; padding:12px 16px; font-size:15px; font-weight:600; border-bottom:.5px solid var(--sep); }
+.vend-row { display:grid; grid-template-columns:26px 1fr auto; gap:4px 8px; align-items:center; padding:9px 16px; border-bottom:.5px solid var(--hair); }
+.vend-row:last-child { border-bottom:0; }
+.vend-rank { font-size:13px; font-weight:600; color:var(--sec); text-align:center; }
+.vend-name { font-size:14px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.vend-amt { font-size:14px; font-weight:600; text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.vend-amt small { display:block; font-size:11px; color:var(--sec); font-weight:400; }
+.vend-bar { grid-column:2 / 3; height:4px; border-radius:2px; background:var(--fill2); overflow:hidden; margin-top:-2px; }
+.vend-bar i { display:block; height:100%; border-radius:2px; }
+.vend-empty { padding:18px 16px; color:var(--sec); font-size:13px; text-align:center; }
+
+@media (max-width:760px) {
+  .hero { grid-template-columns:1fr; padding:18px; }
+  .hero-l .v { font-size:32px; }
+  .cats { grid-template-columns:1fr 1fr; gap:12px; }
+  .charts-row { grid-template-columns:1fr; }
+  .chart-box .cv { height:230px; }
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
-
-/* ── Login ── */
-#loginScreen { position: fixed; inset: 0; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-.login-card { background: white; border-radius: 24px; padding: 40px 44px; width: 100%; max-width: 420px; box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
-.login-logo { width: 64px; height: 64px; background: linear-gradient(135deg, #1a5276, #2e86c1); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 20px; }
-.login-card h2 { text-align: center; font-size: 1.4em; font-weight: 800; color: #2d2d5e; margin-bottom: 6px; }
-.login-card .login-sub { text-align: center; font-size: 0.85em; color: #888; margin-bottom: 28px; }
-.login-field { margin-bottom: 16px; }
-.login-field label { display: block; font-size: 0.8em; font-weight: 700; color: #444; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
-.login-field input { width: 100%; padding: 11px 14px; border: 1.5px solid #dde1f0; border-radius: 10px; font-size: 14px; font-family: inherit; color: #333; }
-.login-field input:focus { outline: none; border-color: #2e86c1; box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
-.login-btn { width: 100%; padding: 13px; background: linear-gradient(135deg, #1a5276, #2e86c1); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
-.login-btn:disabled { opacity: .6; cursor: not-allowed; }
-#loginError { text-align: center; color: #c62828; font-size: 13px; margin-top: 12px; min-height: 18px; }
-
-/* ── Header ── */
-.header {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-  color: white; padding: 18px 32px; display: flex; align-items: center; gap: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.25); flex-wrap: wrap;
-}
-.header-icon { font-size: 34px; }
-.header h1 { font-size: 21px; font-weight: 700; }
-.header p  { font-size: 13px; opacity: .85; margin-top: 2px; }
-.header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; color: white; font-size: 13px; }
-.logout-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35); color: white; border-radius: 16px; padding: 5px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
-
-/* ── Loading / empty ── */
-.loading, .empty-state { display: none; text-align: center; padding: 60px 32px; color: var(--muted); }
-.spinner { width: 44px; height: 44px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── Dashboard ── */
-#dashboard { display: none; }
-.dash-topbar { padding: 12px 32px; background: white; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
-.dash-title { font-size: 15px; font-weight: 700; color: var(--primary); }
-.dash-period { font-size: 12px; color: var(--muted); }
-.btn-back { padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 13px; cursor: pointer; color: var(--primary); font-weight: 600; }
-.btn-back:hover { background: var(--bg); }
-
-.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; padding: 24px 32px 8px; }
-.kpi { background: white; border-radius: 12px; padding: 16px 18px; border-left: 4px solid var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-.kpi.green  { border-color: var(--success); }
-.kpi.orange { border-color: var(--accent2); }
-.kpi.purple { border-color: #7030A0; }
-.kpi.accesorios { border-color: #8d6e63; }
-.kpi.accesorios .kpi-value { color: #8d6e63; }
-.kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
-.kpi-value { font-size: 24px; font-weight: 700; color: var(--primary); margin-top: 4px; line-height: 1.1; }
-.kpi.green  .kpi-value { color: var(--success); }
-.kpi.orange .kpi-value { color: var(--accent2); }
-.kpi.purple .kpi-value { color: #7030A0; }
-.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
-
-.section { padding: 8px 32px; }
-.section-title { font-size: 15px; font-weight: 700; color: var(--primary); margin-bottom: 14px; border-left: 4px solid var(--primary-light); padding-left: 10px; }
-
-.sede-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; padding: 8px 32px 24px; }
-.sede-card { background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-.sede-card.no-data { opacity: .55; }
-.sede-card-header { padding: 14px 18px; color: white; display: flex; align-items: center; gap: 10px; }
-.sede-card-header .s-icon { font-size: 22px; }
-.sede-card-header .s-name { font-size: 15px; font-weight: 700; }
-.sede-card-header .s-total { margin-left: auto; font-size: 18px; font-weight: 700; }
-.sede-card-body { padding: 14px 18px; }
-.sede-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f0f4f8; }
-.sede-row:last-child { border-bottom: none; }
-.sede-row-label { font-size: 12px; color: var(--muted); }
-.sede-row-val   { font-size: 13px; font-weight: 600; color: var(--text); }
-.sede-row-pct   { font-size: 11px; color: var(--muted); margin-left: 6px; }
-.progress-bar { height: 6px; border-radius: 3px; background: #e8edf4; margin-top: 10px; overflow: hidden; }
-.progress-fill { height: 100%; border-radius: 3px; }
-.top-vend-label { font-size: 11px; color: var(--muted); margin-top: 12px; text-transform: uppercase; letter-spacing: .5px; }
-.top-vend-name  { font-size: 13px; font-weight: 700; margin-top: 4px; }
-.top-vend-amt   { font-size: 12px; color: var(--muted); }
-.no-vend-note { font-size: 11px; color: var(--muted); margin-top: 12px; font-style: italic; }
-
-.charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 8px 32px 24px; }
-@media (max-width: 700px) { .charts-row { grid-template-columns: 1fr; } }
-.chart-box { background: white; border-radius: 12px; padding: 18px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-.chart-box h3 { font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 14px; }
-
-.vend-section { padding: 8px 32px 32px; }
-.vend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
-.vend-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-.vend-card-hdr { padding: 10px 14px; color: white; font-size: 13px; font-weight: 700; }
-.vend-table { width: 100%; border-collapse: collapse; }
-.vend-table th { background: #f8f9fb; font-size: 11px; font-weight: 600; color: var(--muted); padding: 7px 12px; text-align: left; border-bottom: 1px solid var(--border); }
-.vend-table td { padding: 8px 12px; font-size: 12px; border-bottom: 1px solid #f0f4f8; }
-.vend-table tr:last-child td { border-bottom: none; }
-.vend-rank { font-weight: 700; color: var(--muted); width: 22px; }
-.rank-1 .vend-rank { color: #C9A84C; }
-.rank-1 td { background: #fffdf0; }
-.vend-name { font-weight: 600; }
-.vend-amt  { text-align: right; font-weight: 600; white-space: nowrap; }
-.vend-pct  { text-align: right; font-size: 11px; color: var(--muted); }
-.vend-empty { padding: 16px; color: var(--muted); font-size: 12px; text-align: center; }
-
-.bg-tresrios   { background: var(--c-tresrios); }
-.bg-natacion   { background: var(--c-natacion); }
-.bg-pinares    { background: var(--c-pinares); }
-.bg-sabanilla  { background: var(--c-sabanilla); }
-.text-tresrios    { color: var(--c-tresrios); }
-.text-natacion    { color: var(--c-natacion); }
-.text-pinares     { color: var(--c-pinares); }
-.text-sabanilla   { color: var(--c-sabanilla); }
 </style>
 </head>
 <body>
@@ -141,7 +95,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
   <div class="login-card">
     <div class="login-logo">📊</div>
     <h2>Reporte de Sedes</h2>
-    <p class="login-sub">Acceso restringido — Facturación consolidada</p>
+    <p class="login-sub">Acceso restringido — facturación consolidada</p>
     <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
     <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
     <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
@@ -150,9 +104,9 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 </div>
 
 <div class="header">
-  <div class="header-icon">🏋️</div>
+  <div class="header-icon">📊</div>
   <div>
-    <h1>Reporte de Facturación por Sede</h1>
+    <h1>Facturación por Sede</h1>
     <p>Datos cargados automáticamente desde el sistema de gestión de cada sede</p>
   </div>
   <div class="header-right">
@@ -174,57 +128,44 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 
   <div class="dash-topbar">
     <div>
-      <div class="dash-title">📊 Reporte de Facturación por Sede</div>
+      <div class="dash-title">Periodo</div>
       <div class="dash-period" id="dashPeriod"></div>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;">
-      <label style="font-size:13px;font-weight:600;color:#555;">📅 Mes:</label>
-      <select id="mesSelectorSedes" onchange="loadAllSedes(this.value)" style="border:1.5px solid #d0d7e8;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;color:#333;cursor:pointer;background:white;"></select>
-      <button class="btn-back" onclick="loadAllSedes(document.getElementById('mesSelectorSedes').value)">↻ Actualizar</button>
+    <div class="topbar-controls">
+      <label for="mesSelectorSedes">Mes</label>
+      <select id="mesSelectorSedes" onchange="loadAllSedes(this.value)"></select>
+      <button class="btn-ghost" onclick="loadAllSedes(document.getElementById('mesSelectorSedes').value)">↻ Actualizar</button>
     </div>
   </div>
 
-  <div class="kpi-row">
-    <div class="kpi">
-      <div class="kpi-label">Total Facturación</div>
-      <div class="kpi-value" id="kpiTotal">—</div>
-      <div class="kpi-sub">Todas las sedes</div>
+  <div class="hero">
+    <div class="hero-l">
+      <div class="l">Facturación total</div>
+      <div class="v" id="kpiTotal">—</div>
+      <div class="s">Todas las sedes</div>
     </div>
-    <div class="kpi green">
-      <div class="kpi-label">Membresías</div>
-      <div class="kpi-value" id="kpiMemb">—</div>
-      <div class="kpi-sub" id="kpiMembPct">—</div>
-    </div>
-    <div class="kpi orange">
-      <div class="kpi-label">Minita</div>
-      <div class="kpi-value" id="kpiMinita">—</div>
-      <div class="kpi-sub" id="kpiMinitaPct">—</div>
-    </div>
-    <div class="kpi purple">
-      <div class="kpi-label">Personal Trainer</div>
-      <div class="kpi-value" id="kpiPT">—</div>
-      <div class="kpi-sub">No incluido en membresías</div>
-    </div>
-    <div class="kpi accesorios">
-      <div class="kpi-label">Accesorios</div>
-      <div class="kpi-value" id="kpiAcc">—</div>
-      <div class="kpi-sub" id="kpiAccPct">—</div>
+    <div>
+      <div class="stack" id="heroStack"></div>
+      <div class="cats">
+        <div class="cat"><div class="l"><i style="background:var(--k-memb)"></i>Membresías</div><div class="v" id="kpiMemb">—</div><div class="s" id="kpiMembPct">—</div></div>
+        <div class="cat"><div class="l"><i style="background:var(--k-min)"></i>Minita</div><div class="v" id="kpiMinita">—</div><div class="s" id="kpiMinitaPct">—</div></div>
+        <div class="cat"><div class="l"><i style="background:var(--k-pt)"></i>Personal Trainer</div><div class="v" id="kpiPT">—</div><div class="s" id="kpiPTPct">—</div></div>
+        <div class="cat"><div class="l"><i style="background:var(--k-acc)"></i>Accesorios</div><div class="v" id="kpiAcc">—</div><div class="s" id="kpiAccPct">—</div></div>
+      </div>
     </div>
   </div>
 
-  <div class="section"><div class="section-title">Resumen por Sede</div></div>
+  <div class="section"><div class="section-title">Resumen por sede</div></div>
   <div class="sede-grid" id="sedeGrid"></div>
 
   <div class="section"><div class="section-title">Gráficos</div></div>
   <div class="charts-row">
-    <div class="chart-box"><h3>Facturación Total por Sede</h3><canvas id="chartBar" height="220"></canvas></div>
-    <div class="chart-box"><h3>Distribución Global Membresías vs Minita</h3><canvas id="chartPie" height="220"></canvas></div>
+    <div class="chart-box"><h3>Facturación por sede</h3><div class="cv"><canvas id="chartBar"></canvas></div></div>
+    <div class="chart-box"><h3>Distribución global</h3><div class="cv"><canvas id="chartPie"></canvas></div></div>
   </div>
 
-  <div class="vend-section">
-    <div class="section-title">Vendedores por Sede</div>
-    <div class="vend-grid" id="vendGrid"></div>
-  </div>
+  <div class="section"><div class="section-title">Vendedores por sede</div></div>
+  <div class="vend-grid" id="vendGrid"></div>
 
 </div>
 
@@ -331,11 +272,33 @@ async function doLogout(silent) { Sesion.cerrar();
 
 // ── Config de sedes y clasificación de productos ────────────────────────────
 const SEDE_META = {
-  '3 Ríos':   { icon: '🌊', cls: 'tresrios',  color: '#00838f' },
-  'Natación': { icon: '🏊', cls: 'natacion',  color: '#6a1b9a' },
-  'Pinares':  { icon: '🌲', cls: 'pinares',   color: '#2e7d32' },
-  'Sabanilla':{ icon: '🏙️', cls: 'sabanilla', color: '#1565c0' },
+  '3 Ríos':   { icon: '🌊', color: 'var(--s-3rios)' },
+  'Natación': { icon: '🏊', color: 'var(--s-nat)' },
+  'Pinares':  { icon: '🌲', color: 'var(--s-pin)' },
+  'Sabanilla':{ icon: '🏙️', color: 'var(--s-sab)' },
 };
+
+// Categorías de venta: etiqueta y color (el mismo en el resumen, las tarjetas y las gráficas)
+const CATS = [
+  { k: 'mem', label: 'Membresías',       color: 'var(--k-memb)' },
+  { k: 'min', label: 'Minita',           color: 'var(--k-min)' },
+  { k: 'pt',  label: 'Personal Trainer', color: 'var(--k-pt)' },
+  { k: 'acc', label: 'Accesorios',       color: 'var(--k-acc)' },
+];
+
+/* ── Gráficas en modo claro/oscuro (igual que index.html) ──
+   Canvas no entiende var(--x): se resuelve cada color al valor real del tema activo. */
+const _mqOscuro = window.matchMedia('(prefers-color-scheme: dark)');
+const cssVal = v => { const m = /^var\((--[\w-]+)\)$/.exec(v); return m ? getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim() : v; };
+const colorReal = v => { let c = cssVal(v); for (let i = 0; i < 3 && c.startsWith('var('); i++) c = cssVal(c); return c; };
+function aplicarTemaGraficas() {
+  if (typeof Chart === 'undefined') return;
+  Chart.defaults.color = colorReal('var(--sec)') || '#6c757d';
+  Chart.defaults.borderColor = colorReal('var(--hair)') || '#f0f2f8';
+  Chart.defaults.font.family = '-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif';
+}
+let _ultimoLatest = null;
+_mqOscuro.addEventListener('change', () => { if (_ultimoLatest) buildDashboard(_ultimoLatest); });
 const SEDES = ['3 Ríos','Natación','Pinares','Sabanilla'];
 
 const PT_KW = ['personal training','personal 2026'];
@@ -461,140 +424,113 @@ function buildDashboard(latest) {
     total += tot; memb += mem; minita += min; pt += pt_; accesorios += acc;
   });
 
+  _ultimoLatest = latest;
+  aplicarTemaGraficas();
+  const totales = { mem: memb, min: minita, pt, acc: accesorios };
+  // Barra apilada por categoría (resumen y tarjetas)
+  const pila = (d, tot) => CATS.map(c => d[c.k] > 0
+      ? `<i style="flex:${d[c.k]};background:${c.color}" title="${c.label}: ${fmt(d[c.k])}"></i>` : '').join('');
+
   document.getElementById('kpiTotal').textContent  = fmt(total);
+  document.getElementById('heroStack').innerHTML   = total > 0 ? pila(totales, total) : '';
   document.getElementById('kpiMemb').textContent   = fmt(memb);
   document.getElementById('kpiMembPct').textContent= pct(memb,total) + ' del total';
   document.getElementById('kpiMinita').textContent = fmt(minita);
   document.getElementById('kpiMinitaPct').textContent = pct(minita,total) + ' del total';
   document.getElementById('kpiPT').textContent     = fmt(pt);
+  document.getElementById('kpiPTPct').textContent  = pct(pt,total) + ' · aparte de membresías';
   document.getElementById('kpiAcc').textContent    = fmt(accesorios);
   document.getElementById('kpiAccPct').textContent = pct(accesorios,total) + ' del total';
 
-  // Sede cards
-  const sedeGrid = document.getElementById('sedeGrid');
-  sedeGrid.innerHTML = '';
-  SEDES.forEach(s => {
+  // Tarjetas por sede
+  const cabeza = (s, m, extra = '') => `<div class="sc-head">
+      <span class="sc-dot" style="background:color-mix(in srgb, ${m.color} 18%, transparent)">${m.icon}</span>
+      <span class="sc-name">${s}</span>${extra}</div>`;
+  const li = (label, val, extra = '', cls = '', punto = '') =>
+    `<div class="li ${cls}"><span class="l">${punto ? `<i style="background:${punto}"></i>` : ''}${label}</span><span class="v">${val}${extra ? ` <small>${extra}</small>` : ''}</span></div>`;
+
+  document.getElementById('sedeGrid').innerHTML = SEDES.map(s => {
     const d = sedeSummary[s];
     const m = SEDE_META[s];
-    if (!d) {
-      sedeGrid.innerHTML += `
-        <div class="sede-card no-data">
-          <div class="sede-card-header bg-${m.cls}"><span class="s-icon">${m.icon}</span><span class="s-name">${s}</span></div>
-          <div class="sede-card-body"><div class="sede-row-label">Sin datos cargados aún</div></div>
-        </div>`;
-      return;
-    }
+    if (!d) return `<div class="sede-card no-data">${cabeza(s, m)}<div class="sc-mes">Sin datos cargados aún</div></div>`;
     const top = d.vRank[0];
-    sedeGrid.innerHTML += `
-      <div class="sede-card">
-        <div class="sede-card-header bg-${m.cls}">
-          <span class="s-icon">${m.icon}</span>
-          <span class="s-name">${s}</span>
-          <span class="s-total">${fmt(d.tot)}</span>
-        </div>
-        <div class="sede-card-body">
-          <div class="sede-row"><span class="sede-row-label">Mes</span><span class="sede-row-val">${d.mes}</span></div>
-          <div class="sede-row">
-            <span class="sede-row-label">Membresías</span>
-            <span class="sede-row-val">${fmt(d.mem)} <span class="sede-row-pct">${pct(d.mem,d.tot)}</span></span>
-          </div>
-          <div class="sede-row">
-            <span class="sede-row-label">Minita</span>
-            <span class="sede-row-val">${fmt(d.min)} <span class="sede-row-pct">${pct(d.min,d.tot)}</span></span>
-          </div>
-          ${d.pt > 0 ? `<div class="sede-row">
-            <span class="sede-row-label">Personal Trainer</span>
-            <span class="sede-row-val">${fmt(d.pt)} <span class="sede-row-pct">${pct(d.pt,d.tot)}</span></span>
-          </div>` : ''}
-          ${d.acc > 0 ? `<div class="sede-row">
-            <span class="sede-row-label">Accesorios</span>
-            <span class="sede-row-val">${fmt(d.acc)} <span class="sede-row-pct">${pct(d.acc,d.tot)}</span></span>
-          </div>` : ''}
-          ${d.fe > 0 ? `<div class="sede-row">
-            <span class="sede-row-label">🧾 Fact. Electrónica</span>
-            <span class="sede-row-val">${fmt(d.fe)} <span class="sede-row-pct">${pct(d.fe,d.tot)}</span></span>
-          </div>
-          <div class="sede-row">
-            <span class="sede-row-label">Sin factura</span>
-            <span class="sede-row-val">${fmt(d.tot - d.fe)} <span class="sede-row-pct">${pct(d.tot-d.fe,d.tot)}</span></span>
-          </div>` : '<div class="sede-row"><span class="sede-row-label" style="color:#bbb;font-style:italic;">🧾 Sin comprobantes cargados</span></div>'}
-          ${gastosMes[s]?.total > 0 ? `<div class="sede-row" style="border-top:1px dashed #e0e0e0;margin-top:4px;padding-top:6px;">
-            <span class="sede-row-label">🧾 Gasto del mes</span>
-            <span class="sede-row-val" style="color:#c0392b;font-weight:700;">−${fmt(gastosMes[s].total)}</span>
-          </div>
-          <div class="sede-row" style="font-size:11px;">
-            <span class="sede-row-label" style="color:#999;">↳ Grupales / Planta</span>
-            <span class="sede-row-val" style="color:#999;font-weight:500;">${fmt(gastosMes[s].grupales)} / ${fmt(gastosMes[s].planta)}</span>
-          </div>` : ''}
-          <div class="progress-bar"><div class="progress-fill" style="width:${pct(d.mem,d.tot)};background:${m.color}"></div></div>
-          ${top ? `<div class="top-vend-label">🏆 Top Vendedor</div>
-          <div class="top-vend-name text-${m.cls}">${top[0]}</div>
-          <div class="top-vend-amt">${fmt(top[1])} · ${pct(top[1],d.tot)}</div>`
-          : `<div class="no-vend-note">Esta sede no registra vendedor por transacción.</div>`}
-        </div>
-      </div>`;
-  });
+    const cats = { mem: d.mem, min: d.min, pt: d.pt, acc: d.acc };
+    const filasCat = CATS.filter(c => c.k === 'mem' || c.k === 'min' || cats[c.k] > 0)
+      .map(c => li(c.label, fmt(cats[c.k]), pct(cats[c.k], d.tot), '', c.color)).join('');
+    const filasFE = d.fe > 0
+      ? li('🧾 Con factura', fmt(d.fe), pct(d.fe, d.tot)) + li('Sin factura', fmt(d.tot - d.fe), pct(d.tot - d.fe, d.tot))
+      : li('🧾 Sin comprobantes cargados', '', '', 'muted');
+    const g = gastosMes[s];
+    const filasGasto = g?.total > 0
+      ? `<div class="list">${li('Gasto del mes', `<span class="red">−${fmt(g.total)}</span>`)}${li('↳ Grupales / Planta', `${fmt(g.grupales)} / ${fmt(g.planta)}`, '', 'sub')}</div>` : '';
+    return `<div class="sede-card">
+      ${cabeza(s, m, `<span class="sc-mes" style="margin-left:auto">${d.mes}</span>`)}
+      <div class="sc-big">${fmt(d.tot)}</div>
+      ${d.tot > 0 ? `<div class="stack sm">${pila(cats, d.tot)}</div>` : ''}
+      <div class="list">${filasCat}</div>
+      <div class="list">${filasFE}</div>
+      ${filasGasto}
+      ${top ? `<div class="top"><span class="medal">🏆</span><div><div class="n">${top[0]}</div><div class="a">Top vendedor · ${fmt(top[1])} · ${pct(top[1], d.tot)}</div></div></div>`
+            : `<div class="no-vend-note">Esta sede no registra vendedor por transacción.</div>`}
+    </div>`;
+  }).join('');
 
-  // Bar chart
+  // Gráfica de barras: una barra por sede, apilada por categoría
   const activeSedes = SEDES.filter(s => sedeSummary[s]);
-  const barLabels = activeSedes.map(s => s);
-  const barMemb   = activeSedes.map(s => sedeSummary[s].mem);
-  const barMinita = activeSedes.map(s => sedeSummary[s].min);
-  const barPT     = activeSedes.map(s => sedeSummary[s].pt);
-  const barAcc    = activeSedes.map(s => sedeSummary[s].acc);
-  const barColors = activeSedes.map(s => SEDE_META[s].color);
-
+  const catKey = { mem: 'mem', min: 'min', pt: 'pt', acc: 'acc' };
   if (chartBar) chartBar.destroy();
   chartBar = new Chart(document.getElementById('chartBar'), {
     type: 'bar',
-    data: { labels: barLabels, datasets: [
-      { label: 'Membresías',       data: barMemb,   backgroundColor: barColors,                 borderRadius: 4 },
-      { label: 'Minita',           data: barMinita, backgroundColor: barColors.map(c=>c+'55'),  borderRadius: 4 },
-      { label: 'Personal Trainer', data: barPT,     backgroundColor: barColors.map(c=>c+'33'),  borderRadius: 4 },
-      { label: 'Accesorios',       data: barAcc,    backgroundColor: barColors.map(c=>c+'1a'),  borderRadius: 4 },
-    ]},
+    data: { labels: activeSedes, datasets: CATS.map((c, i) => ({
+      label: c.label, data: activeSedes.map(s => sedeSummary[s][catKey[c.k]]),
+      backgroundColor: colorReal(c.color), borderRadius: 4, borderSkipped: false, maxBarThickness: 56,
+    })) },
     options: {
-      responsive: true,
-      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } },
-        tooltip: { callbacks: { label: ctx => ' ₡' + Math.round(ctx.raw).toLocaleString('es-CR') } } },
-      scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => '₡' + (v/1000000).toFixed(1)+'M' } } }
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, font: { size: 12 } } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ₡` + Math.round(ctx.raw).toLocaleString('es-CR') } } },
+      scales: { x: { stacked: true, grid: { display: false } },
+                y: { stacked: true, border: { display: false }, ticks: { callback: v => '₡' + (v/1000000).toFixed(1)+'M' } } }
     }
   });
 
   if (chartPie) chartPie.destroy();
   chartPie = new Chart(document.getElementById('chartPie'), {
     type: 'doughnut',
-    data: { labels: ['Membresías', 'Minita', 'Personal Trainer', 'Accesorios'],
-      datasets: [{ data: [memb, minita, pt, accesorios], backgroundColor: ['#2E5FA3','#e67e22','#7030A0','#8d6e63'], borderWidth: 2 }] },
-    options: { responsive: true,
-      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } },
+    data: { labels: CATS.map(c => c.label),
+      datasets: [{ data: [memb, minita, pt, accesorios], backgroundColor: CATS.map(c => colorReal(c.color)),
+        borderColor: colorReal('var(--card)'), borderWidth: 3, hoverOffset: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '66%',
+      plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, font: { size: 12 } } },
         tooltip: { callbacks: { label: ctx => ' ₡' + Math.round(ctx.raw).toLocaleString('es-CR') + ' (' + pct(ctx.raw, total) + ')' } } } }
   });
 
   // Vendedores por sede
-  const vendGrid = document.getElementById('vendGrid');
-  vendGrid.innerHTML = '';
-  SEDES.forEach(s => {
+  const medalla = i => ['🥇','🥈','🥉'][i] || (i + 1);
+  document.getElementById('vendGrid').innerHTML = SEDES.filter(s => sedeSummary[s]).map(s => {
     const d = sedeSummary[s];
-    if (!d) return;
     const m = SEDE_META[s];
+    const max = d.vRank[0]?.[1] || 1;
     const body = d.vRank.length
-      ? `<table class="vend-table">
-          <thead><tr><th>#</th><th>Vendedor</th><th style="text-align:right">CRC</th><th style="text-align:right">%</th></tr></thead>
-          <tbody>${d.vRank.slice(0,8).map((v,i) => `<tr class="${i===0?'rank-1':''}">
-            <td class="vend-rank">${i+1}</td><td class="vend-name">${v[0]}</td>
-            <td class="vend-amt">${fmt(v[1])}</td><td class="vend-pct">${pct(v[1],d.tot)}</td>
-          </tr>`).join('')}</tbody>
-        </table>`
+      ? d.vRank.slice(0,8).map((v,i) => `<div class="vend-row">
+          <span class="vend-rank">${medalla(i)}</span>
+          <span class="vend-name" title="${v[0]}">${v[0]}</span>
+          <span class="vend-amt" style="grid-row:span 2">${fmt(v[1])}<small>${pct(v[1],d.tot)}</small></span>
+          <span class="vend-bar"><i style="width:${(v[1]/max*100).toFixed(1)}%;background:${m.color}"></i></span>
+        </div>`).join('')
       : `<div class="vend-empty">Sin datos de vendedor para esta sede</div>`;
-    vendGrid.innerHTML += `
-      <div class="vend-card">
-        <div class="vend-card-hdr bg-${m.cls}">${m.icon} ${s}</div>
+    return `<div class="vend-card">
+        <div class="vend-card-hdr"><span class="sc-dot" style="background:color-mix(in srgb, ${m.color} 18%, transparent)">${m.icon}</span>${s}</div>
         ${body}
       </div>`;
-  });
+  }).join('');
 
-  const periodos = SEDES.filter(s=>sedeSummary[s]).map(s=>`${s}: ${sedeSummary[s].mes}`).join(' · ');
+  // Si todas las sedes traen el mismo mes basta decirlo una vez
+  const conDatos = SEDES.filter(s=>sedeSummary[s]);
+  const mesesDistintos = new Set(conDatos.map(s => sedeSummary[s].mes));
+  const periodos = mesesDistintos.size === 1
+    ? `${[...mesesDistintos][0]} · ${conDatos.length} de ${SEDES.length} sedes con datos`
+    : conDatos.map(s=>`${s}: ${sedeSummary[s].mes}`).join(' · ');
   document.getElementById('dashPeriod').textContent = periodos;
 }
 </script>

@@ -2,129 +2,106 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Comparativa de Sedes — Proyección vs Cobro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F2F2F7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icons/favicon-64.png">
+<title>Comparativa de Sedes</title>
+<link rel="stylesheet" href="/ui.css">
 <style>
-:root {
-  --primary: #1a5276;
-  --primary-light: #2e86c1;
-  --accent: #148f77;
-  --accent2: #e67e22;
-  --bg: #f0f4f8;
-  --border: #d5dce8;
-  --text: #1c2833;
-  --muted: #6c757d;
-  --warn: #c0392b;
-  --success: #27ae60;
+/* Colores de sede: los mismos tonos que usa index.html */
+:root { --s-3rios:var(--brand); --s-nat:var(--purple); --s-pin:var(--green); --s-sab:var(--blue); }
 
-  --c-tresrios:   #00838f;
-  --c-natacion:   #6a1b9a;
-  --c-pinares:    #2e7d32;
-  --c-sabanilla:  #1565c0;
+#dashboard { display:none; padding-bottom:32px; }
+
+/* ── Rango de fechas ── */
+.rango { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; }
+.fld { display:flex; flex-direction:column; gap:4px; }
+.fld span { font-size:12px; font-weight:600; color:var(--sec); text-transform:uppercase; letter-spacing:.04em; }
+input.ui[type=date] { font-weight:500; min-width:150px; }
+.seg { display:inline-grid; grid-auto-flow:column; gap:2px; background:var(--fill); border-radius:10px; padding:2px; }
+.seg button { border:0; background:none; border-radius:8px; min-height:32px; padding:0 14px; font-size:13px; font-weight:600; white-space:nowrap; }
+.seg button.on { background:var(--card); box-shadow:0 1px 3px rgba(0,0,0,.14); }
+@media (prefers-color-scheme: dark) { .seg button.on { background:#636366; } }
+.filter-note { width:100%; font-size:13px; color:var(--orange); }
+.filter-note:empty { display:none; }
+
+/* ── Resumen: anillo + cifras ── */
+.hero { display:flex; align-items:center; gap:28px; background:var(--card); border-radius:16px; box-shadow:var(--shadow);
+  margin:18px var(--gut) 4px; padding:22px 26px; flex-wrap:wrap; }
+.ring { --p:0; --c:var(--sec); width:132px; height:132px; border-radius:50%; flex:none; position:relative;
+  background:conic-gradient(var(--c) calc(var(--p) * 1%), var(--fill2) 0); display:grid; place-items:center; }
+.ring::before { content:''; position:absolute; inset:14px; border-radius:50%; background:var(--card); }
+.ring > div { position:relative; text-align:center; line-height:1.1; }
+.ring b { display:block; font-size:28px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.ring span { font-size:12px; color:var(--sec); }
+.ring.sm { width:56px; height:56px; }
+.ring.sm::before { inset:6px; }
+.ring.sm b { font-size:13px; }
+.hero-stats { flex:1; min-width:260px; display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:18px; }
+.hs .l { display:block; font-size:13px; color:var(--sec); }
+.hs .v { display:block; font-size:26px; font-weight:700; letter-spacing:-.02em; margin-top:2px; font-variant-numeric:tabular-nums; }
+.hs .s { display:block; font-size:12px; color:var(--sec); margin-top:2px; }
+.hs.green .v { color:var(--green); }
+.hs.red .v { color:var(--red); }
+
+/* ── Tarjetas por sede ── */
+.sede-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; padding:0 var(--gut) 4px; }
+.sede-card { background:var(--card); border-radius:14px; box-shadow:var(--shadow); padding:16px 18px; cursor:pointer;
+  display:flex; flex-direction:column; gap:12px; border:0; text-align:left; color:inherit; font:inherit; width:100%;
+  transition:transform .15s, box-shadow .15s; }
+.sede-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,.10); }
+.sede-card.no-data { cursor:default; opacity:.6; }
+.sede-card.no-data:hover { transform:none; box-shadow:var(--shadow); }
+.sc-head { display:flex; align-items:center; gap:10px; }
+.sc-dot { width:30px; height:30px; border-radius:9px; display:grid; place-items:center; font-size:16px; flex:none; }
+.sc-name { font-size:17px; font-weight:600; }
+.sc-head .ring { margin-left:auto; }
+.sc-big { font-size:26px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.1; }
+.sc-of { font-size:13px; color:var(--sec); margin-top:2px; }
+.bar { height:6px; border-radius:3px; background:var(--fill2); overflow:hidden; }
+.bar i { display:block; height:100%; border-radius:3px; }
+.sc-rows { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.sc-rows div { background:var(--fill); border-radius:10px; padding:8px 10px; }
+.sc-rows .l { display:block; font-size:12px; color:var(--sec); }
+.sc-rows .v { display:block; font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; }
+.sc-rows .v.green { color:var(--green); } .sc-rows .v.red { color:var(--red); }
+.sc-more { font-size:14px; font-weight:600; color:var(--brand-text); }
+
+/* ── Tabla comparativa ── */
+.dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; vertical-align:0; }
+table.tbl tr.sede-row { cursor:pointer; scroll-margin-top:96px; }   /* que la barra fija no tape la fila */
+table.tbl tr.sede-row td:first-child .chev { display:inline-block; color:var(--ter); margin-left:6px; transition:transform .15s; }
+table.tbl tr.sede-row.open td:first-child .chev { transform:rotate(90deg); }
+table.tbl tr.total-row td { background:var(--fill); font-weight:700; border-bottom:0; }
+table.tbl tr.total-row:hover td { background:var(--fill); }
+table.tbl tr.detalle-row > td { background:var(--bg); padding:0; }
+table.tbl tr.detalle-row:hover > td { background:var(--bg); }
+.detalle-inner { padding:14px 16px 16px; }
+.det-filtros { display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+.det-filtros .btn-ghost { margin-left:auto; min-height:32px; font-size:13px; }
+.det-card { background:var(--card); border-radius:12px; overflow:hidden; box-shadow:var(--shadow); }
+table.det { width:100%; border-collapse:collapse; }
+table.det th { font-size:11px; font-weight:600; color:var(--sec); text-transform:uppercase; letter-spacing:.04em;
+  text-align:left; padding:8px 12px; border-bottom:.5px solid var(--sep); }
+table.det td { font-size:13px; padding:8px 12px; border-bottom:.5px solid var(--hair); }
+table.det tr:last-child td { border-bottom:0; }
+table.det .num { text-align:right; }
+.det-empty { color:var(--sec); font-size:13px; padding:14px; }
+.muted-i { color:var(--sec); font-style:italic; }
+
+@media (max-width:760px) {
+  .hero { padding:18px; gap:18px; justify-content:center; }
+  .hero-stats { grid-template-columns:1fr; gap:12px; min-width:0; flex-basis:100%; }
+  .hs { display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .hs .v { font-size:22px; margin:0; }
+  .hs .s { width:100%; margin:0; }
+  .rango { width:100%; }
+  .fld { flex:1; min-width:0; }
+  input.ui[type=date] { min-width:0; width:100%; }
+  .seg { width:100%; grid-auto-columns:1fr; }
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
-
-/* ── Login ── */
-#loginScreen { position: fixed; inset: 0; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-.login-card { background: white; border-radius: 24px; padding: 40px 44px; width: 100%; max-width: 420px; box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
-.login-logo { width: 64px; height: 64px; background: linear-gradient(135deg, #1a5276, #2e86c1); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 20px; }
-.login-card h2 { text-align: center; font-size: 1.4em; font-weight: 800; color: #2d2d5e; margin-bottom: 6px; }
-.login-card .login-sub { text-align: center; font-size: 0.85em; color: #888; margin-bottom: 28px; }
-.login-field { margin-bottom: 16px; }
-.login-field label { display: block; font-size: 0.8em; font-weight: 700; color: #444; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
-.login-field input { width: 100%; padding: 11px 14px; border: 1.5px solid #dde1f0; border-radius: 10px; font-size: 14px; font-family: inherit; color: #333; }
-.login-field input:focus { outline: none; border-color: #2e86c1; box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
-.login-btn { width: 100%; padding: 13px; background: linear-gradient(135deg, #1a5276, #2e86c1); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
-.login-btn:disabled { opacity: .6; cursor: not-allowed; }
-#loginError { text-align: center; color: #c62828; font-size: 13px; margin-top: 12px; min-height: 18px; }
-
-/* ── Header ── */
-.header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: white; padding: 18px 32px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.25); flex-wrap: wrap; }
-.header-icon { font-size: 34px; }
-.header h1 { font-size: 21px; font-weight: 700; }
-.header p  { font-size: 13px; opacity: .85; margin-top: 2px; }
-.header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; color: white; font-size: 13px; }
-.logout-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35); color: white; border-radius: 16px; padding: 5px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
-
-/* ── Loading ── */
-.loading, .empty-state { display: none; text-align: center; padding: 60px 32px; color: var(--muted); }
-.spinner { width: 44px; height: 44px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── Dashboard ── */
-#dashboard { display: none; }
-.filter-bar { padding: 14px 32px; background: white; border-bottom: 1px solid var(--border); display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
-.filter-item label { display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px; }
-.filter-item input[type="date"] { border: 1.5px solid var(--border); border-radius: 10px; padding: 8px 12px; font-size: 13px; font-family: inherit; color: var(--text); }
-.btn-aplicar { padding: 9px 22px; border-radius: 10px; border: none; background: var(--primary); color: white; font-size: 13px; font-weight: 700; cursor: pointer; }
-.btn-aplicar:hover { background: var(--primary-light); }
-.btn-rapido { padding: 8px 14px; border-radius: 20px; border: 1.5px solid var(--border); background: white; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; }
-.btn-rapido:hover { border-color: var(--primary-light); color: var(--primary); }
-.filter-note { width: 100%; font-size: 12px; color: var(--muted); }
-
-.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; padding: 22px 32px 8px; }
-.kpi { background: white; border-radius: 12px; padding: 16px 18px; border-left: 4px solid var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-.kpi.green  { border-color: var(--success); }
-.kpi.orange { border-color: var(--accent2); }
-.kpi.red    { border-color: var(--warn); }
-.kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
-.kpi-value { font-size: 23px; font-weight: 700; color: var(--primary); margin-top: 4px; line-height: 1.1; }
-.kpi.green  .kpi-value { color: var(--success); }
-.kpi.orange .kpi-value { color: var(--accent2); }
-.kpi.red    .kpi-value { color: var(--warn); }
-.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
-
-.section { padding: 8px 32px; }
-.section-title { font-size: 15px; font-weight: 700; color: var(--primary); margin-bottom: 14px; border-left: 4px solid var(--primary-light); padding-left: 10px; }
-
-/* Tabla comparativa */
-.comp-wrap { padding: 0 32px 24px; overflow-x: auto; }
-.comp-table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-.comp-table th { background: var(--primary); color: white; font-size: 12px; padding: 11px 14px; text-align: left; }
-.comp-table th.num, .comp-table td.num { text-align: right; }
-.comp-table td { padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #f0f4f8; }
-.comp-table tr.total-row td { background: #eef3fa; font-weight: 700; border-top: 2px solid var(--primary); }
-.comp-table tr.sede-row { cursor: pointer; }
-.comp-table tr.sede-row:hover td { background: #f7fafd; }
-.pct-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; }
-.pct-alto  { background: #e8f5e9; color: #2e7d32; }
-.pct-medio { background: #fff3e0; color: #e65100; }
-.pct-bajo  { background: #ffebee; color: #c62828; }
-.sede-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
-
-/* Cards por sede */
-.sede-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; padding: 8px 32px 16px; }
-.sede-card { background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); cursor: pointer; transition: transform .15s, box-shadow .15s; }
-.sede-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.14); }
-.sede-card.no-data { opacity: .55; cursor: default; }
-.sede-card.no-data:hover { transform: none; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-.sede-card-header { padding: 14px 18px; color: white; display: flex; align-items: center; gap: 10px; }
-.sede-card-header .s-icon { font-size: 22px; }
-.sede-card-header .s-name { font-size: 15px; font-weight: 700; }
-.sede-card-header .s-total { margin-left: auto; font-size: 17px; font-weight: 700; }
-.sede-card-body { padding: 14px 18px; }
-.sede-row-c { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f0f4f8; }
-.sede-row-c:last-child { border-bottom: none; }
-.sede-row-label { font-size: 12px; color: var(--muted); }
-.sede-row-val   { font-size: 13px; font-weight: 600; color: var(--text); }
-.sede-row-pct   { font-size: 11px; color: var(--muted); margin-left: 6px; }
-.progress-bar { height: 7px; border-radius: 4px; background: #e8edf4; margin-top: 12px; overflow: hidden; }
-.progress-fill { height: 100%; border-radius: 4px; transition: width .3s; }
-.card-hint { font-size: 11px; color: var(--muted); margin-top: 10px; font-style: italic; }
-
-/* Detalle expandible */
-.detalle-row td { background: #fafbfd; padding: 0 14px; }
-.detalle-inner { padding: 14px 4px; }
-.det-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.det-table th { background: #f0f2f8; color: var(--muted); font-size: 11px; padding: 6px 10px; text-align: left; }
-.det-table td { padding: 6px 10px; border-bottom: 1px solid #f0f2f8; }
-.det-table td.num { text-align: right; }
-.tag-pagado    { background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
-.tag-pendiente { background: #ffebee; color: #c62828; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
-.det-filtros { margin-bottom: 8px; display: flex; gap: 8px; }
-.det-filtros button { padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border); background: white; font-size: 11px; cursor: pointer; }
-.det-filtros button.on { background: var(--primary); color: white; border-color: var(--primary); }
 </style>
 </head>
 <body>
@@ -134,7 +111,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
   <div class="login-card">
     <div class="login-logo">⚖️</div>
     <h2>Comparativa de Sedes</h2>
-    <p class="login-sub">Proyección vs Cobro por rango de fechas</p>
+    <p class="login-sub">Proyección vs cobro por rango de fechas</p>
     <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
     <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
     <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
@@ -163,59 +140,43 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 
 <div id="dashboard">
 
-  <div class="filter-bar">
-    <div class="filter-item">
-      <label>Desde</label>
-      <input type="date" id="fDesde">
+  <div class="topbar">
+    <div class="rango">
+      <label class="fld"><span>Desde</span><input type="date" id="fDesde" class="ui" onchange="marcarRapido(null)"></label>
+      <label class="fld"><span>Hasta</span><input type="date" id="fHasta" class="ui" onchange="marcarRapido(null)"></label>
+      <button class="btn-primary" onclick="aplicarFiltro()">Aplicar</button>
     </div>
-    <div class="filter-item">
-      <label>Hasta</label>
-      <input type="date" id="fHasta">
+    <div class="seg" id="segRapido">
+      <button data-r="hoy" onclick="rangoRapido('hoy')">Hoy</button>
+      <button data-r="mes" onclick="rangoRapido('mes')">Mes a la fecha</button>
+      <button data-r="mescompleto" onclick="rangoRapido('mescompleto')">Mes completo</button>
     </div>
-    <button class="btn-aplicar" onclick="aplicarFiltro()">Aplicar</button>
-    <button class="btn-rapido" onclick="rangoRapido('hoy')">Hoy</button>
-    <button class="btn-rapido" onclick="rangoRapido('mes')">Mes a la fecha</button>
-    <button class="btn-rapido" onclick="rangoRapido('mescompleto')">Mes completo</button>
     <div class="filter-note" id="filterNote"></div>
   </div>
 
-  <div class="kpi-row">
-    <div class="kpi">
-      <div class="kpi-label">Proyección a cobro</div>
-      <div class="kpi-value" id="kpiProy">—</div>
-      <div class="kpi-sub" id="kpiProySub">—</div>
-    </div>
-    <div class="kpi green">
-      <div class="kpi-label">Cobrado</div>
-      <div class="kpi-value" id="kpiCobrado">—</div>
-      <div class="kpi-sub" id="kpiCobradoSub">—</div>
-    </div>
-    <div class="kpi orange">
-      <div class="kpi-label">% Recuperado</div>
-      <div class="kpi-value" id="kpiPct">—</div>
-      <div class="kpi-sub">cobrado / proyección</div>
-    </div>
-    <div class="kpi red">
-      <div class="kpi-label">Pendiente</div>
-      <div class="kpi-value" id="kpiPend">—</div>
-      <div class="kpi-sub" id="kpiPendSub">—</div>
+  <div class="hero">
+    <div class="ring" id="ringTotal"><div><b id="kpiPct">—</b><span>recuperado</span></div></div>
+    <div class="hero-stats">
+      <div class="hs"><span class="l">Proyección a cobro</span><span class="v" id="kpiProy">—</span><span class="s" id="kpiProySub">—</span></div>
+      <div class="hs green"><span class="l">Cobrado</span><span class="v" id="kpiCobrado">—</span><span class="s" id="kpiCobradoSub">—</span></div>
+      <div class="hs red"><span class="l">Pendiente</span><span class="v" id="kpiPend">—</span><span class="s" id="kpiPendSub">—</span></div>
     </div>
   </div>
 
-  <div class="section"><div class="section-title">Resumen por Sede</div></div>
+  <div class="section"><div class="section-title">Resumen por sede</div></div>
   <div class="sede-grid" id="sedeGrid"></div>
 
-  <div class="section"><div class="section-title">Comparativa por Sede <span style="font-weight:400;font-size:12px;color:var(--muted);">— haga clic en una sede para ver el detalle de clientes</span></div></div>
-  <div class="comp-wrap">
-    <table class="comp-table">
+  <div class="section"><div class="section-title">Comparativa por sede <span class="section-note">Toque una sede para ver el detalle de clientes</span></div></div>
+  <div class="tbl-wrap">
+    <table class="tbl">
       <thead><tr>
         <th>Sede</th>
         <th class="num">Clientes a cobro</th>
-        <th class="num">Proyección (₡)</th>
+        <th class="num">Proyección</th>
         <th class="num">Pagos recibidos</th>
-        <th class="num">Cobrado (₡)</th>
+        <th class="num">Cobrado</th>
         <th class="num">% Recuperado</th>
-        <th class="num">Pendiente (₡)</th>
+        <th class="num">Pendiente</th>
       </tr></thead>
       <tbody id="compBody"></tbody>
     </table>
@@ -324,10 +285,10 @@ async function doLogout(silent) { Sesion.cerrar();
 
 // ── Config ──────────────────────────────────────────────────────────────
 const SEDE_META = {
-  '3 Ríos':   { icon: '🌊', color: '#00838f' },
-  'Natación': { icon: '🏊', color: '#6a1b9a' },
-  'Pinares':  { icon: '🌲', color: '#2e7d32' },
-  'Sabanilla':{ icon: '🏙️', color: '#1565c0' },
+  '3 Ríos':   { icon: '🌊', color: 'var(--s-3rios)' },
+  'Natación': { icon: '🏊', color: 'var(--s-nat)' },
+  'Pinares':  { icon: '🌲', color: 'var(--s-pin)' },
+  'Sabanilla':{ icon: '🏙️', color: 'var(--s-sab)' },
 };
 const SEDES = ['3 Ríos','Natación','Pinares','Sabanilla'];
 
@@ -360,8 +321,20 @@ function rangoRapido(tipo) {
   else { desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1); hasta = new Date(hoy.getFullYear(), hoy.getMonth()+1, 0); }
   document.getElementById('fDesde').value = isoDate(desde);
   document.getElementById('fHasta').value = isoDate(hasta);
+  marcarRapido(tipo);
   aplicarFiltro();
 }
+
+// Resalta el atajo activo; al tocar las fechas a mano se apaga.
+function marcarRapido(tipo) {
+  document.querySelectorAll('#segRapido button').forEach(b => b.classList.toggle('on', b.dataset.r === tipo));
+}
+
+// Tono según qué tanto se recuperó (igual que las píldoras de %).
+const tonoPct = p => p >= 70 ? 'var(--green)' : p >= 40 ? 'var(--orange)' : 'var(--red)';
+const pillPct = p => `<span class="pill ${p >= 70 ? 'ok' : p >= 40 ? 'low' : 'falt'}">${p.toFixed(1)}%</span>`;
+const escQ = s => s.replace(/'/g, "\\'");
+const idSede = s => norm(s).replace(/\s/g, '-');
 
 // ── Precios de respaldo desde plan_prices (cuando el snapshot trae ValorPlan 0) ──
 let planPricesBySede = null;   // sede → { normPlan: precio }
@@ -446,14 +419,14 @@ function render(snaps, desde, hasta) {
 
   SEDES.forEach(sede => {
     const snap = bySede[sede];
-    const meta = SEDE_META[sede] || { icon: '🏋️', color: '#555' };
+    const meta = SEDE_META[sede] || { icon: '🏋️', color: 'var(--sec)' };
+    const cabeza = (extra = '') => `<div class="sc-head">
+        <span class="sc-dot" style="background:color-mix(in srgb, ${meta.color} 18%, transparent)">${meta.icon}</span>
+        <span class="sc-name">${sede}</span>${extra}</div>`;
     if (!snap) {
-      rows.push(`<tr><td><span class="sede-dot" style="background:${meta.color}"></span>${meta.icon} ${sede}</td>
-        <td colspan="6" style="color:var(--muted);font-style:italic;">Sin datos cargados para este mes</td></tr>`);
-      cards.push(`<div class="sede-card no-data">
-        <div class="sede-card-header" style="background:${meta.color}"><span class="s-icon">${meta.icon}</span><span class="s-name">${sede}</span></div>
-        <div class="sede-card-body"><div class="sede-row-label">Sin datos cargados para este mes</div></div>
-      </div>`);
+      rows.push(`<tr><td><span class="dot" style="background:${meta.color}"></span>${sede}</td>
+        <td colspan="6" class="muted-i">Sin datos cargados para este mes</td></tr>`);
+      cards.push(`<div class="sede-card no-data">${cabeza()}<div class="sc-of">Sin datos cargados para este mes</div></div>`);
       return;
     }
 
@@ -485,57 +458,54 @@ function render(snaps, desde, hasta) {
     const pendientes = proyectados.filter(u => !u.pagado);
     const pendMonto = pendientes.reduce((s,u) => s + u.valor, 0);
     const pct = proy > 0 ? cobrado / proy * 100 : (cobrado > 0 ? 100 : 0);
-    const pctCls = pct >= 70 ? 'pct-alto' : pct >= 40 ? 'pct-medio' : 'pct-bajo';
 
     detalleData[sede] = proyectados;
     tProy += proy; tCobrado += cobrado; tClientes += proyectados.length;
     tPagos += cobros.length; tPendMonto += pendMonto; tPendClientes += pendientes.length;
 
     const sinVentas = !(snap.renov_data || []).length;
-    cards.push(`<div class="sede-card" onclick="toggleDetalle('${sede.replace(/'/g,"\\'")}', true)">
-      <div class="sede-card-header" style="background:${meta.color}">
-        <span class="s-icon">${meta.icon}</span>
-        <span class="s-name">${sede}</span>
-        <span class="s-total">${sinVentas ? '—' : fmt(cobrado)}</span>
+    const anillo = `<span class="ring sm" style="--p:${Math.min(pct,100).toFixed(1)};--c:${tonoPct(pct)}"><div><b>${Math.round(pct)}%</b></div></span>`;
+    cards.push(`<button class="sede-card" onclick="toggleDetalle('${escQ(sede)}', true)">
+      ${cabeza(anillo)}
+      <div>
+        <div class="sc-big">${sinVentas ? '—' : fmt(cobrado)}</div>
+        <div class="sc-of">${sinVentas ? 'sin ventas cargadas' : `cobrado de ${fmt(proy)} proyectados`}</div>
       </div>
-      <div class="sede-card-body">
-        <div class="sede-row-c"><span class="sede-row-label">Proyección a cobro</span>
-          <span class="sede-row-val">${fmt(proy)} <span class="sede-row-pct">${proyectados.length} clientes</span></span></div>
-        <div class="sede-row-c"><span class="sede-row-label">Cobrado</span>
-          <span class="sede-row-val" style="color:var(--success);">${sinVentas ? '—' : fmt(cobrado)} <span class="sede-row-pct">${sinVentas ? 'sin ventas cargadas' : cobros.length + ' pagos'}</span></span></div>
-        <div class="sede-row-c"><span class="sede-row-label">% Recuperado</span>
-          <span class="sede-row-val"><span class="pct-badge ${pctCls}">${pct.toFixed(1)}%</span></span></div>
-        <div class="sede-row-c"><span class="sede-row-label">Pendiente</span>
-          <span class="sede-row-val" style="color:var(--warn);">${fmt(pendMonto)} <span class="sede-row-pct">${pendientes.length} clientes</span></span></div>
-        <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(pct,100)}%;background:${meta.color}"></div></div>
-        <div class="card-hint">Clic para ver el detalle de clientes</div>
+      <div class="bar"><i style="width:${Math.min(pct,100)}%;background:${meta.color}"></i></div>
+      <div class="sc-rows">
+        <div><span class="l">Pagos</span><span class="v green">${sinVentas ? '—' : cobros.length}</span></div>
+        <div><span class="l">Pendiente · ${pendientes.length}</span><span class="v red">${fmt(pendMonto)}</span></div>
       </div>
-    </div>`);
-    rows.push(`<tr class="sede-row" onclick="toggleDetalle('${sede.replace(/'/g,"\\'")}')">
-      <td><span class="sede-dot" style="background:${meta.color}"></span>${meta.icon} <strong>${sede}</strong></td>
+      <span class="sc-more">Ver ${proyectados.length} clientes ›</span>
+    </button>`);
+    rows.push(`<tr class="sede-row" id="fila-${idSede(sede)}" onclick="toggleDetalle('${escQ(sede)}')">
+      <td><span class="dot" style="background:${meta.color}"></span><strong>${sede}</strong><span class="chev">›</span></td>
       <td class="num">${proyectados.length}</td>
       <td class="num"><strong>${fmt(proy)}</strong></td>
-      <td class="num">${sinVentas ? '<span style="color:var(--muted);font-style:italic;" title="No se ha subido el archivo de ventas de este mes">sin ventas cargadas</span>' : cobros.length}</td>
-      <td class="num" style="color:var(--success);font-weight:700;">${fmt(cobrado)}</td>
-      <td class="num"><span class="pct-badge ${pctCls}">${pct.toFixed(1)}%</span></td>
-      <td class="num" style="color:var(--warn);">${fmt(pendMonto)}</td>
+      <td class="num">${sinVentas ? '<span class="muted-i" title="No se ha subido el archivo de ventas de este mes">sin ventas cargadas</span>' : cobros.length}</td>
+      <td class="num" style="color:var(--green);font-weight:700;">${fmt(cobrado)}</td>
+      <td class="num">${pillPct(pct)}</td>
+      <td class="num" style="color:var(--red);">${fmt(pendMonto)}</td>
     </tr>
-    <tr class="detalle-row" id="det-${norm(sede).replace(/\s/g,'-')}" style="display:none;"><td colspan="7"><div class="detalle-inner" id="detInner-${norm(sede).replace(/\s/g,'-')}"></div></td></tr>`);
+    <tr class="detalle-row" id="det-${idSede(sede)}" style="display:none;"><td colspan="7"><div class="detalle-inner" id="detInner-${idSede(sede)}"></div></td></tr>`);
   });
 
   const tPct = tProy > 0 ? tCobrado / tProy * 100 : 0;
   rows.push(`<tr class="total-row">
-    <td>TOTAL</td>
+    <td>Total</td>
     <td class="num">${tClientes}</td>
     <td class="num">${fmt(tProy)}</td>
     <td class="num">${tPagos}</td>
-    <td class="num" style="color:var(--success);">${fmt(tCobrado)}</td>
+    <td class="num" style="color:var(--green);">${fmt(tCobrado)}</td>
     <td class="num">${tPct.toFixed(1)}%</td>
-    <td class="num" style="color:var(--warn);">${fmt(tPendMonto)}</td>
+    <td class="num" style="color:var(--red);">${fmt(tPendMonto)}</td>
   </tr>`);
   document.getElementById('compBody').innerHTML = rows.join('');
   document.getElementById('sedeGrid').innerHTML = cards.join('');
 
+  const ring = document.getElementById('ringTotal');
+  ring.style.setProperty('--p', Math.min(tPct, 100).toFixed(1));
+  ring.style.setProperty('--c', tonoPct(tPct));
   document.getElementById('kpiProy').textContent = fmt(tProy);
   document.getElementById('kpiProySub').textContent = `${tClientes} clientes con vencimiento en el rango`;
   document.getElementById('kpiCobrado').textContent = fmt(tCobrado);
@@ -548,18 +518,21 @@ function render(snaps, desde, hasta) {
 let detFiltro = {};  // sede → 'todos'|'pendientes'|'pagados'
 
 function toggleDetalle(sede, scroll) {
-  const id = norm(sede).replace(/\s/g,'-');
+  const id = idSede(sede);
   const row = document.getElementById('det-' + id);
   if (!row) return;
+  const fila = document.getElementById('fila-' + id);
   const visible = row.style.display !== 'none';
   // Desde las cards: siempre abrir (no cerrar) y hacer scroll al detalle
   if (scroll) {
     row.style.display = '';
+    fila?.classList.add('open');
     renderDetalle(sede);
-    row.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    (fila || row).scrollIntoView({ behavior: 'smooth', block: 'start' });
     return;
   }
   row.style.display = visible ? 'none' : '';
+  fila?.classList.toggle('open', !visible);
   if (!visible) renderDetalle(sede);
 }
 
@@ -569,25 +542,26 @@ function setDetFiltro(sede, f) {
 }
 
 function renderDetalle(sede) {
-  const id = norm(sede).replace(/\s/g,'-');
-  const el = document.getElementById('detInner-' + id);
+  const el = document.getElementById('detInner-' + idSede(sede));
   const data = detalleData[sede] || [];
   const filtro = detFiltro[sede] || 'pendientes';
   const filtered = filtro === 'todos' ? data
     : filtro === 'pagados' ? data.filter(u => u.pagado)
     : data.filter(u => !u.pagado);
 
-  const btn = (f, label) => `<button class="${(detFiltro[sede]||'pendientes')===f?'on':''}" onclick="event.stopPropagation();setDetFiltro('${sede.replace(/'/g,"\\'")}','${f}')">${label}</button>`;
+  const btn = (f, label) => `<button class="${filtro===f?'on':''}" onclick="event.stopPropagation();setDetFiltro('${escQ(sede)}','${f}')">${label}</button>`;
   const filtros = `<div class="det-filtros">
-    ${btn('pendientes', `Pendientes (${data.filter(u=>!u.pagado).length})`)}
-    ${btn('pagados', `Pagados (${data.filter(u=>u.pagado).length})`)}
-    ${btn('todos', `Todos (${data.length})`)}
-    <button onclick="event.stopPropagation();exportDetalleCSV('${sede.replace(/'/g,"\\'")}')" style="margin-left:auto;">📥 Exportar CSV</button>
+    <div class="seg">
+      ${btn('pendientes', `Pendientes · ${data.filter(u=>!u.pagado).length}`)}
+      ${btn('pagados', `Pagados · ${data.filter(u=>u.pagado).length}`)}
+      ${btn('todos', `Todos · ${data.length}`)}
+    </div>
+    <button class="btn-ghost" onclick="event.stopPropagation();exportDetalleCSV('${escQ(sede)}')">📥 Exportar CSV</button>
   </div>`;
 
-  if (!filtered.length) { el.innerHTML = filtros + '<div style="color:var(--muted);font-size:12px;padding:8px;">Sin clientes en esta vista.</div>'; return; }
+  if (!filtered.length) { el.innerHTML = filtros + '<div class="det-card det-empty">Sin clientes en esta vista.</div>'; return; }
 
-  el.innerHTML = filtros + `<table class="det-table">
+  el.innerHTML = filtros + `<div class="det-card"><table class="det">
     <thead><tr><th>Cliente</th><th>Teléfono</th><th>Plan</th><th>Vence</th><th class="num">Valor</th><th>Estado</th></tr></thead>
     <tbody>${filtered.map(u => `<tr>
       <td><strong>${u.nombre}</strong></td>
@@ -595,9 +569,9 @@ function renderDetalle(sede) {
       <td>${u.plan}</td>
       <td>${u.expira}</td>
       <td class="num">${u.valor > 0 ? fmt(u.valor) : '—'}</td>
-      <td>${u.pagado ? '<span class="tag-pagado">✓ Pagó</span>' : '<span class="tag-pendiente">Pendiente</span>'}</td>
+      <td>${u.pagado ? '<span class="pill ok">✓ Pagó</span>' : '<span class="pill falt">Pendiente</span>'}</td>
     </tr>`).join('')}</tbody>
-  </table>`;
+  </table></div>`;
 }
 
 function exportDetalleCSV(sede) {
