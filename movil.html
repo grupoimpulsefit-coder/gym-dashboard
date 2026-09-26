@@ -187,7 +187,7 @@
 
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-09-22a';
+const APP_VER='2026-09-26a';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -994,8 +994,86 @@ function renderCuenta(){
     <div class="sect"><div class="hdr">En este iPhone</div><div class="group">
       <div class="cell"><div class="main"><span class="t">${standalone?'Instalada como app':'Abierta en Safari'}</span><span class="s">${standalone?'Se abre desde el icono de inicio.':'Compartir → "Agregar a pantalla de inicio" para tener el icono.'}</span></div><span class="pill ${standalone?'ok':'status'}">${standalone?'✓':'Safari'}</span></div>
       <button class="cell" onclick="location.reload()"><div class="main"><span class="t" style="color:var(--brand-text)">Recargar datos</span></div></button></div></div>
+    ${puedeAsignarSedes()?`<div class="sect"><div class="hdr">Administración</div><div class="group">
+      <button class="cell" onclick="abrirSedesUsuario()"><div class="main"><span class="t">🏢🔀 Sedes de usuarios</span><span class="s">Habilitar sedes adicionales a alguien</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>
+      </div><div class="ftr">Por ejemplo, que recepción cubra un turno en otra sede. No cambia su sede principal.</div></div>`:''}
     <div class="sect"><div class="group"><button class="cell" onclick="doLogout()"><div class="main"><span class="t" style="color:var(--red)">Cerrar sesión</span></div></button></div>
       <div class="ftr">Cerrar sesión borra la sesión guardada en este teléfono.</div></div>`;
+}
+
+/* ══ Sedes de usuarios ══
+   Habilita sedes adicionales (sedes_extra) a los roles que trabajan por sede.
+   El RPC set_user_sedes valida el permiso en la base: solo admin/admin_sedes/admin_g. */
+const puedeAsignarSedes=()=>['admin','admin_sedes','admin_g'].includes(me?.role);
+const ROLES_CON_SEDE_EXTRA='recepcion,admin_sucursal,coordinador,instructor';
+let _suUsers=[], _suSel=null;
+
+async function abrirSedesUsuario(){
+  if(!puedeAsignarSedes()) return;
+  const sh=document.getElementById('sheet');
+  sh.innerHTML=`<div class="sheet-bg" onclick="cerrarSheet()"></div>
+    <div class="sheet-panel" role="dialog" aria-label="Sedes de usuarios">
+      <div class="sheet-h"><button class="act plain" onclick="cerrarSheet()">Cerrar</button>
+        <span class="tt">🏢🔀 Sedes de usuarios</span><span class="act" style="visibility:hidden">·</span></div>
+      <div class="sheet-body"><div class="ftr" style="padding:0 0 10px">Cargando usuarios…</div></div>
+    </div>`;
+  sh.hidden=false; document.body.style.overflow='hidden';
+  try{
+    _suUsers=(await supaFetch(`/user_roles?role=in.(${ROLES_CON_SEDE_EXTRA})&select=id,nombre,role,sede,sedes_extra&order=nombre.asc`))||[];
+  }catch(e){
+    sh.querySelector('.sheet-body').innerHTML=`<div class="empty" style="margin:0">No se pudieron cargar los usuarios: ${esc(e.message)}</div>`; return;
+  }
+  suListaUsuarios();
+}
+
+function suListaUsuarios(){
+  _suSel=null;
+  const body=document.querySelector('#sheet .sheet-body'); if(!body) return;
+  if(!_suUsers.length){ body.innerHTML='<div class="empty" style="margin:0">No hay usuarios con sede asignada.</div>'; return; }
+  body.innerHTML=`<div class="ftr" style="padding:0 0 10px">Elegí a quién querés habilitarle otra sede.</div>
+    <div class="group" style="margin:0">${_suUsers.map((u,i)=>{
+      const extra=Array.isArray(u.sedes_extra)?u.sedes_extra.filter(Boolean):[];
+      return `<button class="cell" onclick="suAbrirUsuario(${i})">
+        <div class="main"><span class="t">${esc(u.nombre||'(sin nombre)')}</span>
+          <span class="s">${esc(u.role||'')} · ${esc(u.sede||'sin sede')}${extra.length?' + '+esc(extra.join(', ')):''}</span></div>
+        ${extra.length?`<span class="pill info">+${extra.length}</span>`:''}
+        <svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`;}).join('')}</div>`;
+}
+
+function suAbrirUsuario(i){
+  const u=_suUsers[i]; if(!u) return; _suSel=u;
+  const extra=Array.isArray(u.sedes_extra)?u.sedes_extra:[];
+  const sh=document.getElementById('sheet');
+  sh.querySelector('.sheet-h').innerHTML=`<button class="act plain" onclick="suListaUsuarios()">Atrás</button>
+    <span class="tt">${esc(u.nombre||'Usuario')}</span>
+    <button class="act" id="suSave" onclick="suGuardar()">Guardar</button>`;
+  sh.querySelector('.sheet-body').innerHTML=`
+    <div class="ftr" style="padding:0 0 10px">${esc(u.role||'')} · sede principal <b>${esc(u.sede||'—')}</b></div>
+    <div class="group" style="margin:0">${SEDES.map(s=>{
+      const principal=(s===u.sede), marcada=principal||extra.includes(s);
+      return `<label class="cell" style="cursor:${principal?'default':'pointer'};${principal?'opacity:.6':''}">
+        <input type="checkbox" value="${esc(s)}" ${marcada?'checked':''} ${principal?'disabled':''}
+          style="width:22px;height:22px;flex:none;accent-color:var(--brand);margin:0 4px 0 0;">
+        <div class="main"><span class="t">${esc(s)}</span></div>
+        ${principal?'<span class="pill status">principal</span>':''}</label>`;}).join('')}</div>
+    <div class="ftr" id="suMsg" style="padding:10px 0 0">La sede principal siempre queda marcada. Al guardar, la persona debe cerrar sesión y volver a entrar.</div>`;
+}
+
+async function suGuardar(){
+  const u=_suSel; if(!u) return;
+  const btn=document.getElementById('suSave'), msg=document.getElementById('suMsg');
+  const extra=[...document.querySelectorAll('#sheet input[type=checkbox]:checked')].map(c=>c.value).filter(s=>s!==u.sede);
+  btn.disabled=true; btn.textContent='Guardando…';
+  try{
+    await supaFetch('/rpc/set_user_sedes',{method:'POST',body:{p_id:u.id,p_extra:extra}});
+    u.sedes_extra=extra;
+    cerrarSheet();
+    toast(extra.length ? `${u.nombre||'Usuario'} ahora también puede: ${extra.join(', ')}`
+                       : `${u.nombre||'Usuario'}: solo ${u.sede}`);
+  }catch(e){
+    btn.disabled=false; btn.textContent='Guardar';
+    if(msg){ msg.style.color='var(--red)'; msg.textContent='⚠ '+e.message; }
+  }
 }
 
 // ── Service worker (solo la carcasa; nunca datos de Supabase) ──

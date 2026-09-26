@@ -739,7 +739,7 @@
 <div id="sedesUsuarioModal" class="modal">
     <div class="summary-modal-content" style="max-width:460px;">
         <h3>🏢🔀 Sedes de un usuario</h3>
-        <p style="color:var(--sec);margin-top:-6px;margin-bottom:6px;font-size:14px;">Habilita sedes adicionales para recepción / admin de sucursal (por ejemplo, cubrir un turno en otra sede). No cambia su sede principal.</p>
+        <p style="color:var(--sec);margin-top:-6px;margin-bottom:6px;font-size:14px;">Habilita sedes adicionales a quienes trabajan por sede: recepción, admin de sucursal, coordinador e instructor (por ejemplo, cubrir un turno en otra sede). No cambia su sede principal.</p>
         <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px;">
             <div><label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Usuario</label>
                 <select id="suUser" onchange="suRenderSedes()" ><option value="">— Seleccione —</option></select></div>
@@ -1010,7 +1010,8 @@ async function openSedesUsuarioModal() {
     const sel = document.getElementById('suUser'); sel.innerHTML = '<option value="">Cargando…</option>';
     document.getElementById('sedesUsuarioModal').style.display = 'block';
     try {
-        _suUsers = await supaFetch('/user_roles?role=in.(recepcion,admin_sucursal)&select=id,nombre,sede,sedes_extra&order=nombre.asc', { userToken: currentToken }) || [];
+        // Todos los roles que trabajan por sede y usan sedes_extra en las políticas RLS
+        _suUsers = await supaFetch('/user_roles?role=in.(recepcion,admin_sucursal,coordinador,instructor)&select=id,nombre,sede,sedes_extra&order=nombre.asc', { userToken: currentToken }) || [];
     } catch(e) { _suUsers = []; msg.style.color = 'var(--red)'; msg.textContent = 'No se pudieron cargar los usuarios: ' + e.message; }
     sel.innerHTML = '<option value="">— Seleccione —</option>' +
         _suUsers.map(u => `<option value="${_suEsc(u.id)}">${_suEsc(u.nombre || '(sin nombre)')} · ${_suEsc(u.sede || 'sin sede')}</option>`).join('');
@@ -1245,7 +1246,7 @@ async function showSedePicker() {
             su.innerHTML = `
                 <div class="ic t-blue">🏢🔀</div>
                 <div class="tt t-blue">Sedes de usuarios</div>
-                <div class="s1">Recepción multi-sede</div>
+                <div class="s1">Quien cubre otra sede</div>
                 <div class="s2">Habilita sedes adicionales</div>`;
             su.onclick = openSedesUsuarioModal;
             cardsEl.appendChild(su);
