@@ -1271,10 +1271,13 @@ let G = {
 const norm = s => s ? String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim() : '';
 
 // ── Card "Con plan de natación" ──
-// Cuenta usuarios ACTIVOS cuyo plan (el corregido si lo hay) dice "natación".
-// Aquafitness y Estimulación temprana no cuentan: son otros programas de la piscina.
+// Cuenta usuarios ACTIVOS cuyo plan (el corregido si lo hay) es de la piscina:
+// natación, aquafitness o estimulación temprana.
 // El subtítulo desglosa por veces por semana cuando el nombre del plan lo dice.
-const esPlanNatacion = plan => { const p = norm(plan); return p.includes('natacion') || p.includes('nataion'); };
+const esPlanNatacion = plan => {
+  const p = norm(plan);
+  return p.includes('natacion') || p.includes('nataion') || p.includes('aquafitness') || p.includes('estimulacion');
+};
 function actualizarCardNatacion() {
   const el = document.getElementById('cNatacion');
   if (!el) return;
