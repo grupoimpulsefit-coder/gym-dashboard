@@ -1272,11 +1272,15 @@ const norm = s => s ? String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/
 
 // ── Card "Con plan de natación" ──
 // Cuenta usuarios ACTIVOS cuyo plan (el corregido si lo hay) es de la piscina:
-// natación, aquafitness o estimulación temprana.
+// natación, aquafitness o estimulación temprana, y los trimestrales con frecuencia
+// semanal ("Trimestre 2 por semana"), que no nombran la actividad. El trimestral
+// exige la frecuencia para no contar un trimestre de gimnasio.
 // El subtítulo desglosa por veces por semana cuando el nombre del plan lo dice.
+const FRECUENCIA_SEMANAL = /\d\s*(?:vez|veces|x)?\s*(?:por|x|a la)\s*semana/;
 const esPlanNatacion = plan => {
   const p = norm(plan);
-  return p.includes('natacion') || p.includes('nataion') || p.includes('aquafitness') || p.includes('estimulacion');
+  if (p.includes('natacion') || p.includes('nataion') || p.includes('aquafitness') || p.includes('estimulacion')) return true;
+  return p.includes('trimest') && FRECUENCIA_SEMANAL.test(p);
 };
 function actualizarCardNatacion() {
   const el = document.getElementById('cNatacion');
@@ -1288,7 +1292,7 @@ function actualizarCardNatacion() {
   el.textContent = nat.length;
   // Desglose "1× 12 · 2× 30 · 3× 8" según "N vez/veces por semana" en el nombre del plan
   const porVeces = {};
-  nat.forEach(u => { const m = norm(planDe(u)).match(/(\d)\s*(?:vez|veces|x)/); const k = m ? m[1] + '×' : 'otro'; porVeces[k] = (porVeces[k] || 0) + 1; });
+  nat.forEach(u => { const m = norm(planDe(u)).match(/(\d)\s*(?:vez|veces|x|por semana)/); const k = m ? m[1] + '×' : 'otro'; porVeces[k] = (porVeces[k] || 0) + 1; });
   const desglose = Object.keys(porVeces).sort().map(k => `${k} ${porVeces[k]}`).join(' · ');
   const pct = activos.length ? Math.round(nat.length / activos.length * 100) : 0;
   document.getElementById('cNatacionSub').innerHTML =
