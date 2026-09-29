@@ -65,6 +65,17 @@
   .card.teal   .card-value { color:var(--brand-text); }
   .card.cyan   .card-value { color:var(--teal); }
   .card.gray   .card-value { color:var(--sec); }
+  .card-link { cursor:pointer; transition:transform .15s, box-shadow .15s; }
+  .card-link:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,.10); }
+  .card-chev { color:var(--ter); font-weight:600; margin-left:2px; }
+
+  /* Lista de planes contados / no contados (card de natación) */
+  .planes-grupo { margin-bottom:16px; }
+  .planes-grupo h4 { font-size:13px; font-weight:600; color:var(--sec); text-transform:uppercase; letter-spacing:.04em; margin:0 0 8px; }
+  .planes-lista { background:var(--card); border-radius:12px; box-shadow:var(--shadow); overflow:hidden; }
+  .planes-lista div { display:flex; justify-content:space-between; gap:12px; padding:9px 14px; border-bottom:.5px solid var(--hair); font-size:14px; }
+  .planes-lista div:last-child { border-bottom:0; }
+  .planes-lista b { font-variant-numeric:tabular-nums; white-space:nowrap; }
 
   /* ── Pestañas: control segmentado que se desplaza si no cabe ── */
   .tabs { display:flex; gap:2px; overflow-x:auto; max-width:calc(100% - 2 * var(--gut)); margin:18px var(--gut) 0;
@@ -270,7 +281,7 @@
     .proy-controls, .proy-table-section, .proy-chart-section { padding:14px; }
     .card-value { font-size:22px; }
     .nat-modal { padding:0; }
-    .nat-modal-card { margin:0; border-radius:0; min-height:100%; }
+    .nat-modal-card { margin:0; border-radius:0; min-height:100%; max-width:none !important; }   /* gana al max-width en línea */
     .nat-modal-body { max-height:none; }
   }
 </style>
@@ -356,7 +367,7 @@
   <!-- Cards -->
   <div class="cards">
     <div class="card"><div class="card-label">Total Usuarios Hoja1</div><div class="card-value" id="cTotalUsuarios">—</div></div>
-    <div class="card teal"><div class="card-label">🏊 Con plan de natación</div><div class="card-value" id="cNatacion">—</div><div class="card-sub" id="cNatacionSub"></div></div>
+    <div class="card teal card-link" onclick="verPlanesNatacion()" title="Ver qué planes se cuentan"><div class="card-label">🏊 Con plan de natación <span class="card-chev">›</span></div><div class="card-value" id="cNatacion">—</div><div class="card-sub" id="cNatacionSub"></div></div>
     <div class="card red"><div class="card-label">Con plan incorrecto</div><div class="card-value" id="cPlanIncorrecto">—</div></div>
     <div class="card green"><div class="card-label">Planes corregidos</div><div class="card-value" id="cCorregidos">—</div><div class="card-sub" id="cCorregidosHist"></div></div>
     <div class="card orange"><div class="card-label">Clientes en descuento</div><div class="card-value" id="cDescuento">—</div></div>
@@ -1295,9 +1306,51 @@ function actualizarCardNatacion() {
   nat.forEach(u => { const m = norm(planDe(u)).match(/(\d)\s*(?:vez|veces|x|por semana)/); const k = m ? m[1] + '×' : 'otro'; porVeces[k] = (porVeces[k] || 0) + 1; });
   const desglose = Object.keys(porVeces).sort().map(k => `${k} ${porVeces[k]}`).join(' · ');
   const pct = activos.length ? Math.round(nat.length / activos.length * 100) : 0;
+  el.closest('.card').style.cursor = G.hoja1.length ? 'pointer' : 'default';
   document.getElementById('cNatacionSub').innerHTML =
     `${pct}% de ${activos.length} activos${inactivos ? ` · ${inactivos} inactivos más` : ''}` +
     (desglose && nat.length ? `<br><span title="Veces por semana">${desglose}</span>` : '');
+}
+
+// Al tocar el card: todos los planes de los usuarios activos, separados en
+// contados / no contados, para validar que no falte ningún plan de piscina.
+function verPlanesNatacion() {
+  if (!G.hoja1.length) return;
+  const planDe = u => u.planCorregido || u.planOriginal || '';
+  const cuenta = {};
+  G.hoja1.filter(u => u.activo === 'Sí').forEach(u => {
+    const p = planDe(u).trim() || '(sin plan)';
+    cuenta[p] = (cuenta[p] || 0) + 1;
+  });
+  const planes = Object.entries(cuenta).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const si = planes.filter(([p]) => esPlanNatacion(p));
+  const no = planes.filter(([p]) => !esPlanNatacion(p));
+  const suma = arr => arr.reduce((s, [, n]) => s + n, 0);
+  const lista = arr => arr.length
+    ? `<div class="planes-lista">${arr.map(([p, n]) => `<div><span>${esc(p)}</span><b>${n}</b></div>`).join('')}</div>`
+    : '<div class="dim" style="font-size:14px;">Ninguno</div>';
+
+  let modal = document.getElementById('planesNatModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'planesNatModal';
+    modal.className = 'nat-modal';
+    modal.innerHTML = `<div class="nat-modal-card" style="max-width:620px;">
+      <div class="nat-modal-head">
+        <h3>🏊 Planes contados como natación</h3>
+        <button class="btn-ghost" onclick="document.getElementById('planesNatModal').style.display='none'">Cerrar</button>
+      </div>
+      <div class="nat-modal-body" id="planesNatBody"></div>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+  }
+  document.getElementById('planesNatBody').innerHTML = `
+    <div class="alert alert-info">Planes de los <strong>${suma(planes)} usuarios activos</strong>. Revise la lista de
+      <strong>No contados</strong>: si alguno es de piscina, avise para agregarlo.</div>
+    <div class="planes-grupo"><h4>✅ Contados · ${si.length} planes · ${suma(si)} usuarios</h4>${lista(si)}</div>
+    <div class="planes-grupo"><h4>❌ No contados · ${no.length} planes · ${suma(no)} usuarios</h4>${lista(no)}</div>`;
+  modal.style.display = 'block';
 }
 const fmt  = n => n != null ? '₡' + Number(n).toLocaleString('es-CR') : '—';
 const isAddon = s => ADDONS.some(a => norm(s).includes(a));
