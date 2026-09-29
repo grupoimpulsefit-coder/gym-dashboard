@@ -76,6 +76,14 @@
   .planes-lista div { display:flex; justify-content:space-between; gap:12px; padding:9px 14px; border-bottom:.5px solid var(--hair); font-size:14px; }
   .planes-lista div:last-child { border-bottom:0; }
   .planes-lista b { font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .planes-lista div { align-items:center; }
+  .planes-lista .pn { min-width:0; }
+  .planes-lista .pn .tag { margin-left:4px; }
+  .planes-lista .pa { display:flex; align-items:center; gap:4px; flex:none; }
+  .planes-lista .btn-mini { min-height:28px; padding:0 10px; font-weight:600; }
+  .planes-lista .btn-mini.add { background:var(--brand-tint); color:var(--brand-text); }
+  .planes-lista .btn-mini:disabled { opacity:.5; cursor:default; }
+  #planesNatBody code { font-size:12px; background:var(--fill); padding:1px 5px; border-radius:5px; }
 
   /* ── Pestañas: control segmentado que se desplaza si no cabe ── */
   .tabs { display:flex; gap:2px; overflow-x:auto; max-width:calc(100% - 2 * var(--gut)); margin:18px var(--gut) 0;
@@ -949,6 +957,7 @@ async function doLogin() {
     }
     document.getElementById('loginScreen').style.display = 'none';
     cargarResumenGuardado();
+    cargarPlanesNat();   // ajustes manuales del card de natación (en paralelo)
   } catch(e) {
     errEl.textContent = e.message;
   } finally {
@@ -1282,17 +1291,45 @@ let G = {
 const norm = s => s ? String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim() : '';
 
 // ── Card "Con plan de natación" ──
-// Cuenta usuarios ACTIVOS cuyo plan (el corregido si lo hay) es de la piscina:
-// natación, aquafitness, aquaterapia, estimulación temprana, los "P Ejecutivo" y los trimestrales
-// con frecuencia semanal ("Trimestre 2 por semana"), que no nombran la actividad.
-// El trimestral exige la frecuencia para no contar un trimestre de gimnasio.
+// Cuenta usuarios ACTIVOS cuyo plan (el corregido si lo hay) es de la piscina.
+// Dos capas:
+//  1) Por nombre: natación / "Nat" (palabra suelta), aquafitness, aquaterapia,
+//     estimulación temprana, "P Ejecutivo" y los trimestrales con frecuencia
+//     semanal ("Trimestre 2 por semana"), que no nombran la actividad. El
+//     trimestral exige la frecuencia para no contar un trimestre de gimnasio.
+//  2) Ajustes manuales guardados en la tabla planes_natacion (se marcan desde la
+//     ventana del card): incluir=true suma un plan, incluir=false lo saca. Ganan
+//     sobre la regla por nombre. Ver planes_natacion.sql.
 // El subtítulo desglosa por veces por semana cuando el nombre del plan lo dice.
 const FRECUENCIA_SEMANAL = /\d\s*(?:vez|veces|x)?\s*(?:por|x|a la)\s*semana/;
-const esPlanNatacion = plan => {
+const esPlanNatacionPorNombre = plan => {
   const p = norm(plan);
   if (['natacion', 'nataion', 'aquafitness', 'aquaterapia', 'acuaterapia', 'estimulacion', 'ejecutivo'].some(k => p.includes(k))) return true;
+  if (/(^|[^a-z])nat([^a-z]|$)/.test(p)) return true;          // "Anual Nat adultos…", "Semestre Nat Niños…"
   return p.includes('trimest') && FRECUENCIA_SEMANAL.test(p);
 };
+let planesNatAjustes = {};          // plan_norm → { plan, incluir }
+let planesNatTabla = null;          // null = sin consultar, false = la tabla no existe todavía
+const esPlanNatacion = plan => {
+  const a = planesNatAjustes[norm(plan)];
+  return a ? a.incluir : esPlanNatacionPorNombre(plan);
+};
+const puedeEditarPlanesNat = () => currentRole === 'admin' || currentRole === 'admin_sedes';
+
+async function cargarPlanesNat() {
+  try {
+    const rows = await supaFetch('/planes_natacion?select=plan_norm,plan,incluir') || [];
+    planesNatAjustes = {};
+    rows.forEach(r => { planesNatAjustes[r.plan_norm] = { plan: r.plan, incluir: r.incluir }; });
+    planesNatTabla = true;
+  } catch (e) {
+    planesNatAjustes = {};
+    planesNatTabla = false;
+    console.warn('planes_natacion no disponible:', e.message);
+  }
+  if (G.hoja1.length) actualizarCardNatacion();
+}
+
 function actualizarCardNatacion() {
   const el = document.getElementById('cNatacion');
   if (!el) return;
@@ -1313,7 +1350,7 @@ function actualizarCardNatacion() {
 }
 
 // Al tocar el card: todos los planes de los usuarios activos, separados en
-// contados / no contados, para validar que no falte ningún plan de piscina.
+// contados / no contados, con botones para agregar o quitar planes del conteo.
 function verPlanesNatacion() {
   if (!G.hoja1.length) return;
   const planDe = u => u.planCorregido || u.planOriginal || '';
@@ -1326,16 +1363,29 @@ function verPlanesNatacion() {
   const si = planes.filter(([p]) => esPlanNatacion(p));
   const no = planes.filter(([p]) => !esPlanNatacion(p));
   const suma = arr => arr.reduce((s, [, n]) => s + n, 0);
-  const lista = arr => arr.length
-    ? `<div class="planes-lista">${arr.map(([p, n]) => `<div><span>${esc(p)}</span><b>${n}</b></div>`).join('')}</div>`
+  const editable = puedeEditarPlanesNat() && planesNatTabla === true;
+  const fila = ([p, n], contado) => {
+    const manual = planesNatAjustes[norm(p)];
+    const origen = manual ? `<span class="tag ${manual.incluir ? 'tag-corr' : 'tag-noplan'}">${manual.incluir ? 'agregado a mano' : 'quitado a mano'}</span>` : '';
+    const boton = !editable || p === '(sin plan)' ? '' : contado
+      ? `<button class="btn-mini" onclick="marcarPlanNat(${esc(JSON.stringify(p))}, false)">Quitar</button>`
+      : `<button class="btn-mini add" onclick="marcarPlanNat(${esc(JSON.stringify(p))}, true)">＋ Agregar</button>`;
+    return `<div><span class="pn">${esc(p)} ${origen}</span><span class="pa"><b>${n}</b>${boton}</span></div>`;
+  };
+  const lista = (arr, contado) => arr.length
+    ? `<div class="planes-lista">${arr.map(x => fila(x, contado)).join('')}</div>`
     : '<div class="dim" style="font-size:14px;">Ninguno</div>';
+  const aviso = planesNatTabla === false
+    ? ' Para poder agregar planes desde aquí, falta correr <code>planes_natacion.sql</code> en Supabase.'
+    : editable ? ' Si alguno de <strong>No contados</strong> es de piscina, tóquelo en <strong>＋ Agregar</strong>.'
+    : ' Si alguno de <strong>No contados</strong> es de piscina, avise a un administrador.';
 
   let modal = document.getElementById('planesNatModal');
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'planesNatModal';
     modal.className = 'nat-modal';
-    modal.innerHTML = `<div class="nat-modal-card" style="max-width:620px;">
+    modal.innerHTML = `<div class="nat-modal-card" style="max-width:660px;">
       <div class="nat-modal-head">
         <h3>🏊 Planes contados como natación</h3>
         <button class="btn-ghost" onclick="document.getElementById('planesNatModal').style.display='none'">Cerrar</button>
@@ -1346,11 +1396,38 @@ function verPlanesNatacion() {
     modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
   }
   document.getElementById('planesNatBody').innerHTML = `
-    <div class="alert alert-info">Planes de los <strong>${suma(planes)} usuarios activos</strong>. Revise la lista de
-      <strong>No contados</strong>: si alguno es de piscina, avise para agregarlo.</div>
-    <div class="planes-grupo"><h4>✅ Contados · ${si.length} planes · ${suma(si)} usuarios</h4>${lista(si)}</div>
-    <div class="planes-grupo"><h4>❌ No contados · ${no.length} planes · ${suma(no)} usuarios</h4>${lista(no)}</div>`;
+    <div class="alert alert-info">Planes de los <strong>${suma(planes)} usuarios activos</strong>.${aviso}</div>
+    <div id="planesNatMsg" class="form-msg" style="margin-bottom:10px;"></div>
+    <div class="planes-grupo"><h4>✅ Contados · ${si.length} planes · ${suma(si)} usuarios</h4>${lista(si, true)}</div>
+    <div class="planes-grupo"><h4>❌ No contados · ${no.length} planes · ${suma(no)} usuarios</h4>${lista(no, false)}</div>`;
   modal.style.display = 'block';
+}
+
+// Agrega (incluir=true) o quita (false) un plan del conteo. Si la regla por
+// nombre ya da ese resultado, se borra el ajuste en vez de guardar uno redundante.
+async function marcarPlanNat(plan, incluir) {
+  const key = norm(plan);
+  const msg = document.getElementById('planesNatMsg');
+  document.querySelectorAll('#planesNatBody .btn-mini').forEach(b => b.disabled = true);
+  try {
+    if (esPlanNatacionPorNombre(plan) === incluir) {
+      await supaFetch(`/planes_natacion?plan_norm=eq.${encodeURIComponent(key)}`, { method: 'DELETE' });
+    } else {
+      await supaFetch('/planes_natacion?on_conflict=plan_norm', {
+        method: 'POST', prefer: 'resolution=merge-duplicates,return=minimal',
+        body: [{ plan_norm: key, plan, incluir }]
+      });
+    }
+    await cargarPlanesNat();
+    verPlanesNatacion();
+    const m = document.getElementById('planesNatMsg');
+    m.className = 'form-msg ok';
+    m.textContent = `${incluir ? '✓ Agregado' : '✓ Quitado'}: ${plan}`;
+  } catch (e) {
+    msg.className = 'form-msg err';
+    msg.textContent = /row-level security|42501|permission/i.test(e.message) ? 'Su usuario no puede cambiar el conteo.' : 'No se pudo guardar: ' + e.message;
+    document.querySelectorAll('#planesNatBody .btn-mini').forEach(b => b.disabled = false);
+  }
 }
 const fmt  = n => n != null ? '₡' + Number(n).toLocaleString('es-CR') : '—';
 const isAddon = s => ADDONS.some(a => norm(s).includes(a));
