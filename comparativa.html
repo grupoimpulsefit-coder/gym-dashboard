@@ -163,6 +163,9 @@ table.det .num { text-align:right; }
     </div>
   </div>
 
+  <div class="section"><div class="section-title">Meta del mes <span class="section-note" id="metaNota"></span></div></div>
+  <div id="metaBox"></div>
+
   <div class="section"><div class="section-title">Resumen por sede</div></div>
   <div class="sede-grid" id="sedeGrid"></div>
 
@@ -177,6 +180,8 @@ table.det .num { text-align:right; }
         <th class="num">Cobrado</th>
         <th class="num">% Recuperado</th>
         <th class="num">Pendiente</th>
+        <th class="num">Meta</th>
+        <th class="num">Falta meta</th>
       </tr></thead>
       <tbody id="compBody"></tbody>
     </table>
@@ -185,6 +190,7 @@ table.det .num { text-align:right; }
 </div>
 
 <script src="/sesion.js"></script>
+<script src="/metas.js"></script>
 <script>
 // ── Supabase ──────────────────────────────────────────────────────────────
 const SUPA_URL = '__SUPA_URL__';
@@ -395,8 +401,10 @@ async function aplicarFiltro() {
       document.getElementById('emptyState').textContent = `No hay datos cargados para ${mes}.`;
       document.getElementById('dashboard').style.display = 'block';
       document.getElementById('compBody').innerHTML = '';
+      document.getElementById('metaBox').innerHTML = '';
       return;
     }
+    await Metas.cargar(Metas.mesOrdenDe(desde));
     render(snaps, desde, hasta);
     document.getElementById('dashboard').style.display = 'block';
   } catch(e) {
@@ -417,6 +425,23 @@ function render(snaps, desde, hasta) {
   const rows = [];
   const cards = [];
 
+  // Meta del mes: es mensual, así que cuenta lo cobrado desde el día 1 hasta "Hasta"
+  // (no desde "Desde"). Los cálculos viven en /metas.js, compartido con sedes.html.
+  const mesOrden = Metas.mesOrdenDe(desde);
+  const mesTxt = mesNombre(desde);
+  const metaCalc = Metas.calcular({ snaps: bySede, mesOrden, mesTxt, corte: hasta });
+  Metas.recordar({ mesOrden, mesTxt, calc: metaCalc, onGuardado: () => render(snaps, desde, hasta) });
+  document.getElementById('metaBox').innerHTML = Metas.htmlResumen(metaCalc);
+  document.getElementById('metaNota').textContent = metaCalc.total.sedesConMeta
+    ? `Cobrado del 1 al ${metaCalc.corteTxt}, sin importar la fecha "Desde"` : '';
+  const tdMeta = sede => {
+    const r = metaCalc.porSede[sede];
+    if (!(r?.meta > 0)) return '<td class="num muted-i">—</td><td class="num muted-i">—</td>';
+    return `<td class="num">${fmt(r.meta)}</td>` + (r.cobrado >= r.meta
+      ? `<td class="num" style="color:var(--green);font-weight:600;">✓ +${fmt(r.cobrado - r.meta)}</td>`
+      : `<td class="num" style="color:var(--red);font-weight:600;">${fmt(r.falta)}</td>`);
+  };
+
   SEDES.forEach(sede => {
     const snap = bySede[sede];
     const meta = SEDE_META[sede] || { icon: '🏋️', color: 'var(--sec)' };
@@ -425,7 +450,7 @@ function render(snaps, desde, hasta) {
         <span class="sc-name">${sede}</span>${extra}</div>`;
     if (!snap) {
       rows.push(`<tr><td><span class="dot" style="background:${meta.color}"></span>${sede}</td>
-        <td colspan="6" class="muted-i">Sin datos cargados para este mes</td></tr>`);
+        <td colspan="8" class="muted-i">Sin datos cargados para este mes</td></tr>`);
       cards.push(`<div class="sede-card no-data">${cabeza()}<div class="sc-of">Sin datos cargados para este mes</div></div>`);
       return;
     }
@@ -476,6 +501,7 @@ function render(snaps, desde, hasta) {
         <div><span class="l">Pagos</span><span class="v green">${sinVentas ? '—' : cobros.length}</span></div>
         <div><span class="l">Pendiente · ${pendientes.length}</span><span class="v red">${fmt(pendMonto)}</span></div>
       </div>
+      ${Metas.htmlSede(metaCalc, sede)}
       <span class="sc-more">Ver ${proyectados.length} clientes ›</span>
     </button>`);
     rows.push(`<tr class="sede-row" id="fila-${idSede(sede)}" onclick="toggleDetalle('${escQ(sede)}')">
@@ -486,8 +512,9 @@ function render(snaps, desde, hasta) {
       <td class="num" style="color:var(--green);font-weight:700;">${fmt(cobrado)}</td>
       <td class="num">${pillPct(pct)}</td>
       <td class="num" style="color:var(--red);">${fmt(pendMonto)}</td>
+      ${tdMeta(sede)}
     </tr>
-    <tr class="detalle-row" id="det-${idSede(sede)}" style="display:none;"><td colspan="7"><div class="detalle-inner" id="detInner-${idSede(sede)}"></div></td></tr>`);
+    <tr class="detalle-row" id="det-${idSede(sede)}" style="display:none;"><td colspan="9"><div class="detalle-inner" id="detInner-${idSede(sede)}"></div></td></tr>`);
   });
 
   const tPct = tProy > 0 ? tCobrado / tProy * 100 : 0;
@@ -499,6 +526,8 @@ function render(snaps, desde, hasta) {
     <td class="num" style="color:var(--green);">${fmt(tCobrado)}</td>
     <td class="num">${tPct.toFixed(1)}%</td>
     <td class="num" style="color:var(--red);">${fmt(tPendMonto)}</td>
+    <td class="num">${metaCalc.total.meta > 0 ? fmt(metaCalc.total.meta) : '—'}</td>
+    <td class="num" style="color:var(${metaCalc.total.falta > 0 ? '--red' : '--green'});">${metaCalc.total.meta > 0 ? (metaCalc.total.falta > 0 ? fmt(metaCalc.total.falta) : '✓') : '—'}</td>
   </tr>`);
   document.getElementById('compBody').innerHTML = rows.join('');
   document.getElementById('sedeGrid').innerHTML = cards.join('');

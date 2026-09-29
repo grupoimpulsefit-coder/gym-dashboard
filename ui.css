@@ -255,6 +255,33 @@ tr.faltante td{background:var(--red-tint)!important}
 .cat-summary{font-size:13px;color:var(--sec)}
 .cat-summary b{color:var(--label);font-variant-numeric:tabular-nums}
 
+/* ══ Metas (metas.js: comparativa y sedes) ══════════════════════════════ */
+.meta-card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);margin:0 var(--gut) 4px;padding:18px 22px;
+  display:flex;flex-direction:column;gap:12px}
+.meta-card.meta-vacia{flex-direction:row;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.meta-card .hint code{font-size:12px;background:var(--fill);padding:1px 5px;border-radius:5px}
+.meta-top{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:16px;align-items:start}
+.meta-fig .l{display:block;font-size:13px;color:var(--sec)}
+.meta-fig .v{display:block;font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums}
+.meta-fig .s{display:block;font-size:12px;color:var(--sec);margin-top:2px}
+.meta-act{align-self:center}
+.meta-card .t-green,.meta-sede .t-green{color:var(--green)}
+.meta-card .t-red,.meta-sede .t-red{color:var(--red)}
+.meta-bar{position:relative;height:10px;border-radius:5px;background:var(--fill2);overflow:visible}
+.meta-bar i{display:block;height:100%;border-radius:5px;max-width:100%}
+.meta-bar b{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;border-radius:1px;background:var(--label);opacity:.55}
+.meta-leyenda{display:flex;gap:16px;font-size:12px;color:var(--sec)}
+.meta-leyenda span{display:inline-flex;align-items:center;gap:6px}
+.meta-leyenda i{display:inline-block}
+.meta-leyenda i.c{width:14px;height:6px;border-radius:3px;background:var(--brand)}
+.meta-leyenda i.p{width:2px;height:12px;border-radius:1px;background:var(--label);opacity:.55}
+.meta-ritmo{font-size:14px;background:var(--orange-tint);border-radius:10px;padding:10px 12px}
+.meta-sede{background:var(--fill);border-radius:10px;padding:9px 12px;display:flex;flex-direction:column;gap:7px}
+.meta-sede-top{display:flex;justify-content:space-between;gap:8px;font-size:13px;flex-wrap:wrap}
+.meta-sede-top span{color:var(--sec)}
+.meta-sede .meta-bar{height:6px}
+.meta-sede .meta-bar b{top:-3px;bottom:-3px}
+
 /* ══ Responsive ═════════════════════════════════════════════════════════ */
 @media (max-width:760px){
   :root{--gut:16px}
@@ -277,6 +304,11 @@ tr.faltante td{background:var(--red-tint)!important}
   .modal{max-width:none;border-radius:18px 18px 0 0;max-height:94dvh;display:flex;flex-direction:column;margin:0}
   .modal-body{overflow-y:auto;padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
   .modal-foot{padding-bottom:calc(env(safe-area-inset-bottom) + 14px)}
+  .meta-card{padding:16px}
+  .meta-top{grid-template-columns:1fr 1fr;gap:12px}
+  .meta-fig .v{font-size:21px}
+  .meta-act{grid-column:1/-1}
+  .meta-act .btn-ghost{width:100%;justify-content:center}
 }
 @media print{
   .header,.topbar,.dash-topbar,.tabs,.form-card,.btn-primary,.btn-ghost,.btn-del,.btn-edit{display:none!important}

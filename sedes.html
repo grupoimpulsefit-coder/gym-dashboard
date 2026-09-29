@@ -155,6 +155,9 @@
     </div>
   </div>
 
+  <div class="section"><div class="section-title">Meta del mes <span class="section-note" id="metaNota"></span></div></div>
+  <div id="metaBox"></div>
+
   <div class="section"><div class="section-title">Resumen por sede</div></div>
   <div class="sede-grid" id="sedeGrid"></div>
 
@@ -170,6 +173,7 @@
 </div>
 
 <script src="/sesion.js"></script>
+<script src="/metas.js"></script>
 <script>
 // ── Supabase ──────────────────────────────────────────────────────────────
 const SUPA_URL = '__SUPA_URL__';
@@ -377,6 +381,17 @@ async function loadAllSedes(mesElegido) {
       } catch(_) { gastosMes = {}; }
     }
 
+    // Meta del mes: hace falta la lista de usuarios (users_data) para la proyección.
+    // Solo se descarga la del mes elegido; la consulta general no la trae porque pesa.
+    metaMes = Metas.normalizarMes(ordenMes || mesActual);
+    if (metaMes) {
+      try {
+        const us = (await supaFetch(`/gym_snapshots?mes=eq.${encodeURIComponent(mesActual)}&select=sede,users_data&order=updated_at.desc`)) || [];
+        us.forEach(u => { if (latest[u.sede] && !latest[u.sede].users_data) latest[u.sede].users_data = u.users_data; });
+      } catch(_) {}
+      await Metas.cargar(metaMes);
+    }
+
     buildDashboard(latest);
     document.getElementById('dashboard').style.display = 'block';
   } catch(e) {
@@ -386,9 +401,25 @@ async function loadAllSedes(mesElegido) {
   }
 }
 
+let metaMes = null;   // 'YYYY-MM' del mes elegido
+
 function buildDashboard(latest) {
   const fmt = n => '₡' + Math.round(n).toLocaleString('es-CR');
   const pct = (a, b) => b ? (a/b*100).toFixed(1)+'%' : '0%';
+
+  // Meta del mes (cálculos en /metas.js, compartido con comparativa.html). En un
+  // mes cerrado cuenta todo el mes; en el actual, lo cobrado hasta hoy.
+  const mesTxt = document.getElementById('mesSelectorSedes').value;
+  const metaCalc = metaMes ? Metas.calcular({ snaps: latest, mesOrden: metaMes, mesTxt }) : null;
+  if (metaCalc) {
+    Metas.recordar({ mesOrden: metaMes, mesTxt, calc: metaCalc, onGuardado: () => buildDashboard(latest) });
+    document.getElementById('metaBox').innerHTML = Metas.htmlResumen(metaCalc);
+    document.getElementById('metaNota').textContent = metaCalc.total.sedesConMeta
+      ? 'Pagos de membresía, mismo criterio que Comparativa' : '';
+  } else {
+    document.getElementById('metaBox').innerHTML = '';
+    document.getElementById('metaNota').textContent = '';
+  }
 
   // filas de venta por sede, derivadas de renov_data (RegistradoPor/Producto/Total)
   const rowsBySede = {};
@@ -466,6 +497,7 @@ function buildDashboard(latest) {
     return `<div class="sede-card">
       ${cabeza(s, m, `<span class="sc-mes" style="margin-left:auto">${d.mes}</span>`)}
       <div class="sc-big">${fmt(d.tot)}</div>
+      ${metaCalc ? Metas.htmlSede(metaCalc, s) : ''}
       ${d.tot > 0 ? `<div class="stack sm">${pila(cats, d.tot)}</div>` : ''}
       <div class="list">${filasCat}</div>
       <div class="list">${filasFE}</div>
