@@ -356,6 +356,7 @@
   <!-- Cards -->
   <div class="cards">
     <div class="card"><div class="card-label">Total Usuarios Hoja1</div><div class="card-value" id="cTotalUsuarios">—</div></div>
+    <div class="card teal"><div class="card-label">🏊 Con plan de natación</div><div class="card-value" id="cNatacion">—</div><div class="card-sub" id="cNatacionSub"></div></div>
     <div class="card red"><div class="card-label">Con plan incorrecto</div><div class="card-value" id="cPlanIncorrecto">—</div></div>
     <div class="card green"><div class="card-label">Planes corregidos</div><div class="card-value" id="cCorregidos">—</div><div class="card-sub" id="cCorregidosHist"></div></div>
     <div class="card orange"><div class="card-label">Clientes en descuento</div><div class="card-value" id="cDescuento">—</div></div>
@@ -1123,6 +1124,7 @@ function mostrarDashboardDesdeSnapshot(s) {
   G.pages = { usuarios:1, ventas:1, proy:1, validacion:1 };
 
   document.getElementById('cTotalUsuarios').textContent = G.hoja1.length;
+  actualizarCardNatacion();
   document.getElementById('cPlanIncorrecto').textContent = G.hoja1.filter(u=>u.estado!=='ok').length;
   document.getElementById('cCorregidos').textContent = G.hoja1.filter(u=>u.estado==='corregido').length;
   const corregidosHist = G.hoja1.filter(u => u.estado === 'corregido' && u.fuentePlan === 'historico').length;
@@ -1267,6 +1269,29 @@ let G = {
 // UTILIDADES
 // ─────────────────────────────────────────
 const norm = s => s ? String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim() : '';
+
+// ── Card "Con plan de natación" ──
+// Cuenta usuarios ACTIVOS cuyo plan (el corregido si lo hay) dice "natación".
+// Aquafitness y Estimulación temprana no cuentan: son otros programas de la piscina.
+// El subtítulo desglosa por veces por semana cuando el nombre del plan lo dice.
+const esPlanNatacion = plan => { const p = norm(plan); return p.includes('natacion') || p.includes('nataion'); };
+function actualizarCardNatacion() {
+  const el = document.getElementById('cNatacion');
+  if (!el) return;
+  const planDe = u => u.planCorregido || u.planOriginal || '';
+  const activos = G.hoja1.filter(u => u.activo === 'Sí');
+  const nat = activos.filter(u => esPlanNatacion(planDe(u)));
+  const inactivos = G.hoja1.filter(u => u.activo !== 'Sí' && esPlanNatacion(planDe(u))).length;
+  el.textContent = nat.length;
+  // Desglose "1× 12 · 2× 30 · 3× 8" según "N vez/veces por semana" en el nombre del plan
+  const porVeces = {};
+  nat.forEach(u => { const m = norm(planDe(u)).match(/(\d)\s*(?:vez|veces|x)/); const k = m ? m[1] + '×' : 'otro'; porVeces[k] = (porVeces[k] || 0) + 1; });
+  const desglose = Object.keys(porVeces).sort().map(k => `${k} ${porVeces[k]}`).join(' · ');
+  const pct = activos.length ? Math.round(nat.length / activos.length * 100) : 0;
+  document.getElementById('cNatacionSub').innerHTML =
+    `${pct}% de ${activos.length} activos${inactivos ? ` · ${inactivos} inactivos más` : ''}` +
+    (desglose && nat.length ? `<br><span title="Veces por semana">${desglose}</span>` : '');
+}
 const fmt  = n => n != null ? '₡' + Number(n).toLocaleString('es-CR') : '—';
 const isAddon = s => ADDONS.some(a => norm(s).includes(a));
 
@@ -1489,6 +1514,7 @@ async function processUsuariosNat(file) {
     const cInc   = document.getElementById('cPlanIncorrecto');
     const cCorr  = document.getElementById('cCorregidos');
     if (cTotal) cTotal.textContent = newHoja1.length;
+    actualizarCardNatacion();
     if (cInc)   cInc.textContent   = planIncorrecto;
     if (cCorr)  cCorr.textContent  = corregidos;
 
@@ -2543,6 +2569,7 @@ function analizar(wb) {
   // ── Actualizar cards ──
   const corregidosHist = G.hoja1.filter(r => r.estado === 'corregido' && r.fuentePlan === 'historico').length;
   document.getElementById('cTotalUsuarios').textContent = G.hoja1.length;
+  actualizarCardNatacion();
   document.getElementById('cPlanIncorrecto').textContent = planIncorrecto;
   document.getElementById('cCorregidos').textContent = corregidos;
   document.getElementById('cCorregidosHist').textContent = corregidosHist > 0 ? `📅 ${corregidosHist} vía histórico` : '';
