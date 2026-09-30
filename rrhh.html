@@ -158,8 +158,9 @@
             <option value="mensual">📅 Mensual (planilla)</option>
             <option value="semanal">🕐 Semanal por horas (servicios profesionales)</option>
           </select></div>
-        <div class="f-field pago-mensual"><label>Salario mensual (₡)</label><input type="number" id="eSalMensual" min="0" step="1" oninput="autoQuincena();renderCcssDesglose()"></div>
+        <div class="f-field pago-mensual"><label>Salario mensual (₡)</label><input type="number" id="eSalMensual" min="0" step="1" oninput="autoQuincena();renderPagoDiario();renderCcssDesglose()"></div>
         <div class="f-field pago-mensual"><label>Salario quincenal (₡)</label><input type="number" id="eSalQuincena" min="0" step="1"></div>
+        <div class="f-field full pago-mensual"><label>Salario diario</label><div class="pay-box" id="pagoDiarioBox">Indique el salario mensual.</div></div>
         <div class="f-field pago-semanal"><label>Monto por hora (₡)</label><input type="number" id="eMontoHora" min="0" step="1" oninput="renderPagoSemanal();renderCcssDesglose()"></div>
         <div class="f-field pago-semanal"><label>Horas por semana</label><input type="number" id="eHorasSemana" min="0" step="0.5" oninput="renderPagoSemanal();renderCcssDesglose()"></div>
         <div class="f-field full pago-semanal"><label>Pago de la semana</label><div class="pay-box" id="pagoSemanalBox">Indique el monto por hora y las horas por semana.</div></div>
@@ -288,6 +289,9 @@ const esSemanal = e => e?.tipo_pago === 'semanal';
 const pagoSemanal = e => esSemanal(e) ? Number(e.horas_semana||0) * Number(e.monto_hora||0) : 0;
 // Base mensual de cualquier empleado, sea de planilla o por horas.
 const baseMensual = e => esSemanal(e) ? pagoSemanal(e) * SEMANAS_POR_MES : Number(e?.salario_mensual||0);
+// Salario diario de planilla mensual: mensual ÷ 30 (la misma base que usa la liquidación)
+const DIAS_POR_MES = 30;
+const salarioDiario = mensual => (Number(mensual) || 0) / DIAS_POR_MES;
 
 function deduccionCCSS(e){ return aseguradoCCSS(e) ? baseMensual(e) * CCSS_TRABAJADOR : 0; }
 function cargaPatronalCCSS(e){ return aseguradoCCSS(e) ? baseMensual(e) * CCSS_PATRONO : 0; }
@@ -413,7 +417,7 @@ function renderEmpleados(){
       <td>${esSemanal(e)
             ? `<span class="pill info">Semanal</span><div class="s-sub">${Number(e.horas_semana||0)} h × ${fmtCRC(e.monto_hora)} = <b>${fmtCRC(pagoSemanal(e))}</b>/sem</div>`
             : '<span class="pill status">Mensual</span>'}</td>
-      <td class="num">${esSemanal(e) ? `<span title="Equivalente mensual del pago semanal">≈ ${fmtCRC(baseMensual(e))}</span>` : fmtCRC(e.salario_mensual)}</td>
+      <td class="num">${esSemanal(e) ? `<span title="Equivalente mensual del pago semanal">≈ ${fmtCRC(baseMensual(e))}</span>` : `${fmtCRC(e.salario_mensual)}${Number(e.salario_mensual) > 0 ? `<div class="s-sub">${fmtCRC(salarioDiario(e.salario_mensual))}/día</div>` : ''}`}</td>
       <td class="num">${esSemanal(e) ? '<span style="color:var(--ter);">—</span>' : fmtCRC(e.salario_quincenal)}</td>
       <td class="num">${aseguradoCCSS(e) ? fmtCRC(deduccionCCSS(e)) : '<span style="color:var(--ter);">No aseg.</span>'}</td>
       <td>${fmtFecha(e.fecha_ingreso)}</td>
@@ -505,7 +509,16 @@ function onTipoPagoChange(aplicarDefaults){
     }
   }
   renderPagoSemanal();
+  renderPagoDiario();
   renderCcssDesglose();
+}
+
+function renderPagoDiario(){
+  const box = document.getElementById('pagoDiarioBox');
+  const sm = Number(document.getElementById('eSalMensual').value) || 0;
+  if (!sm){ box.textContent = 'Indique el salario mensual.'; return; }
+  box.innerHTML = `<b>${fmtCRC(salarioDiario(sm))} por día</b> · ${fmtCRC(sm)} ÷ ${DIAS_POR_MES} días. `
+    + `Es la misma base que usa la liquidación.`;
 }
 
 function renderPagoSemanal(){
@@ -794,7 +807,7 @@ function calcLiquidacion(){
   const salida = parseFecha(document.getElementById('lqFecha').value) || new Date();
   const tipo = document.getElementById('lqTipo').value;
   const salMensual = Number(document.getElementById('lqSalario').value) || 0;
-  const salDiario = salMensual/30;
+  const salDiario = salarioDiario(salMensual);
   const vacDias = Number(document.getElementById('lqVac').value) || 0;
   const meses = fi ? mesesEntre(fi, salida) : 0;
   const anios = meses/12;
