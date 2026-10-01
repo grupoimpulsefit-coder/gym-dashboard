@@ -74,7 +74,7 @@
         .filter-item { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
         .filter-item label { font-weight: 600; margin: 0; color: var(--sec); font-size: 12px;
             text-transform: uppercase; letter-spacing: .04em; }
-        .filter-item select, .filter-item input[type="text"] {
+        .filter-item select, .filter-item input[type="text"], .filter-item input[type="number"] {
             appearance: none; -webkit-appearance: none; padding: 0 12px; min-height: 40px; border: 1.5px solid transparent;
             border-radius: 10px; font-size: 15px; font-family: inherit; background: var(--fill); color: var(--label); outline: none; width: 100%; }
         .filter-item select { padding-right: 30px;
@@ -617,13 +617,26 @@
                     <div class="filter-item"><label>Buscar cliente</label>
                         <input type="text" id="segSearch" placeholder="Nombre del cliente..." oninput="renderSeguimiento()"></div>
                     <div class="filter-item"><label>Vencido hace</label>
-                        <select id="segRango" onchange="renderSeguimiento()">
+                        <select id="segRango" onchange="onSegRangoChange()">
                             <option value="all">Cualquier antigüedad</option>
-                            <option value="1-15">1 a 15 días</option>
-                            <option value="16-30">16 a 30 días</option>
-                            <option value="31-60">31 a 60 días</option>
-                            <option value="61-9999">Más de 60 días</option>
+                            <optgroup label="Por tramo">
+                                <option value="1-15">1 a 15 días</option>
+                                <option value="16-30">16 a 30 días</option>
+                                <option value="31-60">31 a 60 días</option>
+                                <option value="61-9999">Más de 60 días</option>
+                            </optgroup>
+                            <optgroup label="Desde N días hasta 2 meses">
+                                <option value="15-60">15+ días (15 a 60)</option>
+                                <option value="22-60">22+ días (22 a 60)</option>
+                            </optgroup>
+                            <option value="custom">Otro rango…</option>
                         </select></div>
+                    <div class="filter-item" id="segCustomBox" hidden><label>Días vencido (desde – hasta)</label>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <input type="number" id="segMin" min="0" step="1" value="15" inputmode="numeric" oninput="renderSeguimiento()" style="min-width:0;" aria-label="Mínimo de días">
+                            <span style="color:var(--sec);">–</span>
+                            <input type="number" id="segMax" min="0" step="1" value="60" inputmode="numeric" oninput="renderSeguimiento()" style="min-width:0;" aria-label="Máximo de días (vacío = sin tope)" placeholder="sin tope">
+                        </div></div>
                     <div class="filter-item"><label>Plan</label>
                         <select id="segFilterPlan" onchange="renderSeguimiento()"><option value="all">Todos</option></select></div>
                     <div class="filter-item" style="justify-content:flex-end;">
@@ -2499,16 +2512,34 @@ function getFilteredSeguimiento() {
         if (plan !== 'all' && u.ÚltimoProducto !== plan) return false;
         const diasVencido = Math.round((today - u.ExpiraDate) / 864e5);
         if (rango !== 'all') {
-            const [min, max] = rango.split('-').map(Number);
+            const [min, max] = segRangoDias(rango);
             if (diasVencido < min || diasVencido > max) return false;
         }
         return true;
     });
 }
 
+// "15-60" → [15, 60]. "custom" toma las casillas; "hasta" vacío = sin tope.
+function segRangoDias(rango) {
+    if (rango === 'custom') {
+        const min = Number(document.getElementById('segMin').value) || 0;
+        const maxTxt = document.getElementById('segMax').value;
+        return [min, maxTxt === '' ? Infinity : Number(maxTxt)];
+    }
+    return rango.split('-').map(Number);
+}
+
+function onSegRangoChange() {
+    document.getElementById('segCustomBox').hidden = document.getElementById('segRango').value !== 'custom';
+    renderSeguimiento();
+}
+
 function clearSegFilters() {
     document.getElementById('segSearch').value = '';
     document.getElementById('segRango').value = 'all';
+    document.getElementById('segCustomBox').hidden = true;
+    document.getElementById('segMin').value = 15;
+    document.getElementById('segMax').value = 60;
     document.getElementById('segFilterPlan').value = 'all';
     renderSeguimiento();
 }
