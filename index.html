@@ -1486,7 +1486,7 @@ function isMembershipPlan(product) {
     if (/\d+\s*x\s*\d+\s*mil/i.test(p)) return true;
     // Incluye palabras de planes de natación (natación, gym, aquafitness, estimulación) para
     // clasificar bien esa sede — su renov_data se comparte con index.html.
-    return /plan|promo|flash|anual|lealtad|fidelidad|bloqueado|verano|exclusivo|platium|semestral|trimest|bimest|estudiante|renovaci[oó]n|black|ejecutivo|mensualidad|matr[ií]cula|nataci[oó]n|gym|aquafitness|estimulaci[oó]n|\bpng\b|\bcps\b/i.test(p);
+    return /\b(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b|plan|promo|flash|anual|lealtad|fidelidad|bloqueado|verano|exclusivo|platium|semestral|trimest|bimest|estudiante|renovaci[oó]n|black|ejecutivo|mensualidad|matr[ií]cula|nataci[oó]n|gym|aquafitness|estimulaci[oó]n|\bpng\b|\bcps\b/i.test(p);
 }
 function isClaseSuelta(product) {
     let pl = String(product||'').trim().toLowerCase();
