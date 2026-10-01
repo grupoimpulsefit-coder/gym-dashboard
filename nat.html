@@ -856,6 +856,7 @@
 </div>
 
 <script src="/sesion.js"></script>
+<script src="/catalogo.js"></script>
 <script>
 // ─────────────────────────────────────────
 // SUPABASE
@@ -1465,6 +1466,7 @@ function cleanPlan(s) {
 let planPrices = {};
 
 async function loadPricesForSede(sede) {
+  if (window.Catalogo) await Catalogo.cargar(sede);   // catálogo de ventas de la sede (plan / clase / producto)
   try {
     const rows = await supaFetch(`/plan_prices?sede=eq.${encodeURIComponent(sede)}&select=plan,precio`);
     if (rows && rows.length) { rows.forEach(r => { planPrices[r.plan] = r.precio; }); return; }
@@ -3495,6 +3497,8 @@ function esPlanDeNatacionRecurrente(pl) {
 }
 function isMembershipPlan(product) {
   const p = String(product||'').trim();
+  // Lo que recepción registró en el catálogo de la sede manda sobre la regla por nombre (ver /catalogo.js)
+  const _t = window.Catalogo && Catalogo.tipo(p); if (_t) return _t === 'plan';
   if (/\(\d+\)/.test(p)) return false; // "Agua (1)" etc. — venta suelta con cantidad
   const pl = p.toLowerCase();
   if (esPlanDeNatacionRecurrente(pl)) return true;
@@ -3505,6 +3509,7 @@ function isMembershipPlan(product) {
   return /\b(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b|plan|promo|flash|anual|lealtad|fidelidad|bloqueado|verano|exclusivo|platium|semestral|trimest|bimest|estudiante|renovaci[oó]n|black|mensualidad|matr[ií]cula|nataci[oó]n|gym|aquafitness|estimulaci[oó]n|ejecutivo|\bpng\b|\bcps\b/i.test(p);
 }
 function isClaseSuelta(product) {
+  const _t = window.Catalogo && Catalogo.tipo(product); if (_t) return _t === 'clase';
   const pl = String(product||'').trim().toLowerCase();
   if (esPlanDeNatacionRecurrente(pl)) return false;
   return pl.includes('sesion') || pl.includes('sesión') || pl.includes('clase');

@@ -452,6 +452,7 @@ table.hist tbody tr:hover td { background:var(--fill); }
 </div>
 
 <script src="/sesion.js"></script>
+<script src="/catalogo.js"></script>
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
 let currentToken=null,currentRole=null,currentSede=null,currentEmail='',currentSedes=[];
@@ -1265,9 +1266,9 @@ function parseDateCR(s){ if(!s)return null; s=String(s).trim(); if(s.includes('/
 function parseRenoDT(s){ if(!s)return null; return parseDateCR(String(s).trim().split(/\s+/)[0]); }
 function normP(n){ return String(n||'').toLowerCase().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n').replace(/\s+/g,' ').trim(); }
 function esPlanRecurrenteNat(pl){ return (pl.includes('natacion')||pl.includes('natación')||pl.includes('aquafitness')||pl.includes('estimulaci'))&&(pl.includes('vez por semana')||pl.includes('veces por semana')||pl.includes('x semana')); }
-function isMembershipPlan(product){ let p=String(product||'').trim(); if(/\(\d+\)/.test(p))return false; let pl=p.toLowerCase(); if(esPlanRecurrenteNat(pl))return true; if(pl.includes('sesion')||pl.includes('sesión')||pl.includes('clase'))return false; for(let k of Object.keys(planPrices)){ if(normP(k)===normP(p)||normP(p).includes(normP(k))||normP(k).includes(normP(p)))return true; } if(/\d+\s*x\s*\d+\s*mil/i.test(p))return true; return /\b(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b|plan|promo|flash|anual|lealtad|fidelidad|bloqueado|verano|exclusivo|platium|semestral|trimest|bimest|estudiante|renovaci[oó]n|black|ejecutivo|mensualidad|matr[ií]cula|nataci[oó]n|gym|aquafitness|estimulaci[oó]n|\bpng\b|\bcps\b/i.test(p); }
-function isClaseSuelta(product){ let pl=String(product||'').trim().toLowerCase(); if(!pl.includes('sesion')&&!pl.includes('sesión')&&!pl.includes('clase'))return false; if(/\d*\s*(vez|veces)\s*por\s*semana|x\s*semana/i.test(pl))return false; return true; }
-async function loadPricesForSede(sede){ try{ const rows=await supaFetch(`/plan_prices?sede=eq.${encodeURIComponent(sede)}&select=plan,precio`); planPrices={}; if(rows&&rows.length){ rows.forEach(r=>planPrices[r.plan]=r.precio); return; } const snaps=await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(sede)}&order=updated_at.desc&limit=1&select=users_data`); if(snaps?.length&&snaps[0].users_data?.length){ snaps[0].users_data.forEach(u=>{ if(u.ÚltimoProducto&&u.ValorPlan>0)planPrices[u.ÚltimoProducto]=u.ValorPlan; }); } }catch(_){ planPrices={}; } }
+function isMembershipPlan(product){ let p=String(product||'').trim(); const _t=window.Catalogo&&Catalogo.tipo(p); if(_t)return _t==='plan'; if(/\(\d+\)/.test(p))return false; let pl=p.toLowerCase(); if(esPlanRecurrenteNat(pl))return true; if(pl.includes('sesion')||pl.includes('sesión')||pl.includes('clase'))return false; for(let k of Object.keys(planPrices)){ if(normP(k)===normP(p)||normP(p).includes(normP(k))||normP(k).includes(normP(p)))return true; } if(/\d+\s*x\s*\d+\s*mil/i.test(p))return true; return /\b(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b|plan|promo|flash|anual|lealtad|fidelidad|bloqueado|verano|exclusivo|platium|semestral|trimest|bimest|estudiante|renovaci[oó]n|black|ejecutivo|mensualidad|matr[ií]cula|nataci[oó]n|gym|aquafitness|estimulaci[oó]n|\bpng\b|\bcps\b/i.test(p); }
+function isClaseSuelta(product){ const _t=window.Catalogo&&Catalogo.tipo(product); if(_t)return _t==='clase'; let pl=String(product||'').trim().toLowerCase(); if(!pl.includes('sesion')&&!pl.includes('sesión')&&!pl.includes('clase'))return false; if(/\d*\s*(vez|veces)\s*por\s*semana|x\s*semana/i.test(pl))return false; return true; }
+async function loadPricesForSede(sede){ if(window.Catalogo)Catalogo.cargar(sede); try{ const rows=await supaFetch(`/plan_prices?sede=eq.${encodeURIComponent(sede)}&select=plan,precio`); planPrices={}; if(rows&&rows.length){ rows.forEach(r=>planPrices[r.plan]=r.precio); return; } const snaps=await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(sede)}&order=updated_at.desc&limit=1&select=users_data`); if(snaps?.length&&snaps[0].users_data?.length){ snaps[0].users_data.forEach(u=>{ if(u.ÚltimoProducto&&u.ValorPlan>0)planPrices[u.ÚltimoProducto]=u.ValorPlan; }); } }catch(_){ planPrices={}; } }
 
 // nombre "Agua (3)" → { base:"Agua", qty:3 }
 function parseProdQty(name){ const s=String(name||'').trim(); const m=s.match(/\((\d+)\)\s*$/); return { base:s.replace(/\s*\(\d+\)\s*$/,'').trim(), qty:m?parseInt(m[1],10):1 }; }
@@ -1297,6 +1298,25 @@ async function descontarInventario(soldByBase, origName, D){
   return { unidadesDesc, prodsTocados, noCalzan, detalle };
 }
 
+// Productos del informe que la sede no tiene registrados (ni en plan_prices, ni en
+// inventario, ni en catalogo_ventas): se pregunta si son plan, clase o producto.
+// La respuesta se guarda y manda sobre la regla por nombre. Si la tabla aún no
+// existe, no se pregunta nada y todo sigue como antes.
+async function preguntarProductosNuevos(raw, hdr, col){
+  if(!window.Catalogo) return;
+  await Catalogo.cargar(currentSede);
+  if(!Catalogo.disponible()) return;
+  const ventas=[];
+  for(let i=hdr+1;i<raw.length;i++){ const r=raw[i]; if(!r||!r[col.fecha])continue;
+    const producto=String(r[col.producto]||'').trim(), cliente=String(r[col.cliente]||'').trim();
+    if(producto&&cliente) ventas.push({Producto:producto,Total:parseCRC(r[col.total])}); }
+  const conocidos=new Set(Object.keys(planPrices).map(Catalogo.norm));
+  try{ ((await supaFetch(`/inventario?sede=eq.${encodeURIComponent(currentSede)}&select=producto`))||[]).forEach(p=>conocidos.add(Catalogo.norm(p.producto))); }catch(_){}
+  const sugerir=p=>isClaseSuelta(p)?'clase':isMembershipPlan(p)?'plan':'producto';
+  const nuevos=Catalogo.desconocidos(ventas,conocidos,sugerir);
+  if(nuevos.length) await Catalogo.preguntar({sede:currentSede,items:nuevos});
+}
+
 function cargarVentasProducto(file){
   const reader=new FileReader();
   reader.onload=async e=>{
@@ -1308,6 +1328,7 @@ function cargarVentasProducto(file){
         const fi=nm.findIndex(c=>c==='fecha'), pi=nm.findIndex(c=>c==='producto');
         if(fi>=0&&pi>=0){ hdr=i; col.fecha=fi; col.producto=pi; col.cliente=nm.findIndex(c=>c==='cliente'); col.registrado=nm.findIndex(c=>c.includes('registrado')); col.total=nm.findIndex(c=>c.includes('total crc')); if(col.total<0)col.total=nm.findIndex(c=>c.includes('total')&&!c.includes('usd')); break; } }
       if(hdr<0)throw new Error('No se encontró el encabezado (Fecha/Producto). ¿Es el reporte "Ventas por Producto"?');
+      await preguntarProductosNuevos(raw, hdr, col);   // ver /catalogo.js
       const memb=[],clases=[],sinclasif=[]; const fechas=[];
       for(let i=hdr+1;i<raw.length;i++){ const r=raw[i]; if(!r||!r[col.fecha])continue;
         const fechaStr=String(r[col.fecha]||'').trim(); const cliente=String(r[col.cliente]||'').trim(); const regPor=String(r[col.registrado]||'').trim(); const producto=String(r[col.producto]||'').trim(); const total=parseCRC(r[col.total]);
