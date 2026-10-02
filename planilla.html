@@ -9,12 +9,13 @@
 <link rel="icon" type="image/png" href="/icons/favicon-64.png">
 <title>Planilla Quincenal</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <link rel="stylesheet" href="/ui.css">
 <style>
 /* Propio de Planilla (el resto del diseño vive en /ui.css) */
 #planView { display: none; }
 .modal { max-width: 560px; }
-#panelPlan table.tbl { min-width: 1180px; }
+#panelPlan table.tbl { min-width: 1300px; }
 #panelPlan table.tbl td:first-child { white-space: nowrap; font-weight: 600; }
 .s-sub { font-size: 12px; color: var(--sec); margin-top: 3px; white-space: nowrap; }
 .mas  { color: var(--green); }
@@ -69,6 +70,8 @@ tr.tot td { background: var(--fill); font-weight: 700; }
       <select id="periodoSelector"></select>
       <button class="btn-ghost" onclick="loadPlanilla()">↻ Actualizar</button>
       <button class="btn-ghost" onclick="exportExcel()">⬇️ Excel</button>
+      <button class="btn-ghost" onclick="descargarBoletas()">📄 Boletas PDF</button>
+      <button class="btn-ghost" id="btnEnviar" onclick="enviarBoletas()" style="display:none;">✉️ Enviar boletas</button>
       <button class="btn-primary" id="btnCierre" onclick="toggleCierre()">🔒 Cerrar quincena</button>
     </div>
   </div>
@@ -94,7 +97,7 @@ tr.tot td { background: var(--fill); font-weight: 700; }
       <thead><tr>
         <th>Empleado</th><th>Cuenta BAC</th>
         <th class="num">Base quincena</th><th class="num">Feriados</th><th class="num">Incapacidad</th><th class="num">Sin goce</th><th class="num">Bonos</th>
-        <th class="num">Bruto</th><th class="num">CCSS</th><th class="num">Otras deduc.</th><th class="num">Neto a pagar</th><th></th>
+        <th class="num">Bruto</th><th class="num">CCSS</th><th class="num">Otras deduc.</th><th class="num">Neto a pagar</th><th>Boleta</th><th></th>
       </tr></thead>
       <tbody id="planBody"></tbody>
     </table></div>
@@ -212,7 +215,7 @@ const INCAP_DEF = {
 };
 const TIPO_TXT = { feriado:'🎉 Feriado trabajado', incapacidad:'🩺 Incapacidad', sin_goce:'🚫 Sin goce', bono:'➕ Bono', deduccion:'➖ Deducción' };
 
-let empleados = [], novedades = [], cierre = null;
+let empleados = [], novedades = [], cierre = null, envios = [];
 let periodoActual = null;   // { id, ini:Date, fin:Date, label }
 
 const fmtCRC = n => (n || n === 0) && Math.round(n) !== 0 ? '₡' + Math.round(n).toLocaleString('es-CR') : '—';
@@ -339,6 +342,8 @@ async function loadPlanilla(){
     empleados = (emps || []).filter(e => e.activo !== false && e.tipo_pago !== 'semanal');
     novedades = novs || [];
     cierre = cier?.[0] || null;
+    // Registro de boletas enviadas (si la tabla aún no existe, se sigue sin él)
+    envios = cierre ? ((await supaFetch(`/planilla_boletas_envios?sede=eq.${sede}&periodo=eq.${per}&order=enviado_at.desc&select=*`).catch(() => [])) || []) : [];
     document.getElementById('loading').style.display='none';
     render();
   } catch(e){
@@ -415,6 +420,7 @@ function render(){
   btn.textContent = cerrada ? '🔓 Reabrir quincena' : '🔒 Cerrar quincena';
   btn.className = cerrada ? 'btn-ghost' : 'btn-primary';
   document.getElementById('btnNuevaNov').disabled = cerrada;
+  document.getElementById('btnEnviar').style.display = cerrada ? '' : 'none';
 
   const lineas = lineasActuales();
   const sum = k => lineas.reduce((a,l)=>a+(l[k]||0),0);
@@ -434,7 +440,7 @@ function render(){
 function renderTabla(lineas, cerrada){
   const tb = document.getElementById('planBody'); tb.innerHTML = '';
   if (!lineas.length){
-    tb.innerHTML = `<tr><td colspan="12" class="tbl-empty">No hay empleados de pago mensual en ${esc(currentSede)}. Agréguelos en Recursos Humanos.</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="13" class="tbl-empty">No hay empleados de pago mensual en ${esc(currentSede)}. Agréguelos en Recursos Humanos.</td></tr>`;
     return;
   }
   const c = (v, cls) => v ? `<span class="${cls}">${cls==='menos'?'−':'+'}${fmtCRC(v)}</span>` : '<span style="color:var(--ter);">—</span>';
@@ -452,14 +458,17 @@ function renderTabla(lineas, cerrada){
       <td class="num">${l.asegurado ? c(l.ccss,'menos') : '<span style="color:var(--ter);">No aseg.</span>'}</td>
       <td class="num">${c(l.deduccion,'menos')}</td>
       <td class="num" style="font-weight:700;color:var(--green);">${fmtCRC(l.neto)}</td>
-      <td>${cerrada ? '' : `<button class="btn-ghost btn-mini" onclick="openNovedad('${l.empleado_id}')">＋ Novedad</button>`}</td>`;
+      <td style="white-space:nowrap;">${estadoBoleta(l.empleado_id)}</td>
+      <td style="white-space:nowrap;"><button class="btn-edit" title="Descargar boleta" onclick="descargarBoletas(['${l.empleado_id}'])">📄</button>
+        ${cerrada ? `<button class="btn-edit" title="Enviar boleta por correo" onclick="enviarBoletas(['${l.empleado_id}'])">✉️</button>`
+                  : `<button class="btn-ghost btn-mini" onclick="openNovedad('${l.empleado_id}')">＋ Novedad</button>`}</td>`;
   });
   const sum = k => lineas.reduce((a,l)=>a+(l[k]||0),0);
   const tr = tb.insertRow(); tr.className = 'tot';
   tr.innerHTML = `<td>TOTAL</td><td></td><td class="num">${fmtCRC(sum('base'))}</td><td class="num">${fmtCRC(sum('feriado'))}</td>
     <td class="num">${fmtCRC(sum('incap'))}</td><td class="num">${fmtCRC(sum('sinGoce'))}</td><td class="num">${fmtCRC(sum('bono'))}</td>
     <td class="num">${fmtCRC(sum('bruto'))}</td><td class="num">${fmtCRC(sum('ccss'))}</td><td class="num">${fmtCRC(sum('deduccion'))}</td>
-    <td class="num">${fmtCRC(sum('neto'))}</td><td></td>`;
+    <td class="num">${fmtCRC(sum('neto'))}</td><td></td><td></td>`;
 }
 
 function detalleNovedad(n){
@@ -627,9 +636,160 @@ async function toggleCierre(){
         sede: currentSede, periodo: q.id, fecha_inicio: ymd(q.ini), fecha_fin: ymd(q.fin), estado: 'cerrada',
         detalle: lineas, total_bruto: tot('bruto'), total_ccss: tot('ccss'), total_neto: tot('neto'), total_patrono: tot('patrono'),
         cerrada_por: currentEmail || null } });
+      await loadPlanilla();
+      if (confirm('Quincena cerrada.\n\n¿Enviar ahora la boleta de pago por correo a cada colaborador?')) await enviarBoletas(null, true);
+      return;
     }
     await loadPlanilla();
   } catch(e){ alert('No se pudo completar: ' + e.message); }
+}
+
+// ── Boletas de pago ──
+// Estado del último envío por correo de cada colaborador (columna "Boleta")
+function estadoBoleta(empId){
+  const ev = envios.find(x => x.empleado_id === empId);   // vienen del más nuevo al más viejo
+  if (!ev) return cierre ? '<span class="pill" style="background:var(--fill);color:var(--sec);">No enviada</span>' : '<span style="color:var(--ter);">—</span>';
+  const cuando = new Date(ev.enviado_at).toLocaleDateString('es-CR');
+  if (ev.estado === 'enviado')    return `<span class="pill apr" title="${esc(ev.correo)}">✓ Enviada ${cuando}</span>`;
+  if (ev.estado === 'sin_correo') return `<span class="pill pend" title="Agregue el correo en la ficha de RRHH">Sin correo</span>`;
+  return `<span class="pill rec" title="${esc(ev.error)}">Error</span>`;
+}
+
+/* Dibuja la boleta de un colaborador en la página actual del PDF.
+   jsPDF con Helvetica no trae el símbolo ₡, por eso los montos van como "CRC". */
+function dibujarBoleta(doc, l){
+  const q = periodoActual;
+  const money = n => 'CRC ' + Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const X = 56, W = 483; let y = 56;
+  // Encabezado
+  doc.setFillColor(14, 159, 142); doc.roundedRect(X, y, W, 62, 8, 8, 'F');
+  doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+  doc.text('BOLETA DE PAGO', X + 18, y + 27);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5);
+  doc.text(`Impulse Fit · Sede ${currentSede}`, X + 18, y + 46);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+  doc.text(q.label.replace(/ \(.*\)$/, ''), X + W - 18, y + 27, { align: 'right' });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+  doc.text(`Del ${fmtFecha(q.ini)} al ${fmtFecha(q.fin)}`, X + W - 18, y + 46, { align: 'right' });
+  y += 86;
+
+  // Datos del colaborador
+  doc.setTextColor(30);
+  const dato = (k, v, x) => { doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(120); doc.text(k, x, y);
+                              doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(30); doc.text(String(v || '—'), x, y + 15); };
+  dato('Colaborador', l.nombre, X); dato('Cédula', l.cedula, X + 250); y += 36;
+  dato('Cuenta BAC', l.cuenta_bac, X); dato('Salario mensual', money(l.salario_mensual), X + 250); dato('Salario diario', money(l.diario), X + 380); y += 44;
+
+  // Ingresos y deducciones
+  const tabla = (titulo, filas, total, rgb) => {
+    doc.setFillColor(...rgb); doc.rect(X, y, W, 22, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(40);
+    doc.text(titulo, X + 12, y + 15); y += 22;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5);
+    filas.forEach(([t, v]) => {
+      doc.setDrawColor(225); doc.setLineWidth(.5); doc.line(X, y + 22, X + W, y + 22);
+      doc.setTextColor(50); doc.text(t, X + 12, y + 15); doc.text(money(v), X + W - 12, y + 15, { align: 'right' }); y += 22;
+    });
+    doc.setFont('helvetica', 'bold'); doc.text(`Total ${titulo.toLowerCase()}`, X + 12, y + 15); doc.text(money(total), X + W - 12, y + 15, { align: 'right' });
+    y += 34;
+  };
+  const ing = [['Salario de la quincena' + (l.notaBase ? ` (${l.notaBase})` : ''), l.base]];
+  if (l.feriado)  ing.push(['Feriados trabajados', l.feriado]);
+  if (l.bono)     ing.push(['Bonos / otros ingresos', l.bono]);
+  if (l.subsidio) ing.push(['Subsidio de incapacidad (patrono, no cotiza CCSS)', l.subsidio]);
+  const ded = [];
+  if (l.incap)    ded.push(['Incapacidad (días no laborados)', l.incap]);
+  if (l.sinGoce)  ded.push(['Días sin goce de salario', l.sinGoce]);
+  ded.push([l.asegurado ? `CCSS trabajador (${(CCSS_TRABAJADOR * 100).toFixed(2)}%)` : 'CCSS (no asegurado)', l.ccss]);
+  if (l.deduccion) ded.push(['Otras deducciones', l.deduccion]);
+  tabla('INGRESOS', ing, ing.reduce((a, r) => a + (r[1] || 0), 0), [221, 242, 228]);
+  tabla('DEDUCCIONES', ded, ded.reduce((a, r) => a + (r[1] || 0), 0), [252, 228, 226]);
+
+  // Neto
+  doc.setFillColor(14, 159, 142); doc.roundedRect(X, y, W, 40, 8, 8, 'F');
+  doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+  doc.text('NETO DEPOSITADO', X + 16, y + 25); doc.setFontSize(16); doc.text(money(l.neto), X + W - 16, y + 26, { align: 'right' });
+  y += 62;
+
+  // Detalle de novedades de este colaborador
+  const nov = novedades.filter(n => n.empleado_id === l.empleado_id);
+  if (nov.length){
+    doc.setTextColor(40); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.text('Detalle de novedades', X, y); y += 16;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(70);
+    const TIPO_PDF = { feriado:'Feriado trabajado', incapacidad:'Incapacidad', sin_goce:'Permiso sin goce', bono:'Bono', deduccion:'Deducción' };
+    nov.forEach(n => {
+      const f = n.fecha_inicio ? (n.fecha_fin && n.fecha_fin !== n.fecha_inicio ? `${fmtFecha(n.fecha_inicio)} al ${fmtFecha(n.fecha_fin)}` : fmtFecha(n.fecha_inicio)) : '';
+      const dias = ['bono', 'deduccion'].includes(n.tipo) ? '' : ` · ${Number(n.dias || 0)} día(s)`;
+      const extra = n.tipo === 'incapacidad' ? ` · ${(n.ente || '').toUpperCase()}` : '';
+      const txt = `• ${TIPO_PDF[n.tipo] || n.tipo}${f ? ' · ' + f : ''}${dias}${extra}${n.nota ? ' · ' + n.nota : ''}`;
+      doc.splitTextToSize(txt, W).forEach(line => { doc.text(line, X, y); y += 13; });
+    });
+  }
+
+  // Pie
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(140);
+  doc.text(`Generado el ${new Date().toLocaleString('es-CR')}${cierre ? '' : ' · BORRADOR: la quincena no está cerrada'}`, X, 800);
+  doc.text('Consultas sobre su pago: comuníquese con administración.', X + W, 800, { align: 'right' });
+}
+
+function boletaPDF(lineas){
+  const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  lineas.forEach((l, i) => { if (i) doc.addPage(); dibujarBoleta(doc, l); });
+  return doc;
+}
+const slugTxt = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '_');
+
+function descargarBoletas(ids){
+  const lineas = lineasActuales().filter(l => !ids || ids.includes(l.empleado_id));
+  if (!lineas.length){ alert('No hay boletas para generar.'); return; }
+  const nombre = lineas.length === 1 ? `boleta_${periodoActual.id}_${slugTxt(lineas[0].nombre)}` : `boletas_${slugTxt(currentSede)}_${periodoActual.id}`;
+  boletaPDF(lineas).save(nombre.toLowerCase() + '.pdf');
+}
+
+// Envía por correo (Edge Function enviar-boletas). Solo con la quincena cerrada.
+async function enviarBoletas(ids, yaConfirmado){
+  if (!cierre){ alert('Primero cierre la quincena: las boletas se envían con los montos del cierre.'); return; }
+  const lineas = lineasActuales().filter(l => !ids || ids.includes(l.empleado_id));
+  if (!lineas.length) return;
+  const ya = lineas.filter(l => envios.some(e => e.empleado_id === l.empleado_id && e.estado === 'enviado')).length;
+  const msg = lineas.length === 1
+    ? `¿Enviar la boleta de ${lineas[0].nombre} a su correo?${ya ? '\n(Ya se le había enviado; recibirá otra copia.)' : ''}`
+    : `¿Enviar ${lineas.length} boletas por correo?${ya ? `\n${ya} ya se habían enviado y recibirán otra copia.` : ''}`;
+  if (!yaConfirmado && !confirm(msg)) return;
+
+  const btn = document.getElementById('btnEnviar'); btn.disabled = true;
+  const res = [];
+  try {
+    const TANDA = 15;
+    for (let i = 0; i < lineas.length; i += TANDA){
+      btn.textContent = `✉️ Enviando ${Math.min(i + TANDA, lineas.length)}/${lineas.length}…`;
+      const boletas = lineas.slice(i, i + TANDA).map(l => ({
+        empleado_id: l.empleado_id,
+        pdf_base64: boletaPDF([l]).output('datauristring').split(',')[1],
+      }));
+      const call = async () => fetch(`${SUPA_URL}/functions/v1/enviar-boletas`, { method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + currentToken, 'apikey': SUPA_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sede: currentSede, periodo: periodoActual.id, etiqueta: periodoActual.label, boletas }) });
+      let r = await call();
+      if (r.status === 401 && await Sesion.renovar()) r = await call();
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || ('Error ' + r.status));
+      res.push(...(data.resultados || []));
+    }
+  } catch(e){
+    alert('No se pudieron enviar las boletas: ' + e.message +
+      (/Failed to fetch|404/.test(e.message) ? '\n\n¿Ya se desplegó la función enviar-boletas en Supabase?' : ''));
+  } finally { btn.disabled = false; btn.textContent = '✉️ Enviar boletas'; }
+
+  if (res.length){
+    const ok = res.filter(r => r.estado === 'enviado').length;
+    const sinC = res.filter(r => r.estado === 'sin_correo').map(r => r.nombre);
+    const err = res.filter(r => r.estado === 'error').map(r => `${r.nombre}: ${r.error}`);
+    alert(`✉️ Boletas enviadas: ${ok} de ${res.length}.` +
+      (sinC.length ? `\n\nSin correo en RRHH (no se enviaron):\n• ${sinC.join('\n• ')}` : '') +
+      (err.length ? `\n\nCon error:\n• ${err.join('\n• ')}` : ''));
+  }
+  await loadPlanilla();
 }
 
 // ── Excel ──

@@ -57,6 +57,22 @@ create table if not exists planilla_periodos (
   unique (sede, periodo)
 );
 
+-- 3) Registro de boletas enviadas por correo ----------------------------------
+--    Lo escribe la Edge Function enviar-boletas (service role); la app solo lee.
+create table if not exists planilla_boletas_envios (
+  id           uuid primary key default gen_random_uuid(),
+  sede         text not null,
+  periodo      text not null,
+  empleado_id  uuid references empleados(id) on delete cascade,
+  correo       text,
+  estado       text not null,               -- 'enviado' | 'sin_correo' | 'error'
+  error        text,
+  neto         numeric,
+  enviado_por  text,
+  enviado_at   timestamptz default now()
+);
+create index if not exists planilla_env_periodo_idx on planilla_boletas_envios (sede, periodo);
+
 -- ══════════════════════════════════════════════════════════════════════════
 --  Row Level Security — igual que empleados: solo admin / admin_sedes.
 -- ══════════════════════════════════════════════════════════════════════════
@@ -74,6 +90,12 @@ create policy planilla_per_admin_all on planilla_periodos
   using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('admin','admin_sedes')))
   with check (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('admin','admin_sedes')));
 
--- Comprobación: deberían aparecer las 2 tablas.
+alter table planilla_boletas_envios enable row level security;
+drop policy if exists planilla_env_admin_select on planilla_boletas_envios;
+create policy planilla_env_admin_select on planilla_boletas_envios
+  for select to authenticated
+  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('admin','admin_sedes')));
+
+-- Comprobación: deberían aparecer las 3 tablas.
 select table_name from information_schema.tables
-where table_name in ('planilla_novedades','planilla_periodos') order by table_name;
+where table_name in ('planilla_novedades','planilla_periodos','planilla_boletas_envios') order by table_name;
