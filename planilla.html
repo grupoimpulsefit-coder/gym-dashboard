@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F2F2F7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icons/favicon-64.png">
+<title>Planilla Quincenal</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="/ui.css">
+<style>
+/* Propio de Planilla (el resto del diseño vive en /ui.css) */
+#planView { display: none; }
+.modal { max-width: 560px; }
+#panelPlan table.tbl { min-width: 1180px; }
+#panelPlan table.tbl td:first-child { white-space: nowrap; font-weight: 600; }
+.s-sub { font-size: 12px; color: var(--sec); margin-top: 3px; white-space: nowrap; }
+.mas  { color: var(--green); }
+.menos{ color: var(--red); }
+tr.tot td { background: var(--fill); font-weight: 700; }
+.aviso { margin: 12px var(--gut) 0; padding: 11px 14px; border-radius: 10px; font-size: 13px; background: var(--fill); color: var(--sec); }
+.aviso.feriado { background: var(--blue-tint); color: var(--blue); }
+.aviso.cerrada { background: var(--green-tint); color: var(--green); font-weight: 600; }
+.btn-mini { min-height: 30px; padding: 0 10px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">💸</div>
+    <h2>Planilla Quincenal</h2>
+    <p class="login-sub">Pago de salarios por quincena, con feriados, incapacidades y permisos</p>
+    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
+    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-icon">💸</div>
+  <div>
+    <h1>Planilla Quincenal</h1>
+    <p>Salarios de RRHH · feriados, incapacidades y permisos sin goce</p>
+  </div>
+  <div class="header-right">
+    <span>👤 <span id="userNombre">—</span></span>
+    <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+  </div>
+</div>
+
+<div class="loading" id="loading"><div class="spinner"></div><div>Cargando…</div></div>
+<div class="empty-state" id="emptyState"></div>
+
+<div id="planView">
+  <div class="dash-topbar">
+    <div>
+      <div class="dash-title">💸 Planilla <span id="sedeTitle"></span></div>
+      <div class="dash-period" id="dashPeriod"></div>
+    </div>
+    <div class="topbar-controls">
+      <label>🏢 Sede:</label>
+      <select id="sedeSelector"></select>
+      <label>📅 Quincena:</label>
+      <select id="periodoSelector"></select>
+      <button class="btn-ghost" onclick="loadPlanilla()">↻ Actualizar</button>
+      <button class="btn-ghost" onclick="exportExcel()">⬇️ Excel</button>
+      <button class="btn-primary" id="btnCierre" onclick="toggleCierre()">🔒 Cerrar quincena</button>
+    </div>
+  </div>
+
+  <div id="avisos"></div>
+
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-label">Empleados en planilla</div><div class="kpi-value" id="kpiEmp">—</div><div class="kpi-sub" id="kpiEmpSub">—</div></div>
+    <div class="kpi"><div class="kpi-label">Salario bruto</div><div class="kpi-value" id="kpiBruto">—</div><div class="kpi-sub" id="kpiBrutoSub">—</div></div>
+    <div class="kpi orange"><div class="kpi-label">Deducción CCSS</div><div class="kpi-value" id="kpiCcss">—</div><div class="kpi-sub">trabajador · 10.83%</div></div>
+    <div class="kpi green"><div class="kpi-label">Neto a pagar</div><div class="kpi-value" id="kpiNeto">—</div><div class="kpi-sub">depósitos de la quincena</div></div>
+    <div class="kpi teal"><div class="kpi-label">Carga patronal CCSS</div><div class="kpi-value" id="kpiPatrono">—</div><div class="kpi-sub">aporte del patrono (~26.67%)</div></div>
+  </div>
+
+  <div class="tabs" style="margin:14px var(--gut) 0;">
+    <div class="tab active" id="tabBtnPlan" onclick="switchTab('plan')">💸 Planilla</div>
+    <div class="tab" id="tabBtnNov" onclick="switchTab('nov')">📝 Novedades</div>
+  </div>
+
+  <div class="tab-panel active" id="panelPlan">
+    <div class="section"><div class="section-title">💸 Pago de la quincena <span class="section-note" id="planNote"></span></div></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr>
+        <th>Empleado</th><th>Cuenta BAC</th>
+        <th class="num">Base quincena</th><th class="num">Feriados</th><th class="num">Incapacidad</th><th class="num">Sin goce</th><th class="num">Bonos</th>
+        <th class="num">Bruto</th><th class="num">CCSS</th><th class="num">Otras deduc.</th><th class="num">Neto a pagar</th><th></th>
+      </tr></thead>
+      <tbody id="planBody"></tbody>
+    </table></div>
+  </div>
+
+  <div class="tab-panel" id="panelNov">
+    <div class="section"><div class="section-title">📝 Novedades de la quincena
+      <button class="btn-primary" id="btnNuevaNov" style="margin-left:auto;" onclick="openNovedad()">＋ Agregar novedad</button></div></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Empleado</th><th>Tipo</th><th>Fechas</th><th class="num">Días</th><th>Detalle</th><th class="num">Efecto</th><th>Nota</th><th></th></tr></thead>
+      <tbody id="novBody"></tbody>
+    </table></div>
+  </div>
+
+  <div class="hint" style="padding:16px var(--gut) 28px;line-height:1.6;">
+    ⚠️ Cálculo de referencia. Salario diario = mensual ÷ 30. <b>Feriado trabajado</b>: se suma el salario diario × factor (1 = se paga doble, art. 152 del Código de Trabajo).
+    <b>Incapacidad CCSS</b>: se rebajan los días y el patrono subsidia el 50% de los primeros 3 días (la CCSS paga desde el día 4). <b>INS</b>: lo paga el INS. <b>Maternidad</b>: el patrono paga el 50% de todos los días.
+    Los subsidios no cotizan a la CCSS. Solo entran empleados de pago <b>mensual</b>; los de pago semanal por horas se pagan aparte (RRHH). Verifique tasas y montos con su contador.
+  </div>
+</div>
+
+<!-- Modal novedad -->
+<div class="modal-back" id="novModal">
+  <div class="modal">
+    <div class="modal-head">＋ Agregar novedad</div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="f-field full"><label>Empleado <span class="req">*</span></label><select id="nEmpleado" onchange="previewNovedad()"></select></div>
+        <div class="f-field full"><label>Tipo <span class="req">*</span></label>
+          <select id="nTipo" onchange="onTipoChange()">
+            <option value="feriado">🎉 Feriado trabajado (suma)</option>
+            <option value="incapacidad">🩺 Incapacidad (rebaja)</option>
+            <option value="sin_goce">🚫 Día libre sin goce de salario (rebaja)</option>
+            <option value="bono">➕ Bono / otro ingreso (suma)</option>
+            <option value="deduccion">➖ Otra deducción: adelanto, préstamo… (rebaja)</option>
+          </select></div>
+        <div class="f-field t-fechas"><label>Desde</label><input type="date" id="nDesde" onchange="autoDias()"></div>
+        <div class="f-field t-fechas"><label>Hasta</label><input type="date" id="nHasta" onchange="autoDias()"></div>
+        <div class="f-field t-dias"><label>Días <span class="req">*</span></label><input type="number" id="nDias" min="0" step="0.5" oninput="onDiasChange()"></div>
+        <div class="f-field t-feriado"><label>Factor (× salario diario)</label><input type="number" id="nFactor" min="0" step="0.5" value="1" oninput="previewNovedad()"></div>
+        <div class="f-field t-incap"><label>Ente que incapacita</label>
+          <select id="nEnte" onchange="onEnteChange()">
+            <option value="ccss">CCSS (enfermedad)</option>
+            <option value="ins">INS (riesgo del trabajo)</option>
+            <option value="maternidad">Maternidad</option>
+          </select></div>
+        <div class="f-field t-incap"><label>Días que paga el patrono</label><input type="number" id="nDiasPatrono" min="0" step="0.5" oninput="previewNovedad()"></div>
+        <div class="f-field t-incap"><label>% que paga el patrono</label><input type="number" id="nPct" min="0" max="100" step="1" oninput="previewNovedad()"></div>
+        <div class="f-field t-monto"><label>Monto (₡) <span class="req">*</span></label><input type="number" id="nMonto" min="0" step="1" oninput="previewNovedad()"></div>
+        <div class="f-field full"><label>Nota (opcional)</label><input type="text" id="nNota" placeholder="Ej. boleta CCSS #12345"></div>
+        <div class="f-field full"><label>Efecto en el pago</label><div class="pay-box" id="nPreview">—</div></div>
+      </div>
+      <div id="novErr" style="color:var(--red);font-size:13px;min-height:16px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" type="button" onclick="closeNovedad()">Cancelar</button>
+      <button class="btn-primary" id="novBtn" type="button" onclick="guardarNovedad()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/sesion.js"></script>
+<script>
+// ── Supabase ──
+const SUPA_URL = '__SUPA_URL__';
+const SUPA_KEY = '__SUPA_KEY__';
+let currentToken = null, currentRole = null, currentSede = null, currentEmail = '';
+
+/* ── Sesión: renovación silenciosa + cierre por inactividad (ver sesion.js) ── */
+Sesion.init({ url: SUPA_URL, key: SUPA_KEY, idleMin: 30,
+  onToken: function (t) { currentToken = t; },
+  onExpira: function (m) { _sesionExpirada(m); } });
+function _sesionExpirada(motivo) {
+  var msg = motivo === 'inactividad' ? 'Su sesión se cerró por 30 minutos de inactividad. Vuelva a entrar.'
+          : motivo === 'cerrada'     ? 'La sesión se cerró en otra pestaña.'
+          :                            'Su sesión expiró. Vuelva a entrar.';
+  try { doLogout(true); } catch (_) {}
+  var e = document.getElementById('loginError'); if (e) e.textContent = msg;
+}
+
+async function supaFetch(path, opts = {}) {
+  const token = currentToken || SUPA_KEY;
+  const res = await fetch(SUPA_URL + '/rest/v1' + path, {
+    method: opts.method || 'GET',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json', 'Prefer': opts.prefer || 'return=minimal', ...(opts.headers||{}) },
+    body: opts.body != null ? JSON.stringify(opts.body) : undefined
+  });
+  if (res.status === 401 && !opts._retry && await Sesion.renovar()) return supaFetch(path, { ...opts, _retry: true });
+  if (!res.ok) { const t = await res.text(); throw new Error(t); }
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+const ROLES_PERMITIDOS = ['admin_sedes'];
+const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
+const SEDE_META = { '3 Ríos':{icon:'🌊'}, 'Natación':{icon:'🏊'}, 'Pinares':{icon:'🌲'}, 'Sabanilla':{icon:'🏙️'} };
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+// ── Mismas tasas y bases que RRHH (rrhh.html) — si cambian allá, cambiarlas aquí ──
+const CCSS_TRABAJADOR = (5.50 + 4.33 + 1.00) / 100;                                  // 10.83%
+const CCSS_PATRONO    = (9.25 + 5.42 + 5.00 + 1.50 + 0.50 + 0.50 + 1.50 + 1.50 + 1.50) / 100; // 26.67%
+const DIAS_POR_MES = 30;
+const DIAS_QUINCENA = 15;
+const aseguradoCCSS = e => e.asegurado_ccss !== false;
+const salarioDiario = e => (Number(e.salario_mensual) || 0) / DIAS_POR_MES;
+// Base de la quincena: el quincenal pactado en RRHH, o la mitad del mensual
+const baseQuincena = e => Number(e.salario_quincenal) || (Number(e.salario_mensual) || 0) / 2;
+
+// Incapacidad: qué paga el patrono según el ente (valores por defecto, editables)
+const INCAP_DEF = {
+  ccss:       { pct: 50, dias: d => Math.min(d, 3), txt: 'El patrono paga el 50% de los primeros 3 días; la CCSS paga desde el día 4.' },
+  ins:        { pct: 0,  dias: () => 0,             txt: 'El INS paga la incapacidad por riesgo del trabajo.' },
+  maternidad: { pct: 50, dias: d => d,              txt: 'El patrono paga el 50% y la CCSS el otro 50%.' },
+};
+const TIPO_TXT = { feriado:'🎉 Feriado trabajado', incapacidad:'🩺 Incapacidad', sin_goce:'🚫 Sin goce', bono:'➕ Bono', deduccion:'➖ Deducción' };
+
+let empleados = [], novedades = [], cierre = null;
+let periodoActual = null;   // { id, ini:Date, fin:Date, label }
+
+const fmtCRC = n => (n || n === 0) && Math.round(n) !== 0 ? '₡' + Math.round(n).toLocaleString('es-CR') : '—';
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function parseFecha(s){ if(!s) return null; const [y,m,d]=String(s).split('-').map(Number); return new Date(y,m-1,d); }
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function fmtFecha(s){ const d=typeof s==='string'?parseFecha(s):s; return d ? d.toLocaleDateString('es-CR') : '—'; }
+const diasEntre = (a,b) => Math.round((b-a)/864e5) + 1;
+
+// ── Quincenas ──
+function quincenaDe(y, m, q){   // m: 0-11, q: 1|2
+  const ini = new Date(y, m, q===1 ? 1 : 16);
+  const fin = q===1 ? new Date(y, m, 15) : new Date(y, m+1, 0);
+  return { id:`${y}-${String(m+1).padStart(2,'0')}-Q${q}`, ini, fin,
+    label:`${q===1?'1ª':'2ª'} quincena de ${MESES[m]} ${y} (${ini.getDate()}–${fin.getDate()})` };
+}
+function quincenaDesdeId(id){ const [y,m,q]=id.split('-'); return quincenaDe(Number(y), Number(m)-1, Number(q.slice(1))); }
+function listaQuincenas(){
+  const hoy = new Date(), out = [];
+  for (let k = 1; k >= -12; k--){         // 1 mes adelante y 12 hacia atrás
+    const d = new Date(hoy.getFullYear(), hoy.getMonth()+k, 1);
+    out.push(quincenaDe(d.getFullYear(), d.getMonth(), 2), quincenaDe(d.getFullYear(), d.getMonth(), 1));
+  }
+  return out;
+}
+
+// ── Feriados de Costa Rica ──
+function pascua(y){   // domingo de Pascua (algoritmo gregoriano anónimo)
+  const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),
+        h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),
+        mes=Math.floor((h+l-7*m+114)/31),dia=((h+l-7*m+114)%31)+1;
+  return new Date(y, mes-1, dia);
+}
+function feriadosCR(y){
+  const p = pascua(y), mas = n => new Date(p.getFullYear(), p.getMonth(), p.getDate()+n);
+  return [
+    { f:new Date(y,0,1),   n:'Año Nuevo',                     ob:true },
+    { f:mas(-3),           n:'Jueves Santo',                  ob:true },
+    { f:mas(-2),           n:'Viernes Santo',                 ob:true },
+    { f:new Date(y,3,11),  n:'Juan Santamaría',               ob:true },
+    { f:new Date(y,4,1),   n:'Día del Trabajador',            ob:true },
+    { f:new Date(y,6,25),  n:'Anexión del Partido de Nicoya', ob:true },
+    { f:new Date(y,7,2),   n:'Virgen de los Ángeles',         ob:false },
+    { f:new Date(y,7,15),  n:'Día de la Madre',               ob:true },
+    { f:new Date(y,8,15),  n:'Independencia',                 ob:true },
+    { f:new Date(y,11,1),  n:'Abolición del Ejército',        ob:false },
+    { f:new Date(y,11,25), n:'Navidad',                       ob:true },
+  ];
+}
+const feriadosEn = q => feriadosCR(q.ini.getFullYear()).filter(x => x.f >= q.ini && x.f <= q.fin);
+
+// ── Login ──
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pwd = document.getElementById('loginPassword').value;
+  const btn = document.getElementById('loginBtn'); const errEl = document.getElementById('loginError');
+  if (!email || !pwd) { errEl.textContent='Complete todos los campos.'; return; }
+  btn.textContent='Ingresando...'; btn.disabled=true; errEl.textContent='';
+  try {
+    const res = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, { method:'POST', headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'}, body: JSON.stringify({email,password:pwd}) });
+    const data = await res.json();
+    if (!data.access_token) throw new Error(data.error_description||data.msg||'Credenciales incorrectas');
+    currentToken = data.access_token; Sesion.set(data); currentEmail = email;
+    const roles = await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede`);
+    currentRole = roles?.[0]?.role || null; currentSede = roles?.[0]?.sede || null;
+    if (!ROLES_PERMITIDOS.includes(currentRole)) { errEl.textContent='Su cuenta no tiene acceso a este módulo.'; await doLogout(true); return; }
+    document.getElementById('userNombre').textContent = roles?.[0]?.nombre || email;
+    document.getElementById('loginScreen').style.display='none';
+    arrancar();
+  } catch(e){ errEl.textContent=e.message; } finally { btn.textContent='Entrar'; btn.disabled=false; }
+}
+document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+
+(function(){
+  try {
+    const auth = JSON.parse(sessionStorage.getItem('gymAuth')||'null');
+    if (auth?.token && ROLES_PERMITIDOS.includes(auth.role)) {
+      sessionStorage.removeItem('gymAuth');
+      currentToken=auth.token; Sesion.adoptar(auth); currentRole=auth.role; currentSede=auth.sede||null; currentEmail=auth.email||'';
+      document.getElementById('userNombre').textContent = auth.nombre||'—';
+      document.getElementById('loginScreen').style.display='none';
+      setTimeout(arrancar, 0);
+    }
+  } catch(_){}
+})();
+
+async function doLogout(silent){ Sesion.cerrar();
+  try { await fetch(`${SUPA_URL}/auth/v1/logout`, {method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}}); } catch(_){}
+  currentToken=null; currentRole=null; currentSede=null; currentEmail='';
+  document.getElementById('planView').style.display='none';
+  document.getElementById('emptyState').style.display='none';
+  if (!silent){ document.getElementById('loginEmail').value=''; document.getElementById('loginPassword').value=''; }
+  document.getElementById('loginScreen').style.display='flex';
+}
+
+// ── Arranque ──
+function arrancar(){
+  document.getElementById('planView').style.display='block';
+  if (!SEDES.includes(currentSede)) currentSede = SEDES[0];
+  const sel = document.getElementById('sedeSelector');
+  sel.innerHTML = SEDES.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
+  sel.onchange = () => { currentSede = sel.value; loadPlanilla(); };
+
+  const qs = listaQuincenas();
+  const hoy = new Date();
+  const actual = quincenaDe(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() <= 15 ? 1 : 2);
+  const ps = document.getElementById('periodoSelector');
+  ps.innerHTML = qs.map(q=>`<option value="${q.id}"${q.id===actual.id?' selected':''}>${q.label}</option>`).join('');
+  ps.onchange = () => loadPlanilla();
+  loadPlanilla();
+}
+
+async function loadPlanilla(){
+  periodoActual = quincenaDesdeId(document.getElementById('periodoSelector').value);
+  document.getElementById('emptyState').style.display='none';
+  document.getElementById('loading').style.display='block';
+  const sede = encodeURIComponent(currentSede), per = encodeURIComponent(periodoActual.id);
+  try {
+    const [emps, novs, cier] = await Promise.all([
+      supaFetch(`/empleados?sede=eq.${sede}&order=nombre.asc&select=*`),
+      supaFetch(`/planilla_novedades?sede=eq.${sede}&periodo=eq.${per}&order=created_at.asc&select=*`),
+      supaFetch(`/planilla_periodos?sede=eq.${sede}&periodo=eq.${per}&select=*`),
+    ]);
+    empleados = (emps || []).filter(e => e.activo !== false && e.tipo_pago !== 'semanal');
+    novedades = novs || [];
+    cierre = cier?.[0] || null;
+    document.getElementById('loading').style.display='none';
+    render();
+  } catch(e){
+    document.getElementById('loading').style.display='none';
+    document.getElementById('emptyState').style.display='block';
+    document.getElementById('emptyState').textContent = '⚠️ Error al cargar: ' + e.message +
+      (/planilla_/.test(e.message) ? ' — ¿ya se corrió planilla.sql en Supabase?' : '');
+  }
+}
+
+/* ── Cálculo de una línea de planilla ─────────────────────────────────────
+   Bruto salarial = base + feriados + bonos − incapacidad − sin goce  (cotiza CCSS)
+   Neto = bruto − CCSS trabajador + subsidio de incapacidad − otras deducciones
+   El subsidio de incapacidad no es salario, por eso no cotiza. */
+function efectoNovedad(n, e){
+  const diario = salarioDiario(e), dias = Number(n.dias) || 0;
+  switch (n.tipo){
+    case 'feriado':     return { feriado: dias * diario * (n.factor ?? 1) };
+    case 'sin_goce':    return { sinGoce: dias * diario };
+    case 'incapacidad': return { incap: dias * diario,
+                                 subsidio: (Number(n.dias_patrono) || 0) * diario * (Number(n.pct_patrono) || 0) / 100 };
+    case 'bono':        return { bono: Number(n.monto) || 0 };
+    case 'deduccion':   return { deduccion: Number(n.monto) || 0 };
+  }
+  return {};
+}
+
+function calcLinea(e){
+  const q = periodoActual, diario = salarioDiario(e);
+  let base = baseQuincena(e), notaBase = '';
+  // Ingreso a mitad de quincena: se paga solo lo trabajado
+  const ing = parseFecha(e.fecha_ingreso);
+  if (ing && ing > q.fin) return null;
+  if (ing && ing > q.ini){
+    const d = Math.min(DIAS_QUINCENA, diasEntre(ing, q.fin));
+    base = d * diario; notaBase = `ingresó ${fmtFecha(ing)} · ${d} días`;
+  }
+  const t = { feriado:0, sinGoce:0, incap:0, subsidio:0, bono:0, deduccion:0 };
+  novedades.filter(n => n.empleado_id === e.id).forEach(n => {
+    const ef = efectoNovedad(n, e); for (const k in ef) t[k] += ef[k];
+  });
+  // No se puede rebajar más salario del que hay en la quincena
+  const rebajas = Math.min(base + t.feriado + t.bono, t.incap + t.sinGoce);
+  const escala = (t.incap + t.sinGoce) ? rebajas / (t.incap + t.sinGoce) : 1;
+  t.incap *= escala; t.sinGoce *= escala;
+  const bruto = base + t.feriado + t.bono - t.incap - t.sinGoce;
+  const ccss = aseguradoCCSS(e) ? bruto * CCSS_TRABAJADOR : 0;
+  const patrono = aseguradoCCSS(e) ? bruto * CCSS_PATRONO : 0;
+  const neto = bruto - ccss + t.subsidio - t.deduccion;
+  return { empleado_id: e.id, nombre: e.nombre, cedula: e.cedula || '', cuenta_bac: e.cuenta_bac || '',
+    salario_mensual: Number(e.salario_mensual) || 0, diario, asegurado: aseguradoCCSS(e),
+    base, notaBase, ...t, bruto, ccss, patrono, neto };
+}
+
+function lineasActuales(){
+  if (cierre?.detalle) return cierre.detalle;
+  return empleados.map(calcLinea).filter(Boolean);
+}
+
+// ── Render ──
+function render(){
+  const q = periodoActual, cerrada = !!cierre;
+  document.getElementById('sedeTitle').textContent = `— ${currentSede}`;
+  document.getElementById('dashPeriod').textContent = `${q.label} · ${fmtFecha(q.ini)} al ${fmtFecha(q.fin)}`;
+
+  // Avisos: feriados de la quincena y estado de cierre
+  const fer = feriadosEn(q);
+  let av = '';
+  if (cerrada) av += `<div class="aviso cerrada">🔒 Quincena cerrada por ${esc(cierre.cerrada_por||'—')} el ${new Date(cierre.cerrada_at).toLocaleString('es-CR')}. Se muestran los montos tal como se pagaron.</div>`;
+  if (fer.length) av += `<div class="aviso feriado">🎉 Feriados en esta quincena: ${fer.map(x=>`<b>${x.f.getDate()} de ${MESES[x.f.getMonth()].toLowerCase()}</b> (${esc(x.n)}${x.ob?'':', pago no obligatorio'})`).join(' · ')}. Si alguien lo trabajó, agréguelo como novedad.</div>`;
+  document.getElementById('avisos').innerHTML = av;
+
+  const btn = document.getElementById('btnCierre');
+  btn.textContent = cerrada ? '🔓 Reabrir quincena' : '🔒 Cerrar quincena';
+  btn.className = cerrada ? 'btn-ghost' : 'btn-primary';
+  document.getElementById('btnNuevaNov').disabled = cerrada;
+
+  const lineas = lineasActuales();
+  const sum = k => lineas.reduce((a,l)=>a+(l[k]||0),0);
+  document.getElementById('kpiEmp').textContent = lineas.length;
+  document.getElementById('kpiEmpSub').textContent = `${currentSede} · pago mensual`;
+  document.getElementById('kpiBruto').textContent = fmtCRC(sum('bruto'));
+  document.getElementById('kpiBrutoSub').textContent = `${novedades.length} novedad${novedades.length===1?'':'es'}`;
+  document.getElementById('kpiCcss').textContent = fmtCRC(sum('ccss'));
+  document.getElementById('kpiNeto').textContent = fmtCRC(sum('neto'));
+  document.getElementById('kpiPatrono').textContent = fmtCRC(sum('patrono'));
+  document.getElementById('planNote').textContent = cerrada ? '— cerrada' : '— base tomada de RRHH';
+
+  renderTabla(lineas, cerrada);
+  renderNovedades(cerrada);
+}
+
+function renderTabla(lineas, cerrada){
+  const tb = document.getElementById('planBody'); tb.innerHTML = '';
+  if (!lineas.length){
+    tb.innerHTML = `<tr><td colspan="12" class="tbl-empty">No hay empleados de pago mensual en ${esc(currentSede)}. Agréguelos en Recursos Humanos.</td></tr>`;
+    return;
+  }
+  const c = (v, cls) => v ? `<span class="${cls}">${cls==='menos'?'−':'+'}${fmtCRC(v)}</span>` : '<span style="color:var(--ter);">—</span>';
+  lineas.forEach(l => {
+    const tr = tb.insertRow();
+    tr.innerHTML = `
+      <td>${esc(l.nombre)}<div class="s-sub">${fmtCRC(l.salario_mensual)}/mes · ${fmtCRC(l.diario)}/día</div></td>
+      <td>${esc(l.cuenta_bac)||'—'}</td>
+      <td class="num">${fmtCRC(l.base)}${l.notaBase?`<div class="s-sub">${esc(l.notaBase)}</div>`:''}</td>
+      <td class="num">${c(l.feriado,'mas')}</td>
+      <td class="num">${c(l.incap,'menos')}${l.subsidio?`<div class="s-sub">subsidio +${fmtCRC(l.subsidio)}</div>`:''}</td>
+      <td class="num">${c(l.sinGoce,'menos')}</td>
+      <td class="num">${c(l.bono,'mas')}</td>
+      <td class="num">${fmtCRC(l.bruto)}</td>
+      <td class="num">${l.asegurado ? c(l.ccss,'menos') : '<span style="color:var(--ter);">No aseg.</span>'}</td>
+      <td class="num">${c(l.deduccion,'menos')}</td>
+      <td class="num" style="font-weight:700;color:var(--green);">${fmtCRC(l.neto)}</td>
+      <td>${cerrada ? '' : `<button class="btn-ghost btn-mini" onclick="openNovedad('${l.empleado_id}')">＋ Novedad</button>`}</td>`;
+  });
+  const sum = k => lineas.reduce((a,l)=>a+(l[k]||0),0);
+  const tr = tb.insertRow(); tr.className = 'tot';
+  tr.innerHTML = `<td>TOTAL</td><td></td><td class="num">${fmtCRC(sum('base'))}</td><td class="num">${fmtCRC(sum('feriado'))}</td>
+    <td class="num">${fmtCRC(sum('incap'))}</td><td class="num">${fmtCRC(sum('sinGoce'))}</td><td class="num">${fmtCRC(sum('bono'))}</td>
+    <td class="num">${fmtCRC(sum('bruto'))}</td><td class="num">${fmtCRC(sum('ccss'))}</td><td class="num">${fmtCRC(sum('deduccion'))}</td>
+    <td class="num">${fmtCRC(sum('neto'))}</td><td></td>`;
+}
+
+function detalleNovedad(n){
+  if (n.tipo==='feriado') return `× ${n.factor ?? 1} salario diario`;
+  if (n.tipo==='incapacidad') return `${(n.ente||'').toUpperCase()} · patrono ${n.pct_patrono||0}% de ${n.dias_patrono||0} día(s)`;
+  return '—';
+}
+function renderNovedades(cerrada){
+  const tb = document.getElementById('novBody'); tb.innerHTML = '';
+  if (!novedades.length){ tb.innerHTML = `<tr><td colspan="8" class="tbl-empty">Sin novedades en esta quincena. Todos reciben su salario base.</td></tr>`; return; }
+  novedades.forEach(n => {
+    const e = empleados.find(x=>x.id===n.empleado_id);
+    const ef = e ? efectoNovedad(n, e) : {};
+    const mas = (ef.feriado||0) + (ef.bono||0) + (ef.subsidio||0), menos = (ef.incap||0) + (ef.sinGoce||0) + (ef.deduccion||0);
+    const neto = mas - menos;
+    const fechas = n.fecha_inicio ? (n.fecha_fin && n.fecha_fin!==n.fecha_inicio ? `${fmtFecha(n.fecha_inicio)} – ${fmtFecha(n.fecha_fin)}` : fmtFecha(n.fecha_inicio)) : '—';
+    const tr = tb.insertRow();
+    tr.innerHTML = `
+      <td><strong>${esc(e?.nombre || '(empleado no disponible)')}</strong></td>
+      <td>${TIPO_TXT[n.tipo]||esc(n.tipo)}</td>
+      <td>${fechas}</td>
+      <td class="num">${['bono','deduccion'].includes(n.tipo) ? '—' : Number(n.dias||0)}</td>
+      <td style="font-size:13px;">${detalleNovedad(n)}</td>
+      <td class="num ${neto>=0?'mas':'menos'}">${neto>=0?'+':'−'}${fmtCRC(Math.abs(neto))}</td>
+      <td style="font-size:13px;">${esc(n.nota)||'—'}</td>
+      <td>${cerrada ? '' : `<button class="btn-del" title="Eliminar" onclick="borrarNovedad('${n.id}')">🗑️</button>`}</td>`;
+  });
+}
+
+function switchTab(t){
+  document.getElementById('tabBtnPlan').classList.toggle('active', t==='plan');
+  document.getElementById('tabBtnNov').classList.toggle('active', t==='nov');
+  document.getElementById('panelPlan').classList.toggle('active', t==='plan');
+  document.getElementById('panelNov').classList.toggle('active', t==='nov');
+}
+
+// ── Modal de novedad ──
+function openNovedad(empId){
+  if (cierre) return;
+  if (!empleados.length){ alert('No hay empleados de pago mensual en esta sede.'); return; }
+  const sel = document.getElementById('nEmpleado');
+  sel.innerHTML = empleados.map(e=>`<option value="${e.id}">${esc(e.nombre)}</option>`).join('');
+  if (empId) sel.value = empId;
+  const q = periodoActual, fer = feriadosEn(q);
+  document.getElementById('nTipo').value = 'feriado';
+  // Si la quincena tiene feriado, se propone esa fecha
+  const f0 = fer.length ? ymd(fer[0].f) : ymd(q.ini);
+  document.getElementById('nDesde').value = f0;
+  document.getElementById('nHasta').value = f0;
+  document.getElementById('nDias').value = 1;
+  document.getElementById('nFactor').value = 1;
+  document.getElementById('nEnte').value = 'ccss';
+  document.getElementById('nMonto').value = '';
+  document.getElementById('nNota').value = '';
+  document.getElementById('novErr').textContent = '';
+  onTipoChange();
+  document.getElementById('novModal').classList.add('open');
+}
+function closeNovedad(){ document.getElementById('novModal').classList.remove('open'); }
+
+function onTipoChange(){
+  const t = document.getElementById('nTipo').value;
+  const show = (cls, on) => document.querySelectorAll('.'+cls).forEach(el => { el.hidden = !on; });
+  show('t-fechas', t !== 'bono' && t !== 'deduccion');
+  show('t-dias',   t !== 'bono' && t !== 'deduccion');
+  show('t-feriado', t === 'feriado');
+  show('t-incap',  t === 'incapacidad');
+  show('t-monto',  t === 'bono' || t === 'deduccion');
+  if (t === 'incapacidad') onEnteChange(); else previewNovedad();
+}
+function autoDias(){
+  const a = parseFecha(document.getElementById('nDesde').value), b = parseFecha(document.getElementById('nHasta').value);
+  if (a && b && b >= a) document.getElementById('nDias').value = diasEntre(a, b);
+  onDiasChange();
+}
+function onDiasChange(){ if (document.getElementById('nTipo').value === 'incapacidad') onEnteChange(); else previewNovedad(); }
+function onEnteChange(){
+  const def = INCAP_DEF[document.getElementById('nEnte').value];
+  const d = Number(document.getElementById('nDias').value) || 0;
+  document.getElementById('nDiasPatrono').value = def.dias(d);
+  document.getElementById('nPct').value = def.pct;
+  previewNovedad();
+}
+
+function leerNovedad(){
+  const t = document.getElementById('nTipo').value;
+  const conFechas = t !== 'bono' && t !== 'deduccion';
+  return {
+    empleado_id: document.getElementById('nEmpleado').value,
+    sede: currentSede, periodo: periodoActual.id, tipo: t,
+    fecha_inicio: conFechas ? (document.getElementById('nDesde').value || null) : null,
+    fecha_fin:    conFechas ? (document.getElementById('nHasta').value || document.getElementById('nDesde').value || null) : null,
+    dias:   conFechas ? (Number(document.getElementById('nDias').value) || 0) : 0,
+    factor: t === 'feriado' ? Number(document.getElementById('nFactor').value || 0) : null,
+    ente:         t === 'incapacidad' ? document.getElementById('nEnte').value : null,
+    dias_patrono: t === 'incapacidad' ? (Number(document.getElementById('nDiasPatrono').value) || 0) : null,
+    pct_patrono:  t === 'incapacidad' ? (Number(document.getElementById('nPct').value) || 0) : null,
+    monto: (t === 'bono' || t === 'deduccion') ? (Number(document.getElementById('nMonto').value) || 0) : 0,
+    nota: document.getElementById('nNota').value.trim() || null,
+  };
+}
+
+function previewNovedad(){
+  const box = document.getElementById('nPreview');
+  const n = leerNovedad(), e = empleados.find(x=>x.id===n.empleado_id);
+  if (!e){ box.textContent = '—'; return; }
+  const diario = salarioDiario(e), ef = efectoNovedad(n, e);
+  const extra = n.tipo === 'incapacidad' ? `<br>${INCAP_DEF[n.ente].txt}` : '';
+  let txt;
+  switch (n.tipo){
+    case 'feriado':     txt = `<b class="mas">+${fmtCRC(ef.feriado)}</b> · ${n.dias} día(s) × ${fmtCRC(diario)} × ${n.factor}`; break;
+    case 'sin_goce':    txt = `<b class="menos">−${fmtCRC(ef.sinGoce)}</b> · ${n.dias} día(s) × ${fmtCRC(diario)}`; break;
+    case 'incapacidad': txt = `<b class="menos">−${fmtCRC(ef.incap)}</b> de salario (${n.dias} día(s) × ${fmtCRC(diario)})`
+                            + (ef.subsidio ? ` · <b class="mas">+${fmtCRC(ef.subsidio)}</b> de subsidio del patrono` : ' · sin subsidio del patrono'); break;
+    case 'bono':        txt = `<b class="mas">+${fmtCRC(ef.bono)}</b> · cotiza CCSS`; break;
+    case 'deduccion':   txt = `<b class="menos">−${fmtCRC(ef.deduccion)}</b> · se rebaja del neto, después de la CCSS`; break;
+  }
+  box.innerHTML = txt + extra + (diario ? '' : '<br>⚠️ Este empleado no tiene salario mensual en RRHH.');
+}
+
+async function guardarNovedad(){
+  const err = document.getElementById('novErr');
+  const n = leerNovedad(), q = periodoActual;
+  if (!n.empleado_id){ err.textContent = 'Elija el empleado.'; return; }
+  if (['bono','deduccion'].includes(n.tipo)){
+    if (!n.monto){ err.textContent = 'Indique el monto.'; return; }
+  } else {
+    if (!n.dias){ err.textContent = 'Indique los días.'; return; }
+    const a = parseFecha(n.fecha_inicio), b = parseFecha(n.fecha_fin);
+    if (a && b && b < a){ err.textContent = 'La fecha final no puede ser antes de la inicial.'; return; }
+    if ((a && (a < q.ini || a > q.fin)) || (b && (b < q.ini || b > q.fin))){
+      if (!confirm('Las fechas quedan fuera de esta quincena. Para una incapacidad o permiso que cruza quincenas, registre en cada quincena solo los días que le tocan.\n\n¿Guardar de todos modos?')) return;
+    }
+  }
+  const e = empleados.find(x=>x.id===n.empleado_id), ef = efectoNovedad(n, e);
+  if (n.tipo !== 'bono' && n.tipo !== 'deduccion') n.monto = Math.round(ef.feriado || ef.sinGoce || ef.incap || 0);
+  n.created_by = currentEmail || null;
+  const btn = document.getElementById('novBtn'); btn.disabled = true; btn.textContent = 'Guardando...';
+  try {
+    await supaFetch('/planilla_novedades', { method:'POST', body: n });
+    closeNovedad(); await loadPlanilla();
+  } catch(x){ err.textContent = x.message; } finally { btn.disabled = false; btn.textContent = 'Guardar'; }
+}
+
+async function borrarNovedad(id){
+  if (cierre) return;
+  if (!confirm('¿Eliminar esta novedad?')) return;
+  try { await supaFetch(`/planilla_novedades?id=eq.${encodeURIComponent(id)}`, { method:'DELETE' }); await loadPlanilla(); }
+  catch(e){ alert('No se pudo eliminar: ' + e.message); }
+}
+
+// ── Cerrar / reabrir quincena ──
+async function toggleCierre(){
+  const q = periodoActual;
+  try {
+    if (cierre){
+      if (!confirm(`¿Reabrir la ${q.label}? Los montos se volverán a calcular con los salarios actuales de RRHH.`)) return;
+      await supaFetch(`/planilla_periodos?id=eq.${encodeURIComponent(cierre.id)}`, { method:'DELETE' });
+    } else {
+      const lineas = lineasActuales();
+      if (!lineas.length){ alert('No hay empleados en la planilla.'); return; }
+      const tot = k => Math.round(lineas.reduce((a,l)=>a+(l[k]||0),0));
+      if (!confirm(`Cerrar la ${q.label} de ${currentSede}.\nNeto a pagar: ${fmtCRC(tot('neto'))}.\n\nQueda guardada tal cual y ya no se podrán agregar novedades (se puede reabrir). ¿Continuar?`)) return;
+      await supaFetch('/planilla_periodos', { method:'POST', body: {
+        sede: currentSede, periodo: q.id, fecha_inicio: ymd(q.ini), fecha_fin: ymd(q.fin), estado: 'cerrada',
+        detalle: lineas, total_bruto: tot('bruto'), total_ccss: tot('ccss'), total_neto: tot('neto'), total_patrono: tot('patrono'),
+        cerrada_por: currentEmail || null } });
+    }
+    await loadPlanilla();
+  } catch(e){ alert('No se pudo completar: ' + e.message); }
+}
+
+// ── Excel ──
+function exportExcel(){
+  const lineas = lineasActuales(), q = periodoActual;
+  if (!lineas.length){ alert('No hay datos para exportar.'); return; }
+  const r = n => Math.round(n || 0);
+  const aoa = [
+    [`Planilla — ${currentSede} — ${q.label}`],
+    [`${cierre ? 'CERRADA' : 'Borrador'} · generado ${new Date().toLocaleString('es-CR')} · CCSS trabajador ${(CCSS_TRABAJADOR*100).toFixed(2)}% · patrono ${(CCSS_PATRONO*100).toFixed(2)}%`],
+    [],
+    ['Nombre','Cédula','Cuenta BAC','Salario mensual','Salario diario','Base quincena','Feriados (+)','Bonos (+)','Incapacidad (−)','Sin goce (−)','Bruto','CCSS (−)','Subsidio incap. (+)','Otras deducciones (−)','Neto a pagar','Carga patronal'],
+  ];
+  const numRows = [];
+  lineas.forEach(l => {
+    aoa.push([l.nombre, l.cedula, l.cuenta_bac, r(l.salario_mensual), r(l.diario), r(l.base), r(l.feriado), r(l.bono), r(l.incap), r(l.sinGoce),
+      r(l.bruto), r(l.ccss), r(l.subsidio), r(l.deduccion), r(l.neto), r(l.patrono)]);
+    numRows.push(aoa.length-1);
+  });
+  const tot = k => r(lineas.reduce((a,l)=>a+(l[k]||0),0));
+  aoa.push(['TOTAL','','', '', '', tot('base'), tot('feriado'), tot('bono'), tot('incap'), tot('sinGoce'), tot('bruto'), tot('ccss'), tot('subsidio'), tot('deduccion'), tot('neto'), tot('patrono')]);
+  numRows.push(aoa.length-1);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:26},{wch:14},{wch:18}, ...Array(13).fill({wch:15})];
+  numRows.forEach(rr => { for (let c = 3; c <= 15; c++){ const ref = XLSX.utils.encode_cell({r:rr,c}); if (ws[ref] && typeof ws[ref].v === 'number') ws[ref].z = '#,##0'; } });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Planilla');
+
+  if (novedades.length){
+    const nov = [['Empleado','Tipo','Desde','Hasta','Días','Detalle','Monto','Nota']];
+    novedades.forEach(n => {
+      const e = empleados.find(x=>x.id===n.empleado_id);
+      nov.push([e?.nombre||'', TIPO_TXT[n.tipo]||n.tipo, n.fecha_inicio||'', n.fecha_fin||'', ['bono','deduccion'].includes(n.tipo)?'':Number(n.dias||0),
+        detalleNovedad(n), r(n.monto), n.nota||'']);
+    });
+    const ws2 = XLSX.utils.aoa_to_sheet(nov);
+    ws2['!cols'] = [{wch:26},{wch:22},{wch:12},{wch:12},{wch:8},{wch:34},{wch:14},{wch:30}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Novedades');
+  }
+  const slug = currentSede.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'_').toLowerCase();
+  XLSX.writeFile(wb, `planilla_${slug}_${q.id}.xlsx`);
+}
+</script>
+</body>
+</html>

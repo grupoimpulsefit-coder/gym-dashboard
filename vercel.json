@@ -12,6 +12,7 @@
     { "source": "/caja", "destination": "/caja.html" },
     { "source": "/inventario", "destination": "/inventario.html" },
     { "source": "/movil", "destination": "/movil.html" },
-    { "source": "/mediciones", "destination": "/mediciones.html" }
+    { "source": "/mediciones", "destination": "/mediciones.html" },
+    { "source": "/planilla", "destination": "/planilla.html" }
   ]
 }
