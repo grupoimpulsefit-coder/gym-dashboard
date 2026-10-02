@@ -3049,7 +3049,8 @@ async function processComprobantesFile(data) {
         const colEstado = findCol('estado');
         const colMonto  = findCol('subtotal', 'total crc', 'monto', 'total');
         if (colMonto < 0) throw new Error('No se encontró la columna de monto (Subtotal CRC) en el archivo.');
-        // Columna con impuestos (solo para informar; se guarda el subtotal sin impuestos)
+        // Se guarda el total CON impuestos (columna "Monto CRC"); si el informe no la trae,
+        // se usa el subtotal sin impuestos y se avisa.
         const colConIva = rows[hdr].findIndex(c => String(c || '').trim().toLowerCase() === 'monto crc');
         // Mes de cada comprobante (serial de Excel, Date o texto) → 'YYYY-MM'
         const mesDe = raw => {
@@ -3086,16 +3087,18 @@ async function processComprobantesFile(data) {
             if (v.tipo === 'FE') { totalFE += v.monto; conIvaFE += v.conIva; countFE++; }
             else { totalNC += Math.abs(v.monto); conIvaNC += Math.abs(v.conIva); }
         });
-        feData = { total: Math.round(totalFE - totalNC), count: countFE, loaded: true };
+        const sinIva = Math.round(totalFE - totalNC);
+        const conIva = Math.round(conIvaFE - conIvaNC);
+        feData = { total: colConIva >= 0 ? conIva : sinIva, count: countFE, loaded: true };
         if (mesObjetivo) {
             feData.mesOrden = mesObjetivo;
             feData.mes = mesLabelFromOrden(mesObjetivo);
         }
-        const conIva = Math.round(conIvaFE - conIvaNC);
-        statusEl.textContent = `✅ ${countFE} facturas — Total FE: ₡${feData.total.toLocaleString('es-CR')} sin impuestos`
-            + (colConIva >= 0 ? ` (₡${conIva.toLocaleString('es-CR')} con impuestos)` : '')
+        statusEl.textContent = (colConIva >= 0
+            ? `✅ ${countFE} facturas — Total FE: ₡${conIva.toLocaleString('es-CR')} con impuestos (₡${sinIva.toLocaleString('es-CR')} sin impuestos)`
+            : `✅ ${countFE} facturas — Total FE: ₡${sinIva.toLocaleString('es-CR')} sin impuestos (el informe no trae la columna Monto CRC)`)
             + (feData.mes ? ` · ${feData.mes}` : '')
-            + (totalNC ? ` · NC restadas ₡${Math.round(totalNC).toLocaleString('es-CR')}` : '')
+            + (totalNC ? ` · NC restadas ₡${Math.round(colConIva >= 0 ? conIvaNC : totalNC).toLocaleString('es-CR')}` : '')
             + (fuera ? ` · ${fuera} comprobante(s) de otro mes omitido(s)` : '')
             + (rechazados ? ` · ${rechazados} rechazado(s) omitido(s)` : '');
         await autoSaveToSupabase();
