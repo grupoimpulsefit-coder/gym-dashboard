@@ -835,8 +835,8 @@ function onSedeSelected() {
     badge.textContent = sel;
     badge.style.display = 'inline-block';
     // Limpiar estado previo
-    usuariosLoaded = false;
-    renoLoaded = false;
+    usuariosLoaded = false; usuariosSubido = false; feData = { total: 0, count: 0, loaded: false };
+    renoLoaded = false; renoSubido = false;
     usersData = [];
     renovacionesData = [];
     clasesSueltasData = [];
@@ -1099,8 +1099,8 @@ function mostrarCarga() {
     document.getElementById('sedeSeleccionadaBadge').style.display = 'none';
     document.getElementById('uploadStatusU').innerHTML = '';
     document.getElementById('uploadStatusR').innerHTML = '';
-    usuariosLoaded = false;
-    renoLoaded = false;
+    usuariosLoaded = false; usuariosSubido = false; feData = { total: 0, count: 0, loaded: false };
+    renoLoaded = false; renoSubido = false;
 }
 
 const SEDE_ICONS = {
@@ -1124,8 +1124,8 @@ function volverAlMenu() {
     document.getElementById('dashboard').style.display = 'none';
     document.getElementById('btnCambiarSede').style.display = 'none';
     document.getElementById('mesDashSelector').style.display = 'none';
-    usuariosLoaded = false;
-    renoLoaded = false;
+    usuariosLoaded = false; usuariosSubido = false; feData = { total: 0, count: 0, loaded: false };
+    renoLoaded = false; renoSubido = false;
     showSedePicker();
 }
 
@@ -1319,8 +1319,9 @@ async function loadSedeForColaborador(sede, mesEspecifico) {
             ...u, ExpiraDate: parseDate(u.Expira), IngresoDate: parseDate(u.Ingreso)
         }));
         const renovRaw = snap.renov_data || [];
-        usuariosLoaded = true;
-        renoLoaded = true;
+        usuariosLoaded = true; usuariosSubido = false;   // leído del historial, no subido
+        feData = { total: 0, count: 0, loaded: false };   // la FE subida antes era de otra sede/mes
+        renoLoaded = true; renoSubido = false;
         await loadPricesForSede(currentSedeName);
         // Reclasificar con el clasificador actual (planPrices ya cargado para esta sede),
         // en vez de confiar en los flags guardados del snapshot que pueden estar viejos.
@@ -1547,6 +1548,11 @@ function buildRenovStateFromRaw(renovRaw, refUsers) {
 //  EXCEL PROCESSING — dos archivos separados
 // ══════════════════════════════════════════════════════
 let usuariosLoaded = false, renoLoaded = false;
+// "Loaded" = hay datos en memoria (subidos o leídos del historial) → se usan para mostrar el panel.
+// "Subido" = se cargó el ARCHIVO en esta sesión → solo esto se escribe en el historial. Antes se
+// usaba "Loaded" para guardar, y al subir p. ej. Facturación Electrónica con otro mes abierto, se
+// reescribían las ventas y usuarios de ese mes con los del mes que estaba en pantalla.
+let usuariosSubido = false, renoSubido = false;
 let listenersAttached = false;
 
 function parseCRC(val) {
@@ -1605,7 +1611,7 @@ function processLegacyFile(wb, filename) {
     }
 
     usersData.forEach(u => u.ValorPlan = getPlanPrice(u.ÚltimoProducto, u.PIN));
-    usuariosLoaded = true;
+    usuariosLoaded = true; usuariosSubido = true;
     document.getElementById('uploadStatusU').innerHTML =
         `<span style="color:var(--green);font-weight:600;">✅ ${usersData.length} usuarios cargados — ${currentSedeName}</span>`;
 
@@ -1636,7 +1642,7 @@ function processLegacyFile(wb, filename) {
                 GapDias: clasif.gapDias
             });
         }
-        renoLoaded = true;
+        renoLoaded = true; renoSubido = true;
         document.getElementById('uploadStatusR').innerHTML =
             `<span style="color:var(--green);font-weight:600;">✅ ${renovacionesData.length} renovaciones cargadas (formato combinado)</span>`;
     }
@@ -1693,7 +1699,7 @@ async function processUsuariosFile(data, filename) {
         // Apply prices (from Supabase cache or manual overrides)
         usersData.forEach(u => u.ValorPlan = getPlanPrice(u.ÚltimoProducto, u.PIN));
 
-        usuariosLoaded = true;
+        usuariosLoaded = true; usuariosSubido = true;
         document.getElementById('uploadStatusU').innerHTML =
             `<span style="color:var(--green);font-weight:600;">✅ ${usersData.length} usuarios cargados — ${currentSedeName}</span>`;
 
@@ -1798,7 +1804,7 @@ async function processRenovacionesFile(data, filename) {
             });
         }
 
-        renoLoaded = true;
+        renoLoaded = true; renoSubido = true;
         document.getElementById('uploadStatusR').innerHTML =
             `<span style="color:var(--green);font-weight:600;">✅ ${renovacionesData.length} transacciones de membresía cargadas</span>`;
 
@@ -1854,7 +1860,9 @@ function rebuildDashboard() {
     }
 
     // Guardar snapshot con lo que tengamos: ventas solas, usuarios solos, o ambos
-    if (usuariosLoaded || renoLoaded) autoSaveToSupabase();
+    // Solo se guarda en el historial lo que se SUBIÓ en esta sesión. Abrir una sede (que también
+    // pasa por aquí) no debe escribir nada: antes reescribía un mes con los datos en pantalla.
+    if (usuariosSubido || renoSubido) autoSaveToSupabase();
 }
 
 // ══════════════════════════════════════════════════════
@@ -2717,8 +2725,9 @@ function detectMesFromData() {
 async function autoSaveToSupabase() {
     // Las proyecciones (Informe de Usuarios) solo las guarda admin_sedes.
     // Ventas y Comprobantes los pueden guardar admin/admin_g también.
-    if (usuariosLoaded && !esAdminSedes()) return;
-    const statusEl = usuariosLoaded
+    if (!usuariosSubido && !renoSubido && !feData.loaded) return;   // nada subido: no tocar el historial
+    if (usuariosSubido && !esAdminSedes()) return;
+    const statusEl = usuariosSubido
         ? document.getElementById('uploadStatusU')
         : document.getElementById('uploadStatusR');
     try {
@@ -2729,8 +2738,8 @@ async function autoSaveToSupabase() {
             mesOrden = _mesForzado;
             mes = mesLabelFromOrden(_mesForzado);
         } else {
-            mes      = (feData.loaded && feData.mes && !renoLoaded) ? feData.mes      : _mesDetectado.mes;
-            mesOrden = (feData.loaded && feData.mesOrden && !renoLoaded) ? feData.mesOrden : _mesDetectado.mesOrden;
+            mes      = (feData.loaded && feData.mes && !renoSubido) ? feData.mes      : _mesDetectado.mes;
+            mesOrden = (feData.loaded && feData.mesOrden && !renoSubido) ? feData.mesOrden : _mesDetectado.mesOrden;
         }
         const today = new Date(); today.setHours(0,0,0,0);
         const ranges = [
@@ -2753,7 +2762,7 @@ async function autoSaveToSupabase() {
             mes_orden:     mesOrden,
             updated_at: new Date().toISOString()
         };
-        if (usuariosLoaded) {
+        if (usuariosSubido) {
             record.activos        = usersData.filter(u => u.Activo === 'Sí').length;
             record.total_usuarios = usersData.length;
             record.proyecciones   = proyecciones;
@@ -2766,7 +2775,7 @@ async function autoSaveToSupabase() {
         if (feData.loaded) {
             record.fe_total = feData.total;
         }
-        if (renoLoaded) {
+        if (renoSubido) {
             // Si no subimos Ventas esta vez, no tocar renovaciones/renov_data ya guardados (evita borrarlos)
             record.renovaciones = {
                 nuevos:       renovacionesData.filter(r=>r.Tipo==='Nuevo').length,
@@ -2810,13 +2819,13 @@ async function autoSaveToSupabase() {
             );
         } else {
             // Registro nuevo: dejar valores por defecto razonables para lo que falte
-            if (!usuariosLoaded) {
+            if (!usuariosSubido) {
                 record.activos = 0;
                 record.total_usuarios = 0;
                 record.proyecciones = [];
                 record.users_data = [];
             }
-            if (!renoLoaded) {
+            if (!renoSubido) {
                 record.renovaciones = { nuevos:0, renovaciones:0, reingresos:0, total:0, clasesSueltas:{count:0,total:0}, sinClasificar:{count:0,total:0} };
                 record.renov_data = [];
             }
