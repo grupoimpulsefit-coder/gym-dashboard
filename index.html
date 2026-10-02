@@ -3049,31 +3049,55 @@ async function processComprobantesFile(data) {
         const colEstado = findCol('estado');
         const colMonto  = findCol('subtotal', 'total crc', 'monto', 'total');
         if (colMonto < 0) throw new Error('No se encontró la columna de monto (Subtotal CRC) en el archivo.');
-        let totalFE = 0, totalNC = 0, countFE = 0, rechazados = 0;
-        const fechas = [];
+        // Columna con impuestos (solo para informar; se guarda el subtotal sin impuestos)
+        const colConIva = rows[hdr].findIndex(c => String(c || '').trim().toLowerCase() === 'monto crc');
+        // Mes de cada comprobante (serial de Excel, Date o texto) → 'YYYY-MM'
+        const mesDe = raw => {
+            let d = null;
+            if (raw instanceof Date) d = raw;
+            else if (typeof raw === 'number' && raw > 40000) { const u = new Date(Math.round((raw - 25569) * 86400000)); d = new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate()); }
+            else if (typeof raw === 'string' && raw.trim()) { const t = new Date(raw.trim().replace(' ', 'T')); if (!isNaN(t)) d = t; }
+            return d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` : null;
+        };
+        // Solo cuentan FE (ventas) y NC (notas de crédito) aprobadas. MR (mensaje receptor) y
+        // FEC (factura de compra) son COMPRAS, no ventas; los rechazados por Hacienda tampoco.
+        const validos = [];
+        let rechazados = 0;
         for (let i = hdr + 1; i < rows.length; i++) {
             const tipo = String(rows[i][colTipo] || '').trim().toUpperCase();
             if (!tipo) continue;
-            // No contar comprobantes rechazados por Hacienda
             const estado = String(colEstado >= 0 ? rows[i][colEstado] : '').trim().toLowerCase();
             if (estado === 'rechazado') { rechazados++; continue; }
-            const monto = Number(rows[i][colMonto]) || 0;
-            if (tipo === 'FE') { totalFE += monto; countFE++; }
-            else if (tipo === 'NC') { totalNC += monto; }
-            // Recopilar fechas para detectar el mes del archivo (Date, serial Excel o texto)
-            const fechaRaw = colFecha >= 0 ? rows[i][colFecha] : null;
-            if (fechaRaw instanceof Date) fechas.push(fechaRaw);
-            else if (typeof fechaRaw === 'number' && fechaRaw > 40000) fechas.push(new Date((fechaRaw - 25569) * 86400000));
-            else if (typeof fechaRaw === 'string' && fechaRaw.trim()) { const d = new Date(fechaRaw.trim().replace(' ', 'T')); if (!isNaN(d)) fechas.push(d); }
+            if (tipo !== 'FE' && tipo !== 'NC') continue;
+            validos.push({ tipo, mes: colFecha >= 0 ? mesDe(rows[i][colFecha]) : null,
+                monto: Number(rows[i][colMonto]) || 0, conIva: colConIva >= 0 ? (Number(rows[i][colConIva]) || 0) : 0 });
         }
+        // El informe suele traer días del mes siguiente (se descarga el día 1). Se toma el mes con
+        // más facturas, o el "mes destino" si el admin lo eligió, y se suma SOLO ese mes.
+        const mesForzado = document.getElementById('mesDestinoSelector')?.value || '';
+        const conteo = {};
+        validos.forEach(v => { if (v.mes && v.tipo === 'FE') conteo[v.mes] = (conteo[v.mes] || 0) + 1; });
+        const mesObjetivo = mesForzado || Object.keys(conteo).sort((a, b) => conteo[b] - conteo[a])[0] || null;
+        const delMes = validos.filter(v => !mesObjetivo || !v.mes || v.mes === mesObjetivo);
+        const fuera = validos.length - delMes.length;
+        // Las NC vienen en negativo en el informe; se resta su valor absoluto (antes se sumaban).
+        let totalFE = 0, totalNC = 0, countFE = 0, conIvaFE = 0, conIvaNC = 0;
+        delMes.forEach(v => {
+            if (v.tipo === 'FE') { totalFE += v.monto; conIvaFE += v.conIva; countFE++; }
+            else { totalNC += Math.abs(v.monto); conIvaNC += Math.abs(v.conIva); }
+        });
         feData = { total: Math.round(totalFE - totalNC), count: countFE, loaded: true };
-        // Detectar mes desde las fechas del archivo (no desde today)
-        if (fechas.length) {
-            const ref = new Date(Math.max(...fechas.map(d => d.getTime())));
-            feData.mes = ref.toLocaleDateString('es-CR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
-            feData.mesOrden = `${ref.getFullYear()}-${String(ref.getMonth()+1).padStart(2,'0')}`;
+        if (mesObjetivo) {
+            feData.mesOrden = mesObjetivo;
+            feData.mes = mesLabelFromOrden(mesObjetivo);
         }
-        statusEl.textContent = `✅ ${countFE} facturas — Total FE: ₡${feData.total.toLocaleString('es-CR')}${feData.mes ? ' (' + feData.mes + ')' : ''}${rechazados ? ' · ' + rechazados + ' rechazado(s) omitido(s)' : ''}`;
+        const conIva = Math.round(conIvaFE - conIvaNC);
+        statusEl.textContent = `✅ ${countFE} facturas — Total FE: ₡${feData.total.toLocaleString('es-CR')} sin impuestos`
+            + (colConIva >= 0 ? ` (₡${conIva.toLocaleString('es-CR')} con impuestos)` : '')
+            + (feData.mes ? ` · ${feData.mes}` : '')
+            + (totalNC ? ` · NC restadas ₡${Math.round(totalNC).toLocaleString('es-CR')}` : '')
+            + (fuera ? ` · ${fuera} comprobante(s) de otro mes omitido(s)` : '')
+            + (rechazados ? ` · ${rechazados} rechazado(s) omitido(s)` : '');
         await autoSaveToSupabase();
     } catch(e) {
         statusEl.textContent = '⚠️ Error: ' + e.message;
