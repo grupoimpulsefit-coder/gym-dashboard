@@ -1280,7 +1280,7 @@ async function descontarInventario(soldByBase, origName, D){
   try{ inv=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(currentSede)}&select=*`))||[]; }
   catch(e){ return { error:e.message }; }
   const invByName={}; inv.forEach(p=>{ invByName[normP(p.producto)]=p; });
-  let unidadesDesc=0, prodsTocados=0; const detalle=[];
+  let unidadesDesc=0, prodsTocados=0; const detalle=[], rechazados=[];
   for(const p of inv){
     const k=normP(p.producto);
     const unidadesHoy=soldByBase[k]||0;
@@ -1292,10 +1292,10 @@ async function descontarInventario(soldByBase, origName, D){
     const nuevoStock=(Number(p.cantidad)||0)-delta;
     // mov_motivo: pista para el kardex (ver inventario_movimientos.sql). El trigger la consume y la limpia.
     try{ await supaFetch(`/inventario?id=eq.${p.id}`,{method:'PATCH',body:{cantidad:nuevoStock,desc_dia:D,desc_hoy:unidadesHoy,updated_at:new Date().toISOString(),mov_motivo:`venta: informe de ventas del ${D}`}});
-      if(delta!==0){ unidadesDesc+=delta; prodsTocados++; detalle.push({producto:p.producto,delta,hoy:unidadesHoy,stock:nuevoStock}); } }catch(_){}
+      if(delta!==0){ unidadesDesc+=delta; prodsTocados++; detalle.push({producto:p.producto,delta,hoy:unidadesHoy,stock:nuevoStock}); } }catch(e){ rechazados.push(p.producto+": "+mensajeError(e)); }
   }
   const noCalzan=Object.keys(soldByBase).filter(k=>!invByName[k]&&soldByBase[k]>0).map(k=>origName[k]||k);
-  return { unidadesDesc, prodsTocados, noCalzan, detalle };
+  return { unidadesDesc, prodsTocados, noCalzan, detalle, rechazados };
 }
 
 // Productos del informe que la sede no tiene registrados (ni en plan_prices, ni en
@@ -1366,6 +1366,7 @@ function cargarVentasProducto(file){
         const desc=await descontarInventario(soldByBase, origName, D);   // idempotente por día
         if(desc&&!desc.error){ msg+=`<br>📦 Inventario: ${desc.unidadesDesc||0} unidad(es) descontadas en esta carga`;
           if(desc.detalle&&desc.detalle.length) msg+=` — ${desc.detalle.slice(0,10).map(d=>`${esc(d.producto)} −${d.delta} (${d.hoy} hoy, quedan ${d.stock})`).join(', ')}${desc.detalle.length>10?'…':''}`;
+          if(desc.rechazados&&desc.rechazados.length) msg+=`. ⚠ La base no permitió descontar (${desc.rechazados.length}): ${desc.rechazados.slice(0,3).map(esc).join(" · ")}`;
           if(desc.noCalzan&&desc.noCalzan.length) msg+=`. ⚠ Sin calzar en inventario (${desc.noCalzan.length}): ${desc.noCalzan.slice(0,8).map(esc).join(', ')}${desc.noCalzan.length>8?'…':''}`; }
         else if(desc&&desc.error){ msg+=`<br>⚠ Inventario no actualizado: ${esc(desc.error)}`; }
       }catch(_){}
@@ -1480,24 +1481,25 @@ function openRecibir(id){
 async function aceptarEnvio(){
   const env=window._envioActual; if(!env)return;
   const inputs=[...document.querySelectorAll('#recibirList input[id^="rec_"]')];
-  const items=(env.items||[]).map((it,i)=>({...it, recibido:Number(inputs[i].value)||0}));
+  const recibidos=(env.items||[]).map((it,i)=>Number(inputs[i].value)||0);
   const nota=document.getElementById('recibirNota').value.trim()||null;
   const btn=document.getElementById('btnAceptarEnvio'); btn.disabled=true; btn.textContent='Procesando...';
   try{
-    const inv=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(currentSede)}&select=id,producto,cantidad`))||[];
-    const byName={}; inv.forEach(p=>byName[normP(p.producto)]=p);
-    const noExiste=[];
-    for(const it of items){ if(!(it.recibido>0))continue; const p=byName[normP(it.producto)];
-      if(p) await supaFetch(`/inventario?id=eq.${p.id}`,{method:'PATCH',body:{cantidad:(Number(p.cantidad)||0)+it.recibido,updated_at:new Date().toISOString(),mov_motivo:`entrada: envío aceptado (enviado por ${env.created_by||'—'})`}});
-      else noExiste.push(it.producto); }
-    await supaFetch(`/envios_mercaderia?id=eq.${env.id}`,{method:'PATCH',body:{estado:'aceptado',items,nota,aceptado_por:currentEmail||null,aceptado_at:new Date().toISOString()}});
+    // Se acepta en el servidor (aceptar_envio, ver inventario_proteccion.sql): registra el envío y suma
+    // el stock en un solo paso, con lo ENVIADO según la base, y no deja que quien lo creó lo acepte.
+    const r=await supaFetch('/rpc/aceptar_envio',{method:'POST',prefer:'return=representation',body:{p_envio:env.id,p_recibidos:recibidos,p_nota:nota}});
+    const noExiste=(r&&r.no_existen)||[];
+    const recortados=(env.items||[]).filter((it,i)=>recibidos[i]>(Number(it.enviado)||0)).map(it=>it.producto);
     document.getElementById('recibirModal').style.display='none';
     const sm=document.getElementById('saveMsg'); sm.className='msg ok';
-    sm.textContent='📥 Envío recibido y sumado al stock.'+(noExiste.length?` ⚠ No estaban en inventario: ${noExiste.join(', ')}.`:'');
+    sm.textContent='📥 Envío recibido y sumado al stock.'+(noExiste.length?` ⚠ No estaban en inventario: ${noExiste.join(', ')}.`:'')
+      +(recortados.length?` ⚠ Se sumó como máximo lo enviado en: ${recortados.join(', ')}.`:'');
     loadEnviosCaja();
-  }catch(e){ document.getElementById('recibirErr').textContent='No se pudo: '+e.message; }
+  }catch(e){ document.getElementById('recibirErr').textContent='No se pudo: '+mensajeError(e); }
   finally{ btn.disabled=false; btn.textContent='📥 Aceptar y sumar al stock'; }
 }
+// Los errores de Supabase llegan como JSON en el texto: mostrar solo el mensaje
+function mensajeError(e){ try{ const j=JSON.parse(e.message); return j.message||e.message; }catch(_){ return e.message; } }
 function renderHist(){
   const tb=document.getElementById('histBody');
   if(!cierres.length){tb.innerHTML='<tr><td colspan="9" style="padding:16px;color:var(--muted);">Sin cierres registrados.</td></tr>';return;}

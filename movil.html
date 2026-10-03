@@ -187,7 +187,7 @@
 
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-09-26a';
+const APP_VER='2026-10-02a';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -921,14 +921,16 @@ function renderArqueoResultado(){
     <div class="tiles">${arqTilesHtml(st)}</div>
     <div class="sect"><div class="hdr">Productos con diferencia</div><div class="group">${difs.length?difs.map(r=>{const c=arq.items[r.producto];const sis=Number(r.cantidad)||0;return `<div class="cell"><div class="main"><span class="t">${esc(r.producto)}</span><span class="s num">sistema ${sis} · contado ${c}</span></div>${difBadge(c-sis)}</div>`;}).join(''):'<div class="cell"><span class="s">Todo coincide con el sistema.</span></div>'}</div>
       <div class="ftr">Arqueo registrado${a.created_at?' a las '+hora(a.created_at):''} por ${esc(auth.email||'')}. El stock del sistema no cambió.</div></div>
-    ${difs.length?`<div class="actionbar"><button class="btn primary" id="btnAplicar" onclick="aplicarArqueo()">Aplicar conteo al sistema (${difs.length})</button></div><div class="sect"><div class="ftr" style="text-align:center">Reemplaza la cantidad del sistema por lo contado en esos ${difs.length} producto(s), igual que "guardar conteo" en Inventario.</div></div>`:''}
+    ${difs.length&&!esAdmin()?`<div class="sect"><div class="ftr" style="text-align:center">Solo un administrador puede aplicar el conteo al sistema.</div></div>`:''}
+    ${difs.length&&esAdmin()?`<div class="actionbar"><button class="btn primary" id="btnAplicar" onclick="aplicarArqueo()">Aplicar conteo al sistema (${difs.length})</button></div><div class="sect"><div class="ftr" style="text-align:center">Reemplaza la cantidad del sistema por lo contado en esos ${difs.length} producto(s), igual que "guardar conteo" en Inventario.</div></div>`:''}
     <div class="actionbar"><button class="btn plain" onclick="invCache[detSede]=null;back()">Volver</button></div>`;
 }
 async function aplicarArqueo(){
+  if(!esAdmin()) return;   // la base también lo impide (inventario_proteccion.sql)
   const difs=arq.rows.filter(r=>arq.items[r.producto]!=null&&arq.items[r.producto]!==(Number(r.cantidad)||0));
   if(!difs.length) return; if(!confirm(`¿Reemplazar la cantidad del sistema por lo contado en ${difs.length} producto(s)? Queda registrado en el arqueo.`)) return;
   const b=document.getElementById('btnAplicar'); b.disabled=true; b.textContent='Aplicando…'; let ok=0, err=null;
-  for(const r of difs){ try{ await supaFetch(`/inventario?id=eq.${r.id}`,{method:'PATCH',body:{cantidad:arq.items[r.producto],updated_at:new Date().toISOString()}}); ok++; }catch(e){ err=e; } }
+  for(const r of difs){ try{ await supaFetch(`/inventario?id=eq.${r.id}`,{method:'PATCH',body:{cantidad:arq.items[r.producto],updated_at:new Date().toISOString(),mov_motivo:'ajuste: arqueo del '+todayStr()}}); ok++; }catch(e){ err=e; } }
   try{ if(arq.saved?.id) await supaFetch(`/arqueos_inventario?id=eq.${arq.saved.id}`,{method:'PATCH',body:{ajustado:true}}); }catch(_){}
   invCache[detSede]=null; toast(err?`Se aplicaron ${ok} de ${difs.length}. Error: ${err.message}`:`Inventario actualizado: ${ok} producto(s).`); back();
 }
