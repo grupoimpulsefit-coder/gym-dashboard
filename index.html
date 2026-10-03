@@ -2811,8 +2811,27 @@ async function autoSaveToSupabase() {
         }
         // Intentar actualizar primero; si no existe ningún registro, insertar
         const existing = await supaFetch(
-            `/gym_snapshots?sede=eq.${encodeURIComponent(record.sede)}&mes=eq.${encodeURIComponent(record.mes)}&select=id`
+            `/gym_snapshots?sede=eq.${encodeURIComponent(record.sede)}&mes=eq.${encodeURIComponent(record.mes)}&select=id${record.renov_data ? ',renov_data' : ''}`
         );
+        // Protección de las ventas del mes: un archivo vacío o más corto (p. ej. el reporte de un
+        // solo día) reemplazaba todas las ventas ya guardadas. Septiembre 2026 quedó en 0 así.
+        let avisoVentas = '';
+        if (record.renov_data) {
+            const nuevas = record.renov_data.length;
+            const guardadas = (existing && existing[0] && Array.isArray(existing[0].renov_data)) ? existing[0].renov_data.length : 0;
+            const conservar = () => { delete record.renov_data; delete record.renovaciones; };
+            if (nuevas === 0) {
+                conservar();
+                avisoVentas = guardadas ? ` · ⚠️ El archivo no trae ventas: se conservaron las ${guardadas} guardadas` : ' · ⚠️ El archivo no trae ventas';
+            } else if (guardadas > nuevas && !confirm(
+                `${record.mes} de ${record.sede} ya tiene ${guardadas} ventas guardadas y este archivo trae solo ${nuevas}.\n\n` +
+                `Si es el reporte de un día o de parte del mes, se perderían las demás.\n\n` +
+                `¿Reemplazar las ventas guardadas con las de este archivo?`)) {
+                conservar();
+                avisoVentas = ` · Se conservaron las ${guardadas} ventas guardadas (no se reemplazaron)`;
+            }
+        }
+        if (existing && existing[0]) delete existing[0].renov_data;   // no se necesita más
         if (existing && existing.length > 0) {
             await supaFetch(
                 `/gym_snapshots?sede=eq.${encodeURIComponent(record.sede)}&mes=eq.${encodeURIComponent(record.mes)}`,
@@ -2826,7 +2845,7 @@ async function autoSaveToSupabase() {
                 record.proyecciones = [];
                 record.users_data = [];
             }
-            if (!renoSubido) {
+            if (!record.renov_data) {
                 record.renovaciones = { nuevos:0, renovaciones:0, reingresos:0, total:0, clasesSueltas:{count:0,total:0}, sinClasificar:{count:0,total:0} };
                 record.renov_data = [];
             }
@@ -2834,7 +2853,7 @@ async function autoSaveToSupabase() {
                 method: 'POST', prefer: 'return=minimal', body: record
             });
         }
-        statusEl.innerHTML += ` &nbsp;<span style="color:var(--blue);font-size:13px;">☁️ Historial actualizado (${mes})</span>`;
+        statusEl.innerHTML += ` &nbsp;<span style="color:var(--blue);font-size:13px;">☁️ Historial actualizado (${mes})${avisoVentas}</span>`;
     } catch(e) {
         console.error('Supabase save error:', e);
         statusEl.innerHTML += ` &nbsp;<span style="color:var(--red);font-size:13px;">⚠️ Error nube: ${e.message}</span>`;
