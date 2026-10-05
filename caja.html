@@ -1011,22 +1011,24 @@ async function cargarReporteSinpe(file){
     try{
       const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
       const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
-      let hdr=-1,cRef=-1,cMonto=-1,cFecha=-1,cDet=-1;
+      let hdr=-1,cRef=-1,cMonto=-1,cFecha=-1,cDet=-1,cOrig=-1;
       for(let i=0;i<Math.min(rows.length,15);i++){ const nm=(rows[i]||[]).map(normHdr);
         const ri=nm.findIndex(c=>c.includes('referencia')); const mi=nm.findIndex(c=>c==='monto');
-        if(ri>=0&&mi>=0){ hdr=i; cRef=ri; cMonto=mi; cFecha=nm.findIndex(c=>c.includes('fecha')&&c.includes('transacc')); if(cFecha<0)cFecha=nm.findIndex(c=>c.includes('fecha')); cDet=nm.findIndex(c=>c==='detalle'); break; } }
+        if(ri>=0&&mi>=0){ hdr=i; cRef=ri; cMonto=mi; cFecha=nm.findIndex(c=>c.includes('fecha')&&c.includes('transacc')); if(cFecha<0)cFecha=nm.findIndex(c=>c.includes('fecha')); cDet=nm.findIndex(c=>c==='detalle'); cOrig=nm.findIndex(c=>c.includes('cliente origen')); break; } }
+      let desde=''; for(let i=0;i<Math.min(rows.length,10);i++){ const r=rows[i]||[]; if(normHdr(r[0])==='desde'){ desde=String(r[1]||'').trim().slice(0,10); break; } }
       if(hdr<0)throw new Error('No se encontró el encabezado con "ReferenciaSinpe" y "Monto". ¿Es el reporte SINPE?');
       const seen=new Set(); const all=[];
       for(let i=hdr+1;i<rows.length;i++){ const r=rows[i]; if(!r)continue;
         const ref=String(r[cRef]==null?'':r[cRef]).trim(); if(!ref)continue;
         if(seen.has(ref))continue; seen.add(ref);                     // dedup dentro del mismo archivo
         all.push({ referencia:ref, monto:Math.round(Number(r[cMonto])||0),
-          fecha_tx:cFecha>=0?String(r[cFecha]||'').trim():'', detalle:cDet>=0?String(r[cDet]||'').trim():'' });
+          fecha_tx:cFecha>=0?String(r[cFecha]||'').trim():'', detalle:cDet>=0?String(r[cDet]||'').trim():'', origen:cOrig>=0?String(r[cOrig]||'').trim():'' });
       }
       if(!all.length)throw new Error('El reporte no tiene filas de SINPE.');
       let yaSet=new Set();
       try{ const reg=(await supaFetch(`/sinpe_registrados?sede=eq.${encodeURIComponent(currentSede)}&select=referencia`))||[]; reg.forEach(x=>yaSet.add(String(x.referencia))); }
       catch(err){ hintEl.innerHTML='⚠ No se pudieron leer las referencias registradas: '+esc(err.message)+' (¿corrió el SQL de <code>sinpe_registrados</code>?).'; window._sinpeReporte=null; renderSinpeResumen(); return; }
+      all.forEach(x=>{ x.ya=yaSet.has(x.referencia); });
       const nuevos=all.filter(x=>!yaSet.has(x.referencia));
       const yaReg=all.filter(x=>yaSet.has(x.referencia));
       // Recibidos nuevos que traen fecha de transacción anterior al día del cierre (llegaron antes, se confirman ahora).
@@ -1040,11 +1042,85 @@ async function cargarReporteSinpe(file){
       window._sinpeReporte={ fileName:file.name, all, nuevos,
         nuevosMonto:nuevos.reduce((s,x)=>s+x.monto,0),
         yaRegN:yaReg.length, yaRegMonto:yaReg.reduce((s,x)=>s+x.monto,0),
-        totalN:all.length, totalMonto:all.reduce((s,x)=>s+x.monto,0), pendPrev, nuevosPrev, nuevosPrevMonto };
+        totalN:all.length, totalMonto:all.reduce((s,x)=>s+x.monto,0), pendPrev, nuevosPrev, nuevosPrevMonto, desde };
       renderSinpeResumen();
     }catch(err){ hintEl.innerHTML='⚠ '+esc(err.message); window._sinpeReporte=null; renderSinpeResumen(); }
   };
   reader.readAsArrayBuffer(file);
+}
+// ── Cruce SINPE por transacción ──────────────────────────────────────────────
+// Empareja cada cobro del Informe de Ventas con su transferencia del reporte SINPE:
+//   1) por la referencia anotada en "Notas" del sistema de ventas (completa o los últimos 6+ dígitos)
+//   2) si no hay referencia: por monto (±₡100), nombre del cliente y cercanía en el tiempo
+// Si el informe viene agrupado por método, los cobros SINPE sin transferencia se listan como faltantes.
+// Si no viene agrupado, solo se puede afirmar lo que calza y las transferencias sin cobro.
+function metodoDeFila(r,col){
+  if(!r||(col.fecha>=0&&r[col.fecha]))return null;
+  const t=r.map(c=>String(c||'').trim()).filter(Boolean); if(t.length!==1)return null;
+  const m=normP(t[0]);
+  if(/^sinpe/.test(m))return 'sinpe'; if(/^efectivo/.test(m))return 'efectivo';
+  if(/^tarjeta/.test(m))return 'tarjeta'; if(/^transferencia/.test(m))return 'transferencia';
+  return null;
+}
+function fechaHora(s){ const m=String(s||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i); if(!m)return null;
+  let h=+m[4]; const ap=(m[7]||'').toUpperCase(); if(ap==='PM'&&h<12)h+=12; if(ap==='AM'&&h===12)h=0;
+  return new Date(+m[3],+m[2]-1,+m[1],h,+m[5],+(m[6]||0)); }
+const horaCorta=d=>d?d.toLocaleString('es-CR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+const tokensNombre=s=>normP(String(s||'').replace(/_/g,' ')).replace(/[^a-z ]/g,' ').split(/\s+/).filter(t=>t.length>=3);
+function conciliarSinpe(){
+  const v=window._ventasDetalle, s=window._sinpeReporte; if(!v||!s||!s.all)return null;
+  // Un cobro puede traer varias líneas (plan + matrícula ₡0): se agrupan por hora + cliente
+  const mapa=new Map();
+  v.filas.forEach(f=>{ const k=f.FechaStr+'|'+f.Cliente; let c=mapa.get(k);
+    if(!c){ c={fecha:f.FechaStr, d:fechaHora(f.FechaStr), cliente:f.Cliente, total:0, metodo:f.Metodo, refs:[], productos:[]}; mapa.set(k,c); }
+    c.total+=Number(f.Total)||0; (String(f.Notas||'').match(/\d{6,}/g)||[]).forEach(d=>c.refs.push(d));
+    if(f.Producto&&Number(f.Total))c.productos.push(f.Producto); if(f.Metodo)c.metodo=f.Metodo; });
+  const cobros=[...mapa.values()].map(c=>({...c,total:Math.round(c.total)}));
+  const trans=s.all.map(t=>({...t, d:fechaHora(t.fecha_tx), usada:false}));
+  const pares=[], refSinTrans=[];
+  // 1) Por referencia
+  cobros.filter(c=>c.refs.length).forEach(c=>{
+    const t=trans.find(t=>!t.usada&&c.refs.some(d=>t.referencia===d||t.referencia.endsWith(d)));
+    if(t){ t.usada=true; c.par=t; pares.push({c,t,por:'referencia'}); } else refSinTrans.push(c);
+  });
+  // 2) Sin referencia: cada transferencia busca su cobro por monto + nombre + hora
+  const pool=cobros.filter(c=>!c.refs.length&&!c.par&&c.total>0&&(!v.agrupado||c.metodo==='sinpe'));
+  trans.filter(t=>!t.usada).forEach(t=>{
+    const tn=tokensNombre(t.origen+' '+t.detalle); let mejor=null, mejorP=-1;
+    pool.filter(c=>!c.par).forEach(c=>{
+      const dif=Math.abs(t.monto-c.total); if(dif>100)return;
+      const coinc=tokensNombre(c.cliente).filter(x=>tn.some(y=>y.startsWith(x)||x.startsWith(y))).length;
+      if(!v.agrupado&&!coinc)return;                       // sin método conocido, exigir coincidencia de nombre
+      const horas=(t.d&&c.d)?Math.abs(c.d-t.d)/36e5:24;
+      if(horas>(coinc?72:12))return;                        // sin nombre que coincida, solo si está cerca en el tiempo
+      const p=(dif===0?4:1)+coinc*3-Math.min(horas,72)/24;
+      if(p>mejorP){ mejorP=p; mejor=c; }
+    });
+    if(mejor){ t.usada=true; mejor.par=t; pares.push({c:mejor,t,por:tokensNombre(mejor.cliente).some(x=>tn.some(y=>y.startsWith(x)||x.startsWith(y)))?'monto y nombre':'monto (verificar)'}); }
+  });
+  const sinTrans=v.agrupado?cobros.filter(c=>c.metodo==='sinpe'&&c.total>0&&!c.par&&!c.refs.length):[];
+  const sinCobro=trans.filter(t=>!t.usada&&!t.ya&&!(t.d&&v.fecha&&ymd(t.d)>v.fecha));   // las de días posteriores no son de este cierre
+  const difMonto=pares.filter(x=>x.t.monto!==x.c.total);
+  return { pares, refSinTrans, sinTrans, sinCobro, difMonto, agrupado:v.agrupado, desde:s.desde, fecha:v.fecha,
+    conRef:cobros.filter(c=>c.refs.length).length };
+}
+function htmlConciliacion(){
+  const r=conciliarSinpe(); if(!r)return '';
+  const fila=(izq,der,sub,color)=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 12px;border-top:1px solid var(--border);${color?'color:'+color+';':''}"><span>${izq}${sub?`<div style="font-size:11px;color:var(--muted);font-weight:400;">${sub}</div>`:''}</span><span style="white-space:nowrap;font-weight:700;">${der}</span></div>`;
+  const avisoDesde=c=>(r.desde&&c.d&&r.desde>=ymd(c.d))?`El reporte SINPE empieza el ${esc(r.desde)}: si pagó antes (p. ej. anoche después del cierre), descárguelo desde el día anterior.`:'Revise si pagó por otro medio, a otro número o si el monto es distinto.';
+  let h='';
+  r.sinTrans.forEach(c=>{ h+=fila(`⚠ <b>${esc(c.cliente)}</b> · ${esc(horaCorta(c.d))}`, fmt(c.total), `Cobrado por SINPE sin transferencia en el reporte. ${avisoDesde(c)}`, 'var(--red)'); });
+  r.refSinTrans.forEach(c=>{ h+=fila(`⚠ <b>${esc(c.cliente)}</b> · ref …${esc(c.refs[0].slice(-6))}`, fmt(c.total), `La referencia anotada no aparece en el reporte. ${avisoDesde(c)}`, 'var(--red)'); });
+  r.difMonto.forEach(x=>{ const d=x.t.monto-x.c.total; h+=fila(`≠ <b>${esc(x.c.cliente)}</b>`, (d>0?'+':'−')+fmt(Math.abs(d)), `Facturado ${fmt(x.c.total)} · recibido ${fmt(x.t.monto)} (${esc(x.t.origen||'')})`, 'var(--orange)'); });
+  r.sinCobro.forEach(t=>{ h+=fila(`🕒 <b>${esc(t.origen||'Sin nombre')}</b> · ${esc(horaCorta(t.d))}`, fmt(t.monto), `Recibido sin cobro identificado${t.detalle?' · "'+esc(t.detalle)+'"':''} · ref …${esc(String(t.referencia).slice(-6))}`, 'var(--blue)'); });
+  const nRef=r.pares.filter(x=>x.por==='referencia').length, nMonto=r.pares.length-nRef, nVerif=r.pares.filter(x=>x.por==='monto (verificar)');
+  nVerif.forEach(x=>{ h+=fila(`? <b>${esc(x.c.cliente)}</b> ↔ ${esc(x.t.origen||'')}`, fmt(x.t.monto), 'Emparejado solo por monto: confirme que sea de esta persona.', 'var(--muted)'); });
+  const limpio=!r.sinTrans.length&&!r.refSinTrans.length&&!r.difMonto.length&&!r.sinCobro.length;
+  return `<div style="margin-top:10px;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;">
+    <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--fill);font-weight:700;"><span>🔗 Cruce por transacción</span><span>✓ ${r.pares.length} calzan</span></div>
+    <div style="padding:6px 12px;font-size:11px;color:var(--muted);">${nRef} por referencia anotada · ${nMonto} por monto y nombre${r.conRef?'':' · Anotar la referencia SINPE en "Notas" del sistema de ventas hace el cruce exacto.'}${r.agrupado?'':'<br>El informe no viene separado por método de pago: no se pueden listar los cobros SINPE sin transferencia, solo lo que calza y lo recibido sin cobro.'}</div>
+    ${limpio?`<div style="padding:8px 12px;border-top:1px solid var(--border);color:var(--green);font-weight:700;">✓ Cada cobro SINPE tiene su transferencia</div>`:h}
+  </div>`;
 }
 function renderSinpeResumen(){
   const box=document.getElementById('sinpeResumen'); const s=window._sinpeReporte;
@@ -1069,6 +1145,7 @@ function renderSinpeResumen(){
       <div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--muted);"><span>Pendiente arrastrado</span><span>${fmt(pendPrev)}</span></div>
       <div style="padding:9px 12px;background:${bg};color:${cl};font-weight:800;border-top:1px solid var(--border);"><div style="display:flex;justify-content:space-between;"><span>${ic} Pendiente por facturar</span><span>${fmt(pendAfter)}</span></div><div style="font-weight:600;font-size:11px;margin-top:2px;opacity:.9;">${txt}</div></div>
     </div>`;
+  box.insertAdjacentHTML('beforeend', htmlConciliacion());
 }
 // Al auditar un cierre del historial se muestra el SINPE tal como quedó guardado (sr = c.sinpe_reporte).
 function renderSinpeResumenHist(sr){
@@ -1326,14 +1403,18 @@ function cargarVentasProducto(file){
       let hdr=-1,col={};
       for(let i=0;i<Math.min(raw.length,10);i++){ const r=raw[i]||[]; const nm=r.map(c=>String(c||'').trim().toLowerCase());
         const fi=nm.findIndex(c=>c==='fecha'), pi=nm.findIndex(c=>c==='producto');
-        if(fi>=0&&pi>=0){ hdr=i; col.fecha=fi; col.producto=pi; col.cliente=nm.findIndex(c=>c==='cliente'); col.registrado=nm.findIndex(c=>c.includes('registrado')); col.total=nm.findIndex(c=>c.includes('total crc')); if(col.total<0)col.total=nm.findIndex(c=>c.includes('total')&&!c.includes('usd')); break; } }
+        if(fi>=0&&pi>=0){ hdr=i; col.fecha=fi; col.producto=pi; col.cliente=nm.findIndex(c=>c==='cliente'); col.registrado=nm.findIndex(c=>c.includes('registrado')); col.total=nm.findIndex(c=>c.includes('total crc')); if(col.total<0)col.total=nm.findIndex(c=>c.includes('total')&&!c.includes('usd')); col.notas=nm.findIndex(c=>c==='notas'); break; } }
       if(hdr<0)throw new Error('No se encontró el encabezado (Fecha/Producto). ¿Es el reporte "Ventas por Producto"?');
       await preguntarProductosNuevos(raw, hdr, col);   // ver /catalogo.js
       const memb=[],clases=[],sinclasif=[]; const fechas=[];
-      for(let i=hdr+1;i<raw.length;i++){ const r=raw[i]; if(!r||!r[col.fecha])continue;
+      // Detalle por cobro para el cruce SINPE: nota (referencia) y método si el informe viene agrupado
+      const detalleVentas=[]; let metodo=null, agrupado=false;
+      for(let i=0;i<=hdr;i++){ const m=metodoDeFila(raw[i],col); if(m){ metodo=m; agrupado=true; } }
+      for(let i=hdr+1;i<raw.length;i++){ const r=raw[i]; const mf=metodoDeFila(r,col); if(mf){ metodo=mf; agrupado=true; continue; } if(!r||!r[col.fecha])continue;
         const fechaStr=String(r[col.fecha]||'').trim(); const cliente=String(r[col.cliente]||'').trim(); const regPor=String(r[col.registrado]||'').trim(); const producto=String(r[col.producto]||'').trim(); const total=parseCRC(r[col.total]);
         if(!fechaStr||!cliente)continue; const txDate=parseRenoDT(fechaStr); if(txDate)fechas.push(txDate.getTime());
         const base={FechaStr:fechaStr,Cliente:cliente,RegistradoPor:regPor,Producto:producto,Total:total};
+        detalleVentas.push({...base, Notas:col.notas>=0?String(r[col.notas]||'').trim():'', Metodo:metodo});
         if(/^invitado$/i.test(cliente)){ if(isClaseSuelta(producto))clases.push(base); else sinclasif.push(base); continue; }
         if(isClaseSuelta(producto)){ clases.push(base); continue; }
         if(!isMembershipPlan(producto)){ sinclasif.push(base); continue; }
@@ -1357,6 +1438,7 @@ function cargarVentasProducto(file){
         const {cat,canonical}=resolverOtro(it.Producto); const k=normP(canonical);          // desglose: unificado + categoría (como otros.html)
         if(!otrosResumen[k])otrosResumen[k]={base:canonical,cat,qty:0,total:0}; otrosResumen[k].qty+=qty; otrosResumen[k].total+=Number(it.Total)||0; });
       window._otrosResumen=otrosResumen; renderOtrosResumen(otrosResumen);
+      window._ventasDetalle={ filas:detalleVentas, agrupado, fecha:D }; renderSinpeResumen();   // cruce SINPE por transacción
       // IMPORTANTE: recepción NO toca gym_snapshots (comparativa/sedes). El histórico del mes
       // lo carga el admin desde index; subir solo el día borraría los días anteriores. Aquí
       // la carga afecta únicamente el CIERRE DE CAJA (y el descuento de inventario).
