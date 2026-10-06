@@ -78,7 +78,10 @@ begin
         using errcode = '42501';
     end if;
     if v_delta <> 0 then
-      new.mov_motivo := 'venta: informe de ventas del ' || to_char(new.desc_dia, 'YYYY-MM-DD');   -- el tipo lo decide la base
+      -- El tipo lo decide la base. facturar_caja()/anular_factura_caja() ponen la marca en su
+      -- transacción (ver facturacion.sql); desde la página no se puede poner.
+      new.mov_motivo := coalesce(nullif(current_setting('app.factura_caja', true), ''),
+                                 'venta: informe de ventas del ' || to_char(new.desc_dia, 'YYYY-MM-DD'));
     else
       new.mov_motivo := null;
     end if;
