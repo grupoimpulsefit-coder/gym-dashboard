@@ -204,6 +204,35 @@ table.denom tfoot td:last-child { border-radius:0 0 10px 0; }
 .fx-tbl tr.anulada td { color:var(--ter); text-decoration:line-through; }
 .fx-tbl tr.anulada td:last-child { text-decoration:none; }
 
+/* ── Eventos ── */
+.fx-evs { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; }
+.fx-ev { border:1.5px solid var(--hair); background:var(--card); border-radius:12px; padding:12px; text-align:left;
+  display:flex; flex-direction:column; gap:6px; color:var(--label); }
+.fx-ev:hover { border-color:var(--brand); }
+.fx-ev[aria-pressed="true"] { border-color:var(--brand); background:var(--brand-tint); }
+.fx-ev .n { font-weight:700; font-size:15px; }
+.fx-ev .d { font-size:12px; color:var(--sec); }
+.fx-ev .pr { display:flex; gap:6px; flex-wrap:wrap; font-size:12px; }
+.fx-ev .pr span { background:var(--fill); border-radius:6px; padding:2px 8px; font-variant-numeric:tabular-nums; }
+.fx-seg2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0 10px; }
+.fx-seg2 button { border:1.5px solid var(--hair); background:var(--card); border-radius:10px; padding:8px; font-weight:600; font-size:14px;
+  color:var(--label); display:flex; flex-direction:column; align-items:center; }
+.fx-seg2 button small { font-weight:500; color:var(--sec); font-variant-numeric:tabular-nums; }
+.fx-seg2 button[aria-pressed="true"] { border-color:var(--brand); background:var(--brand-tint); color:var(--brand-text); }
+.fx-inp { width:100%; min-height:40px; border:1.5px solid transparent; border-radius:10px; background:var(--fill); padding:0 12px;
+  font-size:15px; color:var(--label); outline:none; font-family:inherit; }
+.fx-inp:focus { border-color:var(--brand); background:var(--card); }
+.fx-lbl { display:block; font-size:12px; font-weight:600; color:var(--sec); text-transform:uppercase; letter-spacing:.04em; margin:8px 0 4px; }
+.fx-tag { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600;
+  background:var(--fill); color:var(--label); white-space:nowrap; }
+.fx-tag.m { background:var(--brand-tint); color:var(--brand-text); }
+.fx-tag.nm { background:var(--blue-tint); color:var(--blue); }
+.ev-form { display:grid; grid-template-columns:1fr 1fr; gap:0 14px; }
+@media (max-width:620px){ .ev-form { grid-template-columns:1fr; } }
+.ev-checks { display:flex; gap:6px; flex-wrap:wrap; }
+.ev-checks label { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:var(--fill);
+  font-size:13px; font-weight:600; cursor:pointer; }
+
 /* ── Historial ── */
 .tbl-wrap { overflow-x:auto; background:var(--card); border-radius:12px; box-shadow:var(--shadow); }
 table.hist { width:100%; border-collapse:separate; border-spacing:0; min-width:720px; }
@@ -329,6 +358,7 @@ table.hist tbody tr:hover td { background:var(--fill); }
   <div class="caja-tabs"><div class="seg" role="tablist">
     <button role="tab" id="tabCierre" aria-selected="true" onclick="showTab('cierre')">🧾 Cierre</button>
     <button role="tab" id="tabFact" aria-selected="false" onclick="showTab('fact')">🛒 Facturación</button>
+    <button role="tab" id="tabEv" aria-selected="false" onclick="showTab('ev')" hidden>🎟️ Eventos</button>
   </div></div>
 
   <div id="paneCierre">
@@ -463,6 +493,51 @@ table.hist tbody tr:hover td { background:var(--fill); }
   </table></div>
   </div><!-- /paneCierre -->
 
+  <!-- Eventos (solo administradores). Ver eventos.sql -->
+  <div id="paneEv" hidden>
+    <div class="card">
+      <h3 id="evFormTit">Nuevo evento</h3>
+      <div class="ev-form">
+        <div><label class="fx-lbl" for="evNom">Nombre</label><input class="fx-inp" id="evNom" placeholder="Ej. Noche de Salsa"></div>
+        <div><label class="fx-lbl" for="evFecha">Fecha del evento</label><input class="fx-inp" id="evFecha" type="date"></div>
+        <div><label class="fx-lbl" for="evPm">Precio miembro (₡)</label><input class="fx-inp" id="evPm" type="number" min="0" step="1"></div>
+        <div><label class="fx-lbl" for="evPn">Precio no miembro (₡)</label><input class="fx-inp" id="evPn" type="number" min="0" step="1"></div>
+      </div>
+      <span class="fx-lbl">Métodos de pago que acepta</span>
+      <div class="ev-checks" id="evMetodos"></div>
+      <span class="fx-lbl">Sedes donde se vende</span>
+      <div class="ev-checks" id="evSedes"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+        <button class="btn-primary" id="evBtnGuardar" onclick="evGuardar()">Crear evento</button>
+        <button class="btn-ghost" id="evBtnCancelar" onclick="evNuevo()" hidden>Cancelar edición</button>
+      </div>
+      <div class="msg" id="evMsg" style="margin-top:10px;"></div>
+      <div class="hint" style="margin-top:6px;">Se vende hasta el día del evento; después sale solo de Facturación. Miembro: se valida con el PIN contra la lista de clientes activos. No miembro: nombre y teléfono.</div>
+    </div>
+
+    <div class="card">
+      <h3>Eventos</h3>
+      <div style="overflow-x:auto;"><table class="fx-tbl">
+        <thead><tr><th>Evento</th><th>Fecha</th><th class="num">Miembro</th><th class="num">No miembro</th><th>Pago</th><th>Sedes</th><th></th></tr></thead>
+        <tbody id="evLista"></tbody>
+      </table></div>
+    </div>
+
+    <div class="card" id="evRepCard" hidden>
+      <h3><span id="evRepTit">Registro</span> <button class="btn-ghost" style="margin-left:auto;font-size:12px;padding:5px 10px;" onclick="evExportar()">⬇ Exportar CSV</button></h3>
+      <div class="fx-tiles" id="evRepTiles" style="margin:0 0 12px;"></div>
+      <div style="overflow-x:auto;"><table class="fx-tbl">
+        <thead><tr><th>Sede</th><th class="num">Inscritos</th><th class="num">💵 Efectivo</th><th class="num">💳 Tarjeta</th><th class="num">🔷 SINPE</th><th class="num">Total</th></tr></thead>
+        <tbody id="evRepSedes"></tbody>
+      </table></div>
+      <div class="fx-lbl" style="margin-top:16px;">Inscritos</div>
+      <div style="overflow-x:auto;"><table class="fx-tbl">
+        <thead><tr><th>Persona</th><th>Teléfono</th><th>Tipo</th><th>Sede</th><th>Pago</th><th class="num">Monto</th></tr></thead>
+        <tbody id="evRepLista"></tbody>
+      </table></div>
+    </div>
+  </div>
+
   <!-- Facturación de productos (minita y otros). Ver facturacion.sql -->
   <div id="paneFact" hidden>
     <div class="card" id="fxSinTurno" style="text-align:center;padding:32px 18px;" hidden>
@@ -472,6 +547,10 @@ table.hist tbody tr:hover td { background:var(--fill); }
     </div>
     <div class="fx-grid" id="fxMain">
       <div>
+        <div class="card" id="fxEvCard" hidden>
+          <h3>🎟️ Eventos <span style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;">Una persona por cobro</span></h3>
+          <div class="fx-evs" id="fxEventos"></div>
+        </div>
         <div class="card">
           <h3>Productos <span style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;" id="fxProdInfo"></span></h3>
           <input type="search" id="fxQ" class="fx-search" placeholder="Buscar producto…" oninput="renderFxProds()">
@@ -490,6 +569,7 @@ table.hist tbody tr:hover td { background:var(--fill); }
             <button type="button" data-m="tarjeta" aria-pressed="false" onclick="fxSetPago('tarjeta')"><span class="i">💳</span>Tarjeta</button>
             <button type="button" data-m="sinpe" aria-pressed="false" onclick="fxSetPago('sinpe')"><span class="i">🔷</span>SINPE</button>
           </div>
+          <div class="hint" id="fxPagoNota" hidden style="margin:-4px 0 8px;"></div>
           <div id="fxPagoEfectivo">
             <div class="f-row"><label for="fxRecibido">Recibido (₡)</label><input type="number" id="fxRecibido" step="1" min="0" placeholder="opcional" oninput="renderFxVuelto()"></div>
             <div class="f-row" style="margin-bottom:0;"><label>Vuelto</label><span id="fxVuelto" style="font-weight:700;font-variant-numeric:tabular-nums;">—</span></div>
@@ -504,7 +584,7 @@ table.hist tbody tr:hover td { background:var(--fill); }
         </div>
 
         <div class="card">
-          <h3>Facturas del día <span style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;" id="fxN"></span></h3>
+          <h3>Cobros del día <span style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;" id="fxN"></span></h3>
           <div style="overflow-x:auto;"><table class="fx-tbl">
             <thead><tr><th>#</th><th>Hora</th><th>Detalle</th><th>Pago</th><th class="num">Total</th><th></th></tr></thead>
             <tbody id="fxHist"></tbody>
@@ -685,7 +765,8 @@ async function init(){
   const bh=document.getElementById('btnSinpeHist'); if(bh)bh.style.display=esAdmin()?'':'none';   // carga única: solo admins
   renderDenoms(); renderGastos(); renderIngresos();
   document.getElementById('app').style.display='block';
-  try{ if(sessionStorage.getItem('cajaTab')==='fact') showTab('fact'); }catch(_){}
+  document.getElementById('tabEv').hidden=!esAdmin();   // eventos: los crea un administrador
+  try{ const tb=sessionStorage.getItem('cajaTab'); if(tb==='fact'||(tb==='ev'&&esAdmin())) showTab(tb); }catch(_){}
   loadPricesForSede(currentSede);
   await loadCierres();
 }
@@ -718,7 +799,7 @@ function cargarTurnoEnForm(t){
   // Montos en curso (compartidos, desde el servidor)
   window._factCierre=t.facturado||null;
   document.getElementById('cMembresias').value=t.membresias||0;
-  document.getElementById('cOtros').value=sinFacturado(t,'otros_vendidos','total')||0;
+  document.getElementById('cOtros').value=sinFacturado(t,'otros_vendidos','productos')||0;
   document.getElementById('cTarjeta').value=sinFacturado(t,'total_tarjeta','tarjeta');
   document.getElementById('cSinpe').value=sinFacturado(t,'total_sinpe','sinpe');
   document.getElementById('cTransfer').value=t.total_transferencia==null?'':t.total_transferencia;
@@ -902,7 +983,7 @@ function applyRowToForm(row){
     if(row.denominaciones) DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=row.denominaciones[d]||0;});
     window._factCierre=row.facturado||null;
     document.getElementById('cMembresias').value=row.membresias||0;
-    document.getElementById('cOtros').value=sinFacturado(row,'otros_vendidos','total')||0;
+    document.getElementById('cOtros').value=sinFacturado(row,'otros_vendidos','productos')||0;
     document.getElementById('cTarjeta').value=sinFacturado(row,'total_tarjeta','tarjeta');
     document.getElementById('cSinpe').value=sinFacturado(row,'total_sinpe','sinpe');
     document.getElementById('cTransfer').value=row.total_transferencia==null?'':row.total_transferencia;
@@ -934,7 +1015,7 @@ function calc(){
   const totIngresos=ingresos.reduce((a,g)=>a+(Number(g.monto)||0),0);
   const pg=prevGIDia();                                                         // gastos/ingresos de turnos previos de hoy
   const totGastosDia=totGastos+pg.gastos, totIngresosDia=totIngresos+pg.ingresos;
-  const minita=(Number(document.getElementById('cOtros').value)||0)+fx.total;   // productos "Otros" del día (sin sesiones ni membresías) + facturado en caja
+  const minita=(Number(document.getElementById('cOtros').value)||0)+fxProductos(fx);   // productos "Otros" del día (sin sesiones ni membresías) + productos facturados en caja (eventos no)
   const sobreModo=document.getElementById('cSobreModo').value;   // 'retira' | 'ya' | 'no'
   const sobreRetirado=sobreModo==='ya';                          // compat con datos previos
   // El sobre solo sale en el cierre FINAL (= minita total del día). En parciales la minita queda en caja.
@@ -1697,7 +1778,7 @@ function cargarCierre(id){
   window._formCierreId=c.id;   // viendo historial → no dispara autoguardado del turno abierto
   document.getElementById('cFecha').value=c.fecha; document.getElementById('cTurno').value=c.turno||'';
   window._factCierre=c.facturado||null;   // tal como quedó guardado en ese cierre
-  document.getElementById('cCajaInicial').value=c.caja_inicial||0; document.getElementById('cMembresias').value=c.membresias||0; document.getElementById('cOtros').value=sinFacturado(c,'otros_vendidos','total')||0;
+  document.getElementById('cCajaInicial').value=c.caja_inicial||0; document.getElementById('cMembresias').value=c.membresias||0; document.getElementById('cOtros').value=sinFacturado(c,'otros_vendidos','productos')||0;
   window._otrosResumen=c.otros_desglose||null; renderOtrosResumen(window._otrosResumen);
   inventarioCierre=c.inventario_cierre||null; renderConteoCierreResumen();
   renderAperturaInv(c);
@@ -1724,22 +1805,29 @@ function cargarCierre(id){
 // Cada factura se registra con facturar_caja(): valida turno, precio y stock en la
 // base y descuenta el inventario en la misma transacción. Lo facturado en el día se
 // suma en el cierre a cada método de pago, al total de ventas y a la minita (sobre).
+// Los cobros de eventos (eventos.sql) entran igual a los métodos y al total, pero NO al sobre.
 const FX_METODOS={efectivo:'💵 Efectivo',tarjeta:'💳 Tarjeta',sinpe:'🔷 SINPE'};
-const FX_VACIO={efectivo:0,tarjeta:0,sinpe:0,total:0,n:0,desglose:{}};
+const FX_VACIO={efectivo:0,tarjeta:0,sinpe:0,total:0,productos:0,eventos:0,n:0,desglose:{}};
+// Parte que va al sobre (productos). Los cierres guardados antes de los eventos solo traen `total`.
+const fxProductos=f=>f.productos!=null?(Number(f.productos)||0):(Number(f.total)||0);
 let tabActual='cierre';
-const fxState={prods:[],cart:{},pago:'efectivo',cat:'todos',facturas:[],errFacturas:null,busy:false};
+const fxState={prods:[],cart:{},pago:'efectivo',cat:'todos',facturas:[],errFacturas:null,busy:false,
+  eventos:[], evento:null};   // evento: { id, tipo:'miembro'|'no_miembro', pin, nombre, tel, cliente } — uno por cobro
 const puedeAnular=()=>esAdmin()||currentRole==='coordinador';
 
 // Totales facturados que usa el cierre del formulario (null si aún no hay datos de facturas)
 function factCierre(){ return window._factCierre||FX_VACIO; }
 // Las columnas del cierre guardan Informe + facturado; el formulario muestra solo lo del Informe.
-function sinFacturado(row,col,key){ const v=row[col]; if(v==null) return ''; const f=row.facturado||{}; return Math.round((Number(v)||0)-(Number(f[key])||0)); }
+function sinFacturado(row,col,key){ const v=row[col]; if(v==null) return ''; const f=row.facturado||{};
+  return Math.round((Number(v)||0)-(key==='productos'?fxProductos(f):(Number(f[key])||0))); }
 // Solo se guarda la columna `facturado` si la tabla de facturas respondió (facturacion.sql ya corrió).
 function facturadoPayload(){ return window._factCierre?{facturado:window._factCierre}:{}; }
 function resumirFacturas(list){
-  const r={efectivo:0,tarjeta:0,sinpe:0,total:0,n:0,desglose:{}};
+  const r={efectivo:0,tarjeta:0,sinpe:0,total:0,productos:0,eventos:0,n:0,desglose:{}};
   list.filter(f=>f.estado!=='anulada').forEach(f=>{ const t=Math.round(Number(f.total)||0);
     if(r[f.metodo]!=null) r[f.metodo]+=t; r.total+=t; r.n++;
+    if(f.tipo==='evento'){ r.eventos+=t; return; }   // no va al sobre ni al desglose de la minita
+    r.productos+=t;
     (f.items||[]).forEach(it=>{ const {cat,canonical}=resolverOtro(it.producto); const k=normP(canonical);
       if(!r.desglose[k]) r.desglose[k]={base:canonical,cat,qty:0,total:0};
       r.desglose[k].qty+=Number(it.cantidad)||0; r.desglose[k].total+=Math.round(Number(it.total)||0); }); });
@@ -1759,20 +1847,22 @@ function renderFactCierreBox(fx){
   const v=id=>Number(document.getElementById(id).value)||0;
   const fila=(l,inf,caja)=>`<tr><td>${l}</td><td class="num">${fmt(inf)}</td><td class="num">${caja?'+ '+fmt(caja):'—'}</td><td class="num"><b>${fmt(inf+caja)}</b></td></tr>`;
   box.innerHTML=`<div style="background:var(--brand-tint);border-radius:10px;padding:10px 12px;">
-    <div style="font-size:13px;font-weight:600;color:var(--brand-text);margin-bottom:4px;">🛒 Facturado en caja hoy · ${fx.n} factura${fx.n===1?'':'s'} (efectivo ${fmt(fx.efectivo)})</div>
+    <div style="font-size:13px;font-weight:600;color:var(--brand-text);margin-bottom:4px;">🛒 Facturado en caja hoy · ${fx.n} cobro${fx.n===1?'':'s'} (efectivo ${fmt(fx.efectivo)})</div>
+    ${fx.eventos?`<div class="hint" style="margin-bottom:4px;">Minita ${fmt(fxProductos(fx))} · 🎟️ Eventos ${fmt(fx.eventos)} (los eventos no van al sobre)</div>`:''}
     <div style="overflow-x:auto;"><table class="fx-tbl" style="min-width:0;">
       <thead><tr><th></th><th class="num">Informe</th><th class="num">Caja</th><th class="num">Total</th></tr></thead>
-      <tbody>${fila('Tarjeta',v('cTarjeta'),fx.tarjeta)}${fila('SINPE',v('cSinpe'),fx.sinpe)}${fila('Total ventas',v('cTotalVentas'),fx.total)}${fila('Minita (sobre)',v('cOtros'),fx.total)}</tbody>
+      <tbody>${fila('Tarjeta',v('cTarjeta'),fx.tarjeta)}${fila('SINPE',v('cSinpe'),fx.sinpe)}${fila('Total ventas',v('cTotalVentas'),fx.total)}${fila('Minita (sobre)',v('cOtros'),fxProductos(fx))}</tbody>
     </table></div></div>`;
 }
 
 // ── Pestañas ──
 function showTab(t){
   tabActual=t;
-  document.getElementById('paneCierre').hidden=t!=='cierre'; document.getElementById('paneFact').hidden=t!=='fact';
-  document.getElementById('tabCierre').setAttribute('aria-selected',t==='cierre'); document.getElementById('tabFact').setAttribute('aria-selected',t==='fact');
+  [['cierre','paneCierre','tabCierre'],['fact','paneFact','tabFact'],['ev','paneEv','tabEv']].forEach(([k,pane,tab])=>{
+    document.getElementById(pane).hidden=t!==k; document.getElementById(tab).setAttribute('aria-selected',t===k); });
   try{ sessionStorage.setItem('cajaTab',t); }catch(_){}
   if(t==='fact'){ renderFxEstado(); loadFxProds(); loadFacturasDia(); }
+  if(t==='ev') evCargar();
 }
 function renderFxEstado(){
   const abierto=!!turnoActual;
@@ -1782,6 +1872,7 @@ function renderFxEstado(){
 // ── Datos ──
 async function loadFxProds(){
   if(!turnoActual) return;
+  loadFxEventos();
   const sede=currentSede;
   try{ const rows=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(sede)}&order=producto.asc&select=id,producto,precio,cantidad,cantidad_minima,activo`))||[];
     if(sede!==currentSede) return;
@@ -1834,11 +1925,16 @@ function renderFxProds(){
 // ── Ticket ──
 function fxProd(id){ return fxState.prods.find(p=>p.id===id); }
 function fxAgregar(id){ const p=fxProd(id); if(!p) return; const q=fxState.cart[id]||0;
+  if(fxState.evento){ const m=document.getElementById('fxMsg'); m.className='msg err'; m.textContent='Cobre o quite el evento antes de vender productos (van en cobros separados).'; return; }
   if(q>=(Number(p.cantidad)||0)) return; fxState.cart[id]=q+1; document.getElementById('fxMsg').textContent=''; renderFxProds(); renderFxTicket(); }
 function fxQuitar(id){ if(!fxState.cart[id]) return; fxState.cart[id]--; if(fxState.cart[id]<=0) delete fxState.cart[id]; renderFxProds(); renderFxTicket(); }
-function fxVaciar(){ fxState.cart={}; renderFxProds(); renderFxTicket(); }
-function fxTotal(){ return Object.entries(fxState.cart).reduce((a,[id,q])=>{ const p=fxProd(id); return a+(p?(Number(p.precio)||0)*q:0); },0); }
+function fxVaciar(){ fxState.cart={}; fxState.evento=null; renderFxEventos(); renderFxProds(); renderFxTicket(); }
+function fxTotal(){ if(fxState.evento){ const e=fxEvento(); return e?Number(fxState.evento.tipo==='miembro'?e.precio_miembro:e.precio_no_miembro)||0:0; }
+  return Object.entries(fxState.cart).reduce((a,[id,q])=>{ const p=fxProd(id); return a+(p?(Number(p.precio)||0)*q:0); },0); }
 function renderFxTicket(){
+  renderFxPagos();
+  if(fxState.evento&&fxEvento()){ renderFxEventoForm(); return; }
+  fxState.evento=null;
   const L=Object.entries(fxState.cart).filter(([id])=>fxProd(id));
   document.getElementById('fxLines').innerHTML=L.length?L.map(([id,q])=>{ const p=fxProd(id); return `<div class="fx-line">
       <div><div class="n">${esc(p.producto)}</div><div class="u">${fmt(p.precio)} c/u</div></div>
@@ -1865,6 +1961,7 @@ function renderFxVuelto(){
   el.textContent=d>=0?fmt(d):'Faltan '+fmt(-d); el.style.color=d>=0?'var(--green)':'var(--red)';
 }
 async function fxFacturar(){
+  if(fxState.evento) return fxCobrarEvento();
   const msg=document.getElementById('fxMsg');
   if(fxState.busy) return;
   if(!turnoActual){ msg.className='msg err'; msg.textContent='Abra el turno para facturar.'; return; }
@@ -1898,7 +1995,9 @@ function renderFxHist(){
   const L=fxState.facturas;
   tb.innerHTML=L.length?L.map(f=>{
     const anulada=f.estado==='anulada';
-    const det=(f.items||[]).map(it=>esc(it.producto)+(Number(it.cantidad)>1?' ×'+it.cantidad:'')).join(', ');
+    const det=f.tipo==='evento'
+      ? `🎟️ ${esc((f.items&&f.items[0]&&f.items[0].producto)||'Evento')}<div class="hint" style="font-size:12px;">${esc(f.cliente_nombre||'')} ${f.tipo_precio==='miembro'?'<span class="fx-tag m">Miembro</span>':'<span class="fx-tag nm">No miembro</span>'}</div>`
+      : (f.items||[]).map(it=>esc(it.producto)+(Number(it.cantidad)>1?' ×'+it.cantidad:'')).join(', ');
     const ref=f.metodo==='sinpe'&&f.referencia?`<div class="hint" style="font-size:11px;">ref …${esc(String(f.referencia).slice(-6))}</div>`:'';
     const acc=anulada?`<span class="pill dif" title="${esc(f.motivo_anulacion||'')}">Anulada</span>`
       :(puedeAnular()&&turnoActual&&f.cierre_id===turnoActual.id?`<button class="btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="fxAnular('${f.id}')">Anular</button>`:'');
@@ -1919,6 +2018,218 @@ async function fxAnular(id){
     msg.className='msg ok'; msg.textContent=`Factura #${f.numero} anulada. El stock se devolvió al inventario.`; }
   catch(e){ msg.className='msg err'; msg.textContent='⚠ '+mensajeError(e); }
   await Promise.all([loadFxProds(), loadFacturasDia()]);
+}
+
+// ══ Eventos de un día — ver eventos.sql ══════════════════════════════════════
+// Recepción cobra una persona por cobro: miembro (PIN validado contra la lista de
+// clientes activos) o no miembro (nombre y teléfono). Solo con los métodos de pago
+// que el administrador habilitó para ese evento. No se mezcla con productos.
+const fechaCorta=f=>{ const d=parseFecha(f); return isNaN(d)?String(f||''):d.toLocaleDateString('es-CR',{weekday:'short',day:'numeric',month:'short'}); };
+function fxEvento(){ return fxState.evento&&fxState.eventos.find(e=>e.id===fxState.evento.id); }
+async function loadFxEventos(){
+  const sede=currentSede, card=document.getElementById('fxEvCard');
+  try{ const filtro=encodeURIComponent(`{"${sede}"}`);
+    const rows=(await supaFetch(`/eventos_caja?activo=is.true&fecha=gte.${todayStr()}&sedes=cs.${filtro}&order=fecha.asc&select=*`))||[];
+    if(sede!==currentSede) return;
+    fxState.eventos=rows; }
+  catch(_){ fxState.eventos=[]; }   // eventos.sql aún no corrió: la tarjeta queda oculta
+  if(fxState.evento&&!fxEvento()) fxState.evento=null;
+  card.hidden=!fxState.eventos.length;
+  renderFxEventos(); renderFxTicket();
+}
+function renderFxEventos(){
+  document.getElementById('fxEventos').innerHTML=fxState.eventos.map(e=>`<button type="button" class="fx-ev" aria-pressed="${!!fxState.evento&&fxState.evento.id===e.id}" onclick="fxSelEvento('${e.id}')">
+      <span class="n">${esc(e.nombre)}</span><span class="d">${esc(fechaCorta(e.fecha))} · ${(e.metodos||[]).map(m=>FX_METODOS[m]).join(' · ')}</span>
+      <span class="pr"><span>Miembro ${fmt(e.precio_miembro)}</span><span>No miembro ${fmt(e.precio_no_miembro)}</span></span></button>`).join('');
+}
+function fxSelEvento(id){
+  const m=document.getElementById('fxMsg');
+  if(Object.keys(fxState.cart).length){ m.className='msg err'; m.textContent='Cobre o vacíe los productos antes de cobrar un evento (van en cobros separados).'; return; }
+  fxState.evento=(fxState.evento&&fxState.evento.id===id)?null:{id,tipo:'miembro',pin:'',nombre:'',tel:'',cliente:null};
+  m.textContent=''; renderFxEventos(); renderFxTicket();
+}
+function fxEvTipo(t){ if(!fxState.evento) return; fxState.evento.tipo=t; renderFxTicket(); }
+// Solo los métodos de pago que acepta el evento
+function renderFxPagos(){
+  const e=fxState.evento&&fxEvento(); const ok=e?(e.metodos||[]):['efectivo','tarjeta','sinpe'];
+  document.querySelectorAll('#fxPay button').forEach(b=>{ b.hidden=!ok.includes(b.dataset.m); });
+  const nota=document.getElementById('fxPagoNota');
+  nota.hidden=!e||ok.length===3; nota.textContent=e?`Este evento solo acepta ${ok.map(m=>FX_METODOS[m]).join(' y ')}.`:'';
+  if(!ok.includes(fxState.pago)) fxSetPago(ok[0]);
+}
+function renderFxEventoForm(){
+  const e=fxEvento(), ev=fxState.evento, miembro=ev.tipo==='miembro';
+  const cli=ev.cliente;
+  const cliHtml=!cli?'':cli.error?`<div class="msg err" style="margin-top:6px;">${esc(cli.error)}</div>`
+    :`<div style="margin-top:6px;font-size:14px;color:${cli.activo?'var(--green)':'var(--red)'};font-weight:600;">${cli.activo?'✓':'⚠'} ${esc(cli.nombre||'')}${cli.activo?' · cliente activo':' · NO está activo: cobre como no miembro'}<span class="hint" style="font-weight:400;"> · ${esc(cli.sede||'')}</span></div>`;
+  document.getElementById('fxLines').innerHTML=`
+    <div class="fx-line" style="grid-template-columns:minmax(0,1fr) auto;">
+      <div><div class="n">🎟️ ${esc(e.nombre)}</div><div class="u">${esc(fechaCorta(e.fecha))}</div></div>
+      <button type="button" class="btn-ghost" style="font-size:12px;padding:5px 10px;" onclick="fxVaciar()">Quitar</button></div>
+    <div class="fx-seg2">
+      <button type="button" aria-pressed="${miembro}" onclick="fxEvTipo('miembro')">Miembro<small>${fmt(e.precio_miembro)}</small></button>
+      <button type="button" aria-pressed="${!miembro}" onclick="fxEvTipo('no_miembro')">No miembro<small>${fmt(e.precio_no_miembro)}</small></button></div>
+    ${miembro?`<label class="fx-lbl" for="fxEvPin">PIN del cliente</label>
+      <div style="display:flex;gap:8px;"><input class="fx-inp" id="fxEvPin" inputmode="numeric" value="${esc(ev.pin)}" placeholder="PIN"
+        oninput="fxState.evento.pin=this.value;fxState.evento.cliente=null;document.getElementById('fxEvCli').innerHTML=''" onkeydown="if(event.key==='Enter')fxBuscarPin()">
+        <button type="button" class="btn-ghost" onclick="fxBuscarPin()">Buscar</button></div>
+      <div id="fxEvCli">${cliHtml}</div>`
+    :`<label class="fx-lbl" for="fxEvNom">Nombre completo</label>
+      <input class="fx-inp" id="fxEvNom" value="${esc(ev.nombre)}" placeholder="Nombre y apellido" oninput="fxState.evento.nombre=this.value">
+      <label class="fx-lbl" for="fxEvTel">Teléfono</label>
+      <input class="fx-inp" id="fxEvTel" inputmode="tel" value="${esc(ev.tel)}" placeholder="8888-8888" oninput="fxState.evento.tel=this.value">`}`;
+  const t=fxTotal();
+  document.getElementById('fxTot').textContent=fmt(t);
+  const b=document.getElementById('fxBtn'); b.textContent=fxState.busy?'Cobrando…':`Cobrar ${fmt(t)}`; b.disabled=fxState.busy||!turnoActual;
+  renderFxVuelto();
+}
+async function fxBuscarPin(){
+  const ev=fxState.evento; if(!ev) return null;
+  const pin=String(ev.pin||'').trim(); if(!pin){ ev.cliente={error:'Anote el PIN.'}; renderFxTicket(); return null; }
+  try{ const r=await supaFetch('/rpc/buscar_cliente_pin',{method:'POST',prefer:'return=representation',body:{p_pin:pin}});
+    ev.cliente=r?{...r}:{error:`El PIN ${pin} no aparece en la lista de clientes. Cobre como no miembro.`}; }
+  catch(e){ ev.cliente={error:'No se pudo buscar el PIN: '+mensajeError(e)}; }
+  if(fxState.evento===ev) renderFxTicket();
+  return ev.cliente;
+}
+async function fxCobrarEvento(){
+  const msg=document.getElementById('fxMsg'), ev=fxState.evento, e=fxEvento();
+  if(fxState.busy||!ev||!e) return;
+  if(!turnoActual){ msg.className='msg err'; msg.textContent='Abra el turno para cobrar.'; return; }
+  const err=t=>{ msg.className='msg err'; msg.textContent=t; };
+  if(ev.tipo==='miembro'){
+    if(!String(ev.pin||'').trim()) return err('Anote el PIN del cliente para el precio de miembro.');
+    const c=(ev.cliente&&!ev.cliente.error&&String(ev.cliente.pin).trim()===String(ev.pin).trim())?ev.cliente:await fxBuscarPin();
+    if(!c||c.error) return err((c&&c.error)||'No se encontró el PIN.');
+    if(!c.activo) return err('El cliente no está activo. Cobre como no miembro.');
+  }else{
+    if(!String(ev.nombre||'').trim()) return err('Anote el nombre de la persona.');
+    if(String(ev.tel||'').replace(/\D/g,'').length<8) return err('Anote un teléfono de 8 dígitos.');
+  }
+  const total=fxTotal(), pago=fxState.pago;
+  const rawRec=document.getElementById('fxRecibido').value, ref=document.getElementById('fxRef').value.trim();
+  if(pago==='efectivo'&&rawRec!==''&&(Number(rawRec)||0)<total) return err(`El efectivo recibido no cubre el total (${fmt(total)}).`);
+  if(pago==='sinpe'&&ref.replace(/\D/g,'').length<4) return err('Anote la referencia del SINPE (al menos los últimos 4 dígitos).');
+  fxState.busy=true; renderFxTicket(); msg.className='msg'; msg.textContent='';
+  try{
+    const r=await supaFetch('/rpc/vender_evento_caja',{method:'POST',prefer:'return=representation',body:{
+      p_cierre:turnoActual.id, p_evento:e.id, p_tipo_precio:ev.tipo, p_metodo:pago,
+      p_nombre:ev.tipo==='no_miembro'?ev.nombre.trim():null, p_telefono:ev.tipo==='no_miembro'?ev.tel:null,
+      p_pin:ev.tipo==='miembro'?String(ev.pin).trim():null,
+      p_recibido:pago==='efectivo'&&rawRec!==''?Number(rawRec):null, p_referencia:pago==='sinpe'?ref:null }});
+    const vuelto=pago==='efectivo'&&rawRec!==''?` Vuelto ${fmt((Number(rawRec)||0)-(Number(r&&r.total)||total))}.`:'';
+    msg.className='msg ok'; msg.textContent=`✓ ${(r&&r.nombre)||''} inscrito en ${e.nombre} (cobro #${r&&r.numero}, ${fmt(r&&r.total!=null?r.total:total)}, ${FX_METODOS[pago]}).${vuelto}`;
+    fxState.evento=null; document.getElementById('fxRecibido').value=''; document.getElementById('fxRef').value='';
+  }catch(x){ err('⚠ '+mensajeError(x)); }
+  finally{ fxState.busy=false; }
+  renderFxEventos(); renderFxTicket();
+  await loadFacturasDia();
+}
+
+// ── Administración de eventos (solo admin) ──
+const evState={lista:[], edit:null, rep:null, repRows:[]};
+async function evCargar(){
+  if(!esAdmin()) return;
+  try{ evState.lista=(await supaFetch('/eventos_caja?order=fecha.desc&limit=100&select=*'))||[]; }
+  catch(e){ evState.lista=[]; const m=document.getElementById('evMsg'); m.className='msg err'; m.textContent='No se pudieron cargar los eventos: '+mensajeError(e)+'. ¿Ya se corrió eventos.sql en Supabase?'; }
+  if(!evState.edit&&!document.getElementById('evNom').value) evNuevo();
+  renderEvLista();
+  if(evState.rep) evVerRegistro(evState.rep);
+}
+function renderEvChecks(metodos,sedes){
+  document.getElementById('evMetodos').innerHTML=['efectivo','tarjeta','sinpe'].map(m=>`<label><input type="checkbox" id="evM_${m}" ${metodos.includes(m)?'checked':''}> ${FX_METODOS[m]}</label>`).join('');
+  document.getElementById('evSedes').innerHTML=SEDES.map((s,i)=>`<label><input type="checkbox" id="evS_${i}" ${sedes.includes(s)?'checked':''}> ${SEDE_META[s]?.icon||''} ${esc(s)}</label>`).join('');
+}
+function evNuevo(){
+  evState.edit=null;
+  ['evNom','evFecha','evPm','evPn'].forEach(id=>document.getElementById(id).value='');
+  renderEvChecks(['efectivo','tarjeta','sinpe'],SEDES);
+  document.getElementById('evFormTit').textContent='Nuevo evento';
+  document.getElementById('evBtnGuardar').textContent='Crear evento';
+  document.getElementById('evBtnCancelar').hidden=true;
+}
+function evEditar(id){
+  const e=evState.lista.find(x=>x.id===id); if(!e) return;
+  evState.edit=id;
+  document.getElementById('evNom').value=e.nombre; document.getElementById('evFecha').value=e.fecha;
+  document.getElementById('evPm').value=e.precio_miembro; document.getElementById('evPn').value=e.precio_no_miembro;
+  renderEvChecks(e.metodos||[],e.sedes||[]);
+  document.getElementById('evFormTit').textContent='Editar evento';
+  document.getElementById('evBtnGuardar').textContent='Guardar cambios';
+  document.getElementById('evBtnCancelar').hidden=false;
+  document.getElementById('evMsg').textContent='';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+async function evGuardar(){
+  const msg=document.getElementById('evMsg'), err=t=>{ msg.className='msg err'; msg.textContent=t; };
+  const nombre=document.getElementById('evNom').value.trim(), fecha=document.getElementById('evFecha').value;
+  const pmRaw=document.getElementById('evPm').value, pnRaw=document.getElementById('evPn').value;
+  const metodos=['efectivo','tarjeta','sinpe'].filter(m=>document.getElementById('evM_'+m).checked);
+  const sedes=SEDES.filter((s,i)=>document.getElementById('evS_'+i).checked);
+  if(!nombre) return err('Escriba el nombre del evento.');
+  if(!fecha) return err('Elija la fecha del evento.');
+  if(pmRaw===''||pnRaw===''||Number(pmRaw)<0||Number(pnRaw)<0) return err('Ponga los dos precios (miembro y no miembro).');
+  if(!metodos.length) return err('Elija al menos un método de pago.');
+  if(!sedes.length) return err('Elija al menos una sede.');
+  const body={nombre,fecha,precio_miembro:Math.round(Number(pmRaw)),precio_no_miembro:Math.round(Number(pnRaw)),metodos,sedes,updated_at:new Date().toISOString()};
+  const btn=document.getElementById('evBtnGuardar'); btn.disabled=true;
+  try{
+    if(evState.edit) await supaFetch(`/eventos_caja?id=eq.${evState.edit}`,{method:'PATCH',body});
+    else await supaFetch('/eventos_caja',{method:'POST',body:{...body,created_by:currentEmail||null}});
+    msg.className='msg ok'; msg.textContent=evState.edit?'✓ Evento actualizado.':`✓ Evento creado. Ya aparece en Facturación de ${sedes.join(', ')}.`;
+    evNuevo(); await evCargar();
+  }catch(e){ err('⚠ '+mensajeError(e)); }
+  finally{ btn.disabled=false; }
+}
+async function evToggleActivo(id){
+  const e=evState.lista.find(x=>x.id===id); if(!e) return;
+  if(e.activo&&!confirm(`¿Quitar "${e.nombre}" de la venta? Los cobros ya hechos se mantienen.`)) return;
+  try{ await supaFetch(`/eventos_caja?id=eq.${id}`,{method:'PATCH',body:{activo:!e.activo,updated_at:new Date().toISOString()}}); await evCargar(); }
+  catch(x){ const m=document.getElementById('evMsg'); m.className='msg err'; m.textContent='⚠ '+mensajeError(x); }
+}
+function renderEvLista(){
+  const hoy=todayStr();
+  document.getElementById('evLista').innerHTML=evState.lista.length?evState.lista.map(e=>{
+    const est=!e.activo?'<span class="fx-tag">Inactivo</span>':e.fecha<hoy?'<span class="fx-tag">Pasado</span>':'<span class="fx-tag m">A la venta</span>';
+    return `<tr><td><b>${esc(e.nombre)}</b><div style="margin-top:3px;">${est}</div></td><td>${esc(fechaCorta(e.fecha))}</td>
+      <td class="num">${fmt(e.precio_miembro)}</td><td class="num">${fmt(e.precio_no_miembro)}</td>
+      <td>${(e.metodos||[]).map(m=>FX_METODOS[m].split(' ')[0]).join(' ')}</td>
+      <td style="font-size:12px;">${(e.sedes||[]).length===SEDES.length?'Las 4':(e.sedes||[]).map(esc).join(', ')}</td>
+      <td style="white-space:nowrap;"><button class="btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="evVerRegistro('${e.id}')">Registro</button>
+        <button class="btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="evEditar('${e.id}')">Editar</button>
+        <button class="btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="evToggleActivo('${e.id}')">${e.activo?'Desactivar':'Activar'}</button></td></tr>`;
+  }).join(''):'<tr><td colspan="7" class="hint" style="text-align:center;padding:14px;">Aún no hay eventos.</td></tr>';
+}
+async function evVerRegistro(id){
+  const e=evState.lista.find(x=>x.id===id); if(!e) return;
+  evState.rep=id;
+  const card=document.getElementById('evRepCard'); card.hidden=false;
+  document.getElementById('evRepTit').textContent=`Registro · ${e.nombre} (${fechaCorta(e.fecha)})`;
+  try{ evState.repRows=(await supaFetch(`/facturas_caja?evento_id=eq.${id}&order=created_at.asc&select=numero,fecha,sede,metodo,total,estado,tipo_precio,cliente_nombre,cliente_telefono,cliente_pin,created_at,created_by`))||[]; }
+  catch(x){ evState.repRows=[]; document.getElementById('evRepLista').innerHTML=`<tr><td colspan="6" style="color:var(--red);">${esc(mensajeError(x))}</td></tr>`; return; }
+  const L=evState.repRows, A=L.filter(f=>f.estado!=='anulada'), sum=a=>a.reduce((s,f)=>s+(Number(f.total)||0),0);
+  document.getElementById('evRepTiles').innerHTML=`<div class="tile"><div class="tl">Total recaudado</div><div class="tv">${fmt(sum(A))}</div></div>
+    <div class="tile"><div class="tl">Inscritos</div><div class="tv">${A.length}</div></div>
+    <div class="tile"><div class="tl">Miembros / no miembros</div><div class="tv">${A.filter(f=>f.tipo_precio==='miembro').length} / ${A.filter(f=>f.tipo_precio!=='miembro').length}</div></div>`;
+  const sedes=[...new Set([...(e.sedes||[]),...A.map(f=>f.sede)])];
+  const fila=(lbl,F)=>`<tr><td>${lbl}</td><td class="num">${F.length}</td>${['efectivo','tarjeta','sinpe'].map(m=>`<td class="num">${fmt(sum(F.filter(f=>f.metodo===m)))}</td>`).join('')}<td class="num"><b>${fmt(sum(F))}</b></td></tr>`;
+  document.getElementById('evRepSedes').innerHTML=sedes.map(s=>fila(esc(s),A.filter(f=>f.sede===s))).join('')+fila('<b>Total</b>',A);
+  document.getElementById('evRepLista').innerHTML=L.length?L.map(f=>`<tr class="${f.estado==='anulada'?'anulada':''}"><td>${esc(f.cliente_nombre||'')}${f.cliente_pin?`<div class="hint" style="font-size:11px;">PIN ${esc(f.cliente_pin)}</div>`:''}</td>
+      <td class="num" style="text-align:left;">${esc(f.cliente_telefono||'')}</td>
+      <td>${f.tipo_precio==='miembro'?'<span class="fx-tag m">Miembro</span>':'<span class="fx-tag nm">No miembro</span>'}</td>
+      <td>${esc(f.sede)}</td><td>${FX_METODOS[f.metodo]||esc(f.metodo)}</td><td class="num">${fmt(f.total)}${f.estado==='anulada'?' <span class="pill dif">Anulado</span>':''}</td></tr>`).join('')
+    :'<tr><td colspan="6" class="hint" style="text-align:center;padding:14px;">Aún no hay inscritos.</td></tr>';
+}
+function evExportar(){
+  const e=evState.lista.find(x=>x.id===evState.rep); if(!e) return;
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const filas=[['Fecha cobro','Sede','Persona','Teléfono','PIN','Tipo','Método','Monto','Estado']].concat(
+    evState.repRows.map(f=>[new Date(f.created_at).toLocaleString('es-CR'),f.sede,f.cliente_nombre,f.cliente_telefono,f.cliente_pin,
+      f.tipo_precio==='miembro'?'Miembro':'No miembro',f.metodo,Math.round(Number(f.total)||0),f.estado]));
+  const csv='﻿'+filas.map(r=>r.map(q).join(',')).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`evento_${e.nombre.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w]+/g,'_')}_${e.fecha}.csv`;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
 }
 
 // ── PDF (réplica del Excel de cierre) ──
