@@ -153,6 +153,86 @@ table.denom tfoot td:last-child { border-radius:0 0 10px 0; }
 .msg { font-size:14px; min-height:18px; padding:0; }
 .msg.ok { color:var(--green); font-weight:600; } .msg.err { color:var(--red); font-weight:600; }
 
+/* ── Pestañas Cierre / Facturación (control segmentado) ── */
+.caja-tabs { display:flex; justify-content:center; margin:0 0 16px; }
+.seg { display:inline-flex; background:var(--fill); border-radius:10px; padding:2px; gap:2px; }
+.seg button { border:0; background:transparent; padding:7px 18px; border-radius:8px; font-size:14px; font-weight:600; color:var(--label); }
+.seg button[aria-selected="true"] { background:var(--card); box-shadow:var(--shadow); }
+
+/* ── Facturación ── */
+.fx-grid { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(0,1fr); gap:16px; align-items:start; }
+@media (max-width:860px){ .fx-grid { grid-template-columns:1fr; } }
+.fx-grid > * { min-width:0; }   /* la tabla de facturas no debe ensanchar la columna (scroll propio) */
+.fx-search { width:100%; min-height:40px; border:1.5px solid transparent; border-radius:10px; background:var(--fill);
+  padding:0 12px; font-size:15px; color:var(--label); outline:none; margin-bottom:10px; font-family:inherit; }
+.fx-search:focus { border-color:var(--brand); background:var(--card); }
+.fx-chips { display:flex; gap:6px; flex-wrap:wrap; }
+.fx-chip { border:0; background:var(--fill); padding:7px 12px; border-radius:999px; font-size:13px; font-weight:600; color:var(--label); }
+.fx-chip[aria-pressed="true"] { background:var(--brand-tint); color:var(--brand-text); }
+.fx-cat { font-size:12px; font-weight:600; color:var(--sec); text-transform:uppercase; letter-spacing:.04em; margin:14px 0 8px; }
+.fx-prods { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; }
+.fx-prod { border:1.5px solid var(--hair); background:var(--card); border-radius:12px; padding:10px 12px; text-align:left;
+  display:flex; flex-direction:column; gap:4px; min-height:88px; color:var(--label); }
+.fx-prod:hover:not([disabled]) { border-color:var(--brand); }
+.fx-prod .n { font-weight:600; font-size:14px; line-height:1.25; }
+.fx-prod .p { font-size:15px; font-weight:700; margin-top:auto; font-variant-numeric:tabular-nums; }
+.fx-prod .s { font-size:12px; color:var(--sec); }
+.fx-prod .s.low { color:var(--orange); font-weight:600; }
+.fx-prod[disabled] { opacity:.45; cursor:not-allowed; }
+.fx-prod[disabled] .s { color:var(--red); font-weight:600; }
+.fx-line { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:10px; align-items:center; padding:9px 0; border-bottom:.5px solid var(--hair); }
+.fx-line .n { font-size:14px; font-weight:500; }
+.fx-line .u { font-size:12px; color:var(--sec); }
+.fx-line .t { min-width:72px; text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+.fx-step { display:inline-flex; align-items:center; background:var(--fill); border-radius:8px; }
+.fx-step button { border:0; background:transparent; width:32px; height:32px; font-size:17px; font-weight:600; color:var(--brand-text); }
+.fx-step span { min-width:22px; text-align:center; font-weight:600; font-variant-numeric:tabular-nums; }
+.fx-total { display:flex; justify-content:space-between; align-items:baseline; padding:14px 0 4px; }
+.fx-total .l { font-size:13px; color:var(--sec); text-transform:uppercase; letter-spacing:.04em; font-weight:600; }
+.fx-total .v { font-size:30px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.fx-pay { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:8px 0 10px; }
+.fx-pay button { border:1.5px solid var(--hair); background:var(--card); border-radius:12px; padding:10px 6px; font-weight:600; font-size:14px;
+  display:flex; flex-direction:column; align-items:center; gap:2px; color:var(--label); }
+.fx-pay button .i { font-size:20px; }
+.fx-pay button[aria-pressed="true"] { border-color:var(--brand); background:var(--brand-tint); color:var(--brand-text); }
+.fx-cta { width:100%; min-height:48px; font-size:16px; font-weight:700; margin-top:10px; }
+.fx-tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px; }
+.fx-tbl { width:100%; border-collapse:collapse; font-size:13px; min-width:460px; }
+.fx-tbl th { font-size:12px; font-weight:600; color:var(--sec); text-align:left; padding:8px; border-bottom:.5px solid var(--sep); }
+.fx-tbl td { padding:8px; border-bottom:.5px solid var(--hair); vertical-align:top; }
+.fx-tbl .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.fx-tbl tr.anulada td { color:var(--ter); text-decoration:line-through; }
+.fx-tbl tr.anulada td:last-child { text-decoration:none; }
+
+/* ── Eventos ── */
+.fx-evs { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; }
+.fx-ev { border:1.5px solid var(--hair); background:var(--card); border-radius:12px; padding:12px; text-align:left;
+  display:flex; flex-direction:column; gap:6px; color:var(--label); }
+.fx-ev:hover { border-color:var(--brand); }
+.fx-ev[aria-pressed="true"] { border-color:var(--brand); background:var(--brand-tint); }
+.fx-ev .n { font-weight:700; font-size:15px; }
+.fx-ev .d { font-size:12px; color:var(--sec); }
+.fx-ev .pr { display:flex; gap:6px; flex-wrap:wrap; font-size:12px; }
+.fx-ev .pr span { background:var(--fill); border-radius:6px; padding:2px 8px; font-variant-numeric:tabular-nums; }
+.fx-seg2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0 10px; }
+.fx-seg2 button { border:1.5px solid var(--hair); background:var(--card); border-radius:10px; padding:8px; font-weight:600; font-size:14px;
+  color:var(--label); display:flex; flex-direction:column; align-items:center; }
+.fx-seg2 button small { font-weight:500; color:var(--sec); font-variant-numeric:tabular-nums; }
+.fx-seg2 button[aria-pressed="true"] { border-color:var(--brand); background:var(--brand-tint); color:var(--brand-text); }
+.fx-inp { width:100%; min-height:40px; border:1.5px solid transparent; border-radius:10px; background:var(--fill); padding:0 12px;
+  font-size:15px; color:var(--label); outline:none; font-family:inherit; }
+.fx-inp:focus { border-color:var(--brand); background:var(--card); }
+.fx-lbl { display:block; font-size:12px; font-weight:600; color:var(--sec); text-transform:uppercase; letter-spacing:.04em; margin:8px 0 4px; }
+.fx-tag { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600;
+  background:var(--fill); color:var(--label); white-space:nowrap; }
+.fx-tag.m { background:var(--brand-tint); color:var(--brand-text); }
+.fx-tag.nm { background:var(--blue-tint); color:var(--blue); }
+.ev-form { display:grid; grid-template-columns:1fr 1fr; gap:0 14px; }
+@media (max-width:620px){ .ev-form { grid-template-columns:1fr; } }
+.ev-checks { display:flex; gap:6px; flex-wrap:wrap; }
+.ev-checks label { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:var(--fill);
+  font-size:13px; font-weight:600; cursor:pointer; }
+
 /* ── Historial ── */
 .tbl-wrap { overflow-x:auto; background:var(--card); border-radius:12px; box-shadow:var(--shadow); }
 table.hist { width:100%; border-collapse:separate; border-spacing:0; min-width:720px; }
@@ -275,6 +355,13 @@ table.hist tbody tr:hover td { background:var(--fill); }
 
 <div class="wrap" id="app">
 
+  <div class="caja-tabs"><div class="seg" role="tablist">
+    <button role="tab" id="tabCierre" aria-selected="true" onclick="showTab('cierre')">🧾 Cierre</button>
+    <button role="tab" id="tabFact" aria-selected="false" onclick="showTab('fact')">🛒 Facturación</button>
+    <button role="tab" id="tabEv" aria-selected="false" onclick="showTab('ev')" hidden>🎟️ Eventos</button>
+  </div></div>
+
+  <div id="paneCierre">
   <div class="grid">
     <!-- Columna izquierda: datos + billetes -->
     <div>
@@ -284,11 +371,12 @@ table.hist tbody tr:hover td { background:var(--fill); }
         <div class="hint" id="cajaInicialHint" style="margin:-4px 0 10px;"></div>
         <div class="f-row"><label>Membresías (₡)</label><input type="number" id="cMembresias" step="1" oninput="calc()"></div>
         <div class="f-row"><label>Otros vendidos (₡)</label><input type="number" id="cOtros" step="1" oninput="calc()"></div>
-        <div class="hint" id="otrosHint" style="margin:-4px 0 8px;">Solo productos “Otros” (sin sesiones ni membresías). Es el monto del sobre/minita.</div>
+        <div class="hint" id="otrosHint" style="margin:-4px 0 8px;">Solo productos “Otros” (sin sesiones ni membresías) del Ventas por Producto. Lo facturado en caja se suma aparte.</div>
         <div class="f-row"><label>Total Tarjeta (₡)</label><input type="number" id="cTarjeta" step="1" readonly title="Se carga desde el Informe de Ventas" ></div>
         <div class="f-row"><label>Total SINPE (₡)</label><input type="number" id="cSinpe" step="1" readonly title="Se carga desde el Informe de Ventas" ></div>
         <div class="f-row"><label>Total Transferencia (₡)</label><input type="number" id="cTransfer" step="1" readonly title="Se carga desde el Informe de Ventas" ></div>
         <div class="hint">🔒 Tarjeta, SINPE y Transferencia se cargan solo desde el <b>Informe de Ventas</b> (no se editan a mano).</div>
+        <div id="factCierreBox" style="margin:10px 0;"></div>
         <div class="f-row"><label>TOTAL ventas (₡)</label><input type="number" id="cTotalVentas" step="1" oninput="calc()"></div>
         <div class="hint" id="ventasHint"></div>
         <div class="f-row"><label>Sobre (minita)</label>
@@ -403,6 +491,110 @@ table.hist tbody tr:hover td { background:var(--fill); }
     <thead><tr><th>Fecha</th><th>Turno</th><th class="num">Caja inicial</th><th class="num">Efectivo</th><th class="num">Total ventas</th><th class="num">Minita</th><th class="num">Diferencia</th><th>Estado</th><th></th></tr></thead>
     <tbody id="histBody"></tbody>
   </table></div>
+  </div><!-- /paneCierre -->
+
+  <!-- Eventos (solo administradores). Ver eventos.sql -->
+  <div id="paneEv" hidden>
+    <div class="card">
+      <h3 id="evFormTit">Nuevo evento</h3>
+      <div class="ev-form">
+        <div><label class="fx-lbl" for="evNom">Nombre</label><input class="fx-inp" id="evNom" placeholder="Ej. Noche de Salsa"></div>
+        <div><label class="fx-lbl" for="evFecha">Fecha del evento</label><input class="fx-inp" id="evFecha" type="date"></div>
+        <div><label class="fx-lbl" for="evPm">Precio miembro (₡)</label><input class="fx-inp" id="evPm" type="number" min="0" step="1"></div>
+        <div><label class="fx-lbl" for="evPn">Precio no miembro (₡)</label><input class="fx-inp" id="evPn" type="number" min="0" step="1"></div>
+      </div>
+      <span class="fx-lbl">Métodos de pago que acepta</span>
+      <div class="ev-checks" id="evMetodos"></div>
+      <span class="fx-lbl">Sedes donde se vende</span>
+      <div class="ev-checks" id="evSedes"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+        <button class="btn-primary" id="evBtnGuardar" onclick="evGuardar()">Crear evento</button>
+        <button class="btn-ghost" id="evBtnCancelar" onclick="evNuevo()" hidden>Cancelar edición</button>
+      </div>
+      <div class="msg" id="evMsg" style="margin-top:10px;"></div>
+      <div class="hint" style="margin-top:6px;">Se vende hasta el día del evento; después sale solo de Facturación. Miembro: se valida con el PIN contra la lista de clientes activos. No miembro: nombre y teléfono.</div>
+    </div>
+
+    <div class="card">
+      <h3>Eventos</h3>
+      <div style="overflow-x:auto;"><table class="fx-tbl">
+        <thead><tr><th>Evento</th><th>Fecha</th><th class="num">Miembro</th><th class="num">No miembro</th><th>Pago</th><th>Sedes</th><th></th></tr></thead>
+        <tbody id="evLista"></tbody>
+      </table></div>
+    </div>
+
+    <div class="card" id="evRepCard" hidden>
+      <h3><span id="evRepTit">Registro</span> <button class="btn-ghost" style="margin-left:auto;font-size:12px;padding:5px 10px;" onclick="evExportar()">⬇ Exportar CSV</button></h3>
+      <div class="fx-tiles" id="evRepTiles" style="margin:0 0 12px;"></div>
+      <div style="overflow-x:auto;"><table class="fx-tbl">
+        <thead><tr><th>Sede</th><th class="num">Inscritos</th><th class="num">💵 Efectivo</th><th class="num">💳 Tarjeta</th><th class="num">🔷 SINPE</th><th class="num">Total</th></tr></thead>
+        <tbody id="evRepSedes"></tbody>
+      </table></div>
+      <div class="fx-lbl" style="margin-top:16px;">Inscritos</div>
+      <div style="overflow-x:auto;"><table class="fx-tbl">
+        <thead><tr><th>Persona</th><th>Teléfono</th><th>Tipo</th><th>Sede</th><th>Pago</th><th class="num">Monto</th></tr></thead>
+        <tbody id="evRepLista"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- Facturación de productos (minita y otros). Ver facturacion.sql -->
+  <div id="paneFact" hidden>
+    <div class="card" id="fxSinTurno" style="text-align:center;padding:32px 18px;" hidden>
+      <div style="font-size:40px;">🔒</div>
+      <div style="font-size:17px;font-weight:600;margin-top:6px;">Abra el turno para facturar</div>
+      <div class="hint" style="margin-top:4px;">Las facturas quedan ligadas al turno abierto.</div>
+    </div>
+    <div class="fx-grid" id="fxMain">
+      <div>
+        <div class="card" id="fxEvCard" hidden>
+          <h3>🎟️ Eventos <span style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;">Una persona por cobro</span></h3>
+          <div class="fx-evs" id="fxEventos"></div>
+        </div>
+        <div class="card">
+          <h3>Productos <span style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;" id="fxProdInfo"></span></h3>
+          <input type="search" id="fxQ" class="fx-search" placeholder="Buscar producto…" oninput="renderFxProds()">
+          <div class="fx-chips" id="fxChips"></div>
+          <div id="fxProds"></div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h3>Ticket actual <button class="btn-ghost" style="margin-left:auto;font-size:12px;padding:5px 10px;" onclick="fxVaciar()">Vaciar</button></h3>
+          <div id="fxLines"></div>
+          <div class="fx-total"><span class="l">Total</span><span class="v" id="fxTot">₡0</span></div>
+          <div class="hint" style="font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:12px;">Método de pago</div>
+          <div class="fx-pay" id="fxPay">
+            <button type="button" data-m="efectivo" aria-pressed="true" onclick="fxSetPago('efectivo')"><span class="i">💵</span>Efectivo</button>
+            <button type="button" data-m="tarjeta" aria-pressed="false" onclick="fxSetPago('tarjeta')"><span class="i">💳</span>Tarjeta</button>
+            <button type="button" data-m="sinpe" aria-pressed="false" onclick="fxSetPago('sinpe')"><span class="i">🔷</span>SINPE</button>
+          </div>
+          <div class="hint" id="fxPagoNota" hidden style="margin:-4px 0 8px;"></div>
+          <div id="fxPagoEfectivo">
+            <div class="f-row"><label for="fxRecibido">Recibido (₡)</label><input type="number" id="fxRecibido" step="1" min="0" placeholder="opcional" oninput="renderFxVuelto()"></div>
+            <div class="f-row" style="margin-bottom:0;"><label>Vuelto</label><span id="fxVuelto" style="font-weight:700;font-variant-numeric:tabular-nums;">—</span></div>
+          </div>
+          <div id="fxPagoTarjeta" class="hint" hidden>Cobre en el datáfono por el total. Se suma a <b>Total Tarjeta</b> del cierre y se compara con la foto del datáfono.</div>
+          <div id="fxPagoSinpe" hidden>
+            <div class="f-row"><label for="fxRef">Referencia SINPE</label><input type="text" id="fxRef" inputmode="numeric" placeholder="últimos 6 dígitos" style="text-align:left;"></div>
+            <div class="hint">Se cruza con el 🔷 Reporte SINPE del día.</div>
+          </div>
+          <button class="btn-primary fx-cta" id="fxBtn" onclick="fxFacturar()" disabled>Facturar ₡0</button>
+          <div class="msg" id="fxMsg" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="card">
+          <h3>Cobros del día <span style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;" id="fxN"></span></h3>
+          <div style="overflow-x:auto;"><table class="fx-tbl">
+            <thead><tr><th>#</th><th>Hora</th><th>Detalle</th><th>Pago</th><th class="num">Total</th><th></th></tr></thead>
+            <tbody id="fxHist"></tbody>
+          </table></div>
+          <div class="fx-tiles" id="fxPorMetodo"></div>
+          <div class="hint" style="margin-top:10px;">Lo facturado aquí se suma en el cierre a cada método de pago, al total de ventas y a la minita (sobre).</div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Modal: Conteo de inventario al cierre -->
@@ -573,6 +765,8 @@ async function init(){
   const bh=document.getElementById('btnSinpeHist'); if(bh)bh.style.display=esAdmin()?'':'none';   // carga única: solo admins
   renderDenoms(); renderGastos(); renderIngresos();
   document.getElementById('app').style.display='block';
+  document.getElementById('tabEv').hidden=!esAdmin();   // eventos: los crea un administrador
+  try{ const tb=sessionStorage.getItem('cajaTab'); if(tb==='fact'||(tb==='ev'&&esAdmin())) showTab(tb); }catch(_){}
   loadPricesForSede(currentSede);
   await loadCierres();
 }
@@ -603,12 +797,13 @@ function cargarTurnoEnForm(t){
   document.getElementById('cCajaInicial').value=t.caja_inicial||0;
   document.getElementById('cCajaInicial').readOnly=true;
   // Montos en curso (compartidos, desde el servidor)
+  window._factCierre=t.facturado||null;
   document.getElementById('cMembresias').value=t.membresias||0;
-  document.getElementById('cOtros').value=t.otros_vendidos||0;
-  document.getElementById('cTarjeta').value=t.total_tarjeta==null?'':t.total_tarjeta;
-  document.getElementById('cSinpe').value=t.total_sinpe==null?'':t.total_sinpe;
+  document.getElementById('cOtros').value=sinFacturado(t,'otros_vendidos','productos')||0;
+  document.getElementById('cTarjeta').value=sinFacturado(t,'total_tarjeta','tarjeta');
+  document.getElementById('cSinpe').value=sinFacturado(t,'total_sinpe','sinpe');
   document.getElementById('cTransfer').value=t.total_transferencia==null?'':t.total_transferencia;
-  document.getElementById('cTotalVentas').value=t.total_ventas||0;
+  document.getElementById('cTotalVentas').value=sinFacturado(t,'total_ventas','total')||0;
   document.getElementById('cSobreModo').value=t.sobre_modo||'no';
   window._otrosResumen=t.otros_desglose||null;
   window._informeVentas=t.informe_ventas||null;
@@ -627,6 +822,8 @@ function cargarTurnoEnForm(t){
   calc();
   _noSave=false;
   startLivePoll();
+  loadFacturasDia();
+  if(tabActual==='fact') loadFxProds();
 }
 function checkTurno(){
   turnoActual=cierres.find(c=>c.estado==='abierto')||null;
@@ -639,7 +836,8 @@ function checkTurno(){
   document.getElementById('app').style.display = gated?'none':'block';
   const up=document.getElementById('topUploads'); if(up) up.style.display = gated?'none':'flex';
   if(turnoActual) cargarTurnoEnForm(turnoActual);
-  else { stopLivePoll(); document.getElementById('cCajaInicial').readOnly=false; nuevoCierre(); }
+  else { stopLivePoll(); document.getElementById('cCajaInicial').readOnly=false; nuevoCierre(); fxState.facturas=[]; renderFxHist(); }
+  renderFxEstado();
 }
 
 async function openAbrirModal(){
@@ -750,7 +948,7 @@ async function serverSave(showErr){
       efectivo:c.efectivo, denominaciones, gastos, ingresos, total_gastos:c.totGastos, total_ingresos:c.totIngresos,
       minita:c.minita, otros_vendidos:c.otros, otros_desglose:window._otrosResumen||null, sobre_modo:c.sobreModo,
       inventario_cierre:inventarioCierre||null,
-      informe_ventas:window._informeVentas||null, updated_at:upd };
+      informe_ventas:window._informeVentas||null, updated_at:upd, ...facturadoPayload() };
     await supaFetch(`/cierres_caja?id=eq.${turnoActual.id}`,{method:'PATCH',body:payload});
     turnoActual.updated_at=upd; _lastServerUpd=upd;
     const li=document.getElementById('liveInfo'); if(li) li.textContent='💾 Guardado '+new Date(upd).toLocaleTimeString('es-CR');
@@ -776,18 +974,20 @@ async function liveRefresh(){
       _lastServerUpd=row.updated_at; turnoActual=row; applyRowToForm(row);
       const li=document.getElementById('liveInfo'); if(li) li.textContent='🔄 Actualizado '+new Date(row.updated_at).toLocaleTimeString('es-CR');
     }
+    await loadFacturasDia();   // facturas hechas en otra pantalla de la misma sede
   }catch(_){}
 }
 function applyRowToForm(row){
   _noSave=true;
   try{
     if(row.denominaciones) DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=row.denominaciones[d]||0;});
+    window._factCierre=row.facturado||null;
     document.getElementById('cMembresias').value=row.membresias||0;
-    document.getElementById('cOtros').value=row.otros_vendidos||0;
-    document.getElementById('cTarjeta').value=row.total_tarjeta==null?'':row.total_tarjeta;
-    document.getElementById('cSinpe').value=row.total_sinpe==null?'':row.total_sinpe;
+    document.getElementById('cOtros').value=sinFacturado(row,'otros_vendidos','productos')||0;
+    document.getElementById('cTarjeta').value=sinFacturado(row,'total_tarjeta','tarjeta');
+    document.getElementById('cSinpe').value=sinFacturado(row,'total_sinpe','sinpe');
     document.getElementById('cTransfer').value=row.total_transferencia==null?'':row.total_transferencia;
-    document.getElementById('cTotalVentas').value=row.total_ventas||0;
+    document.getElementById('cTotalVentas').value=sinFacturado(row,'total_ventas','total')||0;
     document.getElementById('cSobreModo').value=row.sobre_modo||'no';
     gastos=(Array.isArray(row.gastos)&&row.gastos.length?row.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros'}));
     ingresos=(Array.isArray(row.ingresos)&&row.ingresos.length?row.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc||'',monto:g.monto??''}));
@@ -803,17 +1003,19 @@ function calc(){
   let efectivo=0;
   DENOMS.forEach(d=>{const c=Number(document.getElementById('den_'+d).value)||0; const sub=c*d; efectivo+=sub; document.getElementById('sub_'+d).textContent=fmt(sub);});
   document.getElementById('efectivoCell').textContent=fmt(efectivo);
-  const tarjeta=Number(document.getElementById('cTarjeta').value)||0;
-  const sinpe=Number(document.getElementById('cSinpe').value)||0;
+  // Lo facturado en la pestaña Facturación (día) se suma a lo que trae el Informe / Ventas por Producto.
+  const fx=factCierre();
+  const tarjeta=(Number(document.getElementById('cTarjeta').value)||0)+fx.tarjeta;
+  const sinpe=(Number(document.getElementById('cSinpe').value)||0)+fx.sinpe;
   const transfer=Number(document.getElementById('cTransfer').value)||0;
-  const totalVentas=Number(document.getElementById('cTotalVentas').value)||0;   // acumulado del día
+  const totalVentas=(Number(document.getElementById('cTotalVentas').value)||0)+fx.total;   // acumulado del día
   const cajaIni=fondoInicialDia();                                              // fondo del primer turno del día
   const membresias=Number(document.getElementById('cMembresias').value)||0;
   const totGastos=gastos.reduce((a,g)=>a+(Number(g.monto)||0),0);               // gastos de ESTE turno
   const totIngresos=ingresos.reduce((a,g)=>a+(Number(g.monto)||0),0);
   const pg=prevGIDia();                                                         // gastos/ingresos de turnos previos de hoy
   const totGastosDia=totGastos+pg.gastos, totIngresosDia=totIngresos+pg.ingresos;
-  const minita=Number(document.getElementById('cOtros').value)||0;   // productos "Otros" del día (sin sesiones ni membresías)
+  const minita=(Number(document.getElementById('cOtros').value)||0)+fxProductos(fx);   // productos "Otros" del día (sin sesiones ni membresías) + productos facturados en caja (eventos no)
   const sobreModo=document.getElementById('cSobreModo').value;   // 'retira' | 'ya' | 'no'
   const sobreRetirado=sobreModo==='ya';                          // compat con datos previos
   // El sobre solo sale en el cierre FINAL (= minita total del día). En parciales la minita queda en caja.
@@ -845,6 +1047,7 @@ function calc(){
   const efectivoFinal=(sobreModo==='retira')?(efectivo-minita):efectivo;
   document.getElementById('rEfectivoFinal').textContent=fmt(efectivoFinal);
   document.getElementById('rOtros').textContent=fmt(sobreOut);
+  renderFactCierreBox(fx);
   saveDraft();
   if(window._sinpeReporte)renderSinpeResumen();
   if(fotoDatafono)renderFotoResumen();
@@ -880,7 +1083,7 @@ function nuevoCierre(){
   document.getElementById('cTurno').value='';
   ['cMembresias','cOtros','cTarjeta','cSinpe','cTransfer','cTotalVentas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('cSobreModo').value='no';
-  window._informeVentas=null; window._sinpeReporte=null; fotoDatafono=null; window._otrosResumen=null;
+  window._informeVentas=null; window._sinpeReporte=null; fotoDatafono=null; window._otrosResumen=null; window._factCierre=null;
   document.getElementById('fotoResumen').innerHTML=''; document.getElementById('fileFoto').value='';
   document.getElementById('sinpeResumen').innerHTML=''; renderOtrosResumen(null);
   document.getElementById('aperturaInvCard').style.display='none'; document.getElementById('aperturaInvBody').innerHTML='';
@@ -1068,7 +1271,9 @@ function fechaHora(s){ const m=String(s||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4}
 const horaCorta=d=>d?d.toLocaleString('es-CR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
 const tokensNombre=s=>normP(String(s||'').replace(/_/g,' ')).replace(/[^a-z ]/g,' ').split(/\s+/).filter(t=>t.length>=3);
 function conciliarSinpe(){
-  const v=window._ventasDetalle, s=window._sinpeReporte; if(!v||!s||!s.all)return null;
+  const s=window._sinpeReporte; if(!s||!s.all)return null;
+  const fxSinpe=(turnoActual&&window._formCierreId===turnoActual.id?fxState.facturas:[]).filter(f=>f.estado!=='anulada'&&f.metodo==='sinpe');
+  const v=window._ventasDetalle||(fxSinpe.length?{filas:[],agrupado:false,fecha:document.getElementById('cFecha').value}:null); if(!v)return null;
   // Un cobro puede traer varias líneas (plan + matrícula ₡0): se agrupan por hora + cliente
   const mapa=new Map();
   v.filas.forEach(f=>{ const k=f.FechaStr+'|'+f.Cliente; let c=mapa.get(k);
@@ -1076,6 +1281,9 @@ function conciliarSinpe(){
     c.total+=Number(f.Total)||0; (String(f.Notas||'').match(/\d{6,}/g)||[]).forEach(d=>c.refs.push(d));
     if(f.Producto&&Number(f.Total))c.productos.push(f.Producto); if(f.Metodo)c.metodo=f.Metodo; });
   const cobros=[...mapa.values()].map(c=>({...c,total:Math.round(c.total)}));
+  // Facturas SINPE de la pestaña Facturación: siempre traen referencia → cruce exacto
+  fxSinpe.forEach(f=>{ const d=new Date(f.created_at); cobros.push({ fecha:horaCorta(d), d, cliente:`Factura #${f.numero} (caja)`, total:Math.round(Number(f.total)||0),
+    metodo:'sinpe', refs:[String(f.referencia||'').replace(/\D/g,'')].filter(x=>x.length>=4), productos:(f.items||[]).map(it=>it.producto) }); });
   const trans=s.all.map(t=>({...t, d:fechaHora(t.fecha_tx), usada:false}));
   const pares=[], refSinTrans=[];
   // 1) Por referencia
@@ -1125,7 +1333,7 @@ function htmlConciliacion(){
 function renderSinpeResumen(){
   const box=document.getElementById('sinpeResumen'); const s=window._sinpeReporte;
   if(!s){ box.innerHTML=''; return; }
-  const facturado=Math.round(Number(document.getElementById('cSinpe').value)||0);
+  const facturado=Math.round((Number(document.getElementById('cSinpe').value)||0)+factCierre().sinpe);
   const pendPrev=Math.round(s.pendPrev||0);
   const pendAfter=pendPrev+s.nuevosMonto-facturado;
   // pendiente positivo = SINPE recibido aún sin facturar (normal); negativo = se facturó más de lo recibido (revisar).
@@ -1184,7 +1392,7 @@ async function onFotoDatafono(file){
 }
 function renderFotoResumen(){
   const box=document.getElementById('fotoResumen'); const f=fotoDatafono; if(!f){ box.innerHTML=''; return; }
-  const tarjeta=Math.round(Number(document.getElementById('cTarjeta').value)||0); const a=f.analisis; let res='';
+  const tarjeta=Math.round((Number(document.getElementById('cTarjeta').value)||0)+factCierre().tarjeta); const a=f.analisis; let res='';
   if(a&&a.error){ res=`<div style="margin-top:6px;font-size:12px;color:var(--orange);">🔍 Foto guardada. No se pudo analizar (${esc(a.error)}). Validación manual.</div>`; }
   else if(a&&a.total!=null){ const dif=a.total-tarjeta, ok=dif===0;
     res=`<div style="margin-top:8px;padding:9px 12px;border-radius:9px;background:${ok?'var(--green-tint)':'var(--red-tint)'};color:${ok?'var(--green)':'var(--red)'};font-weight:800;font-size:13px;">${ok?'✓ Calza':'⚠ Difiere'}: datáfono ${fmt(a.total)} vs Tarjeta ${fmt(tarjeta)}${ok?'':' · Dif '+fmt(Math.abs(dif))}<div style="font-weight:600;font-size:11px;margin-top:2px;opacity:.85;">Lectura IA (confianza ${esc(a.confianza||'media')}). Verifique si difiere.</div></div>`; }
@@ -1279,6 +1487,7 @@ function renderConteoCierreResumen(){
 
 // ── Desglose de la minita (productos "Otros") por categoría ──
 function renderOtrosResumen(map){
+  map=desgloseMinita(map);
   const card=document.getElementById('otrosCard'), box=document.getElementById('otrosResumen');
   const keys=Object.keys(map||{}); if(!keys.length){ card.style.display='none'; box.innerHTML=''; return; }
   const groups={}; let gtotal=0, gqty=0;
@@ -1298,8 +1507,8 @@ function renderOtrosResumen(map){
 }
 // Imprime el desglose de "Otros/minita" tal como se ve en pantalla (por categoría).
 function imprimirDesgloseOtros(){
-  const map=window._otrosResumen; const keys=map?Object.keys(map):[];
-  if(!keys.length){ alert('Primero cargá "Ventas por Producto" para ver el desglose.'); return; }
+  const map=desgloseMinita(window._otrosResumen); const keys=Object.keys(map);
+  if(!keys.length){ alert('No hay productos vendidos: facture en la pestaña Facturación o cargue "Ventas por Producto".'); return; }
   const pu=it=>{ const q=Number(it.qty)||0; return q>0?Math.round((Number(it.total)||0)/q):(Number(it.total)||0); };   // monto unitario de venta = total ÷ cantidad
   const groups={}; let gtotal=0, gqty=0;
   keys.forEach(k=>{ const it=map[k]; const cat=it.cat||resolverOtro(it.base||k).cat; (groups[cat]=groups[cat]||[]).push(it); gtotal+=Number(it.total)||0; gqty+=Number(it.qty)||0; });
@@ -1352,29 +1561,6 @@ function parseProdQty(name){ const s=String(name||'').trim(); const m=s.match(/\
 
 // Descuento idempotente de inventario a partir de las ventas de productos del día D.
 // El informe es acumulado del día → se descuenta solo el delta vs lo ya descontado hoy.
-async function descontarInventario(soldByBase, origName, D){
-  let inv;
-  try{ inv=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(currentSede)}&select=*`))||[]; }
-  catch(e){ return { error:e.message }; }
-  const invByName={}; inv.forEach(p=>{ invByName[normP(p.producto)]=p; });
-  let unidadesDesc=0, prodsTocados=0; const detalle=[], rechazados=[];
-  for(const p of inv){
-    const k=normP(p.producto);
-    const unidadesHoy=soldByBase[k]||0;
-    const mismaFecha=(p.desc_dia===D);
-    if(unidadesHoy===0 && !mismaFecha) continue;           // no vendido hoy y sin descuentos previos hoy
-    const yaDesc=mismaFecha?(Number(p.desc_hoy)||0):0;     // unidades ya descontadas HOY (turnos previos)
-    const delta=unidadesHoy-yaDesc;                        // solo lo nuevo de esta carga
-    if(delta===0 && mismaFecha) continue;                   // ya está al día → no re-descuenta
-    const nuevoStock=(Number(p.cantidad)||0)-delta;
-    // mov_motivo: pista para el kardex (ver inventario_movimientos.sql). El trigger la consume y la limpia.
-    try{ await supaFetch(`/inventario?id=eq.${p.id}`,{method:'PATCH',body:{cantidad:nuevoStock,desc_dia:D,desc_hoy:unidadesHoy,updated_at:new Date().toISOString(),mov_motivo:`venta: informe de ventas del ${D}`}});
-      if(delta!==0){ unidadesDesc+=delta; prodsTocados++; detalle.push({producto:p.producto,delta,hoy:unidadesHoy,stock:nuevoStock}); } }catch(e){ rechazados.push(p.producto+": "+mensajeError(e)); }
-  }
-  const noCalzan=Object.keys(soldByBase).filter(k=>!invByName[k]&&soldByBase[k]>0).map(k=>origName[k]||k);
-  return { unidadesDesc, prodsTocados, noCalzan, detalle, rechazados };
-}
-
 // Productos del informe que la sede no tiene registrados (ni en plan_prices, ni en
 // inventario, ni en catalogo_ventas): se pregunta si son plan, clase o producto.
 // La respuesta se guarda y manda sobre la regla por nombre. Si la tabla aún no
@@ -1431,27 +1617,18 @@ function cargarVentasProducto(file){
       const mes=ref.toLocaleDateString('es-CR',{month:'long',year:'numeric'}).replace(/^\w/,c=>c.toUpperCase());
       const mesOrden=`${ref.getFullYear()}-${String(ref.getMonth()+1).padStart(2,'0')}`;
       const D=ymd(ref);
-      // Unidades vendidas por producto (de la categoría productos/minita) para descontar inventario
-      const soldByBase={}, origName={}, otrosResumen={};
+      // Desglose de productos "Otros" (minita). El inventario NO se descuenta aquí: solo al facturar en la pestaña Facturación.
+      const otrosResumen={};
       sinclasif.forEach(it=>{ const {base,qty}=parseProdQty(it.Producto); if(!base)return;
-        const bk=normP(base); soldByBase[bk]=(soldByBase[bk]||0)+qty; origName[bk]=base;   // inventario: por nombre real
         const {cat,canonical}=resolverOtro(it.Producto); const k=normP(canonical);          // desglose: unificado + categoría (como otros.html)
         if(!otrosResumen[k])otrosResumen[k]={base:canonical,cat,qty:0,total:0}; otrosResumen[k].qty+=qty; otrosResumen[k].total+=Number(it.Total)||0; });
       window._otrosResumen=otrosResumen; renderOtrosResumen(otrosResumen);
       window._ventasDetalle={ filas:detalleVentas, agrupado, fecha:D }; renderSinpeResumen();   // cruce SINPE por transacción
       // IMPORTANTE: recepción NO toca gym_snapshots (comparativa/sedes). El histórico del mes
       // lo carga el admin desde index; subir solo el día borraría los días anteriores. Aquí
-      // la carga afecta únicamente el CIERRE DE CAJA (y el descuento de inventario).
+      // la carga afecta únicamente el CIERRE DE CAJA (no toca el inventario).
       let msg=`📦 Día: membresías ${fmt(totMembCaja)} (planes ${fmt(totMemb)} + clases/sesiones ${fmt(totClases)}) · otros/minita ${fmt(totSinC)} · Total ${fmt(totalVentas)}.`;
       if(window._informeVentas){ const dif=Math.round(totalVentas-window._informeVentas.total); msg+= (dif===0?' · ✓ corrobora con Informe de Ventas.':` · ⚠ difiere del Informe en ${fmt(Math.abs(dif))}.`); }
-      try{
-        const desc=await descontarInventario(soldByBase, origName, D);   // idempotente por día
-        if(desc&&!desc.error){ msg+=`<br>📦 Inventario: ${desc.unidadesDesc||0} unidad(es) descontadas en esta carga`;
-          if(desc.detalle&&desc.detalle.length) msg+=` — ${desc.detalle.slice(0,10).map(d=>`${esc(d.producto)} −${d.delta} (${d.hoy} hoy, quedan ${d.stock})`).join(', ')}${desc.detalle.length>10?'…':''}`;
-          if(desc.rechazados&&desc.rechazados.length) msg+=`. ⚠ La base no permitió descontar (${desc.rechazados.length}): ${desc.rechazados.slice(0,3).map(esc).join(" · ")}`;
-          if(desc.noCalzan&&desc.noCalzan.length) msg+=`. ⚠ Sin calzar en inventario (${desc.noCalzan.length}): ${desc.noCalzan.slice(0,8).map(esc).join(', ')}${desc.noCalzan.length>8?'…':''}`; }
-        else if(desc&&desc.error){ msg+=`<br>⚠ Inventario no actualizado: ${esc(desc.error)}`; }
-      }catch(_){}
       document.getElementById('ventasHint').innerHTML=msg;
       calc();
     }catch(err){ alert('Error al leer el archivo: '+err.message); }
@@ -1487,7 +1664,7 @@ async function cerrarTurno(estado){
     total_gastos:c.totGastos, total_ingresos:c.totIngresos, minita:c.minita,
     efectivo_final:efectivoFinal, otros_vendidos:c.otros, otros_desglose:window._otrosResumen||null, inventario_cierre:inventarioCierre||null, sobre_retirado:esFinal&&c.sobreRetirado, sobre_modo:esFinal?c.sobreModo:'no',
     diferencia, estado_dif:diferencia===0?'OK':(diferencia>0?'Faltante':'Sobrante'),
-    informe_ventas:window._informeVentas||null, estado, hora_cierre:new Date().toISOString()
+    informe_ventas:window._informeVentas||null, estado, hora_cierre:new Date().toISOString(), ...facturadoPayload()
   };
   if(fotoDatafono){
     if(estado==='final') payload.foto_cierre=fotoDatafono.path; else payload.foto_datafono=fotoDatafono.path;
@@ -1600,12 +1777,13 @@ function cargarCierre(id){
   stopLivePoll();              // viendo historial → no refrescar/pisar con el turno abierto
   window._formCierreId=c.id;   // viendo historial → no dispara autoguardado del turno abierto
   document.getElementById('cFecha').value=c.fecha; document.getElementById('cTurno').value=c.turno||'';
-  document.getElementById('cCajaInicial').value=c.caja_inicial||0; document.getElementById('cMembresias').value=c.membresias||0; document.getElementById('cOtros').value=c.otros_vendidos||0;
+  window._factCierre=c.facturado||null;   // tal como quedó guardado en ese cierre
+  document.getElementById('cCajaInicial').value=c.caja_inicial||0; document.getElementById('cMembresias').value=c.membresias||0; document.getElementById('cOtros').value=sinFacturado(c,'otros_vendidos','productos')||0;
   window._otrosResumen=c.otros_desglose||null; renderOtrosResumen(window._otrosResumen);
   inventarioCierre=c.inventario_cierre||null; renderConteoCierreResumen();
   renderAperturaInv(c);
-  document.getElementById('cTarjeta').value=c.total_tarjeta||0; document.getElementById('cSinpe').value=c.total_sinpe||0; document.getElementById('cTransfer').value=c.total_transferencia||0;
-  document.getElementById('cTotalVentas').value=c.total_ventas||0;
+  document.getElementById('cTarjeta').value=sinFacturado(c,'total_tarjeta','tarjeta')||0; document.getElementById('cSinpe').value=sinFacturado(c,'total_sinpe','sinpe')||0; document.getElementById('cTransfer').value=c.total_transferencia||0;
+  document.getElementById('cTotalVentas').value=sinFacturado(c,'total_ventas','total')||0;
   document.getElementById('cSobreModo').value=c.sobre_modo||(c.sobre_retirado?'ya':'retira');
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=(c.denominaciones&&c.denominaciones[d])||0;});
   gastos=(c.gastos&&c.gastos.length?c.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc,monto:g.monto,cat:g.cat||'otros'}));
@@ -1621,6 +1799,437 @@ function cargarCierre(id){
   calc();
   renderSinpeResumenHist(c.sinpe_reporte||null);   // muestra cómo quedó el SINPE de ese cierre (sobró/faltó)
   window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ══ Facturación de productos (minita y otros) — ver facturacion.sql ══════════
+// Cada factura se registra con facturar_caja(): valida turno, precio y stock en la
+// base y descuenta el inventario en la misma transacción. Lo facturado en el día se
+// suma en el cierre a cada método de pago, al total de ventas y a la minita (sobre).
+// Los cobros de eventos (eventos.sql) entran igual a los métodos y al total, pero NO al sobre.
+const FX_METODOS={efectivo:'💵 Efectivo',tarjeta:'💳 Tarjeta',sinpe:'🔷 SINPE'};
+const FX_VACIO={efectivo:0,tarjeta:0,sinpe:0,total:0,productos:0,eventos:0,n:0,desglose:{}};
+// Parte que va al sobre (productos). Los cierres guardados antes de los eventos solo traen `total`.
+const fxProductos=f=>f.productos!=null?(Number(f.productos)||0):(Number(f.total)||0);
+let tabActual='cierre';
+const fxState={prods:[],cart:{},pago:'efectivo',cat:'todos',facturas:[],errFacturas:null,busy:false,
+  eventos:[], evento:null};   // evento: { id, tipo:'miembro'|'no_miembro', pin, nombre, tel, cliente } — uno por cobro
+const puedeAnular=()=>esAdmin()||currentRole==='coordinador';
+
+// Totales facturados que usa el cierre del formulario (null si aún no hay datos de facturas)
+function factCierre(){ return window._factCierre||FX_VACIO; }
+// Las columnas del cierre guardan Informe + facturado; el formulario muestra solo lo del Informe.
+function sinFacturado(row,col,key){ const v=row[col]; if(v==null) return ''; const f=row.facturado||{};
+  return Math.round((Number(v)||0)-(key==='productos'?fxProductos(f):(Number(f[key])||0))); }
+// Solo se guarda la columna `facturado` si la tabla de facturas respondió (facturacion.sql ya corrió).
+function facturadoPayload(){ return window._factCierre?{facturado:window._factCierre}:{}; }
+function resumirFacturas(list){
+  const r={efectivo:0,tarjeta:0,sinpe:0,total:0,productos:0,eventos:0,n:0,desglose:{}};
+  list.filter(f=>f.estado!=='anulada').forEach(f=>{ const t=Math.round(Number(f.total)||0);
+    if(r[f.metodo]!=null) r[f.metodo]+=t; r.total+=t; r.n++;
+    if(f.tipo==='evento'){ r.eventos+=t; return; }   // no va al sobre ni al desglose de la minita
+    r.productos+=t;
+    (f.items||[]).forEach(it=>{ const {cat,canonical}=resolverOtro(it.producto); const k=normP(canonical);
+      if(!r.desglose[k]) r.desglose[k]={base:canonical,cat,qty:0,total:0};
+      r.desglose[k].qty+=Number(it.cantidad)||0; r.desglose[k].total+=Math.round(Number(it.total)||0); }); });
+  return r;
+}
+// Desglose de la minita: lo del archivo "Ventas por Producto" + lo facturado en caja
+function desgloseMinita(map){
+  const out={}; Object.entries(map||{}).forEach(([k,it])=>{ out[k]={...it}; });
+  Object.entries(factCierre().desglose||{}).forEach(([k,it])=>{
+    if(!out[k]) out[k]={base:it.base,cat:it.cat,qty:0,total:0};
+    out[k].qty=(Number(out[k].qty)||0)+(Number(it.qty)||0); out[k].total=(Number(out[k].total)||0)+(Number(it.total)||0); });
+  return out;
+}
+function renderFactCierreBox(fx){
+  const box=document.getElementById('factCierreBox'); if(!box) return;
+  if(!fx.n){ box.innerHTML=''; return; }
+  const v=id=>Number(document.getElementById(id).value)||0;
+  const fila=(l,inf,caja)=>`<tr><td>${l}</td><td class="num">${fmt(inf)}</td><td class="num">${caja?'+ '+fmt(caja):'—'}</td><td class="num"><b>${fmt(inf+caja)}</b></td></tr>`;
+  box.innerHTML=`<div style="background:var(--brand-tint);border-radius:10px;padding:10px 12px;">
+    <div style="font-size:13px;font-weight:600;color:var(--brand-text);margin-bottom:4px;">🛒 Facturado en caja hoy · ${fx.n} cobro${fx.n===1?'':'s'} (efectivo ${fmt(fx.efectivo)})</div>
+    ${fx.eventos?`<div class="hint" style="margin-bottom:4px;">Minita ${fmt(fxProductos(fx))} · 🎟️ Eventos ${fmt(fx.eventos)} (los eventos no van al sobre)</div>`:''}
+    <div style="overflow-x:auto;"><table class="fx-tbl" style="min-width:0;">
+      <thead><tr><th></th><th class="num">Informe</th><th class="num">Caja</th><th class="num">Total</th></tr></thead>
+      <tbody>${fila('Tarjeta',v('cTarjeta'),fx.tarjeta)}${fila('SINPE',v('cSinpe'),fx.sinpe)}${fila('Total ventas',v('cTotalVentas'),fx.total)}${fila('Minita (sobre)',v('cOtros'),fxProductos(fx))}</tbody>
+    </table></div></div>`;
+}
+
+// ── Pestañas ──
+function showTab(t){
+  tabActual=t;
+  [['cierre','paneCierre','tabCierre'],['fact','paneFact','tabFact'],['ev','paneEv','tabEv']].forEach(([k,pane,tab])=>{
+    document.getElementById(pane).hidden=t!==k; document.getElementById(tab).setAttribute('aria-selected',t===k); });
+  try{ sessionStorage.setItem('cajaTab',t); }catch(_){}
+  if(t==='fact'){ renderFxEstado(); loadFxProds(); loadFacturasDia(); }
+  if(t==='ev') evCargar();
+}
+function renderFxEstado(){
+  const abierto=!!turnoActual;
+  document.getElementById('fxSinTurno').hidden=abierto; document.getElementById('fxMain').hidden=!abierto;
+}
+
+// ── Datos ──
+async function loadFxProds(){
+  if(!turnoActual) return;
+  loadFxEventos();
+  const sede=currentSede;
+  try{ const rows=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(sede)}&order=producto.asc&select=id,producto,precio,cantidad,cantidad_minima,activo`))||[];
+    if(sede!==currentSede) return;
+    fxState.prods=rows.filter(p=>p.activo!==false); }
+  catch(e){ fxState.prods=[]; document.getElementById('fxProdInfo').textContent='⚠ No se pudo cargar el inventario'; }
+  // El carrito solo conserva productos de esta sede
+  Object.keys(fxState.cart).forEach(id=>{ if(!fxState.prods.some(p=>p.id===id)) delete fxState.cart[id]; });
+  renderFxProds(); renderFxTicket();
+}
+async function loadFacturasDia(){
+  if(!turnoActual){ fxState.facturas=[]; renderFxHist(); return; }
+  const t=turnoActual;
+  try{ fxState.facturas=(await supaFetch(`/facturas_caja?sede=eq.${encodeURIComponent(t.sede)}&fecha=eq.${t.fecha}&order=numero.desc&select=*`))||[]; fxState.errFacturas=null; }
+  catch(e){ fxState.errFacturas=mensajeError(e); renderFxHist(); return; }
+  if(turnoActual!==t && (!turnoActual||turnoActual.id!==t.id)) return;
+  renderFxHist();
+  // El cierre en pantalla es el del turno abierto → actualizar sus totales si cambió lo facturado
+  if(window._formCierreId===t.id){
+    const nuevo=resumirFacturas(fxState.facturas);
+    if(JSON.stringify(nuevo)!==JSON.stringify(window._factCierre||null)){
+      window._factCierre=nuevo; renderOtrosResumen(window._otrosResumen); calc();
+    }
+  }
+}
+
+// ── Catálogo ──
+function renderFxProds(){
+  const q=normP(document.getElementById('fxQ').value||'');
+  const conCat=fxState.prods.map(p=>({...p,cat:resolverOtro(p.producto).cat}));
+  const cats=CAT_ORDER.filter(c=>conCat.some(p=>p.cat===c));
+  if(fxState.cat!=='todos'&&!cats.includes(fxState.cat)) fxState.cat='todos';
+  document.getElementById('fxChips').innerHTML=cats.length>1?['todos',...cats].map(c=>`<button type="button" class="fx-chip" aria-pressed="${fxState.cat===c}" onclick="fxState.cat='${c}';renderFxProds()">${c==='todos'?'Todos':esc(CAT_LABEL[c])}</button>`).join(''):'';
+  document.getElementById('fxProdInfo').textContent=fxState.prods.length?`${fxState.prods.length} productos`:'';
+  const verReal=verInventarioReal();   // recepción cuenta a ciegas: no se le muestra el stock
+  const html=cats.filter(c=>fxState.cat==='todos'||fxState.cat===c).map(c=>{
+    const items=conCat.filter(p=>p.cat===c&&(!q||normP(p.producto).includes(q))); if(!items.length) return '';
+    return `<div class="fx-cat">${esc(CAT_LABEL[c])}</div><div class="fx-prods">`+items.map(p=>{
+      const stock=Number(p.cantidad)||0, precio=Number(p.precio)||0, left=stock-(fxState.cart[p.id]||0);
+      let s='', cls='', off=false;
+      if(precio<=0){ s='Sin precio'; off=true; }
+      else if(stock<=0){ s='Agotado'; off=true; }
+      else if(left<=0){ s='No hay más en el sistema'; off=true; }
+      else if(verReal){ s='Quedan '+left; if(left<=Math.max(Number(p.cantidad_minima)||0,3)) cls='low'; }
+      return `<button type="button" class="fx-prod" ${off?'disabled':''} onclick="fxAgregar('${p.id}')"><span class="n">${esc(p.producto)}</span><span class="p">${precio>0?fmt(precio):'—'}</span><span class="s ${cls}">${s}</span></button>`;
+    }).join('')+'</div>';
+  }).join('');
+  document.getElementById('fxProds').innerHTML=html||`<div class="hint" style="padding:16px 0;text-align:center;">${fxState.prods.length?'Ningún producto coincide con la búsqueda.':'Esta sede no tiene productos en inventario.'}</div>`;
+}
+
+// ── Ticket ──
+function fxProd(id){ return fxState.prods.find(p=>p.id===id); }
+function fxAgregar(id){ const p=fxProd(id); if(!p) return; const q=fxState.cart[id]||0;
+  if(fxState.evento){ const m=document.getElementById('fxMsg'); m.className='msg err'; m.textContent='Cobre o quite el evento antes de vender productos (van en cobros separados).'; return; }
+  if(q>=(Number(p.cantidad)||0)) return; fxState.cart[id]=q+1; document.getElementById('fxMsg').textContent=''; renderFxProds(); renderFxTicket(); }
+function fxQuitar(id){ if(!fxState.cart[id]) return; fxState.cart[id]--; if(fxState.cart[id]<=0) delete fxState.cart[id]; renderFxProds(); renderFxTicket(); }
+function fxVaciar(){ fxState.cart={}; fxState.evento=null; renderFxEventos(); renderFxProds(); renderFxTicket(); }
+function fxTotal(){ if(fxState.evento){ const e=fxEvento(); return e?Number(fxState.evento.tipo==='miembro'?e.precio_miembro:e.precio_no_miembro)||0:0; }
+  return Object.entries(fxState.cart).reduce((a,[id,q])=>{ const p=fxProd(id); return a+(p?(Number(p.precio)||0)*q:0); },0); }
+function renderFxTicket(){
+  renderFxPagos();
+  if(fxState.evento&&fxEvento()){ renderFxEventoForm(); return; }
+  fxState.evento=null;
+  const L=Object.entries(fxState.cart).filter(([id])=>fxProd(id));
+  document.getElementById('fxLines').innerHTML=L.length?L.map(([id,q])=>{ const p=fxProd(id); return `<div class="fx-line">
+      <div><div class="n">${esc(p.producto)}</div><div class="u">${fmt(p.precio)} c/u</div></div>
+      <div class="fx-step"><button type="button" aria-label="Quitar uno" onclick="fxQuitar('${id}')">−</button><span>${q}</span><button type="button" aria-label="Agregar uno" onclick="fxAgregar('${id}')">+</button></div>
+      <div class="t">${fmt((Number(p.precio)||0)*q)}</div></div>`; }).join('')
+    :'<div class="hint" style="padding:14px 0;text-align:center;">Toque un producto para agregarlo.</div>';
+  const t=fxTotal();
+  document.getElementById('fxTot').textContent=fmt(t);
+  const b=document.getElementById('fxBtn'); b.textContent=fxState.busy?'Facturando…':`Facturar ${fmt(t)}`; b.disabled=!t||fxState.busy||!turnoActual;
+  renderFxVuelto();
+}
+function fxSetPago(m){
+  fxState.pago=m;
+  document.querySelectorAll('#fxPay button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===m));
+  document.getElementById('fxPagoEfectivo').hidden=m!=='efectivo';
+  document.getElementById('fxPagoTarjeta').hidden=m!=='tarjeta';
+  document.getElementById('fxPagoSinpe').hidden=m!=='sinpe';
+  document.getElementById('fxMsg').textContent='';
+}
+function renderFxVuelto(){
+  const el=document.getElementById('fxVuelto'), raw=document.getElementById('fxRecibido').value;
+  if(raw===''){ el.textContent='—'; el.style.color=''; return; }
+  const d=(Number(raw)||0)-fxTotal();
+  el.textContent=d>=0?fmt(d):'Faltan '+fmt(-d); el.style.color=d>=0?'var(--green)':'var(--red)';
+}
+async function fxFacturar(){
+  if(fxState.evento) return fxCobrarEvento();
+  const msg=document.getElementById('fxMsg');
+  if(fxState.busy) return;
+  if(!turnoActual){ msg.className='msg err'; msg.textContent='Abra el turno para facturar.'; return; }
+  const items=Object.entries(fxState.cart).filter(([id])=>fxProd(id)).map(([id,q])=>({inventario_id:id,cantidad:q}));
+  if(!items.length) return;
+  const total=fxTotal(), pago=fxState.pago;
+  const rawRec=document.getElementById('fxRecibido').value, ref=document.getElementById('fxRef').value.trim();
+  if(pago==='efectivo'&&rawRec!==''&&(Number(rawRec)||0)<total){ msg.className='msg err'; msg.textContent=`El efectivo recibido no cubre el total (${fmt(total)}).`; return; }
+  if(pago==='sinpe'&&ref.replace(/\D/g,'').length<4){ msg.className='msg err'; msg.textContent='Anote la referencia del SINPE (al menos los últimos 4 dígitos).'; return; }
+  fxState.busy=true; renderFxTicket(); msg.className='msg'; msg.textContent='';
+  try{
+    const r=await supaFetch('/rpc/facturar_caja',{method:'POST',prefer:'return=representation',body:{
+      p_cierre:turnoActual.id, p_metodo:pago, p_items:items,
+      p_recibido:pago==='efectivo'&&rawRec!==''?Number(rawRec):null, p_referencia:pago==='sinpe'?ref:null }});
+    const vuelto=pago==='efectivo'&&rawRec!==''?` Vuelto ${fmt((Number(rawRec)||0)-(Number(r&&r.total)||total))}.`:'';
+    msg.className='msg ok'; msg.textContent=`✓ Factura #${r&&r.numero} registrada (${fmt(r&&r.total!=null?r.total:total)}, ${FX_METODOS[pago]}). Inventario descontado.${vuelto}`;
+    fxState.cart={}; document.getElementById('fxRecibido').value=''; document.getElementById('fxRef').value='';
+  }catch(e){ msg.className='msg err'; msg.textContent='⚠ '+mensajeError(e); }
+  finally{ fxState.busy=false; }
+  await Promise.all([loadFxProds(), loadFacturasDia()]);
+  renderFxTicket();
+}
+
+// ── Facturas del día ──
+function renderFxHist(){
+  const tb=document.getElementById('fxHist'); if(!tb) return;
+  if(fxState.errFacturas){
+    tb.innerHTML=`<tr><td colspan="6" style="color:var(--red);">No se pudieron cargar las facturas: ${esc(fxState.errFacturas)}. ¿Ya se corrió <code>facturacion.sql</code> en Supabase?</td></tr>`;
+    document.getElementById('fxPorMetodo').innerHTML=''; document.getElementById('fxN').textContent=''; return;
+  }
+  const L=fxState.facturas;
+  tb.innerHTML=L.length?L.map(f=>{
+    const anulada=f.estado==='anulada';
+    const det=f.tipo==='evento'
+      ? `🎟️ ${esc((f.items&&f.items[0]&&f.items[0].producto)||'Evento')}<div class="hint" style="font-size:12px;">${esc(f.cliente_nombre||'')} ${f.tipo_precio==='miembro'?'<span class="fx-tag m">Miembro</span>':'<span class="fx-tag nm">No miembro</span>'}</div>`
+      : (f.items||[]).map(it=>esc(it.producto)+(Number(it.cantidad)>1?' ×'+it.cantidad:'')).join(', ');
+    const ref=f.metodo==='sinpe'&&f.referencia?`<div class="hint" style="font-size:11px;">ref …${esc(String(f.referencia).slice(-6))}</div>`:'';
+    const acc=anulada?`<span class="pill dif" title="${esc(f.motivo_anulacion||'')}">Anulada</span>`
+      :(puedeAnular()&&turnoActual&&f.cierre_id===turnoActual.id?`<button class="btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="fxAnular('${f.id}')">Anular</button>`:'');
+    return `<tr class="${anulada?'anulada':''}"><td class="num">${f.numero}</td><td>${new Date(f.created_at).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'})}</td>
+      <td>${det}</td><td>${FX_METODOS[f.metodo]||esc(f.metodo)}${ref}</td><td class="num">${fmt(f.total)}</td><td>${acc}</td></tr>`;
+  }).join(''):'<tr><td colspan="6" class="hint" style="text-align:center;padding:14px;">Aún no hay facturas hoy.</td></tr>';
+  const r=resumirFacturas(L);
+  document.getElementById('fxN').textContent=r.n?`${r.n} · ${fmt(r.total)}`:'';
+  document.getElementById('fxPorMetodo').innerHTML=['efectivo','tarjeta','sinpe'].map(m=>`<div class="tile"><div class="tl">${FX_METODOS[m]}</div><div class="tv">${fmt(r[m])}</div></div>`).join('');
+}
+async function fxAnular(id){
+  const f=fxState.facturas.find(x=>x.id===id); if(!f) return;
+  const motivo=prompt(`Motivo para anular la factura #${f.numero} (${fmt(f.total)}). El stock se devuelve al inventario.`);
+  if(motivo==null) return;
+  const msg=document.getElementById('fxMsg');
+  if(!motivo.trim()){ msg.className='msg err'; msg.textContent='Indique el motivo de la anulación.'; return; }
+  try{ await supaFetch('/rpc/anular_factura_caja',{method:'POST',prefer:'return=representation',body:{p_factura:id,p_motivo:motivo.trim()}});
+    msg.className='msg ok'; msg.textContent=`Factura #${f.numero} anulada. El stock se devolvió al inventario.`; }
+  catch(e){ msg.className='msg err'; msg.textContent='⚠ '+mensajeError(e); }
+  await Promise.all([loadFxProds(), loadFacturasDia()]);
+}
+
+// ══ Eventos de un día — ver eventos.sql ══════════════════════════════════════
+// Recepción cobra una persona por cobro: miembro (PIN validado contra la lista de
+// clientes activos) o no miembro (nombre y teléfono). Solo con los métodos de pago
+// que el administrador habilitó para ese evento. No se mezcla con productos.
+const fechaCorta=f=>{ const d=parseFecha(f); return isNaN(d)?String(f||''):d.toLocaleDateString('es-CR',{weekday:'short',day:'numeric',month:'short'}); };
+function fxEvento(){ return fxState.evento&&fxState.eventos.find(e=>e.id===fxState.evento.id); }
+async function loadFxEventos(){
+  const sede=currentSede, card=document.getElementById('fxEvCard');
+  try{ const filtro=encodeURIComponent(`{"${sede}"}`);
+    const rows=(await supaFetch(`/eventos_caja?activo=is.true&fecha=gte.${todayStr()}&sedes=cs.${filtro}&order=fecha.asc&select=*`))||[];
+    if(sede!==currentSede) return;
+    fxState.eventos=rows; }
+  catch(_){ fxState.eventos=[]; }   // eventos.sql aún no corrió: la tarjeta queda oculta
+  if(fxState.evento&&!fxEvento()) fxState.evento=null;
+  card.hidden=!fxState.eventos.length;
+  renderFxEventos(); renderFxTicket();
+}
+function renderFxEventos(){
+  document.getElementById('fxEventos').innerHTML=fxState.eventos.map(e=>`<button type="button" class="fx-ev" aria-pressed="${!!fxState.evento&&fxState.evento.id===e.id}" onclick="fxSelEvento('${e.id}')">
+      <span class="n">${esc(e.nombre)}</span><span class="d">${esc(fechaCorta(e.fecha))} · ${(e.metodos||[]).map(m=>FX_METODOS[m]).join(' · ')}</span>
+      <span class="pr"><span>Miembro ${fmt(e.precio_miembro)}</span><span>No miembro ${fmt(e.precio_no_miembro)}</span></span></button>`).join('');
+}
+function fxSelEvento(id){
+  const m=document.getElementById('fxMsg');
+  if(Object.keys(fxState.cart).length){ m.className='msg err'; m.textContent='Cobre o vacíe los productos antes de cobrar un evento (van en cobros separados).'; return; }
+  fxState.evento=(fxState.evento&&fxState.evento.id===id)?null:{id,tipo:'miembro',pin:'',nombre:'',tel:'',cliente:null};
+  m.textContent=''; renderFxEventos(); renderFxTicket();
+}
+function fxEvTipo(t){ if(!fxState.evento) return; fxState.evento.tipo=t; renderFxTicket(); }
+// Solo los métodos de pago que acepta el evento
+function renderFxPagos(){
+  const e=fxState.evento&&fxEvento(); const ok=e?(e.metodos||[]):['efectivo','tarjeta','sinpe'];
+  document.querySelectorAll('#fxPay button').forEach(b=>{ b.hidden=!ok.includes(b.dataset.m); });
+  const nota=document.getElementById('fxPagoNota');
+  nota.hidden=!e||ok.length===3; nota.textContent=e?`Este evento solo acepta ${ok.map(m=>FX_METODOS[m]).join(' y ')}.`:'';
+  if(!ok.includes(fxState.pago)) fxSetPago(ok[0]);
+}
+function renderFxEventoForm(){
+  const e=fxEvento(), ev=fxState.evento, miembro=ev.tipo==='miembro';
+  const cli=ev.cliente;
+  const cliHtml=!cli?'':cli.error?`<div class="msg err" style="margin-top:6px;">${esc(cli.error)}</div>`
+    :`<div style="margin-top:6px;font-size:14px;color:${cli.activo?'var(--green)':'var(--red)'};font-weight:600;">${cli.activo?'✓':'⚠'} ${esc(cli.nombre||'')}${cli.activo?' · cliente activo':' · NO está activo: cobre como no miembro'}<span class="hint" style="font-weight:400;"> · ${esc(cli.sede||'')}</span></div>`;
+  document.getElementById('fxLines').innerHTML=`
+    <div class="fx-line" style="grid-template-columns:minmax(0,1fr) auto;">
+      <div><div class="n">🎟️ ${esc(e.nombre)}</div><div class="u">${esc(fechaCorta(e.fecha))}</div></div>
+      <button type="button" class="btn-ghost" style="font-size:12px;padding:5px 10px;" onclick="fxVaciar()">Quitar</button></div>
+    <div class="fx-seg2">
+      <button type="button" aria-pressed="${miembro}" onclick="fxEvTipo('miembro')">Miembro<small>${fmt(e.precio_miembro)}</small></button>
+      <button type="button" aria-pressed="${!miembro}" onclick="fxEvTipo('no_miembro')">No miembro<small>${fmt(e.precio_no_miembro)}</small></button></div>
+    ${miembro?`<label class="fx-lbl" for="fxEvPin">PIN del cliente</label>
+      <div style="display:flex;gap:8px;"><input class="fx-inp" id="fxEvPin" inputmode="numeric" value="${esc(ev.pin)}" placeholder="PIN"
+        oninput="fxState.evento.pin=this.value;fxState.evento.cliente=null;document.getElementById('fxEvCli').innerHTML=''" onkeydown="if(event.key==='Enter')fxBuscarPin()">
+        <button type="button" class="btn-ghost" onclick="fxBuscarPin()">Buscar</button></div>
+      <div id="fxEvCli">${cliHtml}</div>`
+    :`<label class="fx-lbl" for="fxEvNom">Nombre completo</label>
+      <input class="fx-inp" id="fxEvNom" value="${esc(ev.nombre)}" placeholder="Nombre y apellido" oninput="fxState.evento.nombre=this.value">
+      <label class="fx-lbl" for="fxEvTel">Teléfono</label>
+      <input class="fx-inp" id="fxEvTel" inputmode="tel" value="${esc(ev.tel)}" placeholder="8888-8888" oninput="fxState.evento.tel=this.value">`}`;
+  const t=fxTotal();
+  document.getElementById('fxTot').textContent=fmt(t);
+  const b=document.getElementById('fxBtn'); b.textContent=fxState.busy?'Cobrando…':`Cobrar ${fmt(t)}`; b.disabled=fxState.busy||!turnoActual;
+  renderFxVuelto();
+}
+async function fxBuscarPin(){
+  const ev=fxState.evento; if(!ev) return null;
+  const pin=String(ev.pin||'').trim(); if(!pin){ ev.cliente={error:'Anote el PIN.'}; renderFxTicket(); return null; }
+  try{ const r=await supaFetch('/rpc/buscar_cliente_pin',{method:'POST',prefer:'return=representation',body:{p_pin:pin}});
+    ev.cliente=r?{...r}:{error:`El PIN ${pin} no aparece en la lista de clientes. Cobre como no miembro.`}; }
+  catch(e){ ev.cliente={error:'No se pudo buscar el PIN: '+mensajeError(e)}; }
+  if(fxState.evento===ev) renderFxTicket();
+  return ev.cliente;
+}
+async function fxCobrarEvento(){
+  const msg=document.getElementById('fxMsg'), ev=fxState.evento, e=fxEvento();
+  if(fxState.busy||!ev||!e) return;
+  if(!turnoActual){ msg.className='msg err'; msg.textContent='Abra el turno para cobrar.'; return; }
+  const err=t=>{ msg.className='msg err'; msg.textContent=t; };
+  if(ev.tipo==='miembro'){
+    if(!String(ev.pin||'').trim()) return err('Anote el PIN del cliente para el precio de miembro.');
+    const c=(ev.cliente&&!ev.cliente.error&&String(ev.cliente.pin).trim()===String(ev.pin).trim())?ev.cliente:await fxBuscarPin();
+    if(!c||c.error) return err((c&&c.error)||'No se encontró el PIN.');
+    if(!c.activo) return err('El cliente no está activo. Cobre como no miembro.');
+  }else{
+    if(!String(ev.nombre||'').trim()) return err('Anote el nombre de la persona.');
+    if(String(ev.tel||'').replace(/\D/g,'').length<8) return err('Anote un teléfono de 8 dígitos.');
+  }
+  const total=fxTotal(), pago=fxState.pago;
+  const rawRec=document.getElementById('fxRecibido').value, ref=document.getElementById('fxRef').value.trim();
+  if(pago==='efectivo'&&rawRec!==''&&(Number(rawRec)||0)<total) return err(`El efectivo recibido no cubre el total (${fmt(total)}).`);
+  if(pago==='sinpe'&&ref.replace(/\D/g,'').length<4) return err('Anote la referencia del SINPE (al menos los últimos 4 dígitos).');
+  fxState.busy=true; renderFxTicket(); msg.className='msg'; msg.textContent='';
+  try{
+    const r=await supaFetch('/rpc/vender_evento_caja',{method:'POST',prefer:'return=representation',body:{
+      p_cierre:turnoActual.id, p_evento:e.id, p_tipo_precio:ev.tipo, p_metodo:pago,
+      p_nombre:ev.tipo==='no_miembro'?ev.nombre.trim():null, p_telefono:ev.tipo==='no_miembro'?ev.tel:null,
+      p_pin:ev.tipo==='miembro'?String(ev.pin).trim():null,
+      p_recibido:pago==='efectivo'&&rawRec!==''?Number(rawRec):null, p_referencia:pago==='sinpe'?ref:null }});
+    const vuelto=pago==='efectivo'&&rawRec!==''?` Vuelto ${fmt((Number(rawRec)||0)-(Number(r&&r.total)||total))}.`:'';
+    msg.className='msg ok'; msg.textContent=`✓ ${(r&&r.nombre)||''} inscrito en ${e.nombre} (cobro #${r&&r.numero}, ${fmt(r&&r.total!=null?r.total:total)}, ${FX_METODOS[pago]}).${vuelto}`;
+    fxState.evento=null; document.getElementById('fxRecibido').value=''; document.getElementById('fxRef').value='';
+  }catch(x){ err('⚠ '+mensajeError(x)); }
+  finally{ fxState.busy=false; }
+  renderFxEventos(); renderFxTicket();
+  await loadFacturasDia();
+}
+
+// ── Administración de eventos (solo admin) ──
+const evState={lista:[], edit:null, rep:null, repRows:[]};
+async function evCargar(){
+  if(!esAdmin()) return;
+  try{ evState.lista=(await supaFetch('/eventos_caja?order=fecha.desc&limit=100&select=*'))||[]; }
+  catch(e){ evState.lista=[]; const m=document.getElementById('evMsg'); m.className='msg err'; m.textContent='No se pudieron cargar los eventos: '+mensajeError(e)+'. ¿Ya se corrió eventos.sql en Supabase?'; }
+  if(!evState.edit&&!document.getElementById('evNom').value) evNuevo();
+  renderEvLista();
+  if(evState.rep) evVerRegistro(evState.rep);
+}
+function renderEvChecks(metodos,sedes){
+  document.getElementById('evMetodos').innerHTML=['efectivo','tarjeta','sinpe'].map(m=>`<label><input type="checkbox" id="evM_${m}" ${metodos.includes(m)?'checked':''}> ${FX_METODOS[m]}</label>`).join('');
+  document.getElementById('evSedes').innerHTML=SEDES.map((s,i)=>`<label><input type="checkbox" id="evS_${i}" ${sedes.includes(s)?'checked':''}> ${SEDE_META[s]?.icon||''} ${esc(s)}</label>`).join('');
+}
+function evNuevo(){
+  evState.edit=null;
+  ['evNom','evFecha','evPm','evPn'].forEach(id=>document.getElementById(id).value='');
+  renderEvChecks(['efectivo','tarjeta','sinpe'],SEDES);
+  document.getElementById('evFormTit').textContent='Nuevo evento';
+  document.getElementById('evBtnGuardar').textContent='Crear evento';
+  document.getElementById('evBtnCancelar').hidden=true;
+}
+function evEditar(id){
+  const e=evState.lista.find(x=>x.id===id); if(!e) return;
+  evState.edit=id;
+  document.getElementById('evNom').value=e.nombre; document.getElementById('evFecha').value=e.fecha;
+  document.getElementById('evPm').value=e.precio_miembro; document.getElementById('evPn').value=e.precio_no_miembro;
+  renderEvChecks(e.metodos||[],e.sedes||[]);
+  document.getElementById('evFormTit').textContent='Editar evento';
+  document.getElementById('evBtnGuardar').textContent='Guardar cambios';
+  document.getElementById('evBtnCancelar').hidden=false;
+  document.getElementById('evMsg').textContent='';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+async function evGuardar(){
+  const msg=document.getElementById('evMsg'), err=t=>{ msg.className='msg err'; msg.textContent=t; };
+  const nombre=document.getElementById('evNom').value.trim(), fecha=document.getElementById('evFecha').value;
+  const pmRaw=document.getElementById('evPm').value, pnRaw=document.getElementById('evPn').value;
+  const metodos=['efectivo','tarjeta','sinpe'].filter(m=>document.getElementById('evM_'+m).checked);
+  const sedes=SEDES.filter((s,i)=>document.getElementById('evS_'+i).checked);
+  if(!nombre) return err('Escriba el nombre del evento.');
+  if(!fecha) return err('Elija la fecha del evento.');
+  if(pmRaw===''||pnRaw===''||Number(pmRaw)<0||Number(pnRaw)<0) return err('Ponga los dos precios (miembro y no miembro).');
+  if(!metodos.length) return err('Elija al menos un método de pago.');
+  if(!sedes.length) return err('Elija al menos una sede.');
+  const body={nombre,fecha,precio_miembro:Math.round(Number(pmRaw)),precio_no_miembro:Math.round(Number(pnRaw)),metodos,sedes,updated_at:new Date().toISOString()};
+  const btn=document.getElementById('evBtnGuardar'); btn.disabled=true;
+  try{
+    if(evState.edit) await supaFetch(`/eventos_caja?id=eq.${evState.edit}`,{method:'PATCH',body});
+    else await supaFetch('/eventos_caja',{method:'POST',body:{...body,created_by:currentEmail||null}});
+    msg.className='msg ok'; msg.textContent=evState.edit?'✓ Evento actualizado.':`✓ Evento creado. Ya aparece en Facturación de ${sedes.join(', ')}.`;
+    evNuevo(); await evCargar();
+  }catch(e){ err('⚠ '+mensajeError(e)); }
+  finally{ btn.disabled=false; }
+}
+async function evToggleActivo(id){
+  const e=evState.lista.find(x=>x.id===id); if(!e) return;
+  if(e.activo&&!confirm(`¿Quitar "${e.nombre}" de la venta? Los cobros ya hechos se mantienen.`)) return;
+  try{ await supaFetch(`/eventos_caja?id=eq.${id}`,{method:'PATCH',body:{activo:!e.activo,updated_at:new Date().toISOString()}}); await evCargar(); }
+  catch(x){ const m=document.getElementById('evMsg'); m.className='msg err'; m.textContent='⚠ '+mensajeError(x); }
+}
+function renderEvLista(){
+  const hoy=todayStr();
+  document.getElementById('evLista').innerHTML=evState.lista.length?evState.lista.map(e=>{
+    const est=!e.activo?'<span class="fx-tag">Inactivo</span>':e.fecha<hoy?'<span class="fx-tag">Pasado</span>':'<span class="fx-tag m">A la venta</span>';
+    return `<tr><td><b>${esc(e.nombre)}</b><div style="margin-top:3px;">${est}</div></td><td>${esc(fechaCorta(e.fecha))}</td>
+      <td class="num">${fmt(e.precio_miembro)}</td><td class="num">${fmt(e.precio_no_miembro)}</td>
+      <td>${(e.metodos||[]).map(m=>FX_METODOS[m].split(' ')[0]).join(' ')}</td>
+      <td style="font-size:12px;">${(e.sedes||[]).length===SEDES.length?'Las 4':(e.sedes||[]).map(esc).join(', ')}</td>
+      <td style="white-space:nowrap;"><button class="btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="evVerRegistro('${e.id}')">Registro</button>
+        <button class="btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="evEditar('${e.id}')">Editar</button>
+        <button class="btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="evToggleActivo('${e.id}')">${e.activo?'Desactivar':'Activar'}</button></td></tr>`;
+  }).join(''):'<tr><td colspan="7" class="hint" style="text-align:center;padding:14px;">Aún no hay eventos.</td></tr>';
+}
+async function evVerRegistro(id){
+  const e=evState.lista.find(x=>x.id===id); if(!e) return;
+  evState.rep=id;
+  const card=document.getElementById('evRepCard'); card.hidden=false;
+  document.getElementById('evRepTit').textContent=`Registro · ${e.nombre} (${fechaCorta(e.fecha)})`;
+  try{ evState.repRows=(await supaFetch(`/facturas_caja?evento_id=eq.${id}&order=created_at.asc&select=numero,fecha,sede,metodo,total,estado,tipo_precio,cliente_nombre,cliente_telefono,cliente_pin,created_at,created_by`))||[]; }
+  catch(x){ evState.repRows=[]; document.getElementById('evRepLista').innerHTML=`<tr><td colspan="6" style="color:var(--red);">${esc(mensajeError(x))}</td></tr>`; return; }
+  const L=evState.repRows, A=L.filter(f=>f.estado!=='anulada'), sum=a=>a.reduce((s,f)=>s+(Number(f.total)||0),0);
+  document.getElementById('evRepTiles').innerHTML=`<div class="tile"><div class="tl">Total recaudado</div><div class="tv">${fmt(sum(A))}</div></div>
+    <div class="tile"><div class="tl">Inscritos</div><div class="tv">${A.length}</div></div>
+    <div class="tile"><div class="tl">Miembros / no miembros</div><div class="tv">${A.filter(f=>f.tipo_precio==='miembro').length} / ${A.filter(f=>f.tipo_precio!=='miembro').length}</div></div>`;
+  const sedes=[...new Set([...(e.sedes||[]),...A.map(f=>f.sede)])];
+  const fila=(lbl,F)=>`<tr><td>${lbl}</td><td class="num">${F.length}</td>${['efectivo','tarjeta','sinpe'].map(m=>`<td class="num">${fmt(sum(F.filter(f=>f.metodo===m)))}</td>`).join('')}<td class="num"><b>${fmt(sum(F))}</b></td></tr>`;
+  document.getElementById('evRepSedes').innerHTML=sedes.map(s=>fila(esc(s),A.filter(f=>f.sede===s))).join('')+fila('<b>Total</b>',A);
+  document.getElementById('evRepLista').innerHTML=L.length?L.map(f=>`<tr class="${f.estado==='anulada'?'anulada':''}"><td>${esc(f.cliente_nombre||'')}${f.cliente_pin?`<div class="hint" style="font-size:11px;">PIN ${esc(f.cliente_pin)}</div>`:''}</td>
+      <td class="num" style="text-align:left;">${esc(f.cliente_telefono||'')}</td>
+      <td>${f.tipo_precio==='miembro'?'<span class="fx-tag m">Miembro</span>':'<span class="fx-tag nm">No miembro</span>'}</td>
+      <td>${esc(f.sede)}</td><td>${FX_METODOS[f.metodo]||esc(f.metodo)}</td><td class="num">${fmt(f.total)}${f.estado==='anulada'?' <span class="pill dif">Anulado</span>':''}</td></tr>`).join('')
+    :'<tr><td colspan="6" class="hint" style="text-align:center;padding:14px;">Aún no hay inscritos.</td></tr>';
+}
+function evExportar(){
+  const e=evState.lista.find(x=>x.id===evState.rep); if(!e) return;
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const filas=[['Fecha cobro','Sede','Persona','Teléfono','PIN','Tipo','Método','Monto','Estado']].concat(
+    evState.repRows.map(f=>[new Date(f.created_at).toLocaleString('es-CR'),f.sede,f.cliente_nombre,f.cliente_telefono,f.cliente_pin,
+      f.tipo_precio==='miembro'?'Miembro':'No miembro',f.metodo,Math.round(Number(f.total)||0),f.estado]));
+  const csv='﻿'+filas.map(r=>r.map(q).join(',')).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`evento_${e.nombre.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w]+/g,'_')}_${e.fecha}.csv`;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
 }
 
 // ── PDF (réplica del Excel de cierre) ──
