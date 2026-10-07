@@ -694,7 +694,7 @@ const REGLAS_OTROS=[
   { kw:['come strong','become strong'], cat:'galletas', canonical:'Be come Strong' },
   { kw:['gym bite','gymbite'], cat:'galletas', canonical:'Gym bite' },
   { kw:['pre entreno','pre-entreno','preentreno'], cat:'energeticos', canonical:'Scoop de pre entreno' },
-  { kw:['rooster'], cat:'energeticos', canonical:'Rooster' }, { kw:['bucked up'], cat:'energeticos', canonical:'Bucked up' },
+  { kw:['rooster rec'], cat:'energeticos', canonical:'Rooster rec' }, { kw:['rooster'], cat:'energeticos', canonical:'Rooster' }, { kw:['bucked up'], cat:'energeticos', canonical:'Bucked up' },
   { kw:['glu'], cat:'energeticos', canonical:'GLU' }, { kw:['amino'], cat:'energeticos', canonical:'Scoop de Amino' },
   { kw:['proteina'], cat:'energeticos', canonical:'Scoop de Proteína' }, { kw:['creatina'], cat:'energeticos' }, { kw:['scoop'], cat:'energeticos' },
   { kw:['gatorade','gatorage'], cat:'minita', canonical:'Gatorage' }, { kw:['powerade'], cat:'minita', canonical:'Powerade' },
@@ -1828,8 +1828,9 @@ function resumirFacturas(list){
     if(r[f.metodo]!=null) r[f.metodo]+=t; r.total+=t; r.n++;
     if(f.tipo==='evento'){ r.eventos+=t; return; }   // no va al sobre ni al desglose de la minita
     r.productos+=t;
-    (f.items||[]).forEach(it=>{ const {cat,canonical}=resolverOtro(it.producto); const k=normP(canonical);
-      if(!r.desglose[k]) r.desglose[k]={base:canonical,cat,qty:0,total:0};
+    // Nombre exacto del inventario (no el unificado): así "Rooster" y "Rooster rec" salen por separado
+    (f.items||[]).forEach(it=>{ const base=String(it.producto||'').trim(); const {cat}=resolverOtro(base); const k=normP(base);
+      if(!r.desglose[k]) r.desglose[k]={base,cat,qty:0,total:0};
       r.desglose[k].qty+=Number(it.cantidad)||0; r.desglose[k].total+=Math.round(Number(it.total)||0); }); });
   return r;
 }
