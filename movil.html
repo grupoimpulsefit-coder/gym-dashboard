@@ -187,7 +187,7 @@
 
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-10-02a';
+const APP_VER='2026-10-07a';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -245,6 +245,9 @@ const verInventarioReal=()=>esAdmin()||me?.role==='coordinador';
 const puedeAgendarMed=()=>esAdmin()||['recepcion','admin_sucursal','coordinador'].includes(me?.role);
 const puedeRutinaMed=()=>esAdmin()||me?.role==='instructor';
 const puedeVerMed=()=>puedeAgendarMed()||puedeRutinaMed();
+// Asistencia: presente lo marcan recepción o el instructor; ausente solo recepción (lo valida la base)
+const puedePresenteMed=()=>puedeAgendarMed()||me?.role==='instructor';
+const puedeAusenteMed=()=>puedeAgendarMed();
 let arq={rows:[],items:{},filtro:'',soloDif:false,saved:null}, arqVerId=null;
 let audit={seg:'finales',rango:7,soloAlertas:false,rows:[]};
 
@@ -440,8 +443,15 @@ function medHabil(f,dir){ let g=0; while(medDow(f)>4 && g++<7) f=medSuma(f,dir||
 let medFecha=medHabil(todayStr()), medRows=[], medSeq=0, medBloq={};   // medBloq: 'HH:MM' → bloqueo del día mostrado
 function medSetFecha(f){ if(!f) return; medFecha=medHabil(f); renderMedicionesMod(); }
 function medMover(n){ medFecha=medHabil(medSuma(medFecha,n), n>0?1:-1); renderMedicionesMod(); }
-const medPill=r=>r==='completa'?'<span class="pill ok">✓ Completa</span>'
-               :r==='incompleta'?'<span class="pill bad">✗ Incompleta</span>'
+// Estado de la cita: la rutina manda; sin rutina, la asistencia explica por qué no se midió.
+// "Sin marcar" = la hora ya pasó y nadie marcó si el cliente llegó.
+function medPasada(c){ const hoy=todayStr(); if(c.fecha<hoy)return true; if(c.fecha>hoy)return false;
+  const n=new Date(); return String(c.hora).slice(0,5) < `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`; }
+const medPill=c=>c.rutina==='completa'?'<span class="pill ok">✓ Completa</span>'
+               :c.rutina==='incompleta'?'<span class="pill bad">✗ Incompleta</span>'
+               :c.asistencia==='ausente'?'<span class="pill warn">Ausente</span>'
+               :c.asistencia==='presente'?'<span class="pill info">Presente</span>'
+               :medPasada(c)?'<span class="pill warn">Sin marcar</span>'
                :'<span class="pill status">Pendiente</span>';
 
 async function renderMedicionesMod(){
@@ -468,11 +478,12 @@ async function renderMedicionesMod(){
   if(seq!==medSeq) return;
   const by={}; medRows.forEach(r=>{ by[String(r.hora||'').slice(0,5)]=r; });
   const comp=medRows.filter(r=>r.rutina==='completa').length, inc=medRows.filter(r=>r.rutina==='incompleta').length;
+  const aus=medRows.filter(r=>!r.rutina&&r.asistencia==='ausente').length;
   // Bloqueos que caen en un espacio sin cita (los que ya tienen cita no restan)
   const nBloq=Object.keys(medBloq).filter(h=>!by[h]).length;
   const chevSvg='<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg>';
   const fila=m=>{ const h=medHH(m), c=by[h];
-    if(c) return `<button class="cell" onclick="medAbrir('${h}')"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}</span></div>${medPill(c.rutina)}${chevSvg}</button>`;
+    if(c) return `<button class="cell" onclick="medAbrir('${h}')"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}</span></div>${medPill(c)}${chevSvg}</button>`;
     const b=medBloq[h];
     if(b){ const det=(b.tipo==='permanente'?'Todos los '+MED_DIAS[b.dia_semana]:'Solo este día')+(b.motivo?' · '+esc(b.motivo):'');
       return puedeAgendarMed()
@@ -488,20 +499,21 @@ async function renderMedicionesMod(){
       <div class="tile"><span class="l">Libres</span><span class="n num">${MED_SLOTS-medRows.length-nBloq}</span></div>
       <div class="tile"><span class="l">Completas</span><span class="n num" style="color:var(--green)">${comp}</span></div>
       <div class="tile"><span class="l">Incompletas</span><span class="n num" style="color:var(--red)">${inc}</span></div>
+      <div class="tile"><span class="l">Ausentes</span><span class="n num" style="color:var(--orange)">${aus}</span></div>
     </div>
     <div class="sect"><div class="hdr">Mañana · 8:00 a 10:45</div><div class="group">${MED_AM.map(fila).join('')}</div></div>
     <div class="sect"><div class="hdr">Tarde · 5:00 a 7:45 p. m.</div><div class="group">${MED_PM.map(fila).join('')}</div>
-      <div class="ftr">${puedeRutinaMed()&&!puedeAgendarMed()?'Como instructor solo podés marcar la rutina.':'La rutina (completa / incompleta) la marca el instructor.'} Sábado y domingo no hay medición.</div></div>`;
+      <div class="ftr">${puedeRutinaMed()&&!puedeAgendarMed()?'Como instructor podés marcar la rutina y si el cliente llegó (presente).':'La rutina la marca el instructor. Ausente solo lo marca recepción.'} Sábado y domingo no hay medición.</div></div>`;
 }
 
 // Hoja de una medición: crear, editar, marcar rutina o eliminar
-let medHora=null, medRutina='';
+let medHora=null, medRutina='', medAsist='', medAsistOrig='', medFutura=false;
 function medAbrir(h){
   const c=medRows.find(r=>String(r.hora||'').slice(0,5)===h)||null;
   if(!c && !puedeAgendarMed()) return;
   const b=!c && medBloq[h];
   if(b){ medHojaBloqueo(h,b); return; }
-  medHora=h; medRutina=c?.rutina||'';
+  medHora=h; medRutina=c?.rutina||''; medAsist=c?.asistencia||''; medAsistOrig=medAsist; medFutura=medFecha>todayStr();
   const editable=puedeAgendarMed();
   const campo=(lab,id,val,ph,tipo)=>editable
     ? `<div class="cell"><div class="main"><span class="t">${lab}</span></div><input class="qty" id="${id}" type="${tipo||'text'}" value="${esc(val||'')}" placeholder="${ph}" style="width:58%;text-align:right;font-weight:400"></div>`
@@ -511,7 +523,7 @@ function medAbrir(h){
     <div class="sheet-panel" role="dialog" aria-label="Medición">
       <div class="sheet-h"><button class="act" onclick="cerrarSheet()">Cancelar</button>
         <span class="tt">${c?esc(c.nombre):'Nueva medición'}</span>
-        <button class="act" id="medSave" onclick="medGuardar('${c?c.id:''}')" ${(!c&&!editable)||(c&&!editable&&!puedeRutinaMed())?'disabled':''}>${c?'Guardar':'Agendar'}</button></div>
+        <button class="act" id="medSave" onclick="medGuardar('${c?c.id:''}')" ${(!c&&!editable)||(c&&!editable&&!puedeRutinaMed()&&!puedePresenteMed())?'disabled':''}>${c?'Guardar':'Agendar'}</button></div>
       <div class="sheet-body">
         <div class="ftr" style="padding:0 0 10px">${esc(fechaLarga(medFecha))} · ${h} · ${esc(detSede)}</div>
         <div class="group" style="margin:0">
@@ -520,7 +532,15 @@ function medAbrir(h){
           ${campo('PIN','medPin',c?.pin,'PIN')}
           <div class="cell"><div class="main"><span class="t">Agendó</span></div><span class="v">${esc(c?(c.agendado_por_nombre||c.agendado_por||'—'):(me.nombre||auth.email))}</span></div>
         </div>
-        ${c?`<div class="hdr" style="padding:16px 0 6px">Rutina</div>
+        ${c?`<div class="hdr" style="padding:16px 0 6px">¿Llegó el cliente?${medFutura?' · se marca el día de la cita':''}</div>
+          <div class="seg" id="medSegAsist">
+            <button data-v="" onclick="medSetAsist('')">Sin marcar</button>
+            <button data-v="presente" onclick="medSetAsist('presente')">✓ Presente</button>
+            <button data-v="ausente" onclick="medSetAsist('ausente')">✗ Ausente</button>
+          </div>
+          ${c.asistencia_por?`<div class="ftr" style="padding:8px 0 0">Marcado por ${esc(c.asistencia_por)}</div>`:''}
+          ${!puedeAusenteMed()?'<div class="ftr" style="padding:6px 0 0">Solo recepción puede marcar ausente.</div>':''}
+          <div class="hdr" style="padding:16px 0 6px">Rutina</div>
           <div class="seg" id="medSeg">
             <button data-v="" onclick="medSetRutina('')" ${puedeRutinaMed()?'':'disabled'}>Pendiente</button>
             <button data-v="completa" onclick="medSetRutina('completa')" ${puedeRutinaMed()?'':'disabled'}>✓ Completa</button>
@@ -608,12 +628,20 @@ async function medGuardarBloqueo(h){
                     : /duplicate|unique/i.test(e.message) ? 'Ese espacio ya estaba bloqueado. Recargá.' : e.message; }
 }
 
-function medSetRutina(v){ medRutina=v; medPintarSeg(); }
-function medPintarSeg(){ document.querySelectorAll('#medSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===medRutina)); }
+// Rutina marcada = el cliente estuvo (presente). Ausente = sin rutina.
+function medSetRutina(v){ medRutina=v; if(v) medAsist='presente'; medPintarSeg(); }
+function medSetAsist(v){ medAsist=v; if(v==='ausente') medRutina=''; medPintarSeg(); }
+function medPintarSeg(){
+  document.querySelectorAll('#medSeg button').forEach(b=>{ b.classList.toggle('on',b.dataset.v===medRutina);
+    b.disabled=!puedeRutinaMed()||(medAsist==='ausente'&&b.dataset.v!==''); });
+  document.querySelectorAll('#medSegAsist button').forEach(b=>{ const v=b.dataset.v; b.classList.toggle('on',v===medAsist);
+    b.disabled = medFutura || (v==='presente' ? !puedePresenteMed() : (!puedeAusenteMed() && v!==medAsistOrig)); });
+}
 async function medGuardar(id){
   const err=document.getElementById('medErr'), btn=document.getElementById('medSave');
   const inp=i=>document.getElementById(i)?.value.trim()||'';
   const body = id ? {rutina:medRutina||null} : {};
+  if(id && medAsist!==medAsistOrig) body.asistencia=medAsist||null;   // solo si cambió (la base valida quién puede)
   if(puedeAgendarMed()){
     const nombre=inp('medNombre');
     if(!nombre){ err.textContent='El nombre es obligatorio.'; return; }
@@ -627,7 +655,8 @@ async function medGuardar(id){
     cerrarSheet(); toast(id?'Medición actualizada.':`Medición agendada · ${medHora}`); renderMedicionesMod();
   }catch(e){ btn.disabled=false; btn.textContent=id?'Guardar':'Agendar';
     err.textContent = /bloqueado/i.test(e.message) ? 'Ese espacio acaba de ser bloqueado. Recargá la agenda.'
-                    : /duplicate|unique/i.test(e.message) ? 'Ese espacio ya fue tomado. Recargá.' : e.message; }
+                    : /duplicate|unique/i.test(e.message) ? 'Ese espacio ya fue tomado. Recargá.'
+                    : (()=>{ try{ return JSON.parse(e.message).message||e.message; }catch(_){ return e.message; } })(); }
 }
 async function medBorrar(id){
   if(!confirm('¿Eliminar esta medición? El espacio queda libre.')) return;

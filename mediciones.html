@@ -134,6 +134,9 @@ button.row:active{background:var(--fill)}
 .pill.ok{background:var(--green-tint);color:var(--green)}
 .pill.bad{background:var(--red-tint);color:var(--red)}
 .pill.status{background:var(--status-fill);color:var(--status-ink)}
+:root{--orange-tint:rgba(255,149,0,.16)}
+.pill.info{background:var(--blue-tint);color:var(--blue)}
+.pill.warn{background:var(--orange-tint);color:var(--orange)}
 .pasado{opacity:.55}
 
 /* ── Grid semanal (pantallas grandes) ── */
@@ -162,6 +165,9 @@ td.slot{padding:3px}
 .cell.taken .st{font-size:12px;font-weight:500;margin-top:1px;color:var(--sec)}
 .cell.completa{background:var(--green-tint)} .cell.completa .st{color:var(--green)}
 .cell.incompleta{background:var(--red-tint)} .cell.incompleta .st{color:var(--red)}
+.cell.presente{background:var(--blue-tint)} .cell.presente .st{color:var(--blue)}
+.cell.ausente{background:var(--orange-tint)} .cell.ausente .st{color:var(--orange)}
+.cell.sinmarcar .st{color:var(--orange)}
 .cell.ro{cursor:default}
 .cell.bloq{display:block;text-align:left;padding:6px 9px;font-size:13px;color:var(--sec);
   background:repeating-linear-gradient(135deg,var(--slot),var(--slot) 6px,var(--fill2) 6px,var(--fill2) 12px)}
@@ -197,6 +203,8 @@ td.pasado .cell{opacity:.55}
 .seg-rutina button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.14)}
 .seg-rutina button.on[data-v="completa"]{color:var(--green)}
 .seg-rutina button.on[data-v="incompleta"]{color:var(--red)}
+.seg-rutina button.on[data-v="presente"]{color:var(--blue)}
+.seg-rutina button.on[data-v="ausente"]{color:var(--orange)}
 .seg-rutina button:disabled{opacity:.45}
 .hint{font-size:13px;color:var(--sec);padding:0 4px}
 .err{color:var(--red);font-size:14px;min-height:20px;padding:0 4px}
@@ -275,6 +283,7 @@ td.pasado .cell{opacity:.55}
       <div class="tile"><span class="l">Agendadas</span><span class="n num" id="kAgend">0</span></div>
       <div class="tile"><span class="l">Completas</span><span class="n num" id="kComp" style="color:var(--green)">0</span></div>
       <div class="tile"><span class="l">Incompletas</span><span class="n num" id="kInc" style="color:var(--red)">0</span></div>
+      <div class="tile"><span class="l">Ausentes</span><span class="n num" id="kAus" style="color:var(--orange)">0</span></div>
       <div class="tile"><span class="l">Pendientes</span><span class="n num" id="kPend">0</span></div>
       <div class="tile"><span class="l">Libres</span><span class="n num" id="kLibres" style="color:var(--sec)">0</span></div>
     </div>
@@ -282,7 +291,9 @@ td.pasado .cell{opacity:.55}
     <div id="contenido"></div>
 
     <div class="leyenda">
-      <span><span class="dot" style="background:var(--ter)"></span>Pendiente de rutina</span>
+      <span><span class="dot" style="background:var(--ter)"></span>Pendiente</span>
+      <span><span class="dot" style="background:var(--blue)"></span>Presente, sin rutina</span>
+      <span><span class="dot" style="background:var(--orange)"></span>Ausente / sin marcar</span>
       <span><span class="dot" style="background:var(--green)"></span>Rutina completa</span>
       <span><span class="dot" style="background:var(--red)"></span>Rutina incompleta</span>
       <span><span class="dot" style="background:var(--sec)"></span>🔒 Bloqueado <span id="leyBloq"></span></span>
@@ -366,6 +377,10 @@ const bloqueoDe=(f,h)=>bloqUnico[f+'|'+h] || bloqPerm[dowDe(f)+'|'+h] || null;
 const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(currentRole);
 const puedeAgendar=()=>esAdmin()||['recepcion','admin_sucursal','coordinador'].includes(currentRole);
 const puedeRutina=()=>esAdmin()||currentRole==='instructor';
+// Asistencia: presente lo marcan recepción o el instructor; ausente solo recepción (y admins).
+// La base lo hace cumplir (mediciones_asistencia.sql).
+const puedePresente=()=>puedeAgendar()||currentRole==='instructor';
+const puedeAusente=()=>puedeAgendar();
 function computeSedes(sede,extra){const set=[];[sede,...(Array.isArray(extra)?extra:[])].forEach(s=>{if(s&&SEDES.includes(s)&&!set.includes(s))set.push(s);});return set;}
 function aviso(txt,ok){const t=document.getElementById('toast');t.textContent=txt;t.className='toast show'+(ok?'':' bad');clearTimeout(t._h);t._h=setTimeout(()=>{t.className='toast'+(ok?'':' bad');},3200);}
 const chev='<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg>';
@@ -438,7 +453,7 @@ function init(){
   }else ctrl.innerHTML=`<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
   document.getElementById('sedeTitle').textContent='· '+currentSede;
   document.getElementById('leyRol').textContent = puedeRutina()&&!puedeAgendar()
-    ? 'Como instructor solo podés marcar la rutina de cada medición.'
+    ? 'Como instructor podés marcar la rutina y si el cliente llegó (presente).'
     : puedeAgendar()&&!puedeRutina() ? 'La rutina la marca el instructor.' : '';
   document.getElementById('app').hidden=false;
   cargar();
@@ -488,6 +503,19 @@ const rutinaPill=r=>r==='completa'?'<span class="pill ok">✓ Completa</span>'
                    :r==='incompleta'?'<span class="pill bad">✗ Incompleta</span>'
                    :'<span class="pill status">Pendiente</span>';
 
+// Estado para mostrar: la rutina manda; si no hay rutina, la asistencia explica por qué.
+// "Sin marcar" = la hora de la cita ya pasó y nadie marcó si llegó.
+function citaPasada(c){ const hoy=todayStr(); if(c.fecha<hoy)return true; if(c.fecha>hoy)return false;
+  const n=new Date(); return String(c.hora).slice(0,5) < `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`; }
+function estadoCita(c){
+  if(c.rutina==='completa')   return {cls:'completa',  lbl:'✓ Completa',  pill:'<span class="pill ok">✓ Completa</span>'};
+  if(c.rutina==='incompleta') return {cls:'incompleta',lbl:'✗ Incompleta',pill:'<span class="pill bad">✗ Incompleta</span>'};
+  if(c.asistencia==='ausente')  return {cls:'ausente', lbl:'Ausente',             pill:'<span class="pill warn">Ausente</span>'};
+  if(c.asistencia==='presente') return {cls:'presente',lbl:'Presente · sin rutina',pill:'<span class="pill info">Presente</span>'};
+  if(citaPasada(c))             return {cls:'pend sinmarcar',lbl:'Sin marcar',   pill:'<span class="pill warn">Sin marcar</span>'};
+  return {cls:'pend',lbl:'Pendiente',pill:'<span class="pill status">Pendiente</span>'};
+}
+
 function render(){
   pintarSegDias();
   document.getElementById('contenido').innerHTML = vistaSemana ? htmlSemana() : htmlDia();
@@ -500,7 +528,9 @@ function render(){
   document.getElementById('kAgend').textContent=list.length;
   document.getElementById('kComp').textContent=comp;
   document.getElementById('kInc').textContent=inc;
-  document.getElementById('kPend').textContent=list.length-comp-inc;
+  const aus=list.filter(c=>!c.rutina&&c.asistencia==='ausente').length;
+  document.getElementById('kAus').textContent=aus;
+  document.getElementById('kPend').textContent=list.length-comp-inc-aus;
   document.getElementById('kLibres').textContent=(SLOTS.length*NDIAS)-list.length-nBloq;
   document.getElementById('leyBloq').textContent = nBloq ? `${nBloq} espacio(s) bloqueado(s) esta semana` : '';
 }
@@ -523,7 +553,7 @@ function htmlDia(){
       if(c) return `<button class="row${pasado}" onclick="abrir('${f}','${h}')">
         <span class="hr">${h}</span>
         <span class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}</span></span>
-        ${rutinaPill(c.rutina)}${chev}</button>`;
+        ${estadoCita(c).pill}${chev}</button>`;
       const b=bloqueoDe(f,h);
       if(b){
         const det=`${b.tipo==='permanente'?'Todos los '+DIAS[b.dia_semana].toLowerCase():'Solo este día'}${b.motivo?' · '+esc(b.motivo):''}`;
@@ -557,8 +587,7 @@ function htmlSemana(){
       const d=diaDe(i), f=ymd(d), h=hhmm(m), c=citas[f+'|'+h];
       const pasado=f<hoy?' pasado':'';
       if(c){
-        const est=c.rutina||'pend';
-        const lbl=c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':'Pendiente';
+        const {cls:est,lbl}=estadoCita(c);
         tr+=`<td class="slot${pasado}"><div class="cell taken ${est}" onclick="abrir('${f}','${h}')" title="${esc(c.nombre)}">
               <div class="nm">${esc(c.nombre)}</div><div class="st">${lbl}</div></div></td>`;
       }else{
@@ -655,7 +684,7 @@ function abrir(f,h){
     setModo('medicion');
     setTimeout(()=>document.getElementById('fNombre').focus(),120);
   }else{
-    mId=c.id; mRutina=c.rutina||'';
+    mId=c.id; mRutina=c.rutina||''; mAsist=c.asistencia||''; mAsistOrig=mAsist; mFutura=c.fecha>todayStr();
     document.getElementById('mTitulo').textContent=c.nombre;
     const editable=puedeAgendar();
     document.getElementById('mBody').innerHTML=`
@@ -670,6 +699,16 @@ function abrir(f,h){
         <div class="f-row"><label>Agendó</label><span class="v">${esc(c.agendado_por_nombre||c.agendado_por||'—')}</span></div>
       </div>
       <div class="sect" style="gap:7px">
+        <div class="hdr" style="padding:0 4px">¿Llegó el cliente?${mFutura?' · se marca el día de la cita':''}</div>
+        <div class="seg-rutina" id="segAsist">
+          <button data-v="" onclick="setAsist('')">Sin marcar</button>
+          <button data-v="presente" onclick="setAsist('presente')">✓ Presente</button>
+          <button data-v="ausente" onclick="setAsist('ausente')">✗ Ausente</button>
+        </div>
+        ${c.asistencia_por?`<div class="hint">Marcado por ${esc(c.asistencia_por)}${c.asistencia_at?' · '+new Date(c.asistencia_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</div>`:''}
+        ${!puedeAusente()?'<div class="hint">Solo recepción puede marcar ausente.</div>':''}
+      </div>
+      <div class="sect" style="gap:7px">
         <div class="hdr" style="padding:0 4px">Rutina${puedeRutina()?'':' · la marca el instructor'}</div>
         <div class="seg-rutina" id="segRutina">
           <button data-v="" onclick="setRutina('')" ${puedeRutina()?'':'disabled'}>Pendiente</button>
@@ -681,17 +720,26 @@ function abrir(f,h){
     pintarSeg();
     document.getElementById('mFoot').innerHTML = puedeAgendar()
       ? `<button class="btn-destroy" onclick="borrar('${c.id}')">Eliminar medición</button>` : '';
-    const puedeGuardar=editable||puedeRutina();
+    const puedeGuardar=editable||puedeRutina()||puedePresente();
     save.hidden=!puedeGuardar; save.textContent='Guardar'; save.disabled=false;
     save.onclick=()=>guardarEdicion(c.id);
   }
   document.getElementById('modal').classList.add('open');
   document.body.style.overflow='hidden';
 }
-function setRutina(v){mRutina=v;pintarSeg();}
-function pintarSeg(){document.querySelectorAll('#segRutina button').forEach(b=>b.classList.toggle('on',b.dataset.v===mRutina));}
+// Rutina marcada = el cliente estuvo (presente). Ausente = sin rutina.
+function setRutina(v){ mRutina=v; if(v) mAsist='presente'; pintarSeg(); }
+function setAsist(v){ mAsist=v; if(v==='ausente') mRutina=''; pintarSeg(); }
+function pintarSeg(){
+  document.querySelectorAll('#segRutina button').forEach(b=>{ b.classList.toggle('on',b.dataset.v===mRutina);
+    b.disabled=!puedeRutina()||(mAsist==='ausente'&&b.dataset.v!==''); });
+  document.querySelectorAll('#segAsist button').forEach(b=>{ const v=b.dataset.v; b.classList.toggle('on',v===mAsist);
+    // Fecha futura: nada. Instructor: solo "presente" (o dejar lo que ya estaba).
+    b.disabled = mFutura || (v==='presente' ? !puedePresente() : (!puedeAusente() && v!==mAsistOrig)); });
+}
 
 /* Espacio libre: se agenda una medición o se bloquea el espacio */
+let mAsist='', mAsistOrig='', mFutura=false;
 function setModo(m){
   mModo=m;
   document.querySelectorAll('#segModo button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
@@ -762,6 +810,7 @@ async function guardarNueva(){
 async function guardarEdicion(id){
   const err=document.getElementById('mErr'), btn=document.getElementById('mSave');
   const body={rutina:mRutina||null};
+  if(mAsist!==mAsistOrig) body.asistencia=mAsist||null;   // solo si cambió (la base valida quién puede)
   if(puedeAgendar()){
     const nombre=document.getElementById('fNombre').value.trim();
     if(!nombre){err.textContent='El nombre es obligatorio.';return;}
@@ -773,8 +822,10 @@ async function guardarEdicion(id){
   try{
     await supaFetch(`/mediciones?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body});
     cerrar(); aviso('Medición actualizada.',true); cargar();
-  }catch(e){btn.disabled=false;btn.textContent='Guardar';err.textContent=e.message;}
+  }catch(e){btn.disabled=false;btn.textContent='Guardar';err.textContent=mensajeError(e);}
 }
+// Los errores de Supabase llegan como JSON en el texto: mostrar solo el mensaje
+function mensajeError(e){ try{ const j=JSON.parse(e.message); return j.message||e.message; }catch(_){ return e.message; } }
 
 async function borrar(id){
   if(!confirm('¿Eliminar esta medición? El espacio queda libre.'))return;
@@ -791,7 +842,7 @@ function imprimirSemana(){
   head+='</tr>';
   const fila=m=>{let tr=`<tr><td class="h">${hhmm(m)}</td>`;
     for(let i=0;i<NDIAS;i++){const f=ymd(diaDe(i)),h=hhmm(m),c=citas[f+'|'+h];
-      if(c){ tr+=`<td class="${c.rutina||'pend'}"><b>${esc(c.nombre)}</b>${c.telefono?'<br><span class="tel">'+esc(c.telefono)+'</span>':''}${c.pin?'<br><span class="tel">PIN '+esc(c.pin)+'</span>':''}<br><span class="rt">${c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':'☐ Pendiente'}</span></td>`; continue; }
+      if(c){ tr+=`<td class="${c.rutina||(c.asistencia==='ausente'?'ausente':'pend')}"><b>${esc(c.nombre)}</b>${c.telefono?'<br><span class="tel">'+esc(c.telefono)+'</span>':''}${c.pin?'<br><span class="tel">PIN '+esc(c.pin)+'</span>':''}<br><span class="rt">${c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':c.asistencia==='ausente'?'Ausente':c.asistencia==='presente'?'Presente · ☐ rutina':'☐ Pendiente'}</span></td>`; continue; }
       const b=bloqueoDe(f,h);
       tr+= b ? `<td class="bloq">🔒 ${esc(b.motivo||'Bloqueado')}</td>` : '<td></td>';}
     return tr+'</tr>';};
@@ -807,7 +858,7 @@ function imprimirSemana(){
   th{background:#eee;font-size:10px;}td.h{background:#f4f4f4;text-align:center;font-weight:700;width:52px;}
   tr.blk td{background:#e8eef6;font-weight:800;font-size:11px;letter-spacing:.3px;height:auto;}
   .tel{color:#555;font-size:9px;}.rt{font-size:9px;color:#333;}
-  td.completa{background:#eafaf1;}td.incompleta{background:#fdecec;}td.pend{background:#fafafa;}
+  td.completa{background:#eafaf1;}td.incompleta{background:#fdecec;}td.pend{background:#fafafa;}td.ausente{background:#fff4e5;}
   td.bloq{background:#ececec;color:#666;font-size:9px;}
   @page{size:landscape;margin:10mm;}@media print{.noprint{display:none;}}</style></head><body>
   <h1>📏 Mediciones — ${esc(currentSede)}</h1>
