@@ -9,6 +9,11 @@
 --  base, no del navegador. Desde la página no se puede insertar ni editar la
 --  tabla directo: solo con facturar_caja() y anular_factura_caja().
 --
+--  Pago dividido: facturar_caja_v2() recibe la lista de pagos, por ejemplo
+--  [ {metodo:'sinpe', monto:1000, referencia:'123456'}, {metodo:'efectivo', monto:100} ],
+--  y la base valida que sumen exactamente el total. facturar_caja() (un solo
+--  método) queda como atajo de facturar_caja_v2().
+--
 --  Para el inventario se usa el mismo control diario que ya valida
 --  inventario_guard (desc_dia / desc_hoy): cantidad baja y desc_hoy sube en
 --  las mismas unidades.
@@ -32,6 +37,10 @@ create table if not exists facturas_caja (
   created_by        text,
   created_at        timestamptz default now()
 );
+-- Pago dividido: metodo = 'mixto' y el detalle en pagos
+alter table facturas_caja drop constraint if exists facturas_caja_metodo_check;
+alter table facturas_caja add constraint facturas_caja_metodo_check check (metodo in ('efectivo','tarjeta','sinpe','mixto'));
+alter table facturas_caja add column if not exists pagos jsonb;   -- [ { metodo, monto, referencia } ]
 create unique index if not exists facturas_caja_num_idx   on facturas_caja (sede, fecha, numero);
 create index        if not exists facturas_caja_cierre_idx on facturas_caja (cierre_id);
 
@@ -51,8 +60,10 @@ create policy facturas_caja_select on facturas_caja
 
 -- ── Facturar: registra la factura y descuenta el stock en un solo paso ─────
 -- p_items: [ { inventario_id, cantidad } ]. Lo demás (nombre, precio) sale de la base.
-create or replace function facturar_caja(p_cierre uuid, p_metodo text, p_items jsonb,
-                                         p_recibido numeric default null, p_referencia text default null)
+-- p_pagos: [ { metodo, monto, referencia } ], un método a lo sumo una vez. Con un solo
+-- pago, monto puede ir vacío (= el total). p_recibido: efectivo entregado (para el vuelto).
+create or replace function facturar_caja_v2(p_cierre uuid, p_items jsonb, p_pagos jsonb,
+                                            p_recibido numeric default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v_rol    text := public.mi_rol();
@@ -65,9 +76,15 @@ declare
   v_items  jsonb := '[]'::jsonb;
   v_total  numeric := 0;
   v_num    int;
-  v_ref    text := nullif(btrim(coalesce(p_referencia, '')), '');
+  v_ref    text;
   v_id     uuid;
   v_motivo text;
+  v_p      jsonb;
+  v_pagos  jsonb := '[]'::jsonb;
+  v_suma   numeric := 0;
+  v_ef     numeric := 0;
+  v_mets   text[] := '{}';
+  v_monto  numeric;
 begin
   select * into v_c from cierres_caja where id = p_cierre for update;   -- serializa las facturas del turno
   if not found then raise exception 'El turno no existe.'; end if;
@@ -80,9 +97,8 @@ begin
     raise exception 'No puede facturar en esta sede.' using errcode = '42501';
   end if;
 
-  if p_metodo not in ('efectivo','tarjeta','sinpe') then raise exception 'Método de pago inválido.'; end if;
-  if p_metodo = 'sinpe' and (v_ref is null or length(v_ref) < 4) then
-    raise exception 'Anote la referencia del SINPE (al menos los últimos 4 dígitos).';
+  if jsonb_typeof(p_pagos) is distinct from 'array' or jsonb_array_length(p_pagos) = 0 then
+    raise exception 'Indique cómo se pagó.';
   end if;
   if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
     raise exception 'La factura no tiene productos.';
@@ -123,18 +139,54 @@ begin
 
   perform set_config('app.factura_caja', '', true);
 
-  if p_metodo = 'efectivo' and p_recibido is not null and p_recibido < v_total then
-    raise exception 'El efectivo recibido (₡%) no cubre el total (₡%).', p_recibido, v_total;
+  -- Pagos: métodos válidos y sin repetir, montos positivos que suman el total
+  for v_p in select * from jsonb_array_elements(p_pagos) loop
+    if (v_p ->> 'metodo') is null or (v_p ->> 'metodo') not in ('efectivo','tarjeta','sinpe') then
+      raise exception 'Método de pago inválido.';
+    end if;
+    if (v_p ->> 'metodo') = any(v_mets) then raise exception 'Cada método de pago va una sola vez.'; end if;
+    v_mets  := v_mets || (v_p ->> 'metodo');
+    v_monto := case when jsonb_array_length(p_pagos) = 1 and nullif(v_p ->> 'monto', '') is null
+                    then v_total else (v_p ->> 'monto')::numeric end;
+    if v_monto is null or v_monto <= 0 then raise exception 'Cada pago debe tener un monto mayor a cero.'; end if;
+    if (v_p ->> 'metodo') = 'sinpe' then
+      v_ref := nullif(btrim(coalesce(v_p ->> 'referencia', '')), '');
+      if v_ref is null or length(regexp_replace(v_ref, '\D', '', 'g')) < 4 then
+        raise exception 'Anote la referencia del SINPE (al menos los últimos 4 dígitos).';
+      end if;
+    end if;
+    if (v_p ->> 'metodo') = 'efectivo' then v_ef := v_monto; end if;
+    v_suma  := v_suma + v_monto;
+    v_pagos := v_pagos || jsonb_build_object('metodo', v_p ->> 'metodo', 'monto', v_monto,
+                                             'referencia', case when (v_p ->> 'metodo') = 'sinpe' then v_ref end);
+  end loop;
+  if v_suma <> v_total then
+    raise exception 'Los pagos suman ₡% y el total es ₡%.', v_suma, v_total;
+  end if;
+  if v_ef > 0 and p_recibido is not null and p_recibido < v_ef then
+    raise exception 'El efectivo recibido (₡%) no cubre la parte en efectivo (₡%).', p_recibido, v_ef;
   end if;
 
-  insert into facturas_caja (sede, fecha, numero, cierre_id, metodo, items, total, recibido, referencia, created_by)
-  values (v_c.sede, v_c.fecha, v_num, v_c.id, p_metodo, v_items, v_total,
-          case when p_metodo = 'efectivo' then p_recibido end,
-          case when p_metodo = 'sinpe' then v_ref end, v_email)
+  insert into facturas_caja (sede, fecha, numero, cierre_id, metodo, pagos, items, total, recibido, referencia, created_by)
+  values (v_c.sede, v_c.fecha, v_num, v_c.id,
+          case when jsonb_array_length(v_pagos) = 1 then v_pagos -> 0 ->> 'metodo' else 'mixto' end,
+          v_pagos, v_items, v_total,
+          case when v_ef > 0 then p_recibido end, v_ref, v_email)
   returning id into v_id;
 
   return jsonb_build_object('id', v_id, 'numero', v_num, 'total', v_total);
 end;
+$$;
+revoke all on function facturar_caja_v2(uuid, jsonb, jsonb, numeric) from public;
+grant execute on function facturar_caja_v2(uuid, jsonb, jsonb, numeric) to authenticated;
+
+-- Un solo método de pago (lo que usaba la página antes del pago dividido)
+create or replace function facturar_caja(p_cierre uuid, p_metodo text, p_items jsonb,
+                                         p_recibido numeric default null, p_referencia text default null)
+returns jsonb language sql security definer set search_path = public as $$
+  select facturar_caja_v2(p_cierre, p_items,
+                          jsonb_build_array(jsonb_build_object('metodo', p_metodo, 'referencia', p_referencia)),
+                          p_recibido)
 $$;
 revoke all on function facturar_caja(uuid, text, jsonb, numeric, text) from public;
 grant execute on function facturar_caja(uuid, text, jsonb, numeric, text) to authenticated;
