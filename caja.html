@@ -569,6 +569,8 @@ table.hist tbody tr:hover td { background:var(--fill); }
             <button type="button" data-m="tarjeta" aria-pressed="false" onclick="fxSetPago('tarjeta')"><span class="i">💳</span>Tarjeta</button>
             <button type="button" data-m="sinpe" aria-pressed="false" onclick="fxSetPago('sinpe')"><span class="i">🔷</span>SINPE</button>
           </div>
+          <button type="button" class="btn-ghost" id="fxBtnSplit" style="font-size:12px;padding:5px 10px;margin:-2px 0 10px;" onclick="fxToggleSplit()">➗ Dividir pago</button>
+          <div id="fxSplit" hidden style="margin:-2px 0 10px;"></div>
           <div class="hint" id="fxPagoNota" hidden style="margin:-4px 0 8px;"></div>
           <div id="fxPagoEfectivo">
             <div class="f-row"><label for="fxRecibido">Recibido (₡)</label><input type="number" id="fxRecibido" step="1" min="0" placeholder="opcional" oninput="renderFxVuelto()"></div>
@@ -694,7 +696,7 @@ const REGLAS_OTROS=[
   { kw:['come strong','become strong'], cat:'galletas', canonical:'Be come Strong' },
   { kw:['gym bite','gymbite'], cat:'galletas', canonical:'Gym bite' },
   { kw:['pre entreno','pre-entreno','preentreno'], cat:'energeticos', canonical:'Scoop de pre entreno' },
-  { kw:['rooster'], cat:'energeticos', canonical:'Rooster' }, { kw:['bucked up'], cat:'energeticos', canonical:'Bucked up' },
+  { kw:['rooster rec'], cat:'energeticos', canonical:'Rooster rec' }, { kw:['rooster'], cat:'energeticos', canonical:'Rooster' }, { kw:['bucked up'], cat:'energeticos', canonical:'Bucked up' },
   { kw:['glu'], cat:'energeticos', canonical:'GLU' }, { kw:['amino'], cat:'energeticos', canonical:'Scoop de Amino' },
   { kw:['proteina'], cat:'energeticos', canonical:'Scoop de Proteína' }, { kw:['creatina'], cat:'energeticos' }, { kw:['scoop'], cat:'energeticos' },
   { kw:['gatorade','gatorage'], cat:'minita', canonical:'Gatorage' }, { kw:['powerade'], cat:'minita', canonical:'Powerade' },
@@ -1272,7 +1274,7 @@ const horaCorta=d=>d?d.toLocaleString('es-CR',{day:'2-digit',month:'2-digit',hou
 const tokensNombre=s=>normP(String(s||'').replace(/_/g,' ')).replace(/[^a-z ]/g,' ').split(/\s+/).filter(t=>t.length>=3);
 function conciliarSinpe(){
   const s=window._sinpeReporte; if(!s||!s.all)return null;
-  const fxSinpe=(turnoActual&&window._formCierreId===turnoActual.id?fxState.facturas:[]).filter(f=>f.estado!=='anulada'&&f.metodo==='sinpe');
+  const fxSinpe=(turnoActual&&window._formCierreId===turnoActual.id?fxState.facturas:[]).filter(f=>f.estado!=='anulada'&&fxMontoMetodo(f,'sinpe')>0);
   const v=window._ventasDetalle||(fxSinpe.length?{filas:[],agrupado:false,fecha:document.getElementById('cFecha').value}:null); if(!v)return null;
   // Un cobro puede traer varias líneas (plan + matrícula ₡0): se agrupan por hora + cliente
   const mapa=new Map();
@@ -1282,7 +1284,7 @@ function conciliarSinpe(){
     if(f.Producto&&Number(f.Total))c.productos.push(f.Producto); if(f.Metodo)c.metodo=f.Metodo; });
   const cobros=[...mapa.values()].map(c=>({...c,total:Math.round(c.total)}));
   // Facturas SINPE de la pestaña Facturación: siempre traen referencia → cruce exacto
-  fxSinpe.forEach(f=>{ const d=new Date(f.created_at); cobros.push({ fecha:horaCorta(d), d, cliente:`Factura #${f.numero} (caja)`, total:Math.round(Number(f.total)||0),
+  fxSinpe.forEach(f=>{ const d=new Date(f.created_at); cobros.push({ fecha:horaCorta(d), d, cliente:`Factura #${f.numero} (caja)`, total:Math.round(fxMontoMetodo(f,'sinpe')),
     metodo:'sinpe', refs:[String(f.referencia||'').replace(/\D/g,'')].filter(x=>x.length>=4), productos:(f.items||[]).map(it=>it.producto) }); });
   const trans=s.all.map(t=>({...t, d:fechaHora(t.fecha_tx), usada:false}));
   const pares=[], refSinTrans=[];
@@ -1812,7 +1814,8 @@ const FX_VACIO={efectivo:0,tarjeta:0,sinpe:0,total:0,productos:0,eventos:0,n:0,d
 const fxProductos=f=>f.productos!=null?(Number(f.productos)||0):(Number(f.total)||0);
 let tabActual='cierre';
 const fxState={prods:[],cart:{},pago:'efectivo',cat:'todos',facturas:[],errFacturas:null,busy:false,
-  eventos:[], evento:null};   // evento: { id, tipo:'miembro'|'no_miembro', pin, nombre, tel, cliente } — uno por cobro
+  eventos:[], evento:null,
+  split:false, sel:['efectivo'], montos:{}};   // pago dividido: métodos elegidos y monto de cada uno   // evento: { id, tipo:'miembro'|'no_miembro', pin, nombre, tel, cliente } — uno por cobro
 const puedeAnular=()=>esAdmin()||currentRole==='coordinador';
 
 // Totales facturados que usa el cierre del formulario (null si aún no hay datos de facturas)
@@ -1825,11 +1828,12 @@ function facturadoPayload(){ return window._factCierre?{facturado:window._factCi
 function resumirFacturas(list){
   const r={efectivo:0,tarjeta:0,sinpe:0,total:0,productos:0,eventos:0,n:0,desglose:{}};
   list.filter(f=>f.estado!=='anulada').forEach(f=>{ const t=Math.round(Number(f.total)||0);
-    if(r[f.metodo]!=null) r[f.metodo]+=t; r.total+=t; r.n++;
+    ['efectivo','tarjeta','sinpe'].forEach(m=>{ r[m]+=Math.round(fxMontoMetodo(f,m)); }); r.total+=t; r.n++;
     if(f.tipo==='evento'){ r.eventos+=t; return; }   // no va al sobre ni al desglose de la minita
     r.productos+=t;
-    (f.items||[]).forEach(it=>{ const {cat,canonical}=resolverOtro(it.producto); const k=normP(canonical);
-      if(!r.desglose[k]) r.desglose[k]={base:canonical,cat,qty:0,total:0};
+    // Nombre exacto del inventario (no el unificado): así "Rooster" y "Rooster rec" salen por separado
+    (f.items||[]).forEach(it=>{ const base=String(it.producto||'').trim(); const {cat}=resolverOtro(base); const k=normP(base);
+      if(!r.desglose[k]) r.desglose[k]={base,cat,qty:0,total:0};
       r.desglose[k].qty+=Number(it.cantidad)||0; r.desglose[k].total+=Math.round(Number(it.total)||0); }); });
   return r;
 }
@@ -1947,17 +1951,72 @@ function renderFxTicket(){
   renderFxVuelto();
 }
 function fxSetPago(m){
-  fxState.pago=m;
-  document.querySelectorAll('#fxPay button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===m));
-  document.getElementById('fxPagoEfectivo').hidden=m!=='efectivo';
-  document.getElementById('fxPagoTarjeta').hidden=m!=='tarjeta';
-  document.getElementById('fxPagoSinpe').hidden=m!=='sinpe';
+  if(fxState.split){
+    const sel=fxState.sel;
+    if(sel.includes(m)){ if(sel.length>1){ sel.splice(sel.indexOf(m),1); delete fxState.montos[m]; } }
+    else { const resto=fxTotal()-sel.reduce((a,x)=>a+(Number(fxState.montos[x])||0),0); sel.push(m); fxState.montos[m]=resto>0?resto:''; }
+    fxState.pago=sel[0];
+  } else { fxState.pago=m; fxState.sel=[m]; }
+  fxPintarPagos();
   document.getElementById('fxMsg').textContent='';
+}
+function fxPintarPagos(){
+  const sel=fxState.split?fxState.sel:[fxState.pago];
+  document.querySelectorAll('#fxPay button').forEach(b=>b.setAttribute('aria-pressed',sel.includes(b.dataset.m)));
+  document.getElementById('fxPagoEfectivo').hidden=!sel.includes('efectivo');
+  document.getElementById('fxPagoTarjeta').hidden=!sel.includes('tarjeta');
+  document.getElementById('fxPagoSinpe').hidden=!sel.includes('sinpe');
+  document.getElementById('fxBtnSplit').textContent=fxState.split?'✕ Un solo método':'➗ Dividir pago';
+  renderFxSplit(); renderFxVuelto();
+}
+// ── Pago dividido (ej. ₡1 000 SINPE + ₡100 efectivo) ──
+function fxToggleSplit(){
+  fxState.split=!fxState.split;
+  fxState.sel=[fxState.pago]; fxState.montos={[fxState.pago]:fxTotal()||''};
+  fxPintarPagos(); document.getElementById('fxMsg').textContent='';
+}
+function fxMonto(m,v){
+  fxState.montos[m]=v;
+  const otros=fxState.sel.filter(x=>x!==m);
+  if(otros.length===1){   // con dos métodos, el otro se completa solo
+    const resto=fxTotal()-(Number(v)||0); fxState.montos[otros[0]]=resto>0?resto:'';
+    const el=document.getElementById('fxMonto_'+otros[0]); if(el) el.value=fxState.montos[otros[0]];
+  }
+  renderFxSplitRes(); renderFxVuelto();
+}
+function renderFxSplit(){
+  const box=document.getElementById('fxSplit');
+  box.hidden=!fxState.split; if(!fxState.split){ box.innerHTML=''; return; }
+  if(fxState.sel.length===1) fxState.montos[fxState.sel[0]]=fxTotal()||'';
+  box.innerHTML=`<div class="hint" style="margin-bottom:6px;">Toque los métodos que usa el cliente y anote cuánto paga con cada uno.</div>`
+    +fxState.sel.map(m=>`<div class="f-row"><label for="fxMonto_${m}">${FX_METODOS[m]}</label>
+      <input type="number" id="fxMonto_${m}" min="0" step="1" value="${fxState.montos[m]??''}" oninput="fxMonto('${m}',this.value)"></div>`).join('')
+    +'<div id="fxSplitRes" style="font-size:13px;font-weight:600;"></div>';
+  renderFxSplitRes();
+}
+function fxSumaPagos(){ return fxState.sel.reduce((a,m)=>a+(Number(fxState.montos[m])||0),0); }
+function renderFxSplitRes(){
+  const el=document.getElementById('fxSplitRes'); if(!el) return;
+  const t=fxTotal(), d=t-fxSumaPagos();
+  el.textContent=d===0?`✓ Pagos completos: ${fmt(t)}`:d>0?`Faltan ${fmt(d)} de ${fmt(t)}`:`Sobran ${fmt(-d)}: el total es ${fmt(t)}`;
+  el.style.color=d===0?'var(--green)':'var(--red)';
+}
+// Texto del pago de una factura: "💳 Tarjeta" o "🔷 ₡1 000 + 💵 ₡100"
+function fxMetodoTxt(f){
+  const P=Array.isArray(f.pagos)&&f.pagos.length?f.pagos:null;
+  if(P&&P.length>1) return P.map(p=>`${(FX_METODOS[p.metodo]||p.metodo).split(' ')[0]} ${fmt(p.monto)}`).join(' + ');
+  return FX_METODOS[f.metodo]||esc(f.metodo);
+}
+// Monto de una factura en un método (con pago dividido, solo esa parte)
+function fxMontoMetodo(f,m){
+  if(Array.isArray(f.pagos)&&f.pagos.length) return f.pagos.filter(p=>p.metodo===m).reduce((a,p)=>a+(Number(p.monto)||0),0);
+  return f.metodo===m?(Number(f.total)||0):0;
 }
 function renderFxVuelto(){
   const el=document.getElementById('fxVuelto'), raw=document.getElementById('fxRecibido').value;
   if(raw===''){ el.textContent='—'; el.style.color=''; return; }
-  const d=(Number(raw)||0)-fxTotal();
+  const base=fxState.split&&!fxState.evento?(Number(fxState.montos.efectivo)||0):fxTotal();   // con pago dividido, solo la parte en efectivo
+  const d=(Number(raw)||0)-base;
   el.textContent=d>=0?fmt(d):'Faltan '+fmt(-d); el.style.color=d>=0?'var(--green)':'var(--red)';
 }
 async function fxFacturar(){
@@ -1969,6 +2028,7 @@ async function fxFacturar(){
   if(!items.length) return;
   const total=fxTotal(), pago=fxState.pago;
   const rawRec=document.getElementById('fxRecibido').value, ref=document.getElementById('fxRef').value.trim();
+  if(fxState.split&&fxState.sel.length>1) return fxFacturarDividido(items,total,rawRec,ref);
   if(pago==='efectivo'&&rawRec!==''&&(Number(rawRec)||0)<total){ msg.className='msg err'; msg.textContent=`El efectivo recibido no cubre el total (${fmt(total)}).`; return; }
   if(pago==='sinpe'&&ref.replace(/\D/g,'').length<4){ msg.className='msg err'; msg.textContent='Anote la referencia del SINPE (al menos los últimos 4 dígitos).'; return; }
   fxState.busy=true; renderFxTicket(); msg.className='msg'; msg.textContent='';
@@ -1979,7 +2039,33 @@ async function fxFacturar(){
     const vuelto=pago==='efectivo'&&rawRec!==''?` Vuelto ${fmt((Number(rawRec)||0)-(Number(r&&r.total)||total))}.`:'';
     msg.className='msg ok'; msg.textContent=`✓ Factura #${r&&r.numero} registrada (${fmt(r&&r.total!=null?r.total:total)}, ${FX_METODOS[pago]}). Inventario descontado.${vuelto}`;
     fxState.cart={}; document.getElementById('fxRecibido').value=''; document.getElementById('fxRef').value='';
+    if(fxState.split){ fxState.split=false; fxState.sel=[fxState.pago]; fxPintarPagos(); }
   }catch(e){ msg.className='msg err'; msg.textContent='⚠ '+mensajeError(e); }
+  finally{ fxState.busy=false; }
+  await Promise.all([loadFxProds(), loadFacturasDia()]);
+  renderFxTicket();
+}
+async function fxFacturarDividido(items,total,rawRec,ref){
+  const msg=document.getElementById('fxMsg'), err=t=>{ msg.className='msg err'; msg.textContent=t; };
+  const pagos=fxState.sel.map(m=>({metodo:m, monto:Math.round(Number(fxState.montos[m])||0), referencia:m==='sinpe'?ref:null}));
+  if(pagos.some(p=>p.monto<=0)) return err('Anote el monto de cada método, o quite el que no se usa.');
+  const suma=pagos.reduce((a,p)=>a+p.monto,0);
+  if(suma!==total) return err(suma<total?`Faltan ${fmt(total-suma)}: los pagos suman ${fmt(suma)} y el total es ${fmt(total)}.`:`Los pagos suman ${fmt(suma)}, ${fmt(suma-total)} más que el total.`);
+  const ef=pagos.find(p=>p.metodo==='efectivo');
+  if(ef&&rawRec!==''&&(Number(rawRec)||0)<ef.monto) return err(`El efectivo recibido no cubre la parte en efectivo (${fmt(ef.monto)}).`);
+  if(pagos.some(p=>p.metodo==='sinpe')&&ref.replace(/\D/g,'').length<4) return err('Anote la referencia del SINPE (al menos los últimos 4 dígitos).');
+  fxState.busy=true; renderFxTicket(); msg.className='msg'; msg.textContent='';
+  try{
+    const r=await supaFetch('/rpc/facturar_caja_v2',{method:'POST',prefer:'return=representation',body:{
+      p_cierre:turnoActual.id, p_items:items, p_pagos:pagos, p_recibido:ef&&rawRec!==''?Number(rawRec):null }});
+    const vuelto=ef&&rawRec!==''?` Vuelto ${fmt((Number(rawRec)||0)-ef.monto)}.`:'';
+    msg.className='msg ok'; msg.textContent=`✓ Factura #${r&&r.numero} registrada (${fmt(total)}: ${pagos.map(p=>`${FX_METODOS[p.metodo]} ${fmt(p.monto)}`).join(' + ')}). Inventario descontado.${vuelto}`;
+    fxState.cart={}; document.getElementById('fxRecibido').value=''; document.getElementById('fxRef').value='';
+    fxState.split=false; fxState.sel=[fxState.pago]; fxPintarPagos();
+  }catch(e){
+    const t=mensajeError(e);
+    err('⚠ '+(/facturar_caja_v2|PGRST202|Could not find/i.test(t)?'Falta correr de nuevo facturacion.sql en Supabase para habilitar el pago dividido.':t));
+  }
   finally{ fxState.busy=false; }
   await Promise.all([loadFxProds(), loadFacturasDia()]);
   renderFxTicket();
@@ -1998,11 +2084,11 @@ function renderFxHist(){
     const det=f.tipo==='evento'
       ? `🎟️ ${esc((f.items&&f.items[0]&&f.items[0].producto)||'Evento')}<div class="hint" style="font-size:12px;">${esc(f.cliente_nombre||'')} ${f.tipo_precio==='miembro'?'<span class="fx-tag m">Miembro</span>':'<span class="fx-tag nm">No miembro</span>'}</div>`
       : (f.items||[]).map(it=>esc(it.producto)+(Number(it.cantidad)>1?' ×'+it.cantidad:'')).join(', ');
-    const ref=f.metodo==='sinpe'&&f.referencia?`<div class="hint" style="font-size:11px;">ref …${esc(String(f.referencia).slice(-6))}</div>`:'';
+    const ref=fxMontoMetodo(f,'sinpe')>0&&f.referencia?`<div class="hint" style="font-size:11px;">ref …${esc(String(f.referencia).slice(-6))}</div>`:'';
     const acc=anulada?`<span class="pill dif" title="${esc(f.motivo_anulacion||'')}">Anulada</span>`
       :(puedeAnular()&&turnoActual&&f.cierre_id===turnoActual.id?`<button class="btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="fxAnular('${f.id}')">Anular</button>`:'');
     return `<tr class="${anulada?'anulada':''}"><td class="num">${f.numero}</td><td>${new Date(f.created_at).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'})}</td>
-      <td>${det}</td><td>${FX_METODOS[f.metodo]||esc(f.metodo)}${ref}</td><td class="num">${fmt(f.total)}</td><td>${acc}</td></tr>`;
+      <td>${det}</td><td>${fxMetodoTxt(f)}${ref}</td><td class="num">${fmt(f.total)}</td><td>${acc}</td></tr>`;
   }).join(''):'<tr><td colspan="6" class="hint" style="text-align:center;padding:14px;">Aún no hay facturas hoy.</td></tr>';
   const r=resumirFacturas(L);
   document.getElementById('fxN').textContent=r.n?`${r.n} · ${fmt(r.total)}`:'';
@@ -2055,7 +2141,10 @@ function renderFxPagos(){
   document.querySelectorAll('#fxPay button').forEach(b=>{ b.hidden=!ok.includes(b.dataset.m); });
   const nota=document.getElementById('fxPagoNota');
   nota.hidden=!e||ok.length===3; nota.textContent=e?`Este evento solo acepta ${ok.map(m=>FX_METODOS[m]).join(' y ')}.`:'';
+  document.getElementById('fxBtnSplit').hidden=!!e;   // los eventos se cobran con un solo método
+  if(e&&fxState.split){ fxState.split=false; fxState.sel=[fxState.pago]; fxPintarPagos(); }
   if(!ok.includes(fxState.pago)) fxSetPago(ok[0]);
+  if(fxState.split) renderFxSplitRes();
 }
 function renderFxEventoForm(){
   const e=fxEvento(), ev=fxState.evento, miembro=ev.tipo==='miembro';
