@@ -374,6 +374,21 @@ async function guardarCosto(baseProd, categoria, costo) {
   }
 }
 
+// ── Ventas de productos cobradas en la caja (facturas_caja, ver facturacion.sql) ──
+// Desde que la minita se factura en caja ya no viene en el archivo de ventas del
+// sistema anterior, así que el reporte suma las dos fuentes. Eventos y anuladas no cuentan.
+async function ventasCajaMes(mesOrden) {
+  if (!/^\d{4}-\d{2}$/.test(mesOrden || '')) return [];
+  const [y, m] = mesOrden.split('-').map(Number);
+  const sig = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+  try {
+    const fs = (await supaFetch(`/facturas_caja?fecha=gte.${mesOrden}-01&fecha=lt.${sig}-01&estado=eq.activa&select=sede,tipo,items,created_by`)) || [];
+    return fs.filter(f => (f.tipo || 'producto') === 'producto')
+      .flatMap(f => (f.items || []).map(it => ({ sede: f.sede, producto: it.producto, cantidad: Number(it.cantidad) || 0,
+                                                total: Number(it.total) || 0, vendedor: f.created_by })));
+  } catch (_) { return []; }   // sin la tabla o sin permiso: el reporte sigue solo con el archivo
+}
+
 // ── Carga de snapshots del mes ──────────────────────────────────────────────
 let allSnaps = [];    // todos los snapshots (para el selector de meses)
 let mesActual = null;
@@ -405,8 +420,11 @@ async function init() {
   }
 }
 
-function loadMes(mes) {
+async function loadMes(mes) {
   mesActual = mes;
+  const mesOrden = (allSnaps.find(s => s.mes === mes && s.mes_orden) || {}).mes_orden;
+  const caja = await ventasCajaMes(mesOrden);
+  if (mesActual !== mes) return;   // se cambió de mes mientras cargaba
   // Tomar el snapshot más reciente por sede para el mes elegido
   const latest = {};
   allSnaps.filter(s => s.mes === mes).forEach(s => { if (!latest[s.sede]) latest[s.sede] = s; });
@@ -436,10 +454,26 @@ function loadMes(mes) {
     });
   });
 
+  // Ventas de la caja: el nombre es el del inventario; la cantidad viene aparte
+  caja.forEach(v => {
+    if (!SEDES.includes(v.sede)) return;
+    const info = resolverProducto(v.producto);
+    if (!info) return;
+    const cat  = info.cat || 'otros';
+    const base = info.canonical || '(sin nombre)';
+    const key  = norm(base) + '||' + cat;
+    if (!agg[key]) agg[key] = { base, categoria: cat, units: 0, revenue: 0, sedes: {} };
+    const a = agg[key];
+    a.units += v.cantidad; a.revenue += v.total;
+    if (!a.sedes[v.sede]) a.sedes[v.sede] = { units: 0, revenue: 0 };
+    a.sedes[v.sede].units += v.cantidad; a.sedes[v.sede].revenue += v.total;
+  });
+
   productos = Object.values(agg);
-  const sedesConDatos = SEDES.filter(s => latest[s]);
+  const sedesConDatos = SEDES.filter(s => latest[s] || caja.some(v => v.sede === s));
   document.getElementById('dashPeriod').textContent =
-    `${mes} · ${sedesConDatos.length ? sedesConDatos.join(' · ') : 'sin sedes con ventas'}`;
+    `${mes} · ${sedesConDatos.length ? sedesConDatos.join(' · ') : 'sin sedes con ventas'}` +
+    (caja.length ? ' · incluye ventas de caja' : '');
   render();
   document.getElementById('dashboard').style.display = 'block';
 }
