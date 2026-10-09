@@ -330,6 +330,22 @@ function classify(p) {
   return 'memb';
 }
 
+// ── Ventas de productos cobradas en la caja (facturas_caja, ver facturacion.sql) ──
+// Desde que la minita se factura en caja ya no viene en el archivo de ventas del
+// sistema anterior, así que el reporte suma las dos fuentes. Eventos y anuladas no cuentan.
+async function ventasCajaMes(mesOrden) {
+  if (!/^\d{4}-\d{2}$/.test(mesOrden || '')) return [];
+  const [y, m] = mesOrden.split('-').map(Number);
+  const sig = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+  try {
+    const fs = (await supaFetch(`/facturas_caja?fecha=gte.${mesOrden}-01&fecha=lt.${sig}-01&estado=eq.activa&select=sede,tipo,items,created_by`)) || [];
+    return fs.filter(f => (f.tipo || 'producto') === 'producto')
+      .flatMap(f => (f.items || []).map(it => ({ sede: f.sede, producto: it.producto, cantidad: Number(it.cantidad) || 0,
+                                                total: Number(it.total) || 0, vendedor: f.created_by })));
+  } catch (_) { return []; }   // sin la tabla o sin permiso: el reporte sigue solo con el archivo
+}
+let ventasCaja = [];   // ventas de caja del mes elegido
+
 // ── Carga automática desde gym_snapshots ────────────────────────────────────
 let chartBar = null, chartPie = null;
 let gastosMes = {};   // sede → { total, grupales, planta } del mes seleccionado
@@ -392,6 +408,7 @@ async function loadAllSedes(mesElegido) {
       await Metas.cargar(metaMes);
     }
 
+    ventasCaja = await ventasCajaMes(ordenMes);
     buildDashboard(latest);
     document.getElementById('dashboard').style.display = 'block';
   } catch(e) {
@@ -422,7 +439,8 @@ function buildDashboard(latest) {
   }
 
   // filas de venta por sede, derivadas de renov_data (RegistradoPor/Producto/Total)
-  const rowsBySede = {};
+  // más las ventas de productos cobradas en la caja (todas son minita o accesorios)
+  const rowsBySede = {}, cajaBySede = {};
   SEDES.forEach(s => {
     const snap = latest[s];
     rowsBySede[s] = (snap?.renov_data || []).map(r => ({
@@ -431,17 +449,24 @@ function buildDashboard(latest) {
       total: Number(r.Total) || 0,
       cat: classify(r.Producto)
     }));
+    cajaBySede[s] = ventasCaja.filter(v => v.sede === s).map(v => {
+      const c = classify(v.producto);
+      return { vendedor: v.vendedor ? String(v.vendedor).split('@')[0] + ' (caja)' : 'Caja',
+               producto: v.producto, total: v.total, cat: c === 'accesorios' ? 'accesorios' : 'minita' };
+    });
   });
 
   let total = 0, memb = 0, minita = 0, pt = 0, accesorios = 0;
   const sedeSummary = {};
   SEDES.forEach(s => {
     const snap = latest[s];
-    if (!snap) return;
-    const rows = rowsBySede[s];
-    const tot = rows.length
-      ? rows.reduce((a,r)=>a+r.total,0)
-      : (snap.renovaciones?.total || 0); // fallback si no hay detalle (ej. Natación)
+    if (!snap && !cajaBySede[s].length) return;
+    const rowsArchivo = rowsBySede[s], rowsCaja = cajaBySede[s];
+    const rows = rowsArchivo.concat(rowsCaja);
+    const tot = (rowsArchivo.length
+      ? rowsArchivo.reduce((a,r)=>a+r.total,0)
+      : (snap?.renovaciones?.total || 0))   // fallback si no hay detalle (ej. Natación)
+      + rowsCaja.reduce((a,r)=>a+r.total,0);
     const mem  = rows.filter(r=>r.cat==='memb').reduce((a,r)=>a+r.total,0);
     const min  = rows.filter(r=>r.cat==='minita').reduce((a,r)=>a+r.total,0);
     const pt_  = rows.filter(r=>r.cat==='pt').reduce((a,r)=>a+r.total,0);
@@ -451,7 +476,7 @@ function buildDashboard(latest) {
     rows.forEach(r => { vMap[r.vendedor] = (vMap[r.vendedor]||0) + r.total; });
     const vRank = Object.entries(vMap).sort((a,b)=>b[1]-a[1]);
 
-    sedeSummary[s] = { tot, mem, min, pt: pt_, acc, vRank, hasDetalle: rows.length > 0, mes: snap.mes, updated_at: snap.updated_at, fe: snap.fe_total || 0, feCount: snap.fe_count || 0 };
+    sedeSummary[s] = { tot, mem, min, pt: pt_, acc, vRank, hasDetalle: rows.length > 0, mes: snap?.mes || mesTxt, updated_at: snap?.updated_at || null, fe: snap?.fe_total || 0, feCount: snap?.fe_count || 0 };
     total += tot; memb += mem; minita += min; pt += pt_; accesorios += acc;
   });
 
