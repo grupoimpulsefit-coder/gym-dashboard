@@ -306,7 +306,7 @@ table.hist tbody tr:hover td { background:var(--fill); }
   <div class="topbar-controls" id="topUploads">
     <label class="btn-ghost" for="fileVentas" style="cursor:pointer;">📤 Informe de Ventas</label>
     <input type="file" id="fileVentas" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarInformeVentas(this.files[0])">
-    <label class="btn-ghost" for="fileVentasProd" style="cursor:pointer;">📦 Ventas por Producto</label>
+    <label class="btn-ghost" for="fileVentasProd" style="cursor:pointer;" title="Opcional: ya no hace falta para el cierre. Sirve para el cruce de SINPE por referencia o si se vendió algún producto en el sistema de membresías.">📦 Ventas por Producto (opcional)</label>
     <input type="file" id="fileVentasProd" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarVentasProducto(this.files[0])">
     <label class="btn-ghost" for="fileSinpe" style="cursor:pointer;">🔷 Reporte SINPE</label>
     <input type="file" id="fileSinpe" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarReporteSinpe(this.files[0])">
@@ -370,8 +370,9 @@ table.hist tbody tr:hover td { background:var(--fill); }
         <div class="f-row"><label>Caja inicial (₡)</label><input type="number" id="cCajaInicial" step="1" oninput="calc()"></div>
         <div class="hint" id="cajaInicialHint" style="margin:-4px 0 10px;"></div>
         <div class="f-row"><label>Membresías (₡)</label><input type="number" id="cMembresias" step="1" oninput="calc()"></div>
+        <div class="hint" style="margin:-4px 0 8px;">Se llena solo con el <b>Informe de Ventas</b>: todo lo cobrado en el sistema de membresías (planes, clases y sesiones).</div>
         <div class="f-row"><label>Otros vendidos (₡)</label><input type="number" id="cOtros" step="1" oninput="calc()"></div>
-        <div class="hint" id="otrosHint" style="margin:-4px 0 8px;">Solo productos “Otros” (sin sesiones ni membresías) del Ventas por Producto. Lo facturado en caja se suma aparte.</div>
+        <div class="hint" id="otrosHint" style="margin:-4px 0 8px;">Productos vendidos en el sistema de membresías (normalmente 0: los productos se cobran en la pestaña Facturación, que se suma aparte). Solo se llena si se carga el Ventas por Producto.</div>
         <div class="f-row"><label>Total Tarjeta (₡)</label><input type="number" id="cTarjeta" step="1" readonly title="Se carga desde el Informe de Ventas" ></div>
         <div class="f-row"><label>Total SINPE (₡)</label><input type="number" id="cSinpe" step="1" readonly title="Se carga desde el Informe de Ventas" ></div>
         <div class="f-row"><label>Total Transferencia (₡)</label><input type="number" id="cTransfer" step="1" readonly title="Se carga desde el Informe de Ventas" ></div>
@@ -1199,8 +1200,13 @@ function cargarInformeVentas(file){
       document.getElementById('cSinpe').value=Math.round(sinpe);
       document.getElementById('cTransfer').value=Math.round(transfer);
       document.getElementById('cTotalVentas').value=Math.round(total);
+      // Los productos ya se cobran en la pestaña Facturación: lo del sistema de membresías es membresías
+      // (planes + clases/sesiones). Si se cargó el Ventas por Producto y trajo productos, se restan.
+      const otrosPOS=Number(document.getElementById('cOtros').value)||0;
+      const memb=Math.max(0,Math.round(total-otrosPOS));
+      document.getElementById('cMembresias').value=memb;
       window._informeVentas={efectivo:Math.round(efectivo),sinpe:Math.round(sinpe),tarjeta:Math.round(tarjeta),transfer:Math.round(transfer),total:Math.round(total)};
-      document.getElementById('ventasHint').innerHTML=`📄 Informe del día (acumulado): Efectivo ${fmt(efectivo)} · Tarjeta ${fmt(tarjeta)} · SINPE ${fmt(sinpe)} · Transferencia ${fmt(transfer)} · <b>Total ${fmt(total)}</b>. El cuadre es contra el fondo del primer turno del día.`;
+      document.getElementById('ventasHint').innerHTML=`📄 Informe del día (acumulado): Efectivo ${fmt(efectivo)} · Tarjeta ${fmt(tarjeta)} · SINPE ${fmt(sinpe)} · Transferencia ${fmt(transfer)} · <b>Total ${fmt(total)}</b> → <b>Membresías ${fmt(memb)}</b>${otrosPOS?` (sin ${fmt(otrosPOS)} de productos)`:''}. El cuadre es contra el fondo del primer turno del día.`;
       calc();
     }catch(err){alert('Error al leer el archivo: '+err.message);}
   };
@@ -1510,7 +1516,7 @@ function renderOtrosResumen(map){
 // Imprime el desglose de "Otros/minita" tal como se ve en pantalla (por categoría).
 function imprimirDesgloseOtros(){
   const map=desgloseMinita(window._otrosResumen); const keys=Object.keys(map);
-  if(!keys.length){ alert('No hay productos vendidos: facture en la pestaña Facturación o cargue "Ventas por Producto".'); return; }
+  if(!keys.length){ alert('No hay productos vendidos: se facturan en la pestaña Facturación.'); return; }
   const pu=it=>{ const q=Number(it.qty)||0; return q>0?Math.round((Number(it.total)||0)/q):(Number(it.total)||0); };   // monto unitario de venta = total ÷ cantidad
   const groups={}; let gtotal=0, gqty=0;
   keys.forEach(k=>{ const it=map[k]; const cat=it.cat||resolverOtro(it.base||k).cat; (groups[cat]=groups[cat]||[]).push(it); gtotal+=Number(it.total)||0; gqty+=Number(it.qty)||0; });
@@ -1612,9 +1618,11 @@ function cargarVentasProducto(file){
       const totMemb=Math.round(sum(memb)), totClases=Math.round(sum(clases)), totSinC=Math.round(sum(sinclasif));
       const totalVentas=totMemb+totClases+totSinC;
       const totMembCaja=totMemb+totClases;   // caja.html: membresías incluye clases grupales y sesiones de gym
-      document.getElementById('cTotalVentas').value=totalVentas;
-      document.getElementById('cMembresias').value=totMembCaja;
       document.getElementById('cOtros').value=totSinC;   // minita = solo productos "Otros" (sin sesiones ni membresías), acumulado del día
+      // El Informe de Ventas manda (es contra lo que se cuadra): si ya está cargado, el total queda el
+      // suyo y membresías = total − productos. Sin Informe, se usa lo que trae este archivo.
+      if(window._informeVentas) document.getElementById('cMembresias').value=Math.max(0,Math.round(window._informeVentas.total-totSinC));
+      else { document.getElementById('cTotalVentas').value=totalVentas; document.getElementById('cMembresias').value=totMembCaja; }
       const ref=fechas.length?new Date(Math.max(...fechas)):new Date();
       const mes=ref.toLocaleDateString('es-CR',{month:'long',year:'numeric'}).replace(/^\w/,c=>c.toUpperCase());
       const mesOrden=`${ref.getFullYear()}-${String(ref.getMonth()+1).padStart(2,'0')}`;
