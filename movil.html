@@ -155,6 +155,11 @@
   .toast.show{opacity:.95}
   .btn.plain{background:var(--fill);color:var(--label)}
   .btn.plain svg{stroke:var(--label)}
+  .btn.danger{background:var(--red-tint);color:var(--red)}
+  .btn.danger svg{stroke:var(--red)}
+  .sheet-body select.qty{width:58%;text-align:right;font-weight:400;-webkit-appearance:none;appearance:none}
+  .sheet-body .search{margin:0 0 10px}
+  .sheet-body .search input{background:var(--fill)}
   .pill.wrap{white-space:normal;height:auto;min-height:24px;padding:3px 9px;line-height:1.25;text-align:left}
   .foto img{cursor:zoom-in}
   .foto img.zoom{max-height:none;cursor:zoom-out}
@@ -187,7 +192,7 @@
 
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-10-07a';
+const APP_VER='2026-10-08a';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -200,6 +205,7 @@ const ICONS={
   gastos:'<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h6M9 16h6"/></svg>',
   inventario:'<svg viewBox="0 0 24 24"><path d="M3 8l9-4 9 4-9 4z"/><path d="M3 8v8l9 4 9-4V8"/><path d="M12 12v8"/></svg>',
   cierres:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  rebajo:'<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12h8"/></svg>',
   envios:'<svg viewBox="0 0 24 24"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></svg>',
   proyecciones:'<svg viewBox="0 0 24 24"><path d="M4 18L10 11l4 4 6-8"/><path d="M15 7h5v5"/></svg>',
   arqueo:'<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8 13l3 3 5-6"/></svg>',
@@ -757,7 +763,7 @@ async function renderInventarioMod(){
   const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
   let rows; try{ rows=await loadInventario(detSede); }catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar el inventario: ${esc(e.message)}</div>`; return; }
   pintarInventario(v,rows);
-  pintarArqueosRecientes(v);
+  pintarArqueosRecientes(v).then(()=>pintarRebajosRecientes(v));
 }
 function pintarInventario(v,rows){
   const f=invFiltro.trim().toLowerCase();
@@ -772,9 +778,10 @@ function pintarInventario(v,rows){
       <div class="tile wide"><div><span class="l">Valor del inventario</span><div class="n num"><small>₡</small>${Math.round(valor).toLocaleString('es-CR')}</div></div>${upd?`<span class="pill status">Actualizado ${hora(upd)}</span>`:''}</div></div>
     ${puedeArquear()?`<div class="actionbar"><button class="btn primary" onclick="goMod('arqueo',()=>goMod('inventario'))">${ICONS.arqueo}Hacer arqueo de ${esc(detSede)}</button></div>`:''}
     ${esAdmin()?`<div class="actionbar"><button class="btn plain" onclick="abrirEnvio()">${ICONS.envios}Enviar mercadería a ${esc(detSede)}</button></div>`:''}
+    ${esAdmin()?`<div class="actionbar"><button class="btn plain" onclick="abrirRebajo()">${ICONS.rebajo}Rebajar inventario</button></div>`:''}
     <div class="search"><input type="search" placeholder="Buscar producto" value="${esc(invFiltro)}" oninput="invFiltro=this.value;pintarInventario(document.getElementById('view'),invCache['${esc(detSede)}']||[]);const i=document.querySelector('.search input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}"></div>
     <div class="sect"><div class="hdr">Stock actual · ${esc(detSede)}</div><div class="group">${items||'<div class="cell"><span class="s">Sin productos.</span></div>'}</div>
-      <div class="ftr">Stock del sistema (se descuenta al subir "Ventas por Producto"). Solo lectura; los ajustes se hacen en Inventario.</div></div>`;
+      <div class="ftr">Stock del sistema (se descuenta al subir "Ventas por Producto"). ${esAdmin()?'Mermas, vencidos o consumo interno: "Rebajar inventario"; queda en el kardex con su motivo.':'Solo lectura; los ajustes los hace un administrador.'}</div></div>`;
 }
 
 // Gastos: del mes, solo esta sede
@@ -814,15 +821,60 @@ async function renderEnviosMod(){
   const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div></div>';
   let rows; try{ rows=(await supaFetch(`/envios_mercaderia?sede=eq.${encodeURIComponent(detSede)}&order=created_at.desc&limit=20&select=id,estado,items,nota,created_at,aceptado_at,aceptado_por,created_by`))||[]; }
   catch(e){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(e.message)}</div>`; return; }
+  enviosRows=rows;
   const pend=rows.filter(r=>r.estado==='pendiente'), acep=rows.filter(r=>r.estado!=='pendiente');
   const item=r=>{ const items=Array.isArray(r.items)?r.items:[]; const n=items.reduce((s,i)=>s+(Number(i.enviado)||0),0);
-    const det=items.map(i=>`<div class="cell"><div class="main"><span class="t">${esc(i.producto)}</span></div><span class="v num">${r.estado==='pendiente'?'enviado '+(i.enviado??0):(i.enviado??0)+' → recibido '+(i.recibido==null?'—':i.recibido)}</span></div>`).join('');
-    return `<button class="cell" onclick="const d=document.getElementById('env_${r.id}');d.hidden=!d.hidden"><div class="main"><span class="t">${items.length} producto(s) · ${n} unidades</span><span class="s">${new Date(r.created_at).toLocaleDateString('es-CR',{day:'numeric',month:'short'})} ${hora(r.created_at)}${r.aceptado_at?' · aceptado '+hora(r.aceptado_at):''}${r.nota?' · '+esc(r.nota):''}</span></div><span class="pill ${r.estado==='pendiente'?'warn':'ok'}">${r.estado==='pendiente'?'Por aceptar':'Aceptado'}</span><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button><div id="env_${r.id}" hidden>${det}</div>`; };
+    return `<button class="cell" onclick="verEnvio('${r.id}')"><div class="main"><span class="t">${items.length} producto(s) · ${n} unidades</span><span class="s">${new Date(r.created_at).toLocaleDateString('es-CR',{day:'numeric',month:'short'})} ${hora(r.created_at)}${r.created_by?' · '+esc(quien(r.created_by)):''}${r.aceptado_at?' · aceptado '+hora(r.aceptado_at):''}</span></div><span class="pill ${r.estado==='pendiente'?'warn':'ok'}">${r.estado==='pendiente'?'Por aceptar':'Aceptado'}</span><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`; };
   v.innerHTML=`
     ${esAdmin()?`<div class="actionbar"><button class="btn primary" onclick="abrirEnvio()">${ICONS.envios}Enviar mercadería a ${esc(detSede)}</button></div>`:''}
     <div class="tiles"><div class="tile"><span class="l">Por aceptar</span><span class="n num" style="color:${pend.length?'var(--orange)':'var(--green)'}">${pend.length}</span></div><div class="tile"><span class="l">Aceptados (últimos)</span><span class="n num">${acep.length}</span></div></div>
-    ${pend.length?`<div class="sect"><div class="hdr">Pendientes</div><div class="group">${pend.map(item).join('')}</div><div class="ftr">Recepción los acepta desde Caja indicando lo que realmente llegó; el stock se suma con lo recibido.</div></div>`:''}
+    ${pend.length?`<div class="sect"><div class="hdr">Pendientes</div><div class="group">${pend.map(item).join('')}</div><div class="ftr">Recepción los acepta desde Caja indicando lo que realmente llegó; el stock se suma con lo recibido.${esAdmin()?' Tocá uno para ver el detalle o cancelarlo.':''}</div></div>`:''}
     <div class="sect"><div class="hdr">Historial</div><div class="group">${acep.length?acep.map(item).join(''):'<div class="cell"><span class="s">Sin envíos aceptados todavía.</span></div>'}</div></div>`;
+}
+
+let enviosRows=[];
+const quien=e=>String(e||'').split('@')[0];
+const fechaHora=t=>t?new Date(t).toLocaleDateString('es-CR',{day:'numeric',month:'short'})+' '+hora(t):'—';
+function verEnvio(id){
+  const r=enviosRows.find(x=>x.id===id); if(!r) return;
+  const items=Array.isArray(r.items)?r.items:[]; const pend=r.estado==='pendiente';
+  const n=items.reduce((s,i)=>s+(Number(i.enviado)||0),0);
+  const fila=(t,v)=>`<div class="cell"><div class="main"><span class="t">${t}</span></div><span class="v">${v}</span></div>`;
+  const sh=document.getElementById('sheet');
+  sh.innerHTML=`<div class="sheet-bg" onclick="cerrarSheet()"></div>
+    <div class="sheet-panel" role="dialog" aria-label="Envío">
+      <div class="sheet-h"><button class="act" onclick="cerrarSheet()">Cerrar</button><span class="tt">Envío a ${esc(detSede)}</span><span class="act" style="visibility:hidden">Cerrar</span></div>
+      <div class="sheet-body">
+        <div class="group" style="margin:0">
+          ${fila('Estado',`<span class="pill ${pend?'warn':'ok'}">${pend?'Por aceptar':'Aceptado'}</span>`)}
+          ${fila('Enviado por',esc(r.created_by||'—'))}
+          ${fila('Creado',esc(fechaHora(r.created_at)))}
+          ${pend?'':fila('Aceptado por',esc(r.aceptado_por||'—'))+fila('Aceptado',esc(fechaHora(r.aceptado_at)))}
+          ${r.nota?fila('Nota de recepción',esc(r.nota)):''}
+        </div>
+        <div class="hdr" style="padding:16px 0 6px">${items.length} producto(s) · ${n} unidades</div>
+        <div class="group" style="margin:0">${items.map(i=>{ const env=Number(i.enviado)||0, rec=i.recibido==null?null:Number(i.recibido);
+          return `<div class="cell"><div class="main"><span class="t">${esc(i.producto)}</span>${!pend&&rec!=null&&rec!==env?`<span class="s" style="color:var(--red)">llegaron ${env-rec} menos</span>`:''}</div><span class="v num">${pend?'enviado '+env:env+' → '+(rec==null?'—':rec)}</span></div>`; }).join('')||'<div class="cell"><span class="s">Sin productos.</span></div>'}</div>
+        ${pend&&esAdmin()?`<div style="padding-top:18px"><button class="btn danger" id="btnCancelEnv" onclick="cancelarEnvio('${r.id}')">Cancelar envío</button></div>
+          <div class="ftr" style="padding:8px 0 0;text-align:center">Se borra el envío. No afecta el stock: nunca se sumó.</div>`
+          :pend?'<div class="ftr" style="padding:12px 0 0">Recepción lo acepta desde Caja. Solo un administrador puede cancelarlo.</div>'
+          :'<div class="ftr" style="padding:12px 0 0">Ya fue aceptado y el stock se sumó: no se puede cancelar. Si hay que corregir, hacé un rebajo desde Inventario.</div>'}
+      </div></div>`;
+  sh.hidden=false; document.body.style.overflow='hidden';
+}
+async function cancelarEnvio(id){
+  if(!esAdmin()) return;
+  const r=enviosRows.find(x=>x.id===id); if(!r) return;
+  const prods=(r.items||[]).map(i=>`${i.producto} (${i.enviado})`).join(', ');
+  if(!confirm(`¿Cancelar este envío pendiente a ${detSede}?\n\n${prods}\n\nNo afecta el stock (nunca se sumó). No se puede deshacer.`)) return;
+  const b=document.getElementById('btnCancelEnv'); if(b){ b.disabled=true; b.textContent='Cancelando…'; }
+  try{
+    // Solo borra si sigue pendiente: si recepción lo acaba de aceptar, no se toca
+    const out=await supaFetch(`/envios_mercaderia?id=eq.${encodeURIComponent(id)}&estado=eq.pendiente`,{method:'DELETE',prefer:'return=representation'});
+    cerrarSheet();
+    toast(out&&out.length?'Envío cancelado.':'No se canceló: recepción ya lo había aceptado.');
+    renderEnviosMod();
+  }catch(e){ if(b){ b.disabled=false; b.textContent='Cancelar envío'; } toast('No se pudo cancelar: '+e.message); }
 }
 
 // Proyecciones (solo admin): último snapshot de la sede
@@ -1006,6 +1058,83 @@ async function enviarMercaderia(){
     cerrarSheet(); toast(`Envío creado: ${it.length} producto(s). Pendiente de que recepción lo acepte.`);
     if(curMod==='envios') renderEnviosMod();
   }catch(e){ err.textContent='No se pudo enviar: '+e.message; b.disabled=false; b.textContent='Enviar'; }
+}
+
+// ── Rebajos de inventario (solo admins; inventario_proteccion.sql impide que otros roles bajen stock).
+// Cada rebajo queda en el kardex (inventario_movimientos) como tipo "ajuste" con su motivo y usuario.
+const MOTIVOS_REBAJO=['Merma / dañado','Vencido','Consumo interno','Cortesía / regalía','Otro'];
+let reb={items:{}};
+async function abrirRebajo(){
+  if(!esAdmin()) return;
+  let rows; try{ rows=await loadInventario(detSede); }catch(e){ toast('No se pudo cargar el inventario: '+e.message); return; }
+  reb={items:{},rows};
+  const sh=document.getElementById('sheet');
+  sh.innerHTML=`<div class="sheet-bg" onclick="cerrarSheet()"></div>
+    <div class="sheet-panel" role="dialog" aria-label="Rebajar inventario">
+      <div class="sheet-h"><button class="act" onclick="cerrarSheet()">Cancelar</button><span class="tt">Rebajar en ${esc(detSede)}</span><button class="act" id="btnRebajar" onclick="aplicarRebajo()" disabled>Rebajar</button></div>
+      <div class="sheet-body">
+        <div class="group" style="margin:0">
+          <div class="cell"><div class="main"><span class="t">Motivo</span></div><select class="qty" id="rebMotivo" onchange="rebResumen()">${MOTIVOS_REBAJO.map(m=>`<option>${esc(m)}</option>`).join('')}</select></div>
+          <div class="cell"><div class="main"><span class="t">Detalle</span></div><input class="qty" id="rebDetalle" type="text" placeholder="Opcional" maxlength="120" style="width:58%;text-align:right;font-weight:400" oninput="rebResumen()"></div>
+        </div>
+        <div class="hdr" style="padding:16px 0 6px">Cantidad a rebajar</div>
+        <div class="search"><input type="search" placeholder="Buscar producto" oninput="rebFiltrar(this.value)"></div>
+        <div class="group" style="margin:0">${rows.length?rows.map(r=>{ const q=Number(r.cantidad)||0;
+          return `<div class="cell" data-n="${esc(String(r.producto||'').toLowerCase())}"><div class="main"><span class="t">${esc(r.producto)}</span><span class="s num" id="rebS_${r.id}">stock ${q}</span></div><input class="qty num" type="number" inputmode="numeric" min="0" max="${q}" step="1" placeholder="0" oninput="rebInput('${r.id}',this.value)"></div>`; }).join(''):'<div class="cell"><span class="s">Sin productos en inventario.</span></div>'}</div>
+        <div class="ftr" id="rebSum" style="padding:10px 0 0"></div><div class="err" id="rebErr"></div>
+        <div class="ftr" style="padding:6px 0 0">Baja el stock del sistema ya. Queda en el kardex con el motivo y quién lo hizo.</div>
+      </div></div>`;
+  sh.hidden=false; document.body.style.overflow='hidden';
+}
+function rebFiltrar(t){ const f=t.trim().toLowerCase(); document.querySelectorAll('#sheet .cell[data-n]').forEach(c=>{ c.hidden=!!f&&!c.dataset.n.includes(f); }); }
+function rebInput(id,val){ const n=Math.max(0,Math.floor(Number(val)||0)); if(n) reb.items[id]=n; else delete reb.items[id];
+  const r=reb.rows.find(x=>x.id===id); const q=Number(r?.cantidad)||0; const s=document.getElementById('rebS_'+id);
+  if(s){ s.textContent=n?`stock ${q} → ${q-n}`:`stock ${q}`; s.style.color=n>q?'var(--red)':''; }
+  rebResumen(); }
+function rebResumen(){
+  const ids=Object.keys(reb.items); const err=document.getElementById('rebErr'); err.textContent='';
+  const u=ids.reduce((s,id)=>s+reb.items[id],0);
+  const val=ids.reduce((s,id)=>{ const r=reb.rows.find(x=>x.id===id); return s+reb.items[id]*(Number(r?.precio)||0); },0);
+  document.getElementById('rebSum').textContent=ids.length?`${ids.length} producto(s) · ${u} unidades · ${fmt(val)}`:'';
+  const pasados=ids.filter(id=>reb.items[id]>(Number(reb.rows.find(x=>x.id===id)?.cantidad)||0));
+  const otroSinDet=document.getElementById('rebMotivo').value==='Otro'&&!document.getElementById('rebDetalle').value.trim();
+  if(pasados.length) err.textContent='No se puede rebajar más de lo que hay en stock.';
+  else if(ids.length&&otroSinDet) err.textContent='Con motivo "Otro", escribí el detalle.';
+  document.getElementById('btnRebajar').disabled=!ids.length||!!pasados.length||otroSinDet;
+}
+async function aplicarRebajo(){
+  if(!esAdmin()) return;
+  const ids=Object.keys(reb.items); if(!ids.length) return;
+  const motivo=document.getElementById('rebMotivo').value, det=document.getElementById('rebDetalle').value.trim();
+  const lista=ids.map(id=>{ const r=reb.rows.find(x=>x.id===id); return `${r.producto}: −${reb.items[id]}`; }).join('\n');
+  if(!confirm(`¿Rebajar en ${detSede}?\n\n${lista}\n\nMotivo: ${motivo}${det?' · '+det:''}`)) return;
+  const b=document.getElementById('btnRebajar'); b.disabled=true; b.textContent='Rebajando…';
+  const movMotivo=`ajuste: rebajo · ${motivo}${det?' · '+det:''}`;
+  let ok=0; const fallos=[];
+  for(const id of ids){
+    const r=reb.rows.find(x=>x.id===id); const n=reb.items[id];
+    try{
+      // Se parte del stock ACTUAL y solo se escribe si nadie lo cambió entre medio (p. ej. ventas subiendo)
+      let hecho=false;
+      for(let intento=0; intento<3 && !hecho; intento++){
+        const cur=await supaFetch(`/inventario?id=eq.${id}&select=cantidad`); const q=Number(cur?.[0]?.cantidad)||0;
+        if(n>q) throw new Error(`solo hay ${q}`);
+        const out=await supaFetch(`/inventario?id=eq.${id}&cantidad=eq.${q}`,{method:'PATCH',prefer:'return=representation',body:{cantidad:q-n,updated_at:new Date().toISOString(),mov_motivo:movMotivo}});
+        hecho=!!(out&&out.length);
+      }
+      if(!hecho) throw new Error('el stock cambió mientras se guardaba, intentá de nuevo');
+      ok++;
+    }catch(e){ fallos.push(`${r.producto} (${e.message})`); }
+  }
+  invCache[detSede]=null;
+  if(fallos.length){ b.textContent='Rebajar'; document.getElementById('rebErr').textContent=`Se rebajaron ${ok} de ${ids.length}. Sin rebajar: ${fallos.join('; ')}`;
+    fallos.length===ids.length?b.disabled=false:null; if(ok) renderInventarioMod(); return; }
+  cerrarSheet(); toast(`Rebajo aplicado: ${ok} producto(s).`); renderInventarioMod();
+}
+async function pintarRebajosRecientes(v){
+  let rows; try{ rows=(await supaFetch(`/inventario_movimientos?sede=eq.${encodeURIComponent(detSede)}&motivo=like.${encodeURIComponent('ajuste: rebajo*')}&order=created_at.desc&limit=10&select=producto,delta,motivo,usuario,created_at`))||[]; }catch(_){ return; }
+  if(!rows.length||curMod!=='inventario') return;
+  v.insertAdjacentHTML('beforeend',`<div class="sect"><div class="hdr">Rebajos recientes</div><div class="group">${rows.map(m=>`<div class="cell"><div class="main"><span class="t">${esc(m.producto)}</span><span class="s">${esc(String(m.motivo||'').replace(/^ajuste: rebajo · /,''))} · ${esc(fechaHora(m.created_at))}${m.usuario?' · '+esc(quien(m.usuario)):''}</span></div><span class="v strong num" style="color:var(--red)">${Number(m.delta)||0}</span></div>`).join('')}</div></div>`);
 }
 
 // ── Salto a los módulos completos (misma sesión, vía handoff gymAuth como index.html) ──
