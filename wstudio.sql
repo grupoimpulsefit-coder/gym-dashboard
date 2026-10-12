@@ -1,0 +1,12 @@
+-- ══════════════════════════════════════════════════════════════════════════
+--  CAJA — montos para abrir y cerrar el turno en WStudio
+--  Correr una vez en el SQL editor de Supabase. Se puede repetir sin problema.
+--
+--  WStudio solo conoce las membresías, pero la minita y los eventos que se
+--  cobran en caja.html entran a la misma gaveta, datáfono y SINPE. Al cerrar
+--  cada turno, caja.html calcula y guarda aquí lo que se declaró en WStudio
+--  (solo membresías), para que el turno siguiente abra con esos mismos montos:
+--    { cierre: { efectivo, tarjeta, sinpe, transferencia } }
+--  Sin esta columna caja.html los deduce del informe y la diferencia guardados.
+-- ══════════════════════════════════════════════════════════════════════════
+alter table cierres_caja add column if not exists wstudio jsonb;

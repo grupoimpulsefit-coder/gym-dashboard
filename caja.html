@@ -233,6 +233,19 @@ table.denom tfoot td:last-child { border-radius:0 0 10px 0; }
 .ev-checks label { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:var(--fill);
   font-size:13px; font-weight:600; cursor:pointer; }
 
+/* ── Recuadro WStudio ── */
+.ws-card { border:1.5px solid var(--brand); }
+.ws-card h3 { color:var(--brand-text); }
+.ws-sub { font-size:12px; font-weight:600; color:var(--sec); text-transform:uppercase; letter-spacing:.04em; margin:12px 0 2px; }
+.ws-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:10px; align-items:center; padding:7px 0; border-bottom:.5px solid var(--hair); }
+.ws-row:last-child { border-bottom:0; }
+.ws-row .v { font-size:18px; font-weight:700; font-variant-numeric:tabular-nums; }
+.ws-copy { border:0; background:var(--brand-tint); color:var(--brand-text); font-weight:600; font-size:12px; border-radius:8px; padding:6px 10px; min-width:72px; }
+.ws-copy.ok { background:var(--green-tint); color:var(--green); }
+.ws-calc { display:grid; gap:3px; margin-top:6px; font-variant-numeric:tabular-nums; }
+.ws-calc div { display:flex; justify-content:space-between; gap:10px; color:var(--sec); }
+.ws-calc div.t { color:var(--label); font-weight:700; border-top:.5px solid var(--sep); padding-top:4px; }
+
 /* ── Historial ── */
 .tbl-wrap { overflow-x:auto; background:var(--card); border-radius:12px; box-shadow:var(--shadow); }
 table.hist { width:100%; border-collapse:separate; border-spacing:0; min-width:720px; }
@@ -365,6 +378,11 @@ table.hist tbody tr:hover td { background:var(--fill); }
   <div class="grid">
     <!-- Columna izquierda: datos + billetes -->
     <div>
+      <div class="card ws-card" id="wsCard" hidden>
+        <h3>🟢 Para WStudio</h3>
+        <div class="hint">Copie cada monto en la casilla del mismo nombre en WStudio (CRC). Es solo dinero de membresías: la minita y los eventos de esta caja no van allá. En WStudio no registre salidas de efectivo.</div>
+        <div id="wsBody"></div>
+      </div>
       <div class="card">
         <h3>Datos del cierre</h3>
         <div class="f-row"><label>Caja inicial (₡)</label><input type="number" id="cCajaInicial" step="1" oninput="calc()"></div>
@@ -914,7 +932,7 @@ async function abrirTurno(){
     document.getElementById('abrirModal').style.display='none';
     await loadCierres();
     const sm=document.getElementById('saveMsg'); sm.className='msg ok';
-    sm.innerHTML=`✅ Turno ${window._turnoNum} abierto (efectivo ${fmt(efectivo)}).`+(inv.length?(discrep.length?` <span style="color:var(--warn);">⚠ Inventario con ${discrep.length} diferencia(s): ${discrep.slice(0,5).map(esc).join('; ')}${discrep.length>5?'…':''}</span>`:' <span style="color:var(--success);">Inventario cuadra ✓</span>'):'');
+    sm.innerHTML=`✅ Turno ${window._turnoNum} abierto (efectivo ${fmt(efectivo)}). Arriba, en <b>🟢 Para WStudio</b>, están los montos para abrir allá.`+(inv.length?(discrep.length?` <span style="color:var(--warn);">⚠ Inventario con ${discrep.length} diferencia(s): ${discrep.slice(0,5).map(esc).join('; ')}${discrep.length>5?'…':''}</span>`:' <span style="color:var(--success);">Inventario cuadra ✓</span>'):'');
   }catch(e){ err.textContent='No se pudo abrir: '+e.message; }
   finally{ btn.disabled=false; btn.textContent='🔓 Abrir turno'; }
 }
@@ -1051,6 +1069,7 @@ function calc(){
   document.getElementById('rEfectivoFinal').textContent=fmt(efectivoFinal);
   document.getElementById('rOtros').textContent=fmt(sobreOut);
   renderFactCierreBox(fx);
+  renderWStudio({efectivo,cajaIni,totGastosDia,totIngresosDia,sobreOut,fx});
   saveDraft();
   if(window._sinpeReporte)renderSinpeResumen();
   if(fotoDatafono)renderFotoResumen();
@@ -1676,6 +1695,8 @@ async function cerrarTurno(estado){
     diferencia, estado_dif:diferencia===0?'OK':(diferencia>0?'Faltante':'Sobrante'),
     informe_ventas:window._informeVentas||null, estado, hora_cierre:new Date().toISOString(), ...facturadoPayload()
   };
+  const ws=wsCierre({...c, sobreOut});
+  if(ws && Object.prototype.hasOwnProperty.call(turnoActual,'wstudio')) payload.wstudio={cierre:ws};   // columna de wstudio.sql
   if(fotoDatafono){
     if(estado==='final') payload.foto_cierre=fotoDatafono.path; else payload.foto_datafono=fotoDatafono.path;
     const a=fotoDatafono.analisis||{}; const tj=Math.round(c.tarjeta);
@@ -2327,6 +2348,73 @@ function evExportar(){
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
   a.download=`evento_${e.nombre.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w]+/g,'_')}_${e.fecha}.csv`;
   document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
+}
+
+// ══ WStudio: montos para abrir y cerrar el turno allá ═════════════════════════
+// WStudio se abre en ₡0 el primer turno del día y solo conoce las membresías.
+// Tarjeta, SINPE y Transferencia: lo del Informe de Ventas (acumulado del día).
+// Efectivo: sale del conteo, sin fondo ni lo cobrado en esta caja, y sumando los
+// gastos y sobres que salieron (allá no se registran salidas). Es el efectivo del
+// Informe más la diferencia de este cierre: si aquí cuadra, allá también.
+const WS_CAMPOS=[['efectivo','💵 Efectivo'],['tarjeta','💳 Tarjeta'],['sinpe','🔷 SINPE'],['transferencia','🏦 Transferencia bancaria']];
+function wsCierre(c){
+  if(document.getElementById('cTarjeta').value==='') return null;   // falta el Informe de Ventas
+  const fx=c.fx||factCierre();
+  return { efectivo:Math.round(c.efectivo-c.cajaIni+c.totGastosDia-c.totIngresosDia+c.sobreOut-fx.efectivo),
+           tarjeta:Math.round(Number(document.getElementById('cTarjeta').value)||0),
+           sinpe:Math.round(Number(document.getElementById('cSinpe').value)||0),
+           transferencia:Math.round(Number(document.getElementById('cTransfer').value)||0) };
+}
+// Lo que se declaró al cerrar un turno ya guardado
+function wsDeFila(row){
+  if(!row) return null;
+  if(row.wstudio&&row.wstudio.cierre) return row.wstudio.cierre;
+  const inf=row.informe_ventas; if(!inf) return null;   // cierres viejos: se deduce del informe y la diferencia
+  return { efectivo:Math.round((Number(inf.efectivo)||0)-(Number(row.diferencia)||0)), tarjeta:Math.round(Number(inf.tarjeta)||0),
+           sinpe:Math.round(Number(inf.sinpe)||0), transferencia:Math.round(Number(inf.transfer)||0) };
+}
+// Apertura: turno 1 en ₡0; los demás con lo que cerró el turno anterior del día
+function wsApertura(fc){
+  if(!fc) return null;
+  const prev=(cierres||[]).filter(x=>x.sede===fc.sede&&x.fecha===fc.fecha&&x.id!==fc.id&&(x.estado==='parcial'||x.estado==='final')&&(Number(x.turno_num)||0)<(Number(fc.turno_num)||0))
+    .sort((a,b)=>(b.turno_num||0)-(a.turno_num||0))[0];
+  if(!prev) return {efectivo:0,tarjeta:0,sinpe:0,transferencia:0,primero:true};
+  const v=wsDeFila(prev); return v?{...v,turnoPrev:prev.turno_num}:{falta:true,turnoPrev:prev.turno_num};
+}
+function wsFilas(v,pref){
+  return WS_CAMPOS.map(([k,l])=>`<div class="ws-row"><span>${l}</span><span class="v" id="${pref}_${k}">${fmt(v[k])}</span>
+    <button type="button" class="ws-copy" onclick="wsCopiar(this,${Math.round(v[k]||0)})">Copiar</button></div>`).join('');
+}
+function wsCopiar(btn,n){
+  const ok=()=>{ btn.textContent='✓ Copiado'; btn.classList.add('ok'); setTimeout(()=>{ btn.textContent='Copiar'; btn.classList.remove('ok'); },1500); };
+  try{ navigator.clipboard.writeText(String(n)).then(ok,()=>{ prompt('Copie el monto:',n); }); }catch(_){ prompt('Copie el monto:',n); }
+}
+function renderWStudio(c){
+  const card=document.getElementById('wsCard'), body=document.getElementById('wsBody'); if(!card) return;
+  const fc=_formCierre();
+  if(!fc){ card.hidden=true; return; }
+  card.hidden=false;
+  const ap=wsApertura(fc);
+  let h=`<div class="ws-sub">Al abrir este turno${ap&&ap.turnoPrev?` (como cerró el turno ${ap.turnoPrev})`:''}</div>`;
+  h+= ap&&ap.primero ? '<div class="hint" style="padding:6px 0;">Primer turno del día: abra WStudio con <b>todo en ₡0</b>.</div>'
+    : ap&&!ap.falta ? wsFilas(ap,'wsA')
+    : '<div class="hint" style="padding:6px 0;color:var(--orange);">No se encontró lo que se declaró en el turno anterior.</div>';
+  const ci=wsCierre(c);
+  h+=`<div class="ws-sub">Al cerrar este turno</div>`;
+  if(!ci){ h+='<div class="hint" style="padding:6px 0;">Cargue el 📤 <b>Informe de Ventas</b> de WStudio para ver los montos.</div>'; }
+  else{
+    h+=wsFilas(ci,'wsC');
+    h+=`<details style="margin-top:8px;font-size:13px;"><summary style="cursor:pointer;color:var(--brand-text);font-weight:600;">¿Cómo se calculó el efectivo?</summary><div class="ws-calc">
+      <div><span>Efectivo contado</span><span>${fmt(c.efectivo)}</span></div>
+      <div><span>− Caja inicial (fondo del día)</span><span>−${fmt(c.cajaIni)}</span></div>
+      <div><span>+ Gastos y depósitos del día</span><span>+${fmt(c.totGastosDia)}</span></div>
+      <div><span>− Ingresos extra del día</span><span>−${fmt(c.totIngresosDia)}</span></div>
+      <div><span>+ Sobre de minita ya sacado</span><span>+${fmt(c.sobreOut)}</span></div>
+      <div><span>− Efectivo cobrado en esta caja (minita y eventos)</span><span>−${fmt(c.fx.efectivo)}</span></div>
+      <div class="t"><span>= Efectivo para WStudio</span><span>${fmt(ci.efectivo)}</span></div></div>
+      <div class="hint" style="margin-top:6px;">Tarjeta, SINPE y Transferencia son los del Informe de Ventas de WStudio.</div></details>`;
+  }
+  body.innerHTML=h;
 }
 
 // ── PDF (réplica del Excel de cierre) ──
