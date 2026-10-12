@@ -192,7 +192,7 @@
 
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-10-08a';
+const APP_VER='2026-10-12a';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -436,13 +436,14 @@ async function renderMod(showLoading){
 }
 
 /* ══ Mediciones: agenda del día, solo lunes a viernes ══
-   Espacios de 15 min · mañana 08:00–10:45 · tarde 17:00–19:45. */
+   Espacios de 15 min · mañana 07:30–10:30 · tarde 17:00–19:45 · viernes en la tarde no hay. */
 const MED_AM=[], MED_PM=[];
-for(let m=8*60;  m<=10*60+45; m+=15) MED_AM.push(m);
+for(let m=7*60+30; m<=10*60+30; m+=15) MED_AM.push(m);
 for(let m=17*60; m<=19*60+45; m+=15) MED_PM.push(m);
-const MED_SLOTS=MED_AM.length+MED_PM.length;
+const medPMDe=dow=>dow===4?[]:MED_PM;   // viernes (4) sin tarde
 const MED_DIAS=['lunes','martes','miércoles','jueves','viernes'];
 const medHH=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const medMin=h=>{const [a,b]=String(h||'').split(':').map(Number);return a*60+(b||0);};
 const medDow=s=>{const [y,m,d]=String(s).split('-').map(Number);return (new Date(y,m-1,d).getDay()+6)%7;};
 const medSuma=(s,n)=>{const [y,m,d]=String(s).split('-').map(Number);const x=new Date(y,m-1,d);x.setDate(x.getDate()+n);return ymd(x);};
 function medHabil(f,dir){ let g=0; while(medDow(f)>4 && g++<7) f=medSuma(f,dir||1); return f; }   // salta sábado y domingo
@@ -486,7 +487,10 @@ async function renderMedicionesMod(){
   const comp=medRows.filter(r=>r.rutina==='completa').length, inc=medRows.filter(r=>r.rutina==='incompleta').length;
   const aus=medRows.filter(r=>!r.rutina&&r.asistencia==='ausente').length;
   // Bloqueos que caen en un espacio sin cita (los que ya tienen cita no restan)
-  const nBloq=Object.keys(medBloq).filter(h=>!by[h]).length;
+  const amHoy=MED_AM, pmHoy=medPMDe(dow), validos=[...amHoy,...pmHoy].map(medHH);
+  const nBloq=Object.keys(medBloq).filter(h=>!by[h]&&validos.includes(h)).length;
+  const libres=validos.filter(h=>!by[h]&&!medBloq[h]).length;
+  const fuera=medRows.filter(r=>!validos.includes(String(r.hora||'').slice(0,5)));   // agendadas antes del cambio de horario
   const chevSvg='<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg>';
   const fila=m=>{ const h=medHH(m), c=by[h];
     if(c) return `<button class="cell" onclick="medAbrir('${h}')"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}</span></div>${medPill(c)}${chevSvg}</button>`;
@@ -502,13 +506,14 @@ async function renderMedicionesMod(){
   v.innerHTML=`
     <div class="tiles">
       <div class="tile"><span class="l">Agendadas</span><span class="n num">${medRows.length}</span></div>
-      <div class="tile"><span class="l">Libres</span><span class="n num">${MED_SLOTS-medRows.length-nBloq}</span></div>
+      <div class="tile"><span class="l">Libres</span><span class="n num">${libres}</span></div>
       <div class="tile"><span class="l">Completas</span><span class="n num" style="color:var(--green)">${comp}</span></div>
       <div class="tile"><span class="l">Incompletas</span><span class="n num" style="color:var(--red)">${inc}</span></div>
       <div class="tile"><span class="l">Ausentes</span><span class="n num" style="color:var(--orange)">${aus}</span></div>
     </div>
-    <div class="sect"><div class="hdr">Mañana · 8:00 a 10:45</div><div class="group">${MED_AM.map(fila).join('')}</div></div>
-    <div class="sect"><div class="hdr">Tarde · 5:00 a 7:45 p. m.</div><div class="group">${MED_PM.map(fila).join('')}</div>
+    ${fuera.length?`<div class="sect"><div class="hdr">⚠ Fuera del horario</div><div class="group">${fuera.map(r=>fila(medMin(r.hora))).join('')}</div><div class="ftr">Se agendaron antes del cambio de horario. Abrilas para eliminarlas y volver a agendarlas en un espacio válido.</div></div>`:''}
+    <div class="sect"><div class="hdr">Mañana · 7:30 a 10:30</div><div class="group">${amHoy.map(fila).join('')}</div></div>
+    <div class="sect"><div class="hdr">Tarde · 5:00 a 7:45 p. m.</div><div class="group">${pmHoy.length?pmHoy.map(fila).join(''):'<div class="cell"><span class="s">Viernes en la tarde no hay mediciones.</span></div>'}</div>
       <div class="ftr">${puedeRutinaMed()&&!puedeAgendarMed()?'Como instructor podés marcar la rutina y si el cliente llegó (presente).':'La rutina la marca el instructor. Ausente solo lo marca recepción.'} Sábado y domingo no hay medición.</div></div>`;
 }
 

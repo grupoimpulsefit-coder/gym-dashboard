@@ -169,6 +169,8 @@ td.slot{padding:3px}
 .cell.ausente{background:var(--orange-tint)} .cell.ausente .st{color:var(--orange)}
 .cell.sinmarcar .st{color:var(--orange)}
 .cell.ro{cursor:default}
+.cell.na{cursor:default;background:transparent;color:var(--ter)}
+.cell.na:hover{background:transparent}
 .cell.bloq{display:block;text-align:left;padding:6px 9px;font-size:13px;color:var(--sec);
   background:repeating-linear-gradient(135deg,var(--slot),var(--slot) 6px,var(--fill2) 6px,var(--fill2) 12px)}
 .cell.bloq .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -333,12 +335,19 @@ const DIAS_CORTO=['Lun','Mar','Mié','Jue','Vie'];
 const NDIAS=DIAS.length;
 const ROL_LABEL={admin:'⚙ Admin',admin_sedes:'🏢 Admin Sedes',admin_g:'💰 Admin Gastos',recepcion:'🧾 Recepción',admin_sucursal:'🏪 Admin Sucursal',coordinador:'📋 Coordinador',instructor:'🏋️ Instructor'};
 
-// Espacios de 15 min: mañana 08:00→10:45 · tarde 17:00→19:45 (la última es la hora de inicio)
+// Espacios de 15 min: mañana 07:30→10:30 · tarde 17:00→19:45 (la última es la hora de inicio).
+// Viernes en la tarde no hay mediciones.
 const SLOTS_AM=[], SLOTS_PM=[];
-for(let m=8*60;  m<=10*60+45; m+=15) SLOTS_AM.push(m);
+for(let m=7*60+30; m<=10*60+30; m+=15) SLOTS_AM.push(m);
 for(let m=17*60; m<=19*60+45; m+=15) SLOTS_PM.push(m);
 const SLOTS=[...SLOTS_AM,...SLOTS_PM];
 const hhmm=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const TXT_AM='Mañana · 7:30 a 10:30', TXT_PM='Tarde · 5:00 a 7:45 p. m.';
+const VIERNES=4;
+const haySlot=(dow,m)=>!(dow===VIERNES && m>=12*60);   // dow: lunes = 0
+const minDe=h=>{const [a,b]=String(h||'').split(':').map(Number);return a*60+(b||0);};
+// Citas agendadas antes del cambio de horario que ya no caen en un espacio válido
+const fueraDeHorario=c=>{const m=minDe(c.hora);return !SLOTS.includes(m)||!haySlot(dowDe(c.fecha),m);};
 
 let currentToken=null,currentRole=null,currentSede=null,currentEmail='',currentNombre='',currentSedes=[];
 
@@ -523,15 +532,16 @@ function render(){
   const comp=list.filter(c=>c.rutina==='completa').length, inc=list.filter(c=>c.rutina==='incompleta').length;
   // Espacios bloqueados de la semana visible (los permanentes cuentan una vez por día)
   let nBloq=0;
+  let nLibres=0;
   for(let i=0;i<NDIAS;i++){ const f=ymd(diaDe(i));
-    SLOTS.forEach(m=>{ const h=hhmm(m); if(!citas[f+'|'+h] && bloqueoDe(f,h)) nBloq++; }); }
+    SLOTS.forEach(m=>{ if(!haySlot(i,m)) return; const h=hhmm(m); if(citas[f+'|'+h]) return; if(bloqueoDe(f,h)) nBloq++; else nLibres++; }); }
   document.getElementById('kAgend').textContent=list.length;
   document.getElementById('kComp').textContent=comp;
   document.getElementById('kInc').textContent=inc;
   const aus=list.filter(c=>!c.rutina&&c.asistencia==='ausente').length;
   document.getElementById('kAus').textContent=aus;
   document.getElementById('kPend').textContent=list.length-comp-inc-aus;
-  document.getElementById('kLibres').textContent=(SLOTS.length*NDIAS)-list.length-nBloq;
+  document.getElementById('kLibres').textContent=nLibres;
   document.getElementById('leyBloq').textContent = nBloq ? `${nBloq} espacio(s) bloqueado(s) esta semana` : '';
 }
 
@@ -547,13 +557,15 @@ function pintarSegDias(){
 // Vista de un día (teléfono): lista de espacios agrupada en mañana y tarde
 function htmlDia(){
   const f=ymd(diaDe(diaSel)), hoy=todayStr(), pasado=f<hoy?' pasado':'';
-  const bloque=(titulo,slots)=>{
-    const filas=slots.map(m=>{
-      const h=hhmm(m), c=citas[f+'|'+h];
-      if(c) return `<button class="row${pasado}" onclick="abrir('${f}','${h}')">
+  const filaCita=(h,c)=>`<button class="row${pasado}" onclick="abrir('${f}','${h}')">
         <span class="hr">${h}</span>
         <span class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}</span></span>
         ${estadoCita(c).pill}${chev}</button>`;
+  const bloque=(titulo,slots)=>{
+    if(!slots.length) return `<div class="sect"><div class="hdr">${titulo}</div><div class="group"><div class="row ro"><span class="main"><span class="t" style="color:var(--sec)">Viernes en la tarde no hay mediciones.</span></span></div></div></div>`;
+    const filas=slots.map(m=>{
+      const h=hhmm(m), c=citas[f+'|'+h];
+      if(c) return filaCita(h,c);
       const b=bloqueoDe(f,h);
       if(b){
         const det=`${b.tipo==='permanente'?'Todos los '+DIAS[b.dia_semana].toLowerCase():'Solo este día'}${b.motivo?' · '+esc(b.motivo):''}`;
@@ -567,9 +579,11 @@ function htmlDia(){
     }).join('');
     return `<div class="sect"><div class="hdr">${titulo}</div><div class="group">${filas}</div></div>`;
   };
+  const fuera=Object.values(citas).filter(c=>c.fecha===f&&fueraDeHorario(c)).sort((a,b)=>String(a.hora).localeCompare(String(b.hora)));
   return `<div style="display:flex;flex-direction:column;gap:22px">
-    ${bloque('🌅 Mañana · 8:00 a 10:45',SLOTS_AM)}
-    ${bloque('🌇 Tarde · 5:00 a 7:45 p. m.',SLOTS_PM)}
+    ${fuera.length?`<div class="sect"><div class="hdr">⚠ Fuera del horario</div><div class="group">${fuera.map(c=>filaCita(normHora(c.hora),c)).join('')}</div><div class="hint" style="padding:6px 4px 0">Se agendaron antes del cambio de horario. Ábralas para eliminarlas y volver a agendarlas en un espacio válido.</div></div>`:''}
+    ${bloque('🌅 '+TXT_AM,SLOTS_AM)}
+    ${bloque('🌇 '+TXT_PM,SLOTS_PM.filter(m=>haySlot(diaSel,m)))}
   </div>`;
 }
 
@@ -586,6 +600,7 @@ function htmlSemana(){
     for(let i=0;i<NDIAS;i++){
       const d=diaDe(i), f=ymd(d), h=hhmm(m), c=citas[f+'|'+h];
       const pasado=f<hoy?' pasado':'';
+      if(!c && !haySlot(i,m)){ tr+=`<td class="slot${pasado}"><div class="cell na" title="Viernes en la tarde no hay mediciones">—</div></td>`; continue; }
       if(c){
         const {cls:est,lbl}=estadoCita(c);
         tr+=`<td class="slot${pasado}"><div class="cell taken ${est}" onclick="abrir('${f}','${h}')" title="${esc(c.nombre)}">
@@ -608,12 +623,14 @@ function htmlSemana(){
 
   const COLS=NDIAS+1;
   let body='<tbody>';
-  body+=`<tr class="blk"><td colspan="${COLS}">🌅 Mañana · 8:00 a 10:45</td></tr>`;
+  body+=`<tr class="blk"><td colspan="${COLS}">🌅 ${TXT_AM}</td></tr>`;
   SLOTS_AM.forEach(m=>body+=fila(m));
-  body+=`<tr class="blk"><td colspan="${COLS}">🌇 Tarde · 5:00 a 7:45 p. m.</td></tr>`;
+  body+=`<tr class="blk"><td colspan="${COLS}">🌇 ${TXT_PM} · viernes sin mediciones</td></tr>`;
   SLOTS_PM.forEach(m=>body+=fila(m));
   body+='</tbody>';
-  return `<div class="grid-wrap"><table class="grid">${head+body}</table></div>`;
+  const fuera=Object.values(citas).filter(fueraDeHorario).sort((a,b)=>(a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  const avisoFuera=fuera.length?`<div class="sect" style="margin-bottom:16px"><div class="hdr">⚠ Citas fuera del horario (${fuera.length})</div><div class="group">${fuera.map(c=>`<button class="row" onclick="abrir('${c.fecha}','${normHora(c.hora)}')"><span class="hr">${normHora(c.hora)}</span><span class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(DIAS[dowDe(c.fecha)]||'')} ${esc(fechaCorta(new Date(c.fecha+'T00:00:00')))}${c.telefono?' · '+esc(c.telefono):''}</span></span>${estadoCita(c).pill}${chev}</button>`).join('')}</div><div class="hint" style="padding:6px 4px 0">Se agendaron antes del cambio de horario. Ábralas para eliminarlas y volver a agendarlas en un espacio válido.</div></div>`:'';
+  return `${avisoFuera}<div class="grid-wrap"><table class="grid">${head+body}</table></div>`;
 }
 
 // ── Sheet de medición ──
@@ -842,13 +859,14 @@ function imprimirSemana(){
   head+='</tr>';
   const fila=m=>{let tr=`<tr><td class="h">${hhmm(m)}</td>`;
     for(let i=0;i<NDIAS;i++){const f=ymd(diaDe(i)),h=hhmm(m),c=citas[f+'|'+h];
+      if(!c&&!haySlot(i,m)){ tr+='<td class="na"></td>'; continue; }
       if(c){ tr+=`<td class="${c.rutina||(c.asistencia==='ausente'?'ausente':'pend')}"><b>${esc(c.nombre)}</b>${c.telefono?'<br><span class="tel">'+esc(c.telefono)+'</span>':''}${c.pin?'<br><span class="tel">PIN '+esc(c.pin)+'</span>':''}<br><span class="rt">${c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':c.asistencia==='ausente'?'Ausente':c.asistencia==='presente'?'Presente · ☐ rutina':'☐ Pendiente'}</span></td>`; continue; }
       const b=bloqueoDe(f,h);
       tr+= b ? `<td class="bloq">🔒 ${esc(b.motivo||'Bloqueado')}</td>` : '<td></td>';}
     return tr+'</tr>';};
-  let body=`<tr class="blk"><td colspan="${COLS}">MAÑANA · 8:00 a 10:45</td></tr>`;
+  let body=`<tr class="blk"><td colspan="${COLS}">${TXT_AM.toUpperCase()}</td></tr>`;
   SLOTS_AM.forEach(m=>body+=fila(m));
-  body+=`<tr class="blk"><td colspan="${COLS}">TARDE · 5:00 a 7:45 p. m.</td></tr>`;
+  body+=`<tr class="blk"><td colspan="${COLS}">${TXT_PM.toUpperCase()} · VIERNES SIN MEDICIONES</td></tr>`;
   SLOTS_PM.forEach(m=>body+=fila(m));
   const html=`<!doctype html><html><head><meta charset="utf-8"><title>Mediciones ${esc(currentSede)}</title>
   <style>*{font-family:-apple-system,"SF Pro Text",Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;}body{margin:16px;color:#111;}
@@ -859,7 +877,7 @@ function imprimirSemana(){
   tr.blk td{background:#e8eef6;font-weight:800;font-size:11px;letter-spacing:.3px;height:auto;}
   .tel{color:#555;font-size:9px;}.rt{font-size:9px;color:#333;}
   td.completa{background:#eafaf1;}td.incompleta{background:#fdecec;}td.pend{background:#fafafa;}td.ausente{background:#fff4e5;}
-  td.bloq{background:#ececec;color:#666;font-size:9px;}
+  td.bloq{background:#ececec;color:#666;font-size:9px;}td.na{background:repeating-linear-gradient(135deg,#fff,#fff 5px,#f1f1f1 5px,#f1f1f1 10px);}
   @page{size:landscape;margin:10mm;}@media print{.noprint{display:none;}}</style></head><body>
   <h1>📏 Mediciones — ${esc(currentSede)}</h1>
   <div class="sub">Semana del ${lunes.toLocaleDateString('es-CR',{day:'numeric',month:'long'})} al ${diaDe(NDIAS-1).toLocaleDateString('es-CR',{day:'numeric',month:'long',year:'numeric'})} · impreso ${new Date().toLocaleString('es-CR')}</div>
