@@ -319,8 +319,6 @@ table.hist tbody tr:hover td { background:var(--fill); }
   <div class="topbar-controls" id="topUploads">
     <label class="btn-ghost" for="fileVentas" style="cursor:pointer;">📤 Informe de Ventas</label>
     <input type="file" id="fileVentas" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarInformeVentas(this.files[0])">
-    <label class="btn-ghost" for="fileVentasProd" style="cursor:pointer;" title="Opcional: ya no hace falta para el cierre. Sirve para el cruce de SINPE por referencia o si se vendió algún producto en el sistema de membresías.">📦 Ventas por Producto (opcional)</label>
-    <input type="file" id="fileVentasProd" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarVentasProducto(this.files[0])">
     <label class="btn-ghost" for="fileSinpe" style="cursor:pointer;">🔷 Reporte SINPE</label>
     <input type="file" id="fileSinpe" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarReporteSinpe(this.files[0])">
     <label class="btn-ghost" id="btnSinpeHist" for="fileSinpeHist" style="cursor:pointer;display:none;" title="Carga ÚNICA de SINPE históricos (para que no se recuenten)">🗄️ SINPE históricos</label>
@@ -389,8 +387,10 @@ table.hist tbody tr:hover td { background:var(--fill); }
         <div class="hint" id="cajaInicialHint" style="margin:-4px 0 10px;"></div>
         <div class="f-row"><label>Membresías (₡)</label><input type="number" id="cMembresias" step="1" oninput="calc()"></div>
         <div class="hint" style="margin:-4px 0 8px;">Se llena solo con el <b>Informe de Ventas</b>: todo lo cobrado en el sistema de membresías (planes, clases y sesiones).</div>
-        <div class="f-row"><label>Otros vendidos (₡)</label><input type="number" id="cOtros" step="1" oninput="calc()"></div>
-        <div class="hint" id="otrosHint" style="margin:-4px 0 8px;">Productos vendidos en el sistema de membresías (normalmente 0: los productos se cobran en la pestaña Facturación, que se suma aparte). Solo se llena si se carga el Ventas por Producto.</div>
+        <div id="otrosWrap" hidden>
+          <div class="f-row"><label>Otros vendidos (₡)</label><input type="number" id="cOtros" step="1" readonly></div>
+          <div class="hint" id="otrosHint" style="margin:-4px 0 8px;">Productos de este cierre cargados con el antiguo "Ventas por Producto". Hoy los productos se cobran en la pestaña Facturación.</div>
+        </div>
         <div class="f-row"><label>Total Tarjeta (₡)</label><input type="number" id="cTarjeta" step="1" readonly title="Se carga desde el Informe de Ventas" ></div>
         <div class="f-row"><label>Total SINPE (₡)</label><input type="number" id="cSinpe" step="1" readonly title="Se carga desde el Informe de Ventas" ></div>
         <div class="f-row"><label>Total Transferencia (₡)</label><input type="number" id="cTransfer" step="1" readonly title="Se carga desde el Informe de Ventas" ></div>
@@ -665,7 +665,6 @@ table.hist tbody tr:hover td { background:var(--fill); }
 </div>
 
 <script src="/sesion.js"></script>
-<script src="/catalogo.js"></script>
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
 let currentToken=null,currentRole=null,currentSede=null,currentEmail='',currentSedes=[];
@@ -779,7 +778,7 @@ async function init(){
     ctrl.innerHTML=`<label>🏢 Sede:</label> <select id="sedeSel"></select>`;
     const sel=document.getElementById('sedeSel');
     sel.innerHTML=opciones.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
-    sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;stopLivePoll();loadPricesForSede(currentSede);loadCierres();};
+    sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;stopLivePoll();loadCierres();};
   }else ctrl.innerHTML=`<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
   document.getElementById('sedeTitle').textContent='· '+currentSede;
   limpiarCacheVieja();   // borra borradores viejos en localStorage (ya no se usan)
@@ -788,7 +787,6 @@ async function init(){
   document.getElementById('app').style.display='block';
   document.getElementById('tabEv').hidden=!esAdmin();   // eventos: los crea un administrador
   try{ const tb=sessionStorage.getItem('cajaTab'); if(tb==='fact'||(tb==='ev'&&esAdmin())) showTab(tb); }catch(_){}
-  loadPricesForSede(currentSede);
   await loadCierres();
 }
 
@@ -1024,7 +1022,7 @@ function calc(){
   let efectivo=0;
   DENOMS.forEach(d=>{const c=Number(document.getElementById('den_'+d).value)||0; const sub=c*d; efectivo+=sub; document.getElementById('sub_'+d).textContent=fmt(sub);});
   document.getElementById('efectivoCell').textContent=fmt(efectivo);
-  // Lo facturado en la pestaña Facturación (día) se suma a lo que trae el Informe / Ventas por Producto.
+  // Lo facturado en la pestaña Facturación (día) se suma a lo que trae el Informe de Ventas (membresías).
   const fx=factCierre();
   const tarjeta=(Number(document.getElementById('cTarjeta').value)||0)+fx.tarjeta;
   const sinpe=(Number(document.getElementById('cSinpe').value)||0)+fx.sinpe;
@@ -1036,6 +1034,7 @@ function calc(){
   const totIngresos=ingresos.reduce((a,g)=>a+(Number(g.monto)||0),0);
   const pg=prevGIDia();                                                         // gastos/ingresos de turnos previos de hoy
   const totGastosDia=totGastos+pg.gastos, totIngresosDia=totIngresos+pg.ingresos;
+  document.getElementById('otrosWrap').hidden=!(Number(document.getElementById('cOtros').value)||0);   // solo cierres viejos
   const minita=(Number(document.getElementById('cOtros').value)||0)+fxProductos(fx);   // productos "Otros" del día (sin sesiones ni membresías) + productos facturados en caja (eventos no)
   const sobreModo=document.getElementById('cSobreModo').value;   // 'retira' | 'ya' | 'no'
   const sobreRetirado=sobreModo==='ya';                          // compat con datos previos
@@ -1105,7 +1104,7 @@ function nuevoCierre(){
   document.getElementById('cTurno').value='';
   ['cMembresias','cOtros','cTarjeta','cSinpe','cTransfer','cTotalVentas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('cSobreModo').value='no';
-  window._informeVentas=null; window._sinpeReporte=null; fotoDatafono=null; window._otrosResumen=null; window._factCierre=null;
+  window._informeVentas=null; window._sinpeReporte=null; window._ventasDetalle=null; fotoDatafono=null; window._otrosResumen=null; window._factCierre=null;
   document.getElementById('fotoResumen').innerHTML=''; document.getElementById('fileFoto').value='';
   document.getElementById('sinpeResumen').innerHTML=''; renderOtrosResumen(null);
   document.getElementById('aperturaInvCard').style.display='none'; document.getElementById('aperturaInvBody').innerHTML='';
@@ -1196,6 +1195,26 @@ async function cargarSinpeHistorico(file){
   reader.readAsArrayBuffer(file);
 }
 
+// Detalle del Informe de Ventas: secciones "Cuenta → <método>", cada una con su encabezado
+// (Fecha, Cliente, Notas, Total CRC) y una fila por cobro. Devuelve el formato del cruce SINPE.
+function detalleInforme(rows){
+  const filas=[]; let metodo=null, col=null, max='';
+  rows.forEach(r=>{
+    const t=(r||[]).map(c=>String(c==null?'':c).trim());
+    const ic=t.findIndex(c=>normP(c)==='cuenta');
+    if(ic>=0){ const m=normP(t.slice(ic+1).find(Boolean)||'');
+      metodo=/^sinpe/.test(m)?'sinpe':/^efectivo/.test(m)?'efectivo':/^tarjeta/.test(m)?'tarjeta':/^transferencia/.test(m)?'transferencia':null; col=null; return; }
+    const nm=t.map(normP);
+    if(nm.includes('fecha')&&nm.includes('cliente')){ col={fecha:nm.indexOf('fecha'),cliente:nm.indexOf('cliente'),notas:nm.indexOf('notas'),total:nm.indexOf('total crc')}; return; }
+    if(!col||!metodo) return;
+    const fecha=t[col.fecha], cliente=t[col.cliente];
+    if(!/^\d{1,2}\/\d{1,2}\/\d{4}/.test(fecha)||!cliente) return;
+    const d=parseDateCR(fecha); if(d&&ymd(d)>max) max=ymd(d);
+    filas.push({ FechaStr:fecha, Cliente:cliente, Producto:'', Total:Number(r[col.total])||0, Notas:col.notas>=0?t[col.notas]:'', Metodo:metodo });
+  });
+  return { filas, agrupado:true, fecha:max||document.getElementById('cFecha').value };
+}
+
 // ── Cargar Informe de Ventas (validación/autollenado) ──
 function cargarInformeVentas(file){
   const reader=new FileReader();
@@ -1215,12 +1234,14 @@ function cargarInformeVentas(file){
       });
       const total=efectivo+sinpe+tarjeta+transfer;
       if(!total){alert('No se encontraron los totales por método en el archivo. Verifique que sea el Informe de Ventas.');return;}
+      window._ventasDetalle=detalleInforme(rows);   // cobro por cobro, para el cruce SINPE
+      if(window._sinpeReporte) renderSinpeResumen();
       document.getElementById('cTarjeta').value=Math.round(tarjeta);
       document.getElementById('cSinpe').value=Math.round(sinpe);
       document.getElementById('cTransfer').value=Math.round(transfer);
       document.getElementById('cTotalVentas').value=Math.round(total);
-      // Los productos ya se cobran en la pestaña Facturación: lo del sistema de membresías es membresías
-      // (planes + clases/sesiones). Si se cargó el Ventas por Producto y trajo productos, se restan.
+      // Los productos se cobran en la pestaña Facturación: todo lo del sistema de membresías es membresías
+      // (planes + clases/sesiones). cOtros solo trae algo en cierres viejos del "Ventas por Producto".
       const otrosPOS=Number(document.getElementById('cOtros').value)||0;
       const memb=Math.max(0,Math.round(total-otrosPOS));
       document.getElementById('cMembresias').value=memb;
@@ -1279,19 +1300,11 @@ async function cargarReporteSinpe(file){
   reader.readAsArrayBuffer(file);
 }
 // ── Cruce SINPE por transacción ──────────────────────────────────────────────
-// Empareja cada cobro del Informe de Ventas con su transferencia del reporte SINPE:
+// Empareja cada cobro del Informe de Ventas (que viene por método de pago, con cliente y notas)
+// y cada factura SINPE de la pestaña Facturación con su transferencia del reporte SINPE:
 //   1) por la referencia anotada en "Notas" del sistema de ventas (completa o los últimos 6+ dígitos)
 //   2) si no hay referencia: por monto (±₡100), nombre del cliente y cercanía en el tiempo
-// Si el informe viene agrupado por método, los cobros SINPE sin transferencia se listan como faltantes.
-// Si no viene agrupado, solo se puede afirmar lo que calza y las transferencias sin cobro.
-function metodoDeFila(r,col){
-  if(!r||(col.fecha>=0&&r[col.fecha]))return null;
-  const t=r.map(c=>String(c||'').trim()).filter(Boolean); if(t.length!==1)return null;
-  const m=normP(t[0]);
-  if(/^sinpe/.test(m))return 'sinpe'; if(/^efectivo/.test(m))return 'efectivo';
-  if(/^tarjeta/.test(m))return 'tarjeta'; if(/^transferencia/.test(m))return 'transferencia';
-  return null;
-}
+// Los cobros SINPE sin transferencia se listan como faltantes.
 function fechaHora(s){ const m=String(s||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i); if(!m)return null;
   let h=+m[4]; const ap=(m[7]||'').toUpperCase(); if(ap==='PM'&&h<12)h+=12; if(ap==='AM'&&h===12)h=0;
   return new Date(+m[3],+m[2]-1,+m[1],h,+m[5],+(m[6]||0)); }
@@ -1567,103 +1580,12 @@ function imprimirDesgloseOtros(){
   w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch(_){} },350);
 }
 
-// ── Ventas por Producto → auto-llena el cierre y actualiza el snapshot de la sede ──
-let planPrices={};
-function parseCRC(v){
-  if(typeof v==='number') return isFinite(v)?v:0;      // XLSX ya lo entrega como número (con decimales) → no tocar
-  let s=String(v||'').trim().replace(/[₡€\s]/g,'');
-  if(/^\d+\.\d{1,2}$/.test(s)) return parseFloat(s);    // texto tipo "28642.5" → punto es decimal, no miles
-  s=s.replace(/\./g,'').replace(',','.'); let n=parseFloat(s); return isNaN(n)?0:n;
-}
+// ── Utilidades ──
 function parseDateCR(s){ if(!s)return null; s=String(s).trim(); if(s.includes('/')){const p=s.split('/'); if(p.length===3){let y=parseInt(p[2]); if(y<100)y+=2000; const d=new Date(y,parseInt(p[1])-1,parseInt(p[0])); if(!isNaN(d.getTime()))return d;}} return null; }
-function parseRenoDT(s){ if(!s)return null; return parseDateCR(String(s).trim().split(/\s+/)[0]); }
 function normP(n){ return String(n||'').toLowerCase().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n').replace(/\s+/g,' ').trim(); }
-function esPlanRecurrenteNat(pl){ return (pl.includes('natacion')||pl.includes('natación')||pl.includes('aquafitness')||pl.includes('estimulaci'))&&(pl.includes('vez por semana')||pl.includes('veces por semana')||pl.includes('x semana')); }
-function isMembershipPlan(product){ let p=String(product||'').trim(); const _t=window.Catalogo&&Catalogo.tipo(p); if(_t)return _t==='plan'; if(/\(\d+\)/.test(p))return false; let pl=p.toLowerCase(); if(esPlanRecurrenteNat(pl))return true; if(pl.includes('sesion')||pl.includes('sesión')||pl.includes('clase'))return false; for(let k of Object.keys(planPrices)){ if(normP(k)===normP(p)||normP(p).includes(normP(k))||normP(k).includes(normP(p)))return true; } if(/\d+\s*x\s*\d+\s*mil/i.test(p))return true; return /\b(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b|plan|promo|flash|anual|lealtad|fidelidad|bloqueado|verano|exclusivo|platium|semestral|trimest|bimest|estudiante|renovaci[oó]n|black|ejecutivo|mensualidad|matr[ií]cula|nataci[oó]n|gym|aquafitness|estimulaci[oó]n|\bpng\b|\bcps\b/i.test(p); }
-function isClaseSuelta(product){ const _t=window.Catalogo&&Catalogo.tipo(product); if(_t)return _t==='clase'; let pl=String(product||'').trim().toLowerCase(); if(!pl.includes('sesion')&&!pl.includes('sesión')&&!pl.includes('clase'))return false; if(/\d*\s*(vez|veces)\s*por\s*semana|x\s*semana/i.test(pl))return false; return true; }
-async function loadPricesForSede(sede){ if(window.Catalogo)Catalogo.cargar(sede); try{ const rows=await supaFetch(`/plan_prices?sede=eq.${encodeURIComponent(sede)}&select=plan,precio`); planPrices={}; if(rows&&rows.length){ rows.forEach(r=>planPrices[r.plan]=r.precio); return; } const snaps=await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(sede)}&order=updated_at.desc&limit=1&select=users_data`); if(snaps?.length&&snaps[0].users_data?.length){ snaps[0].users_data.forEach(u=>{ if(u.ÚltimoProducto&&u.ValorPlan>0)planPrices[u.ÚltimoProducto]=u.ValorPlan; }); } }catch(_){ planPrices={}; } }
 
 // nombre "Agua (3)" → { base:"Agua", qty:3 }
 function parseProdQty(name){ const s=String(name||'').trim(); const m=s.match(/\((\d+)\)\s*$/); return { base:s.replace(/\s*\(\d+\)\s*$/,'').trim(), qty:m?parseInt(m[1],10):1 }; }
-
-// Descuento idempotente de inventario a partir de las ventas de productos del día D.
-// El informe es acumulado del día → se descuenta solo el delta vs lo ya descontado hoy.
-// Productos del informe que la sede no tiene registrados (ni en plan_prices, ni en
-// inventario, ni en catalogo_ventas): se pregunta si son plan, clase o producto.
-// La respuesta se guarda y manda sobre la regla por nombre. Si la tabla aún no
-// existe, no se pregunta nada y todo sigue como antes.
-async function preguntarProductosNuevos(raw, hdr, col){
-  if(!window.Catalogo) return;
-  await Catalogo.cargar(currentSede);
-  if(!Catalogo.disponible()) return;
-  const ventas=[];
-  for(let i=hdr+1;i<raw.length;i++){ const r=raw[i]; if(!r||!r[col.fecha])continue;
-    const producto=String(r[col.producto]||'').trim(), cliente=String(r[col.cliente]||'').trim();
-    if(producto&&cliente) ventas.push({Producto:producto,Total:parseCRC(r[col.total])}); }
-  const conocidos=new Set(Object.keys(planPrices).map(Catalogo.norm));
-  try{ ((await supaFetch(`/inventario?sede=eq.${encodeURIComponent(currentSede)}&select=producto`))||[]).forEach(p=>conocidos.add(Catalogo.norm(p.producto))); }catch(_){}
-  const sugerir=p=>isClaseSuelta(p)?'clase':isMembershipPlan(p)?'plan':'producto';
-  const nuevos=Catalogo.desconocidos(ventas,conocidos,sugerir);
-  if(nuevos.length) await Catalogo.preguntar({sede:currentSede,items:nuevos});
-}
-
-function cargarVentasProducto(file){
-  const reader=new FileReader();
-  reader.onload=async e=>{
-    try{
-      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
-      const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
-      let hdr=-1,col={};
-      for(let i=0;i<Math.min(raw.length,10);i++){ const r=raw[i]||[]; const nm=r.map(c=>String(c||'').trim().toLowerCase());
-        const fi=nm.findIndex(c=>c==='fecha'), pi=nm.findIndex(c=>c==='producto');
-        if(fi>=0&&pi>=0){ hdr=i; col.fecha=fi; col.producto=pi; col.cliente=nm.findIndex(c=>c==='cliente'); col.registrado=nm.findIndex(c=>c.includes('registrado')); col.total=nm.findIndex(c=>c.includes('total crc')); if(col.total<0)col.total=nm.findIndex(c=>c.includes('total')&&!c.includes('usd')); col.notas=nm.findIndex(c=>c==='notas'); break; } }
-      if(hdr<0)throw new Error('No se encontró el encabezado (Fecha/Producto). ¿Es el reporte "Ventas por Producto"?');
-      await preguntarProductosNuevos(raw, hdr, col);   // ver /catalogo.js
-      const memb=[],clases=[],sinclasif=[]; const fechas=[];
-      // Detalle por cobro para el cruce SINPE: nota (referencia) y método si el informe viene agrupado
-      const detalleVentas=[]; let metodo=null, agrupado=false;
-      for(let i=0;i<=hdr;i++){ const m=metodoDeFila(raw[i],col); if(m){ metodo=m; agrupado=true; } }
-      for(let i=hdr+1;i<raw.length;i++){ const r=raw[i]; const mf=metodoDeFila(r,col); if(mf){ metodo=mf; agrupado=true; continue; } if(!r||!r[col.fecha])continue;
-        const fechaStr=String(r[col.fecha]||'').trim(); const cliente=String(r[col.cliente]||'').trim(); const regPor=String(r[col.registrado]||'').trim(); const producto=String(r[col.producto]||'').trim(); const total=parseCRC(r[col.total]);
-        if(!fechaStr||!cliente)continue; const txDate=parseRenoDT(fechaStr); if(txDate)fechas.push(txDate.getTime());
-        const base={FechaStr:fechaStr,Cliente:cliente,RegistradoPor:regPor,Producto:producto,Total:total};
-        detalleVentas.push({...base, Notas:col.notas>=0?String(r[col.notas]||'').trim():'', Metodo:metodo});
-        if(/^invitado$/i.test(cliente)){ if(isClaseSuelta(producto))clases.push(base); else sinclasif.push(base); continue; }
-        if(isClaseSuelta(producto)){ clases.push(base); continue; }
-        if(!isMembershipPlan(producto)){ sinclasif.push(base); continue; }
-        memb.push(base);
-      }
-      const sum=a=>a.reduce((s,x)=>s+(Number(x.Total)||0),0);
-      const totMemb=Math.round(sum(memb)), totClases=Math.round(sum(clases)), totSinC=Math.round(sum(sinclasif));
-      const totalVentas=totMemb+totClases+totSinC;
-      const totMembCaja=totMemb+totClases;   // caja.html: membresías incluye clases grupales y sesiones de gym
-      document.getElementById('cOtros').value=totSinC;   // minita = solo productos "Otros" (sin sesiones ni membresías), acumulado del día
-      // El Informe de Ventas manda (es contra lo que se cuadra): si ya está cargado, el total queda el
-      // suyo y membresías = total − productos. Sin Informe, se usa lo que trae este archivo.
-      if(window._informeVentas) document.getElementById('cMembresias').value=Math.max(0,Math.round(window._informeVentas.total-totSinC));
-      else { document.getElementById('cTotalVentas').value=totalVentas; document.getElementById('cMembresias').value=totMembCaja; }
-      const ref=fechas.length?new Date(Math.max(...fechas)):new Date();
-      const mes=ref.toLocaleDateString('es-CR',{month:'long',year:'numeric'}).replace(/^\w/,c=>c.toUpperCase());
-      const mesOrden=`${ref.getFullYear()}-${String(ref.getMonth()+1).padStart(2,'0')}`;
-      const D=ymd(ref);
-      // Desglose de productos "Otros" (minita). El inventario NO se descuenta aquí: solo al facturar en la pestaña Facturación.
-      const otrosResumen={};
-      sinclasif.forEach(it=>{ const {base,qty}=parseProdQty(it.Producto); if(!base)return;
-        const {cat,canonical}=resolverOtro(it.Producto); const k=normP(canonical);          // desglose: unificado + categoría (como otros.html)
-        if(!otrosResumen[k])otrosResumen[k]={base:canonical,cat,qty:0,total:0}; otrosResumen[k].qty+=qty; otrosResumen[k].total+=Number(it.Total)||0; });
-      window._otrosResumen=otrosResumen; renderOtrosResumen(otrosResumen);
-      window._ventasDetalle={ filas:detalleVentas, agrupado, fecha:D }; renderSinpeResumen();   // cruce SINPE por transacción
-      // IMPORTANTE: recepción NO toca gym_snapshots (comparativa/sedes). El histórico del mes
-      // lo carga el admin desde index; subir solo el día borraría los días anteriores. Aquí
-      // la carga afecta únicamente el CIERRE DE CAJA (no toca el inventario).
-      let msg=`📦 Día: membresías ${fmt(totMembCaja)} (planes ${fmt(totMemb)} + clases/sesiones ${fmt(totClases)}) · otros/minita ${fmt(totSinC)} · Total ${fmt(totalVentas)}.`;
-      if(window._informeVentas){ const dif=Math.round(totalVentas-window._informeVentas.total); msg+= (dif===0?' · ✓ corrobora con Informe de Ventas.':` · ⚠ difiere del Informe en ${fmt(Math.abs(dif))}.`); }
-      document.getElementById('ventasHint').innerHTML=msg;
-      calc();
-    }catch(err){ alert('Error al leer el archivo: '+err.message); }
-  };
-  reader.readAsArrayBuffer(file);
-}
 
 // ── Guardar ──
 async function cerrarTurno(estado){
@@ -1866,7 +1788,7 @@ function resumirFacturas(list){
       r.desglose[k].qty+=Number(it.cantidad)||0; r.desglose[k].total+=Math.round(Number(it.total)||0); }); });
   return r;
 }
-// Desglose de la minita: lo del archivo "Ventas por Producto" + lo facturado en caja
+// Desglose de la minita: lo facturado en caja (+ lo que traían los cierres viejos del "Ventas por Producto")
 function desgloseMinita(map){
   const out={}; Object.entries(map||{}).forEach(([k,it])=>{ out[k]={...it}; });
   Object.entries(factCierre().desglose||{}).forEach(([k,it])=>{
