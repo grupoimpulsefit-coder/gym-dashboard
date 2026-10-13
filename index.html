@@ -212,6 +212,14 @@
         .chk-row .tag { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--brand-text);
             background: var(--brand-tint); border-radius: 8px; padding: 3px 9px; }
         .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+        /* Crear varias cuentas */
+        .bk-row { display: grid; grid-template-columns: 1.3fr 1.6fr 1fr 1fr auto auto; gap: 6px; align-items: center;
+            padding: 8px; background: var(--card); border-radius: 12px; }
+        .bk-row.ok { background: var(--green-tint, rgba(52,199,89,.14)); }
+        .bk-row .bk-pl { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+        .bk-row .bk-x { border: 0; background: none; color: var(--sec); font-size: 16px; min-width: 32px; min-height: 32px; cursor: pointer; }
+        .bk-row .bk-est { grid-column: 1 / -1; font-size: 13px; padding: 0 4px; }
+        @media (max-width: 700px) { .bk-row { grid-template-columns: 1fr 1fr; } .bk-row .bk-x { justify-self: end; } }
         .summary-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 14px; font-size: 14px;
             border-radius: 12px; overflow: hidden; background: var(--card); }
         .summary-table th { background: var(--card); color: var(--sec); padding: 10px 14px; text-align: left;
@@ -748,6 +756,34 @@
     </div>
 </div>
 
+<!-- ── Modal: Crear varias cuentas (solo admin) ── -->
+<div id="crearVariasModal" class="modal">
+    <div class="summary-modal-content" style="max-width:920px;">
+        <h3>👥➕ Crear varias cuentas</h3>
+        <p style="color:var(--sec);margin-top:-6px;font-size:14px;">Para dar de alta a varios instructores o recepcionistas de una vez. Marque <b>Planilla</b> en quienes están en planilla: su cuenta queda ligada a su ficha de RRHH y les aparece <b>Mi Portal</b> (vacaciones). Quien no está en planilla solo ve sus módulos.</p>
+        <details style="margin:12px 0;background:var(--card);border-radius:12px;padding:10px 14px;">
+            <summary style="cursor:pointer;font-weight:600;">📋 Pegar lista desde Excel</summary>
+            <div style="font-size:13px;color:var(--sec);margin:8px 0;">Copie las columnas <b>Nombre · Correo · Sede · Planilla (sí/no)</b> y opcional <b>Rol</b>, y péguelas aquí. Si no trae rol, se usa el rol por defecto.</div>
+            <textarea id="bkPegado" rows="5" style="width:100%;border:0;border-radius:10px;background:var(--fill);color:var(--label);padding:10px;font:inherit;font-size:14px;" placeholder="Ana Mora	ana@correo.com	Pinares	sí"></textarea>
+            <div class="modal-buttons" style="margin-top:8px;"><button class="btn btn-orange" onclick="bkPegar()">Cargar filas</button></div>
+        </details>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px;">
+            <div><label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Rol por defecto</label>
+                <select id="bkRolDef"></select></div>
+            <div><label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Contraseña temporal (para todos)</label>
+                <input type="text" id="bkPass" autocomplete="off"></div>
+        </div>
+        <div id="bkFilas" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <div class="modal-buttons" style="justify-content:flex-start;margin-top:10px;"><button class="btn btn-orange" onclick="bkAgregar();bkRender()">＋ Agregar fila</button></div>
+        <div id="bkMsg" style="font-size:13px;min-height:18px;margin-top:10px;"></div>
+        <div class="modal-buttons">
+            <button class="btn btn-green" id="bkBtn" onclick="bkCrear()">✅ Crear cuentas</button>
+            <button class="btn btn-orange" id="bkCopiar" onclick="bkCopiar()" style="display:none;">📋 Copiar accesos</button>
+            <button class="btn btn-orange" onclick="document.getElementById('crearVariasModal').style.display='none'">Cerrar</button>
+        </div>
+    </div>
+</div>
+
 <!-- ── Modal: Sedes de un usuario (multi-sede recepción) ── -->
 <div id="sedesUsuarioModal" class="modal">
     <div class="summary-modal-content" style="max-width:460px;">
@@ -1015,6 +1051,131 @@ async function crearCuenta() {
     }
 }
 
+// ── Crear varias cuentas a la vez (misma Edge Function, una por persona) ──
+// "Planilla" = la persona tiene ficha en RRHH: se liga por correo (o se crea una ficha básica)
+// para que vea Mi Portal. La ficha la lee el portal con user_id = su cuenta.
+const BK_ROLES = { instructor:'🏋️ Instructor', recepcion:'🧾 Recepción', coordinador:'🧭 Coordinador', admin_sucursal:'🏪 Admin de sucursal' };
+const BK_SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
+let bkFilas = [];
+const bkNorm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+function bkClave() { return 'Impulse' + Math.floor(1000 + Math.random() * 9000); }
+function openCrearVariasModal() {
+    const def = document.getElementById('bkRolDef');
+    def.innerHTML = Object.entries(BK_ROLES).map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+    document.getElementById('bkPass').value = bkClave();
+    document.getElementById('bkPegado').value = '';
+    document.getElementById('bkMsg').textContent = '';
+    document.getElementById('bkCopiar').style.display = 'none';
+    bkFilas = []; bkAgregar(); bkAgregar(); bkAgregar(); bkRender();
+    document.getElementById('crearVariasModal').style.display = 'block';
+}
+function bkAgregar(f) {
+    bkFilas.push({ nombre:'', email:'', role:document.getElementById('bkRolDef').value || 'instructor', sede:BK_SEDES[0], planilla:false, estado:'', color:'', ok:false, ...(f || {}) });
+}
+function bkRender() {
+    const opt = (lista, sel) => lista.map(([v, l]) => `<option value="${_suEsc(v)}"${v === sel ? ' selected' : ''}>${_suEsc(l)}</option>`).join('');
+    document.getElementById('bkFilas').innerHTML = bkFilas.map((f, i) => `<div class="bk-row${f.ok ? ' ok' : ''}">
+        <input placeholder="Nombre completo" value="${_suEsc(f.nombre)}" oninput="bkFilas[${i}].nombre=this.value" ${f.ok ? 'disabled' : ''}>
+        <input type="email" placeholder="correo@ejemplo.com" value="${_suEsc(f.email)}" oninput="bkFilas[${i}].email=this.value" autocomplete="off" ${f.ok ? 'disabled' : ''}>
+        <select onchange="bkFilas[${i}].role=this.value" ${f.ok ? 'disabled' : ''}>${opt(Object.entries(BK_ROLES), f.role)}</select>
+        <select onchange="bkFilas[${i}].sede=this.value" ${f.ok ? 'disabled' : ''}>${opt(BK_SEDES.map(x => [x, x]), f.sede)}</select>
+        <label class="bk-pl" title="Está en planilla: liga su ficha de RRHH y ve Mi Portal"><input type="checkbox" ${f.planilla ? 'checked' : ''} onchange="bkFilas[${i}].planilla=this.checked" ${f.ok ? 'disabled' : ''}> Planilla</label>
+        <button class="bk-x" title="Quitar fila" onclick="bkFilas.splice(${i},1);bkRender()" ${f.ok ? 'disabled' : ''}>✕</button>
+        ${f.estado ? `<div class="bk-est" style="color:${f.color || 'var(--sec)'}">${f.estado}</div>` : ''}
+    </div>`).join('') || '<div style="color:var(--sec);font-size:14px;">Sin filas. Agregue una o pegue la lista.</div>';
+    const n = bkFilas.filter(f => !f.ok && (f.email || f.nombre).trim()).length;
+    const btn = document.getElementById('bkBtn'); btn.textContent = n ? `✅ Crear ${n} cuenta${n === 1 ? '' : 's'}` : '✅ Crear cuentas';
+}
+// Pegado desde Excel: columnas separadas por tabulador (o ; ,). El correo se reconoce por la @.
+function bkPegar() {
+    const lineas = document.getElementById('bkPegado').value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const nuevas = [];
+    lineas.forEach(l => {
+        const c = l.split(/\t|;|,(?=\s*\S)/).map(x => x.trim()).filter(x => x !== '');
+        const email = c.find(x => x.includes('@')); if (!email) return;   // encabezado u otra cosa
+        let nombre = '', sede = null, planilla = false, role = null;
+        c.forEach(x => {
+            if (x === email) return; const n = bkNorm(x);
+            const sd = n.includes('rios') ? '3 Ríos' : (n.includes('natacion') || n.includes('piscina')) ? 'Natación' : n.includes('pinares') ? 'Pinares' : n.includes('sabanilla') ? 'Sabanilla' : null;
+            if (sd) { sede = sd; return; }
+            if (/^(si|s|x|1|true|planilla)$/.test(n)) { planilla = true; return; }
+            if (/^(no|n|0|false)$/.test(n)) return;
+            if (n.startsWith('instruct') || n.startsWith('entrenad')) { role = 'instructor'; return; }
+            if (n.startsWith('recep')) { role = 'recepcion'; return; }
+            if (n.startsWith('coordin')) { role = 'coordinador'; return; }
+            if (n.includes('sucursal')) { role = 'admin_sucursal'; return; }
+            if (!nombre) nombre = x;
+        });
+        nuevas.push({ nombre, email: email.toLowerCase(), sede: sede || BK_SEDES[0], planilla, role: role || document.getElementById('bkRolDef').value });
+    });
+    if (!nuevas.length) { const m = document.getElementById('bkMsg'); m.style.color = 'var(--red)'; m.textContent = 'No se encontró ningún correo en lo pegado.'; return; }
+    bkFilas = bkFilas.filter(f => f.ok || (f.email || f.nombre).trim());   // quita las filas vacías
+    nuevas.forEach(f => bkAgregar(f));
+    document.getElementById('bkPegado').value = '';
+    bkRender();
+}
+async function bkCrear() {
+    const msg = document.getElementById('bkMsg');
+    const pass = document.getElementById('bkPass').value.trim();
+    const pend = bkFilas.filter(f => !f.ok && (f.email || f.nombre).trim());
+    if (!pend.length) { msg.style.color = 'var(--red)'; msg.textContent = 'No hay cuentas por crear.'; return; }
+    if (pass.length < 6) { msg.style.color = 'var(--red)'; msg.textContent = 'La contraseña temporal debe tener al menos 6 caracteres.'; return; }
+    const vistos = new Set(bkFilas.filter(f => f.ok).map(f => f.email.trim().toLowerCase()));
+    for (const f of pend) {
+        const e = f.email.trim().toLowerCase();
+        f.estado = !f.nombre.trim() ? 'Falta el nombre.' : !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) ? 'Correo inválido.' : vistos.has(e) ? 'Correo repetido en la lista.' : '';
+        f.color = f.estado ? 'var(--red)' : ''; vistos.add(e);
+    }
+    if (pend.some(f => f.estado)) { bkRender(); msg.style.color = 'var(--red)'; msg.textContent = 'Corrija las filas marcadas.'; return; }
+    const btn = document.getElementById('bkBtn'); btn.disabled = true;
+    let ok = 0, err = 0;
+    for (const f of pend) {
+        f.estado = 'Creando…'; f.color = 'var(--sec)'; bkRender(); btn.textContent = `Creando ${ok + err + 1} de ${pend.length}…`;
+        const email = f.email.trim().toLowerCase(), nombre = f.nombre.trim();
+        try {
+            const res = await fetch(`${SUPA_URL}/functions/v1/crear-usuario`, { method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + currentToken, 'apikey': SUPA_KEY, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nombre, email, password: pass, role: f.role, sede: f.sede }) });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(/already|registered|exists/i.test(data.error || '') ? 'Ese correo ya tiene cuenta.' : (data.error || 'Error ' + res.status));
+            const notas = [];
+            // La función no le pone sede al coordinador: se le asigna aquí (sin sede, los módulos lo rechazan)
+            if (f.role === 'coordinador') {
+                try { await supaFetch(`/user_roles?id=eq.${data.id}`, { method: 'PATCH', userToken: currentToken, body: { sede: f.sede } }); }
+                catch (_) { notas.push('⚠ no se le pudo asignar la sede'); }
+            }
+            if (f.planilla) notas.push(await bkLigarFicha(data.id, nombre, email, f.sede));
+            f.ok = true; f.email = email; ok++;
+            f.estado = '✓ Cuenta creada' + (f.planilla ? '' : ' · sin planilla (no ve Mi Portal)') + (notas.length ? ' · ' + notas.join(' · ') : '');
+            f.color = 'var(--green)';
+        } catch (e2) { err++; f.estado = '⚠ ' + e2.message; f.color = 'var(--red)'; }
+        bkRender();
+    }
+    btn.disabled = false; bkRender();
+    msg.style.color = err ? 'var(--red)' : 'var(--green)';
+    msg.textContent = `${ok} cuenta(s) creada(s)${err ? ` · ${err} con error` : ''}. Contraseña temporal para todos: ${pass}`;
+    document.getElementById('bkCopiar').style.display = bkFilas.some(f => f.ok) ? '' : 'none';
+}
+// Liga (o crea) la ficha de RRHH por correo. Devuelve una nota para el estado de la fila.
+async function bkLigarFicha(uid, nombre, email, sede) {
+    try {
+        const fichas = await supaFetch(`/empleados?correo=eq.${encodeURIComponent(email)}&select=id,user_id`, { userToken: currentToken }) || [];
+        const libre = fichas.find(x => !x.user_id);
+        if (libre) { await supaFetch(`/empleados?id=eq.${libre.id}`, { method: 'PATCH', userToken: currentToken, body: { user_id: uid } }); return 'ligada a su ficha de RRHH'; }
+        if (fichas.length) return '⚠ su ficha de RRHH ya estaba ligada a otra cuenta';
+        await supaFetch('/empleados', { method: 'POST', userToken: currentToken,
+            body: { nombre, correo: email, sede, tipo_pago: 'mensual', activo: true, user_id: uid } });
+        return 'ficha de RRHH creada: complete salario e ingreso en RRHH';
+    } catch (e) { return '⚠ no se pudo ligar la ficha de RRHH: ' + e.message; }
+}
+function bkCopiar() {
+    const pass = document.getElementById('bkPass').value.trim();
+    const txt = bkFilas.filter(f => f.ok).map(f => `${f.nombre.trim()} — ${f.email} — contraseña: ${pass}`).join('\n')
+        + `\n\nEntrar en ${location.origin} y cambiar la contraseña.`;
+    navigator.clipboard.writeText(txt).then(() => { const m = document.getElementById('bkMsg'); m.style.color = 'var(--green)'; m.textContent = '📋 Accesos copiados: péguelos en WhatsApp o correo.'; })
+        .catch(() => prompt('Copie los accesos:', txt));
+}
+
 // ── Sedes de un usuario (habilitar sedes adicionales para recepción / admin_sucursal) ──
 let _suUsers = [];
 function _suEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -1068,6 +1229,17 @@ async function guardarSedesUsuario() {
     } finally {
         btn.disabled = false; btn.textContent = '💾 Guardar sedes';
     }
+}
+
+// Recepción / coordinador / instructor en planilla: si su cuenta está ligada a una ficha activa
+// de RRHH, ven también Mi Portal (vacaciones). Si no, no se muestra.
+async function portalSiPlanilla(cardsEl, mk) {
+    if (!currentUserId) return;
+    try {
+        const r = await supaFetch(`/empleados?user_id=eq.${encodeURIComponent(currentUserId)}&select=id,activo`, { userToken: currentToken });
+        if (r && r.some(x => x.activo !== false))
+            cardsEl.appendChild(mk('🌴','Mi Portal','Mis vacaciones','Ver saldo y solicitar días libres','#e8f7ee','#2e7d32','/rrhh'));
+    } catch (_) {}
 }
 
 // 'admin' conserva su acceso actual; 'admin_sedes' y 'admin_g' entran con los mismos permisos de admin en index/nat
@@ -1167,6 +1339,7 @@ async function showSedePicker() {
         cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
         cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
         cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agendar citas','Agenda semanal cada 15 minutos','#e8f4fd','#1a5276','/mediciones'));
+        portalSiPlanilla(cardsEl, makeHandoffCard);
         return;
     }
 
@@ -1177,6 +1350,7 @@ async function showSedePicker() {
         cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
         cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agendar citas','Agenda semanal cada 15 minutos','#e8f4fd','#1a5276','/mediciones'));
         cardsEl.appendChild(makeHandoffCard('📦','Inventario','Consultar stock','Solo lectura: productos, precios y faltantes','#fff8e1','#b9770e','/inventario'));
+        portalSiPlanilla(cardsEl, makeHandoffCard);
         return;
     }
 
@@ -1184,6 +1358,7 @@ async function showSedePicker() {
     if (currentRole === 'instructor') {
         statusEl.textContent = 'Su módulo' + (currentSede ? ` (${currentSede})` : '') + ':';
         cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agenda de la semana','Marcar rutina completa o incompleta','#e8f4fd','#1a5276','/mediciones'));
+        portalSiPlanilla(cardsEl, makeHandoffCard);
         return;
     }
 
@@ -1255,6 +1430,16 @@ async function showSedePicker() {
                 <div class="s2">Asigna rol y sede</div>`;
             cc.onclick = openCrearCuentaModal;
             cardsEl.appendChild(cc);
+            // Crear varias cuentas — instructores / recepción en lote
+            const cv = document.createElement('div');
+            cv.className = 'pick-card punteada';
+            cv.innerHTML = `
+                <div class="ic t-green">👥➕</div>
+                <div class="tt t-green">Crear varias cuentas</div>
+                <div class="s1">Instructores / recepción</div>
+                <div class="s2">Pegar lista · marcar planilla</div>`;
+            cv.onclick = openCrearVariasModal;
+            cardsEl.appendChild(cv);
             // Sedes de usuarios — habilitar sedes adicionales (multi-sede)
             const su = document.createElement('div');
             su.className = 'pick-card punteada';

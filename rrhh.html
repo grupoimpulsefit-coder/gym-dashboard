@@ -189,6 +189,23 @@
   </div>
 </div>
 
+<!-- Modal vincular cuenta existente (admin) -->
+<div class="modal-back" id="vincModal">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-head">🔗 Vincular cuenta existente</div>
+    <div class="modal-body">
+      <div class="hint" id="vincInfo" style="margin-bottom:10px;"></div>
+      <div class="f-field"><label>Cuenta</label><select id="vincSel" class="ui"></select></div>
+      <div class="hint" style="margin-top:8px;">Para quien ya tiene usuario (recepción, instructor, coordinador…). Con la cuenta ligada le aparece <b>Mi Portal</b> para ver su saldo y pedir vacaciones; sus demás permisos no cambian.</div>
+      <div id="vincErr" style="color:var(--warn);font-size:13px;min-height:16px;margin-top:8px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" type="button" onclick="document.getElementById('vincModal').classList.remove('open')">Cancelar</button>
+      <button class="btn-primary" id="vincBtn" type="button" onclick="guardarVinculo()">Vincular</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal liquidación (admin) -->
 <div class="modal-back" id="liqModal">
   <div class="modal">
@@ -252,7 +269,8 @@ async function supaFetch(path, opts = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
-const ROLES_PERMITIDOS = ['admin_sedes', 'empleado', 'admin_sucursal'];
+// Portal: empleado, y el personal por sede que está en planilla (su cuenta ligada a una ficha)
+const ROLES_PERMITIDOS = ['admin_sedes', 'empleado', 'admin_sucursal', 'recepcion', 'coordinador', 'instructor'];
 const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
 const SEDE_META = { '3 Ríos':{icon:'🌊'}, 'Natación':{icon:'🏊'}, 'Pinares':{icon:'🌲'}, 'Sabanilla':{icon:'🏙️'} };
 
@@ -440,7 +458,7 @@ function renderEmpleados(){
       <td class="num">${aseguradoCCSS(e) ? fmtCRC(deduccionCCSS(e)) : '<span style="color:var(--ter);">No aseg.</span>'}</td>
       <td>${fmtFecha(e.fecha_ingreso)}</td>
       <td class="num saldo-badge" style="color:${saldo<0?'var(--red)':'var(--green)'};">${saldo.toFixed(1)}</td>
-      <td>${esBaja(e) ? '<span class="pill rec">De baja</span>' : e.user_id ? '<span class="pill apr">Activo</span>' : `<button class="btn-ghost" style="min-height:30px;padding:0 10px;font-size:13px;" onclick="crearAcceso('${e.id}')">Crear acceso</button>`}</td>
+      <td style="white-space:nowrap;">${esBaja(e) ? '<span class="pill rec">De baja</span>' : e.user_id ? `<span class="pill apr">Activo</span> <button class="btn-ghost" title="Desligar la cuenta de esta ficha" style="min-height:26px;padding:0 6px;font-size:12px;" onclick="desvincularCuenta('${e.id}')">✕</button>` : `<button class="btn-ghost" style="min-height:30px;padding:0 10px;font-size:13px;" onclick="crearAcceso('${e.id}')">Crear acceso</button> <button class="btn-ghost" title="Ya tiene cuenta (recepción, instructor…): ligarla a esta ficha" style="min-height:30px;padding:0 10px;font-size:13px;" onclick="vincularCuenta('${e.id}')">Vincular cuenta</button>`}</td>
       <td style="white-space:nowrap;"><button class="btn-edit" title="Editar" onclick="openEmpleadoModal('${e.id}')">✏️</button> <button class="btn-edit" title="Calcular liquidación" onclick="openLiquidacion('${e.id}')">💰</button>${esBaja(e)
         ? ` <button class="btn-ok" title="Volver a activarlo" onclick="reactivarEmpleado('${e.id}')">↩︎ Reactivar</button> <button class="btn-del" title="Eliminar definitivamente" onclick="eliminarEmpleado('${e.id}')">🗑</button>`
         : ''}</td>`;
@@ -673,6 +691,51 @@ async function eliminarEmpleado(id){
       ? `No se puede eliminar a ${e.nombre}: tiene solicitudes de vacaciones registradas. Déjelo dado de baja; así su historial se conserva.`
       : 'No se pudo eliminar: ' + m);
   }
+}
+
+// Ligar una cuenta que ya existe (recepción, instructor, coordinador…) a la ficha: el portal
+// encuentra la ficha por user_id. No cambia el rol de la cuenta.
+let vincEmpId = null;
+async function vincularCuenta(id){
+  const e = empleados.find(x=>x.id===id); if(!e) return;
+  vincEmpId = id;
+  document.getElementById('vincInfo').textContent = `Ficha: ${e.nombre} · ${e.sede}`;
+  document.getElementById('vincErr').textContent = '';
+  const sel = document.getElementById('vincSel'); sel.innerHTML = '<option value="">Cargando…</option>';
+  document.getElementById('vincModal').classList.add('open');
+  try {
+    const [cuentas, ligadas] = await Promise.all([
+      supaFetch('/user_roles?role=in.(recepcion,instructor,coordinador,admin_sucursal,empleado)&select=id,nombre,role,sede&order=nombre.asc'),
+      supaFetch('/empleados?user_id=not.is.null&select=user_id')
+    ]);
+    const usadas = new Set((ligadas||[]).map(x=>x.user_id));
+    const libres = (cuentas||[]).filter(c=>!usadas.has(c.id));
+    const nomRol = {recepcion:'Recepción',instructor:'Instructor',coordinador:'Coordinador',admin_sucursal:'Admin sucursal',empleado:'Solo portal'};
+    // Primero las de la misma sede y con nombre parecido
+    const n = t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const pal = n(e.nombre).split(/\s+/).filter(w=>w.length>2);
+    const score = c=>(c.sede===e.sede?2:0)+(pal.some(w=>n(c.nombre).includes(w))?3:0);
+    libres.sort((a,b)=>score(b)-score(a)||String(a.nombre).localeCompare(String(b.nombre)));
+    sel.innerHTML = libres.length
+      ? '<option value="">— Seleccione —</option>'+libres.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre||'(sin nombre)')} · ${esc(nomRol[c.role]||c.role)}${c.sede?' · '+esc(c.sede):''}</option>`).join('')
+      : '<option value="">No hay cuentas sin ficha</option>';
+  } catch(err){ sel.innerHTML='<option value="">—</option>'; document.getElementById('vincErr').textContent='No se pudieron cargar las cuentas: '+mensajeError(err); }
+}
+async function guardarVinculo(){
+  const uid = document.getElementById('vincSel').value; const err = document.getElementById('vincErr');
+  if (!uid){ err.textContent='Seleccione una cuenta.'; return; }
+  const btn = document.getElementById('vincBtn'); btn.disabled = true;
+  try {
+    await supaFetch(`/empleados?id=eq.${encodeURIComponent(vincEmpId)}`, { method:'PATCH', body:{ user_id: uid } });
+    document.getElementById('vincModal').classList.remove('open'); await loadAdmin();
+  } catch(e){ err.textContent = 'No se pudo vincular: ' + mensajeError(e); }
+  finally { btn.disabled = false; }
+}
+async function desvincularCuenta(id){
+  const e = empleados.find(x=>x.id===id); if(!e) return;
+  if (!confirm(`¿Desligar la cuenta de la ficha de ${e.nombre}?\n\nLa cuenta sigue existiendo con sus permisos, pero deja de ver Mi Portal.`)) return;
+  try { await supaFetch(`/empleados?id=eq.${encodeURIComponent(id)}`, { method:'PATCH', body:{ user_id: null } }); await loadAdmin(); }
+  catch(err){ alert('No se pudo: ' + mensajeError(err)); }
 }
 
 async function crearAcceso(id){
