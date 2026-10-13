@@ -825,7 +825,7 @@ function cargarTurnoEnForm(t){
   document.getElementById('cTotalVentas').value=sinFacturado(t,'total_ventas','total')||0;
   document.getElementById('cSobreModo').value=t.sobre_modo||'no';
   window._otrosResumen=t.otros_desglose||null;
-  window._informeVentas=t.informe_ventas||null;
+  window._informeVentas=t.informe_ventas||null; window._ventasDetalle=(t.informe_ventas&&t.informe_ventas.detalle)||null;
   gastos=(Array.isArray(t.gastos)&&t.gastos.length?t.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros'}));
   ingresos=(Array.isArray(t.ingresos)&&t.ingresos.length?t.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc||'',monto:g.monto??''}));
   // Billetes/monedas: conteo de cierre en curso (del servidor) si existe; si no, arranca con el CONTEO DE APERTURA.
@@ -1012,7 +1012,7 @@ function applyRowToForm(row){
     ingresos=(Array.isArray(row.ingresos)&&row.ingresos.length?row.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc||'',monto:g.monto??''}));
     window._otrosResumen=row.otros_desglose||null; renderOtrosResumen(window._otrosResumen);
     inventarioCierre=row.inventario_cierre||null; renderConteoCierreResumen();
-    window._informeVentas=row.informe_ventas||null;
+    window._informeVentas=row.informe_ventas||null; window._ventasDetalle=(row.informe_ventas&&row.informe_ventas.detalle)||null;
     renderGastos(); renderIngresos(); calc();
   } finally { _noSave=false; }
 }
@@ -1245,7 +1245,7 @@ function cargarInformeVentas(file){
       const otrosPOS=Number(document.getElementById('cOtros').value)||0;
       const memb=Math.max(0,Math.round(total-otrosPOS));
       document.getElementById('cMembresias').value=memb;
-      window._informeVentas={efectivo:Math.round(efectivo),sinpe:Math.round(sinpe),tarjeta:Math.round(tarjeta),transfer:Math.round(transfer),total:Math.round(total)};
+      window._informeVentas={efectivo:Math.round(efectivo),sinpe:Math.round(sinpe),tarjeta:Math.round(tarjeta),transfer:Math.round(transfer),total:Math.round(total),detalle:window._ventasDetalle};   // el detalle se guarda con el turno: el cruce SINPE sobrevive a recargar la página
       document.getElementById('ventasHint').innerHTML=`📄 Informe del día (acumulado): Efectivo ${fmt(efectivo)} · Tarjeta ${fmt(tarjeta)} · SINPE ${fmt(sinpe)} · Transferencia ${fmt(transfer)} · <b>Total ${fmt(total)}</b> → <b>Membresías ${fmt(memb)}</b>${otrosPOS?` (sin ${fmt(otrosPOS)} de productos)`:''}. El cuadre es contra el fondo del primer turno del día.`;
       calc();
     }catch(err){alert('Error al leer el archivo: '+err.message);}
@@ -1352,24 +1352,41 @@ function conciliarSinpe(){
   return { pares, refSinTrans, sinTrans, sinCobro, difMonto, agrupado:v.agrupado, desde:s.desde, fecha:v.fecha,
     conRef:cobros.filter(c=>c.refs.length).length };
 }
-function htmlConciliacion(){
-  const r=conciliarSinpe(); if(!r)return '';
+// Resultado del cruce en formato plano (sin fechas como objeto): se muestra en vivo y se guarda
+// en el cierre final (sinpe_reporte.cruce) para revisarlo después en el historial y en la app.
+function cruceGuardable(r){
+  if(!r) return null;
+  const aviso=c=>(r.desde&&c.d&&r.desde>=ymd(c.d))?`El reporte SINPE empieza el ${r.desde}: si pagó antes (p. ej. anoche después del cierre), descárguelo desde el día anterior.`:'Revise si pagó por otro medio, a otro número o si el monto es distinto.';
+  const nRef=r.pares.filter(x=>x.por==='referencia').length;
+  return { at:new Date().toISOString(), desde:r.desde||null, fecha:r.fecha||null, agrupado:!!r.agrupado, conRef:r.conRef||0,
+    calzan:r.pares.length, porRef:nRef, porMonto:r.pares.length-nRef,
+    sinTrans:r.sinTrans.map(c=>({cliente:c.cliente, cuando:horaCorta(c.d)||c.fecha||'', total:c.total, aviso:aviso(c)})),
+    refSinTrans:r.refSinTrans.map(c=>({cliente:c.cliente, ref:String(c.refs[0]||'').slice(-6), total:c.total, aviso:aviso(c)})),
+    difMonto:r.difMonto.map(x=>({cliente:x.c.cliente, facturado:x.c.total, recibido:x.t.monto, origen:x.t.origen||''})),
+    sinCobro:r.sinCobro.map(t=>({origen:t.origen||'', cuando:horaCorta(t.d)||t.fecha_tx||'', monto:t.monto, detalle:t.detalle||'', ref:String(t.referencia||'').slice(-6)})),
+    verificar:r.pares.filter(x=>x.por==='monto (verificar)').map(x=>({cliente:x.c.cliente, origen:x.t.origen||'', monto:x.t.monto})) };
+}
+// Faltante = cobro SINPE sin su transferencia (con o sin referencia anotada)
+const faltantesCruce=g=>g?((g.sinTrans||[]).length+(g.refSinTrans||[]).length):0;
+function htmlCruce(g, guardado){
+  if(!g) return '';
   const fila=(izq,der,sub,color)=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 12px;border-top:1px solid var(--border);${color?'color:'+color+';':''}"><span>${izq}${sub?`<div style="font-size:11px;color:var(--muted);font-weight:400;">${sub}</div>`:''}</span><span style="white-space:nowrap;font-weight:700;">${der}</span></div>`;
-  const avisoDesde=c=>(r.desde&&c.d&&r.desde>=ymd(c.d))?`El reporte SINPE empieza el ${esc(r.desde)}: si pagó antes (p. ej. anoche después del cierre), descárguelo desde el día anterior.`:'Revise si pagó por otro medio, a otro número o si el monto es distinto.';
   let h='';
-  r.sinTrans.forEach(c=>{ h+=fila(`⚠ <b>${esc(c.cliente)}</b> · ${esc(horaCorta(c.d))}`, fmt(c.total), `Cobrado por SINPE sin transferencia en el reporte. ${avisoDesde(c)}`, 'var(--red)'); });
-  r.refSinTrans.forEach(c=>{ h+=fila(`⚠ <b>${esc(c.cliente)}</b> · ref …${esc(c.refs[0].slice(-6))}`, fmt(c.total), `La referencia anotada no aparece en el reporte. ${avisoDesde(c)}`, 'var(--red)'); });
-  r.difMonto.forEach(x=>{ const d=x.t.monto-x.c.total; h+=fila(`≠ <b>${esc(x.c.cliente)}</b>`, (d>0?'+':'−')+fmt(Math.abs(d)), `Facturado ${fmt(x.c.total)} · recibido ${fmt(x.t.monto)} (${esc(x.t.origen||'')})`, 'var(--orange)'); });
-  r.sinCobro.forEach(t=>{ h+=fila(`🕒 <b>${esc(t.origen||'Sin nombre')}</b> · ${esc(horaCorta(t.d))}`, fmt(t.monto), `Recibido sin cobro identificado${t.detalle?' · "'+esc(t.detalle)+'"':''} · ref …${esc(String(t.referencia).slice(-6))}`, 'var(--blue)'); });
-  const nRef=r.pares.filter(x=>x.por==='referencia').length, nMonto=r.pares.length-nRef, nVerif=r.pares.filter(x=>x.por==='monto (verificar)');
-  nVerif.forEach(x=>{ h+=fila(`? <b>${esc(x.c.cliente)}</b> ↔ ${esc(x.t.origen||'')}`, fmt(x.t.monto), 'Emparejado solo por monto: confirme que sea de esta persona.', 'var(--muted)'); });
-  const limpio=!r.sinTrans.length&&!r.refSinTrans.length&&!r.difMonto.length&&!r.sinCobro.length;
+  (g.sinTrans||[]).forEach(c=>{ h+=fila(`⚠ <b>${esc(c.cliente)}</b>${c.cuando?' · '+esc(c.cuando):''}`, fmt(c.total), `Cobrado por SINPE sin transferencia en el reporte. ${esc(c.aviso||'')}`, 'var(--red)'); });
+  (g.refSinTrans||[]).forEach(c=>{ h+=fila(`⚠ <b>${esc(c.cliente)}</b> · ref …${esc(c.ref)}`, fmt(c.total), `La referencia anotada no aparece en el reporte. ${esc(c.aviso||'')}`, 'var(--red)'); });
+  (g.difMonto||[]).forEach(x=>{ const d=x.recibido-x.facturado; h+=fila(`≠ <b>${esc(x.cliente)}</b>`, (d>0?'+':'−')+fmt(Math.abs(d)), `Facturado ${fmt(x.facturado)} · recibido ${fmt(x.recibido)} (${esc(x.origen)})`, 'var(--orange)'); });
+  (g.sinCobro||[]).forEach(t=>{ h+=fila(`🕒 <b>${esc(t.origen||'Sin nombre')}</b>${t.cuando?' · '+esc(t.cuando):''}`, fmt(t.monto), `Recibido sin cobro identificado${t.detalle?' · "'+esc(t.detalle)+'"':''}${t.ref?' · ref …'+esc(t.ref):''}`, 'var(--blue)'); });
+  (g.verificar||[]).forEach(x=>{ h+=fila(`? <b>${esc(x.cliente)}</b> ↔ ${esc(x.origen)}`, fmt(x.monto), 'Emparejado solo por monto: confirme que sea de esta persona.', 'var(--muted)'); });
+  const nFalt=faltantesCruce(g);
+  const limpio=!nFalt&&!(g.difMonto||[]).length&&!(g.sinCobro||[]).length;
+  const cab=nFalt?`<span style="color:var(--red);">⚠ ${nFalt} sin transferencia</span>`:`<span>✓ ${g.calzan} calzan</span>`;
   return `<div style="margin-top:10px;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;">
-    <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--fill);font-weight:700;"><span>🔗 Cruce por transacción</span><span>✓ ${r.pares.length} calzan</span></div>
-    <div style="padding:6px 12px;font-size:11px;color:var(--muted);">${nRef} por referencia anotada · ${nMonto} por monto y nombre${r.conRef?'':' · Anotar la referencia SINPE en "Notas" del sistema de ventas hace el cruce exacto.'}${r.agrupado?'':'<br>El informe no viene separado por método de pago: no se pueden listar los cobros SINPE sin transferencia, solo lo que calza y lo recibido sin cobro.'}</div>
+    <div style="display:flex;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--fill);font-weight:700;"><span>🔗 Cruce por transacción${guardado?' <span style="font-weight:500;color:var(--muted);">(guardado)</span>':''}</span>${cab}</div>
+    <div style="padding:6px 12px;font-size:11px;color:var(--muted);">${g.calzan} calzan: ${g.porRef} por referencia anotada · ${g.porMonto} por monto y nombre${g.conRef?'':' · Anotar la referencia SINPE en "Notas" del sistema de ventas hace el cruce exacto.'}${g.agrupado?'':'<br>Sin el detalle por método de pago: solo se ve lo que calza y lo recibido sin cobro.'}</div>
     ${limpio?`<div style="padding:8px 12px;border-top:1px solid var(--border);color:var(--green);font-weight:700;">✓ Cada cobro SINPE tiene su transferencia</div>`:h}
   </div>`;
 }
+function htmlConciliacion(){ return htmlCruce(cruceGuardable(conciliarSinpe()), false); }
 function renderSinpeResumen(){
   const box=document.getElementById('sinpeResumen'); const s=window._sinpeReporte;
   if(!s){ box.innerHTML=''; return; }
@@ -1412,7 +1429,9 @@ function renderSinpeResumenHist(sr){
       <div style="display:flex;justify-content:space-between;padding:6px 12px;"><span>Facturado (cierre)</span><span>${fmt(sr.facturado||0)}</span></div>
       <div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--muted);"><span>Pendiente arrastrado</span><span>${fmt(sr.pendPrev||0)}</span></div>
       <div style="padding:9px 12px;background:${bg};color:${cl};font-weight:800;border-top:1px solid var(--border);"><div style="display:flex;justify-content:space-between;"><span>${ic} Pendiente por facturar</span><span>${fmt(pendAfter)}</span></div><div style="font-weight:600;font-size:11px;margin-top:2px;opacity:.9;">${txt}</div></div>
-    </div>`;
+      ${sr.ajuste_manual?`<div style="padding:6px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);">✎ Pendiente puesto en 0 a mano (antes ${fmt(sr.ajuste_manual.pendiente_antes||0)})</div>`:''}
+    </div>
+    ${sr.cruce?htmlCruce(sr.cruce,true):'<div class="hint" style="margin-top:8px;">Este cierre no guardó el cruce por transacción (se guarda desde el 13/10/2026).</div>'}`;
 }
 
 // ── Foto del datáfono (obligatoria en parcial/final) + análisis con IA (Claude Vision) ──
@@ -1630,7 +1649,8 @@ async function cerrarTurno(estado){
   if(sr && esFinal){
     const pendAfter=Math.round((sr.pendPrev||0)+sr.nuevosMonto-c.sinpe);
     payload.sinpe_pendiente=pendAfter;
-    payload.sinpe_reporte={ fileName:sr.fileName, totalN:sr.totalN, totalMonto:sr.totalMonto, yaRegN:sr.yaRegN, yaRegMonto:sr.yaRegMonto, nuevosN:sr.nuevos.length, nuevosMonto:sr.nuevosMonto, facturado:Math.round(c.sinpe), pendPrev:Math.round(sr.pendPrev||0), pendAfter };
+    let cruce=null; try{ cruce=cruceGuardable(conciliarSinpe()); }catch(_){}   // el cruce no debe frenar el cierre
+    payload.sinpe_reporte={ fileName:sr.fileName, totalN:sr.totalN, totalMonto:sr.totalMonto, yaRegN:sr.yaRegN, yaRegMonto:sr.yaRegMonto, nuevosN:sr.nuevos.length, nuevosMonto:sr.nuevosMonto, facturado:Math.round(c.sinpe), pendPrev:Math.round(sr.pendPrev||0), pendAfter, cruce };
   }
   const btn=estado==='final'?document.getElementById('btnFinal'):document.getElementById('btnParcial');
   const bt0=btn.textContent; btn.disabled=true; btn.textContent='Guardando...';
@@ -1721,7 +1741,7 @@ function renderHist(){
     <td class="num">${fmt(c.caja_inicial)}</td><td class="num">${fmt(c.efectivo)}</td>
     <td class="num">${fmt(c.total_ventas)}</td><td class="num">${fmt(c.minita)}</td>
     <td class="num" style="color:${Math.round(c.diferencia||0)===0?'var(--green)':'var(--red)'};">${fmt(c.diferencia)}</td>
-    <td>${Math.round(c.diferencia||0)===0?'<span class="pill ok">OK</span>':(Math.round(c.diferencia||0)>0?'<span class="pill dif">Faltante</span>':'<span class="pill dif" style="background:var(--blue-tint);color:var(--blue);">Sobrante</span>')}</td>
+    <td>${Math.round(c.diferencia||0)===0?'<span class="pill ok">OK</span>':(Math.round(c.diferencia||0)>0?'<span class="pill dif">Faltante</span>':'<span class="pill dif" style="background:var(--blue-tint);color:var(--blue);">Sobrante</span>')}${faltantesCruce(c.sinpe_reporte&&c.sinpe_reporte.cruce)?` <span class="pill dif" title="Cobros SINPE sin transferencia: abra el cierre para ver quiénes">⚠ SINPE ${faltantesCruce(c.sinpe_reporte.cruce)}</span>`:''}</td>
     <td><button class="btn-ghost" onclick='cargarCierre(${JSON.stringify(c.id)})'>Ver</button></td>
   </tr>`).join('');
 }

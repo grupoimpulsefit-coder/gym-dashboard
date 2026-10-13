@@ -192,7 +192,7 @@
 
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-10-12a';
+const APP_VER='2026-10-13a';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -320,6 +320,8 @@ const turnosDe=s=>cierres.filter(c=>c.sede===s).sort((a,b)=>(a.turno_num||0)-(b.
 const ultimoTurno=s=>{const ts=turnosDe(s);return ts[ts.length-1]||null;};
 function difInfo(c){ if(!c) return null; const d=Math.round(Number(c.diferencia)||0); if(d===0) return {cls:'ok',txt:'Cuadra'}; if(d>0) return {cls:'bad',txt:'Faltante '+fmt(d)}; return {cls:'info',txt:'Sobrante '+fmt(-d)}; }
 function estadoPill(c){ if(!c) return '<span class="pill warn">Sin turno</span>'; if(c.estado==='abierto') return '<span class="pill status live"><span class="dot"></span>Abierto '+hora(c.hora_apertura)+'</span>'; if(c.estado==='parcial') return '<span class="pill status">Parcial '+hora(c.hora_cierre)+'</span>'; return '<span class="pill status">Final '+hora(c.hora_cierre)+'</span>'; }
+// Cruce SINPE guardado en el cierre final: cobros SINPE sin su transferencia
+const cruceFaltan=c=>{ const g=c?.sinpe_reporte?.cruce; return g?((g.sinTrans||[]).length+(g.refSinTrans||[]).length):0; };
 function sinpePill(c){ const sr=c?.sinpe_reporte; if(!sr) return null; const pa=Math.round(sr.pendAfter!=null?sr.pendAfter:((Number(sr.pendPrev)||0)+(Number(sr.nuevosMonto)||0)-(Number(sr.facturado)||0))); return pa<0?{cls:'bad',txt:'SINPE faltó '+fmt(-pa),pa}:pa===0?{cls:'ok',txt:'SINPE cuadró',pa}:{cls:'info',txt:'SINPE +'+fmt(pa)+' por facturar',pa}; }
 // Alertas automáticas de un cierre (misma lógica para cards, hub y auditoría). prev = turno anterior del mismo día.
 function prevDe(s,c){ if(!c) return null; return turnosDe(s).find(t=>t.turno_num===(c.turno_num||0)-1)||null; }
@@ -327,6 +329,7 @@ function alertasDe(c,prev){ const a=[]; if(!c) return a; const cerrado=c.estado!
   const d=Math.round(Number(c.diferencia)||0); if(cerrado&&d!==0) a.push({cls:d>0?'bad':'info',t:(d>0?'Faltante ':'Sobrante ')+fmt(Math.abs(d))});
   if(c.estado==='final'&&!c.sinpe_reporte) a.push({cls:'warn',t:'Sin reporte SINPE'});
   const sp=sinpePill(c); if(sp&&sp.pa<0) a.push({cls:'bad',t:'SINPE: facturó '+fmt(-sp.pa)+' más de lo recibido'});
+  const nf=cruceFaltan(c); if(nf) a.push({cls:'bad',t:`SINPE: ${nf} cobro(s) sin transferencia`});
   if(cerrado){ const inv=c.inventario_cierre||{}; const k=Object.keys(inv);
     if(!k.length) a.push({cls:'warn',t:'Sin conteo de inventario'});
     else { const n=k.filter(x=>inv[x]&&inv[x].contado!=null&&Number(inv[x].contado)!==Number(inv[x].sistema)).length; if(n) a.push({cls:'warn',t:n+' producto(s) con diferencia en el conteo'}); } }
@@ -694,7 +697,15 @@ async function renderCaja(showLoading){
     sinpeHtml=`<div class="cell"><div class="main"><span class="t">Recibidos nuevos</span><span class="s">${esc(sr.fileName||'Reporte SINPE')} · ${sr.nuevosN||0} mov.</span></div><span class="v strong num">${fmt(sr.nuevosMonto)}</span></div>
       <div class="cell"><div class="main"><span class="t">Facturado</span></div><span class="v num">${fmt(sr.facturado)}</span></div>
       <div class="cell"><div class="main"><span class="t">Pendiente arrastrado</span></div><span class="v num">${fmt(sr.pendPrev)}</span></div>
-      <div class="cell"><div class="main"><span class="t">Pendiente por facturar</span></div><span class="pill ${sp.cls}">${sp.pa<0?'Faltó '+fmt(-sp.pa):sp.pa===0?'Cuadró':'Sobró '+fmt(sp.pa)}</span></div>`; }
+      <div class="cell"><div class="main"><span class="t">Pendiente por facturar</span></div><span class="pill ${sp.cls}">${sp.pa<0?'Faltó '+fmt(-sp.pa):sp.pa===0?'Cuadró':'Sobró '+fmt(sp.pa)}</span></div>`;
+    const g=sr.cruce;
+    if(g){ const fila=(t,s,v,col)=>`<div class="cell"><div class="main"><span class="t" style="color:${col}">${t}</span><span class="s">${s}</span></div><span class="v strong num" style="color:${col}">${v}</span></div>`;
+      sinpeHtml+=fila('Cruce por transacción',`${g.calzan} calzan · ${g.porRef} por referencia`,cruceFaltan(c)?'⚠ '+cruceFaltan(c):'✓','var(--label)');
+      (g.sinTrans||[]).forEach(x=>{ sinpeHtml+=fila('⚠ '+esc(x.cliente),'Cobrado por SINPE sin transferencia'+(x.cuando?' · '+esc(x.cuando):''),fmt(x.total),'var(--red)'); });
+      (g.refSinTrans||[]).forEach(x=>{ sinpeHtml+=fila('⚠ '+esc(x.cliente),'Referencia …'+esc(x.ref)+' no está en el reporte',fmt(x.total),'var(--red)'); });
+      (g.difMonto||[]).forEach(x=>{ sinpeHtml+=fila('≠ '+esc(x.cliente),`Facturado ${fmt(x.facturado)} · recibido ${fmt(x.recibido)}`,fmt(Math.abs(x.recibido-x.facturado)),'var(--orange)'); });
+      (g.sinCobro||[]).forEach(x=>{ sinpeHtml+=fila('🕒 '+esc(x.origen||'Sin nombre'),'Recibido sin cobro identificado'+(x.detalle?' · '+esc(x.detalle):''),fmt(x.monto),'var(--blue)'); }); }
+  }
   else sinpeHtml=`<div class="cell"><div class="main"><span class="t">Sin reporte SINPE</span><span class="s">${c.estado==='final'?'Obligatorio en el cierre final':'Se concilia en el cierre final'}</span></div><span class="pill ${c.estado==='final'?'warn':'status'}">${c.estado==='final'?'Falta':'Aún no'}</span></div>`;
   const inv=c.inventario_cierre||{}; const invKeys=Object.keys(inv); const invDifs=invKeys.filter(k=>inv[k]&&inv[k].contado!=null&&Number(inv[k].contado)!==Number(inv[k].sistema));
   let invHtml='';
