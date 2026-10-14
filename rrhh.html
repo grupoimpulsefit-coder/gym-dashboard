@@ -87,7 +87,7 @@
 
   <div class="tabs">
     <div class="tab active" id="tabBtnEmp" onclick="switchTab('emp')">👤 Empleados</div>
-    <div class="tab" id="tabBtnVac" onclick="switchTab('vac')">🌴 Solicitudes de vacaciones</div>
+    <div class="tab" id="tabBtnVac" onclick="switchTab('vac')">🌴 Solicitudes de días libres</div>
     <div class="tab" id="tabBtnDoc" onclick="switchTab('doc')">📎 Incapacidades y citas <span id="nDocsPend"></span></div>
   </div>
 
@@ -105,13 +105,13 @@
   </div>
 
   <div class="tab-panel" id="panelVac">
-    <div class="section"><div class="section-title">🌴 Solicitudes de vacaciones / días libres
+    <div class="section"><div class="section-title">🌴 Solicitudes de días libres (vacaciones o sin goce)
       <select id="vacFiltro" class="ui" onchange="renderSolicitudes()" style="margin-left:auto;">
         <option value="pendiente">Pendientes</option><option value="all">Todas</option>
         <option value="aprobada">Aprobadas</option><option value="rechazada">Rechazadas</option>
       </select></div></div>
     <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Empleado</th><th>Desde</th><th>Hasta</th><th class="num">Días</th><th>Motivo</th><th>Estado</th><th>Solicitada</th><th></th></tr></thead>
+      <thead><tr><th>Empleado</th><th>Tipo</th><th>Desde</th><th>Hasta</th><th class="num">Días</th><th>Motivo</th><th>Estado</th><th>Solicitada</th><th></th></tr></thead>
       <tbody id="vacBody"></tbody>
     </table></div>
   </div>
@@ -142,11 +142,17 @@
   <div class="section"><div class="section-title">🌴 Solicitar días libres</div></div>
   <div class="form-card">
     <div class="form-grid">
+      <div class="f-field full"><label>Tipo <span class="req">*</span></label>
+        <select id="sTipo" onchange="onTipoLibre()">
+          <option value="vacaciones">🌴 Vacaciones (con goce de salario · rebaja del saldo)</option>
+          <option value="sin_goce">📅 Libre sin goce de salario (no rebaja vacaciones · se descuenta del salario)</option>
+        </select></div>
       <div class="f-field"><label>Desde <span class="req">*</span></label><input type="date" id="sDesde" onchange="calcDias()"></div>
       <div class="f-field"><label>Hasta <span class="req">*</span></label><input type="date" id="sHasta" onchange="calcDias()"></div>
       <div class="f-field"><label>Días solicitados <span class="req">*</span></label><input type="number" id="sDias" min="1" step="0.5"></div>
       <div class="f-field full"><label>Motivo (opcional)</label><input type="text" id="sMotivo" placeholder="Ej. vacaciones familiares"></div>
     </div>
+    <div class="hint" id="sHint" style="margin-top:8px;"></div>
     <div class="form-actions">
       <div class="form-msg" id="sMsg"></div>
       <button class="btn-primary" id="sBtn" onclick="enviarSolicitud()">📨 Enviar solicitud</button>
@@ -155,7 +161,7 @@
 
   <div class="section"><div class="section-title">📋 Mis solicitudes</div></div>
   <div class="tbl-wrap"><table class="tbl">
-    <thead><tr><th>Desde</th><th>Hasta</th><th class="num">Días</th><th>Motivo</th><th>Estado</th><th>Comentario</th><th>Solicitada</th></tr></thead>
+    <thead><tr><th>Tipo</th><th>Desde</th><th>Hasta</th><th class="num">Días</th><th>Motivo</th><th>Estado</th><th>Comentario</th><th>Solicitada</th></tr></thead>
     <tbody id="misBody"></tbody>
   </table></div>
 
@@ -369,7 +375,10 @@ function parseFecha(s){ if(!s) return null; const [y,m,d]=String(s).split('-').m
 function fmtFecha(s){ const d=parseFecha(s); return d ? d.toLocaleDateString('es-CR') : '—'; }
 function mesesTrabajados(fi, hasta){ if(!fi) return 0; let m=(hasta.getFullYear()-fi.getFullYear())*12+(hasta.getMonth()-fi.getMonth()); if(hasta.getDate()<fi.getDate()) m--; return Math.max(0,m); }
 function diasAcumulados(emp){ const fi=parseFecha(emp.fecha_ingreso); if(!fi) return 0; return mesesTrabajados(fi,new Date())*Number(emp.vac_dias_por_mes||0) + Number(emp.vac_ajuste||0); }
-function diasUsados(empId){ return solicitudesDe(empId).filter(s=>s.estado==='aprobada').reduce((a,s)=>a+Number(s.dias||0),0); }
+// Solo las vacaciones (con goce) rebajan el saldo; los días libres sin goce se descuentan en Planilla.
+const esSinGoce = s => s.tipo === 'sin_goce';
+const TIPO_LIBRE = s => esSinGoce(s) ? '<span class="pill status" style="white-space:nowrap">Sin goce</span>' : '<span class="pill info" style="white-space:nowrap">Vacaciones</span>';
+function diasUsados(empId){ return solicitudesDe(empId).filter(s=>s.estado==='aprobada'&&!esSinGoce(s)).reduce((a,s)=>a+Number(s.dias||0),0); }
 function solicitudesDe(empId){ return solicitudes.filter(s=>s.empleado_id===empId); }
 function saldoVac(emp, usados){ return diasAcumulados(emp) - (usados!=null ? usados : diasUsados(emp.id)); }
 
@@ -516,7 +525,7 @@ function renderSolicitudes(){
   const rows = solicitudes.filter(s=> filtro==='all' ? true : s.estado===filtro);
   const empName = id => (empleados.find(e=>e.id===id)?.nombre) || '—';
   const tb = document.getElementById('vacBody'); tb.innerHTML='';
-  if (!rows.length){ tb.innerHTML=`<tr><td colspan="8" class="tbl-empty">Sin solicitudes ${filtro==='all'?'':'('+filtro+')'}.</td></tr>`; return; }
+  if (!rows.length){ tb.innerHTML=`<tr><td colspan="9" class="tbl-empty">Sin solicitudes ${filtro==='all'?'':'('+filtro+')'}.</td></tr>`; return; }
   rows.forEach(s=>{
     const badge = s.estado==='aprobada'?'<span class="pill apr">Aprobada</span>':s.estado==='rechazada'?'<span class="pill rec">Rechazada</span>':'<span class="pill pend">Pendiente</span>';
     const acciones = s.estado==='pendiente'
@@ -525,6 +534,7 @@ function renderSolicitudes(){
     const tr = tb.insertRow();
     tr.innerHTML = `
       <td><strong>${esc(empName(s.empleado_id))}</strong></td>
+      <td>${TIPO_LIBRE(s)}</td>
       <td>${fmtFecha(s.fecha_inicio)}</td><td>${fmtFecha(s.fecha_fin)}</td>
       <td class="num">${Number(s.dias).toFixed(1)}</td>
       <td>${esc(s.motivo)||'—'}</td>
@@ -541,7 +551,9 @@ async function resolver(id, estado){
   if (estado==='aprobada'){
     const emp = empleados.find(e=>e.id===s.empleado_id);
     const saldo = emp ? saldoVac(emp) : 0;
-    if (!confirm(`Aprobar ${Number(s.dias).toFixed(1)} día(s) de ${emp?.nombre||''}. Saldo actual: ${saldo.toFixed(1)}. ¿Continuar?`)) return;
+    if (!confirm(esSinGoce(s)
+      ? `Aprobar ${Number(s.dias).toFixed(1)} día(s) libre(s) SIN goce de salario de ${emp?.nombre||''}.\n\nNo rebaja las vacaciones; esos días se descuentan del salario en Planilla. ¿Continuar?`
+      : `Aprobar ${Number(s.dias).toFixed(1)} día(s) de vacaciones de ${emp?.nombre||''}. Saldo actual: ${saldo.toFixed(1)}. ¿Continuar?`)) return;
   }
   try {
     await supaFetch(`/vacaciones_solicitudes?id=eq.${encodeURIComponent(id)}`, { method:'PATCH', body:{ estado, comentario_admin: comentario, resuelto_por: currentEmail, resuelto_at: new Date().toISOString() } });
@@ -832,7 +844,7 @@ async function initPortal(){
     }
     misSolicitudes = (await supaFetch(`/vacaciones_solicitudes?empleado_id=eq.${miEmpleado.id}&order=created_at.desc&select=*`)) || [];
     renderPortal();
-    onDocTipo(); cargarMisDocs();
+    onTipoLibre(); onDocTipo(); cargarMisDocs();
   } catch(e){
     document.getElementById('loading').style.display='none';
     document.getElementById('emptyState').style.display='block';
@@ -841,23 +853,30 @@ async function initPortal(){
 }
 
 function renderPortal(){
-  const usados = misSolicitudes.filter(s=>s.estado==='aprobada').reduce((a,s)=>a+Number(s.dias||0),0);
+  const usados = misSolicitudes.filter(s=>s.estado==='aprobada'&&!esSinGoce(s)).reduce((a,s)=>a+Number(s.dias||0),0);
   const acum = diasAcumulados(miEmpleado);
   document.getElementById('pAcum').textContent = acum.toFixed(1);
   document.getElementById('pUsados').textContent = usados.toFixed(1);
   document.getElementById('pSaldo').textContent = (acum - usados).toFixed(1);
   document.getElementById('pIngreso').textContent = fmtFecha(miEmpleado.fecha_ingreso);
   const tb = document.getElementById('misBody'); tb.innerHTML='';
-  if (!misSolicitudes.length){ tb.innerHTML=`<tr><td colspan="7" class="tbl-empty">Aún no ha hecho solicitudes.</td></tr>`; return; }
+  if (!misSolicitudes.length){ tb.innerHTML=`<tr><td colspan="8" class="tbl-empty">Aún no ha hecho solicitudes.</td></tr>`; return; }
   misSolicitudes.forEach(s=>{
     const badge = s.estado==='aprobada'?'<span class="pill apr">Aprobada</span>':s.estado==='rechazada'?'<span class="pill rec">Rechazada</span>':'<span class="pill pend">Pendiente</span>';
     const tr = tb.insertRow();
-    tr.innerHTML = `<td>${fmtFecha(s.fecha_inicio)}</td><td>${fmtFecha(s.fecha_fin)}</td><td class="num">${Number(s.dias).toFixed(1)}</td>
+    tr.innerHTML = `<td>${TIPO_LIBRE(s)}</td><td>${fmtFecha(s.fecha_inicio)}</td><td>${fmtFecha(s.fecha_fin)}</td><td class="num">${Number(s.dias).toFixed(1)}</td>
       <td>${esc(s.motivo)||'—'}</td><td>${badge}</td><td>${esc(s.comentario_admin)||'—'}</td>
       <td style="font-size:12px;color:var(--muted);">${new Date(s.created_at).toLocaleDateString('es-CR')}</td>`;
   });
 }
 
+function onTipoLibre(){
+  const sg = document.getElementById('sTipo').value === 'sin_goce';
+  document.getElementById('sHint').textContent = sg
+    ? 'Día(s) libre(s) sin goce: no se rebajan de sus vacaciones, pero se descuentan de su salario en la planilla de esa quincena.'
+    : 'Vacaciones: se pagan normal y se rebajan de su saldo de vacaciones.';
+  document.getElementById('sBtn').textContent = sg ? '📨 Solicitar libre sin goce' : '📨 Enviar solicitud';
+}
 function calcDias(){
   const a = parseFecha(document.getElementById('sDesde').value);
   const b = parseFecha(document.getElementById('sHasta').value);
@@ -871,8 +890,10 @@ async function enviarSolicitud(){
   if (!desde || !hasta){ msg.className='form-msg err'; msg.textContent='Indique las fechas.'; return; }
   if (parseFecha(hasta) < parseFecha(desde)){ msg.className='form-msg err'; msg.textContent='La fecha final no puede ser antes de la inicial.'; return; }
   if (!dias || dias<=0){ msg.className='form-msg err'; msg.textContent='Indique los días solicitados.'; return; }
+  const sinGoce = document.getElementById('sTipo').value === 'sin_goce';
   const payload = { empleado_id: miEmpleado.id, user_id: currentUserId, sede: miEmpleado.sede,
     fecha_inicio: desde, fecha_fin: hasta, dias, motivo: document.getElementById('sMotivo').value.trim()||null, estado:'pendiente' };
+  if (sinGoce) payload.tipo = 'sin_goce';   // vacaciones es el valor por defecto de la columna
   const btn = document.getElementById('sBtn'); btn.disabled=true; btn.textContent='Enviando...';
   try {
     await supaFetch('/vacaciones_solicitudes', { method:'POST', body: payload });
@@ -881,8 +902,8 @@ async function enviarSolicitud(){
     misSolicitudes = (await supaFetch(`/vacaciones_solicitudes?empleado_id=eq.${miEmpleado.id}&order=created_at.desc&select=*`)) || [];
     renderPortal();
     setTimeout(()=>{ if (msg.textContent.startsWith('✅')) msg.textContent=''; }, 4000);
-  } catch(e){ msg.className='form-msg err'; msg.textContent='⚠️ ' + e.message; }
-  finally { btn.disabled=false; btn.textContent='📨 Enviar solicitud'; }
+  } catch(e){ msg.className='form-msg err'; msg.textContent='⚠️ ' + (/tipo/.test(e.message) && /column|schema cache/i.test(e.message) ? 'Los días sin goce todavía no están habilitados: falta correr rrhh_sin_goce.sql en Supabase.' : e.message); }
+  finally { btn.disabled=false; onTipoLibre(); }
 }
 
 // ══ Documentos: incapacidades, citas médicas y comprobantes ══

@@ -344,6 +344,7 @@ async function loadPlanilla(){
     empleados = (emps || []).filter(e => e.activo !== false && e.tipo_pago !== 'semanal');
     novedades = novs || [];
     cierre = cier?.[0] || null;
+    libresSinGoce = (await supaFetch(`/vacaciones_solicitudes?sede=eq.${sede}&tipo=eq.sin_goce&estado=eq.aprobada&fecha_inicio=lte.${ymd(periodoActual.fin)}&order=fecha_inicio.asc&select=*`).catch(() => [])) || [];
     docsIncap = (await supaFetch(`/rrhh_documentos?sede=eq.${sede}&tipo=eq.incapacidad&estado=neq.rechazado&fecha_inicio=lte.${ymd(periodoActual.fin)}&order=fecha_inicio.asc&select=*`).catch(() => [])) || [];
     // Registro de boletas enviadas (si la tabla aún no existe, se sigue sin él)
     envios = cierre ? ((await supaFetch(`/planilla_boletas_envios?sede=eq.${sede}&periodo=eq.${per}&order=enviado_at.desc&select=*`).catch(() => [])) || []) : [];
@@ -421,6 +422,10 @@ function render(){
       return `<div class="fila"><span><b>${esc(e?.nombre||'—')}</b> · ${fmtFecha(parseFecha(d.fecha_inicio))}${d.fecha_fin&&d.fecha_fin!==d.fecha_inicio?' – '+fmtFecha(parseFecha(d.fecha_fin)):''}${d.ente?' · '+esc(String(d.ente).toUpperCase()):''}${d.numero?' · boleta '+esc(d.numero):''}${d.estado==='pendiente'?' · <i>sin revisar en RRHH</i>':''}</span>
         <button class="btn-ghost btn-mini" onclick="verDocPlanilla('${esc(d.archivo_path)}')">👁 Ver</button>
         <button class="btn-primary btn-mini" onclick="usarDocIncap('${d.id}')">＋ Agregar a la planilla</button></div>`; }).join('')}</div>`; }
+  if (!cerrada){ const sg = libresSinRegistrar();
+    if (sg.length) av += `<div class="aviso doc">📅 <b>Días libres sin goce aprobados en RRHH</b> que todavía no están en esta quincena:${sg.map(x=>{ const e=empleados.find(y=>y.id===x.empleado_id);
+      return `<div class="fila"><span><b>${esc(e?.nombre||'—')}</b> · ${fmtFecha(parseFecha(x.fecha_inicio))}${x.fecha_fin&&x.fecha_fin!==x.fecha_inicio?' – '+fmtFecha(parseFecha(x.fecha_fin)):''} · ${Number(x.dias)||0} día(s)${x.motivo?' · '+esc(x.motivo):''}</span>
+        <button class="btn-primary btn-mini" onclick="usarLibreSinGoce('${x.id}')">＋ Agregar a la planilla</button></div>`; }).join('')}</div>`; }
   if (fer.length) av += `<div class="aviso feriado">🎉 Feriados en esta quincena: ${fer.map(x=>`<b>${x.f.getDate()} de ${MESES[x.f.getMonth()].toLowerCase()}</b> (${esc(x.n)}${x.ob?'':', pago no obligatorio'})`).join(' · ')}. Si alguien lo trabajó, agréguelo como novedad.</div>`;
   document.getElementById('avisos').innerHTML = av;
 
@@ -537,6 +542,33 @@ function openNovedad(empId){
   document.getElementById('novModal').classList.add('open');
 }
 function closeNovedad(){ window._docNov = null; document.getElementById('novModal').classList.remove('open'); }
+
+// ── Días libres sin goce aprobados en RRHH ──
+let libresSinGoce = [];
+function libresSinRegistrar(){
+  const q = periodoActual;
+  return (libresSinGoce || []).filter(x => {
+    const a = parseFecha(x.fecha_inicio), b = parseFecha(x.fecha_fin || x.fecha_inicio);
+    if (!a || !b || b < q.ini || a > q.fin) return false;
+    if (!empleados.some(e => e.id === x.empleado_id)) return false;
+    return !novedades.some(n => n.tipo === 'sin_goce' && n.empleado_id === x.empleado_id
+      && parseFecha(n.fecha_inicio) <= b && parseFecha(n.fecha_fin || n.fecha_inicio) >= a);
+  });
+}
+function usarLibreSinGoce(id){
+  const x = (libresSinGoce || []).find(y => y.id === id); if (!x) return;
+  const q = periodoActual;
+  openNovedad(x.empleado_id);
+  const a = parseFecha(x.fecha_inicio), b = parseFecha(x.fecha_fin || x.fecha_inicio);
+  const recortada = a < q.ini || b > q.fin;
+  document.getElementById('nTipo').value = 'sin_goce';
+  document.getElementById('nDesde').value = ymd(a < q.ini ? q.ini : a);
+  document.getElementById('nHasta').value = ymd(b > q.fin ? q.fin : b);
+  document.getElementById('nNota').value = 'Libre sin goce aprobado en RRHH' + (x.motivo ? ' · ' + x.motivo : '');
+  onTipoChange(); autoDias();
+  // Si está entera en la quincena se respetan los días que pidió (p. ej. medio día); si cruza, se cuentan los de esta
+  if (!recortada && Number(x.dias) > 0){ document.getElementById('nDias').value = Number(x.dias); onDiasChange(); }
+}
 
 // ── Incapacidades enviadas desde Mi Portal ──
 let docsIncap = [];
