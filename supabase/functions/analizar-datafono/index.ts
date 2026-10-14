@@ -4,22 +4,33 @@
 //  Storage y usa Claude (visión) para leer el TOTAL de tarjeta del tiquete.
 //  Devuelve el monto para compararlo contra "Total Tarjeta" del cierre.
 //
-//  Requiere un secreto con la API key de Anthropic:
-//    supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-//  Deploy:
-//    supabase functions deploy analizar-datafono
-//  (SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY ya vienen inyectadas.)
+//  Requiere un secreto con la API key de Anthropic (Supabase → Edge Functions
+//  → Secrets):  ANTHROPIC_API_KEY = sk-ant-...
+//  Se publica desde el panel de Supabase (Edge Functions → Deploy a new
+//  function → Via Editor) con el nombre exacto: analizar-datafono
+//  (SUPABASE_URL, SUPABASE_ANON_KEY y SUPABASE_SERVICE_ROLE_KEY ya vienen inyectadas.)
 // ════════════════════════════════════════════════════════════════════════
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
+import Anthropic from 'npm:@anthropic-ai/sdk';
+import { zodOutputFormat } from 'npm:@anthropic-ai/sdk/helpers/zod';
+import { z } from 'npm:zod';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
-const ROLES_OK = ['recepcion', 'admin_sucursal', 'admin_sedes', 'admin_g', 'admin'];
-const MODEL = 'claude-haiku-4-5-20251001';
+const ROLES_OK = ['recepcion', 'admin_sucursal', 'coordinador', 'admin_sedes', 'admin_g', 'admin'];
+// Lectura simple de un número en una foto: el Haiku actual alcanza y cuesta centésimas de colón por foto.
+const MODEL = 'claude-haiku-5-5';
+const TIPOS_IMAGEN = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const;
+
+// Respuesta con forma fija (structured outputs): no hay que buscar el JSON dentro del texto.
+const Lectura = z.object({
+  total: z.number().int().nullable(),          // colones, sin separadores; null si no se lee
+  confianza: z.enum(['alta', 'media', 'baja']),
+});
 
 function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
@@ -58,38 +69,37 @@ Deno.serve(async (req) => {
       b64 = encodeBase64(new Uint8Array(await file.arrayBuffer()));
     }
     if (!b64) return json({ error: 'No se recibió imagen.' }, 400);
+    const tipo = (TIPOS_IMAGEN as readonly string[]).includes(mediaType)
+      ? mediaType as typeof TIPOS_IMAGEN[number] : 'image/jpeg';
 
     // 3) Pedir a Claude que lea el total del tiquete -------------------------
     const prompt = 'Esta es la foto del comprobante de un datáfono (POS) de un gimnasio en Costa Rica ' +
-      '(auditoría o cierre de lote). Identificá el MONTO TOTAL de las ventas con tarjeta (el gran total, en colones). ' +
-      'Respondé ÚNICAMENTE con un JSON válido en una sola línea, sin texto extra, con esta forma: ' +
-      '{"total": <numero entero en colones sin separadores ni símbolo>, "confianza": <"alta"|"media"|"baja">}. ' +
-      'Si no lográs leer el total, usá {"total": null, "confianza": "baja"}.';
-    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL, max_tokens: 200,
+      '(auditoría o cierre de lote). Identificá el MONTO TOTAL de las ventas con tarjeta: el gran total, en colones. ' +
+      'Devolvé "total" como número entero en colones, sin separadores ni símbolo, y "confianza" según qué tan legible está. ' +
+      'Si no se puede leer el total con seguridad, devolvé total null y confianza "baja".';
+    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    let msg;
+    try {
+      msg = await client.messages.parse({
+        model: MODEL,
+        max_tokens: 2048,   // incluye el razonamiento del modelo además de la respuesta corta
+        output_config: { effort: 'low', format: zodOutputFormat(Lectura) },
         messages: [{ role: 'user', content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } },
+          { type: 'image', source: { type: 'base64', media_type: tipo, data: b64 } },
           { type: 'text', text: prompt },
         ] }],
-      }),
-    });
-    const aiData = await aiRes.json().catch(() => ({}));
-    if (!aiRes.ok) return json({ error: 'Error de la IA: ' + (aiData?.error?.message || aiRes.status) }, 502);
-    const text = (aiData?.content?.[0]?.text || '').trim();
+      });
+    } catch (e) {
+      if (e instanceof Anthropic.APIError) return json({ error: `Error de la IA (${e.status ?? 'sin conexión'}): ${e.message}` }, 502);
+      throw e;
+    }
 
-    // 4) Parsear el JSON / número --------------------------------------------
-    let total: number | null = null, confianza = 'baja';
-    try {
-      const m = text.match(/\{[\s\S]*\}/);
-      if (m) { const p = JSON.parse(m[0]); total = p.total == null ? null : Math.round(Number(p.total)); confianza = p.confianza || 'media'; }
-    } catch (_) { /* fallback abajo */ }
-    if (total == null) { const digits = text.replace(/[^\d]/g, ''); if (digits) total = parseInt(digits, 10); }
-    if (total != null && !isFinite(total)) total = null;
-
-    return json({ total, confianza, raw: text });
+    // 4) Resultado ------------------------------------------------------------
+    if (msg.stop_reason === 'refusal') return json({ total: null, confianza: 'baja', motivo: 'La IA no procesó la imagen.' });
+    const p = msg.parsed_output;
+    if (!p) return json({ total: null, confianza: 'baja', motivo: 'Respuesta incompleta de la IA.' });
+    const total = p.total == null || !isFinite(p.total) ? null : Math.round(p.total);
+    return json({ total, confianza: total == null ? 'baja' : p.confianza });
   } catch (e) {
     return json({ error: String((e as Error)?.message || e) }, 500);
   }
