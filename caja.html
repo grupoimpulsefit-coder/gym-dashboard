@@ -778,7 +778,7 @@ async function init(){
     ctrl.innerHTML=`<label>🏢 Sede:</label> <select id="sedeSel"></select>`;
     const sel=document.getElementById('sedeSel');
     sel.innerHTML=opciones.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
-    sel.onchange=()=>{currentSede=sel.value;document.getElementById('sedeTitle').textContent='· '+currentSede;stopLivePoll();loadCierres();};
+    sel.onchange=()=>cambiarSede(sel.value);
   }else ctrl.innerHTML=`<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
   document.getElementById('sedeTitle').textContent='· '+currentSede;
   limpiarCacheVieja();   // borra borradores viejos en localStorage (ya no se usan)
@@ -808,6 +808,38 @@ function updateTurnoUI(){
     [bP,bF].forEach(b=>{b.disabled=true;b.style.opacity=.45;b.style.cursor='not-allowed';});
   }
 }
+// ── Cambio de sede ──
+// Todo lo que vive en memoria (reporte SINPE, foto, informe, facturación, conteos) es de UNA sede:
+// al cambiar se limpia antes de cargar la nueva, para no ver ni guardar datos de la anterior.
+async function cambiarSede(nueva){
+  if(!nueva||nueva===currentSede) return;
+  // Lo que se estaba escribiendo en la sede anterior se guarda antes de salir. serverSave arma
+  // los datos al instante (con el turno y el formulario de la sede anterior) y después los envía.
+  const pendiente=_saveTimer; clearTimeout(_saveTimer); _saveTimer=null;
+  const guardado=pendiente?serverSave(false).catch(()=>{}):null;
+  stopLivePoll();
+  currentSede=nueva; document.getElementById('sedeTitle').textContent='· '+currentSede;
+  limpiarEstadoSede();
+  nuevoCierre();              // formulario en blanco mientras carga la sede nueva
+  if(guardado) await guardado;
+  if(currentSede!==nueva) return;   // se eligió otra sede mientras tanto
+  await loadCierres();
+  if(currentSede!==nueva) return;
+  if(tabActual==='fact'){ renderFxEstado(); loadFxProds(); }
+}
+function limpiarEstadoSede(){
+  turnoActual=null; cierres=[]; window._formCierreId=null; _lastServerUpd=null; _lastEditTs=0;
+  window._sinpeReporte=null; window._ventasDetalle=null; window._informeVentas=null; window._otrosResumen=null;
+  window._factCierre=null; fotoDatafono=null; inventarioCierre=null; window._enviosPend=[]; window._envioActual=null;
+  fxState.prods=[]; fxState.cart={}; fxState.facturas=[]; fxState.errFacturas=null; fxState.eventos=[]; fxState.evento=null;
+  ['sinpeResumen','fotoResumen','ventasHint','saveMsg','conteoCierreResumen','liveInfo','aperturaInvBody','factCierreBox'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=''; });
+  ['fileVentas','fileSinpe','fileFoto'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  DENOMS.forEach(d=>{ const el=document.getElementById('den_'+d); if(el) el.value=0; });
+  document.getElementById('histBody').innerHTML='<tr><td colspan="9" style="padding:16px;color:var(--muted);">Cargando…</td></tr>';
+  renderEnviosBanner();
+  try{ renderFxProds(); renderFxTicket(); renderFxHist(); }catch(_){}
+}
+
 function cargarTurnoEnForm(t){
   _noSave=true;   // carga programática → no dispara autoguardado
   window._formCierreId=t.id;
@@ -830,7 +862,7 @@ function cargarTurnoEnForm(t){
   ingresos=(Array.isArray(t.ingresos)&&t.ingresos.length?t.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc||'',monto:g.monto??''}));
   // Billetes/monedas: conteo de cierre en curso (del servidor) si existe; si no, arranca con el CONTEO DE APERTURA.
   const baseDen=(t.denominaciones&&Object.keys(t.denominaciones).length)?t.denominaciones:(t.denominaciones_apertura||null);
-  if(baseDen) DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=baseDen[d]||0;});
+  DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=baseDen?(baseDen[d]||0):0;});
   inventarioCierre=t.inventario_cierre||null;
   _lastServerUpd=t.updated_at||null; _lastEditTs=0;
   document.getElementById('cajaInicialHint').textContent='Fondo del primer turno del día (base del cuadre del día completo).';
@@ -958,6 +990,7 @@ function saveDraft(){
 async function serverSave(showErr){
   if(!turnoActual || window._formCierreId!==turnoActual.id || turnoActual.estado!=='abierto'){ if(showErr){const m=document.getElementById('saveMsg');m.className='msg err';m.textContent='No hay turno abierto para guardar.';} return; }
   try{
+    const t=turnoActual;   // el turno de ESTE guardado (puede cambiar de sede mientras se envía)
     _noSave=true; const c=calc(); _noSave=false;
     const denominaciones={}; DENOMS.forEach(d=>denominaciones[d]=Number(document.getElementById('den_'+d).value)||0);
     const blank=id=>document.getElementById(id).value==='';
@@ -968,8 +1001,10 @@ async function serverSave(showErr){
       minita:c.minita, otros_vendidos:c.otros, otros_desglose:window._otrosResumen||null, sobre_modo:c.sobreModo,
       inventario_cierre:inventarioCierre||null,
       informe_ventas:window._informeVentas||null, updated_at:upd, ...facturadoPayload() };
-    await supaFetch(`/cierres_caja?id=eq.${turnoActual.id}`,{method:'PATCH',body:payload});
-    turnoActual.updated_at=upd; _lastServerUpd=upd;
+    await supaFetch(`/cierres_caja?id=eq.${t.id}`,{method:'PATCH',body:payload});
+    t.updated_at=upd;
+    if(turnoActual!==t) return;   // ya se está viendo otra sede: no tocar su pantalla
+    _lastServerUpd=upd;
     const li=document.getElementById('liveInfo'); if(li) li.textContent='💾 Guardado '+new Date(upd).toLocaleTimeString('es-CR');
     if(showErr){ const m=document.getElementById('saveMsg'); m.className='msg ok'; m.textContent='💾 Guardado en el servidor.'; }
   }catch(e){ const li=document.getElementById('liveInfo'); if(li) li.textContent='⚠️ Sin guardar';
@@ -985,8 +1020,10 @@ function startLivePoll(){ stopLivePoll(); _pollTimer=setInterval(liveRefresh, 15
 async function liveRefresh(){
   if(!turnoActual) return;
   if(Date.now()-_lastEditTs < 12000) return;   // el usuario está editando → no pisar su conteo
+  const id=turnoActual.id;
   try{
-    const rows=await supaFetch(`/cierres_caja?id=eq.${turnoActual.id}&select=*`);
+    const rows=await supaFetch(`/cierres_caja?id=eq.${id}&select=*`);
+    if(!turnoActual||turnoActual.id!==id) return;   // cambió de sede o de turno mientras llegaba
     const row=rows&&rows[0]; if(!row) return;
     if(row.estado!=='abierto'){ await loadCierres(); return; }   // cerrado/eliminado en otro lado
     if(row.updated_at && row.updated_at!==_lastServerUpd){
@@ -1680,16 +1717,22 @@ async function cerrarTurno(estado){
   finally{ btn.disabled=false; btn.textContent=bt0; }
 }
 
+let _cierresSeq=0;
 async function loadCierres(){
-  try{ cierres=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(currentSede)}&order=fecha.desc,created_at.desc&limit=30&select=*`))||[]; }
-  catch(_){ cierres=[]; }
+  const seq=++_cierresSeq, sede=currentSede;
+  let rows; try{ rows=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(sede)}&order=fecha.desc,created_at.desc&limit=30&select=*`))||[]; }
+  catch(_){ rows=[]; }
+  if(seq!==_cierresSeq||sede!==currentSede) return;   // ya se pidió otra sede (o una recarga más nueva)
+  cierres=rows;
   renderHist(); checkTurno(); loadEnviosCaja();
 }
 
 // ── Envíos de mercadería por recibir ──
 async function loadEnviosCaja(){
-  try{ window._enviosPend=(await supaFetch(`/envios_mercaderia?sede=eq.${encodeURIComponent(currentSede)}&estado=eq.pendiente&order=created_at.desc&select=*`))||[]; }catch(_){ window._enviosPend=[]; }
-  renderEnviosBanner();
+  const sede=currentSede; let rows;
+  try{ rows=(await supaFetch(`/envios_mercaderia?sede=eq.${encodeURIComponent(sede)}&estado=eq.pendiente&order=created_at.desc&select=*`))||[]; }catch(_){ rows=[]; }
+  if(sede!==currentSede) return;
+  window._enviosPend=rows; renderEnviosBanner();
 }
 function renderEnviosBanner(){
   const b=document.getElementById('enviosBanner'); const list=window._enviosPend||[];
@@ -1860,9 +1903,11 @@ async function loadFxProds(){
 async function loadFacturasDia(){
   if(!turnoActual){ fxState.facturas=[]; renderFxHist(); return; }
   const t=turnoActual;
-  try{ fxState.facturas=(await supaFetch(`/facturas_caja?sede=eq.${encodeURIComponent(t.sede)}&fecha=eq.${t.fecha}&order=numero.desc&select=*`))||[]; fxState.errFacturas=null; }
-  catch(e){ fxState.errFacturas=mensajeError(e); renderFxHist(); return; }
-  if(turnoActual!==t && (!turnoActual||turnoActual.id!==t.id)) return;
+  let lista;
+  try{ lista=(await supaFetch(`/facturas_caja?sede=eq.${encodeURIComponent(t.sede)}&fecha=eq.${t.fecha}&order=numero.desc&select=*`))||[]; }
+  catch(e){ if(turnoActual&&turnoActual.id===t.id){ fxState.errFacturas=mensajeError(e); renderFxHist(); } return; }
+  if(!turnoActual||turnoActual.id!==t.id) return;   // cambió de sede o de turno mientras llegaba
+  fxState.facturas=lista; fxState.errFacturas=null;
   renderFxHist();
   // El cierre en pantalla es el del turno abierto → actualizar sus totales si cambió lo facturado
   if(window._formCierreId===t.id){
