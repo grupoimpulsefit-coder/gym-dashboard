@@ -165,6 +165,9 @@ td.slot{padding:3px}
 .cell.taken .st{font-size:12px;font-weight:500;margin-top:1px;color:var(--sec)}
 .cell.completa{background:var(--green-tint)} .cell.completa .st{color:var(--green)}
 .cell.incompleta{background:var(--red-tint)} .cell.incompleta .st{color:var(--red)}
+:root{--purple-tint:rgba(175,82,222,.14)}
+.cell.solomed{background:var(--purple-tint)} .cell.solomed .st{color:var(--purple)}
+.pill.solomed{background:var(--purple-tint);color:var(--purple)}
 .cell.presente{background:var(--blue-tint)} .cell.presente .st{color:var(--blue)}
 .cell.ausente{background:var(--orange-tint)} .cell.ausente .st{color:var(--orange)}
 .cell.sinmarcar .st{color:var(--orange)}
@@ -205,6 +208,7 @@ td.pasado .cell{opacity:.55}
 .seg-rutina button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.14)}
 .seg-rutina button.on[data-v="completa"]{color:var(--green)}
 .seg-rutina button.on[data-v="incompleta"]{color:var(--red)}
+.seg-rutina button.on[data-v="sin_rutina"]{color:var(--purple)}
 .seg-rutina button.on[data-v="presente"]{color:var(--blue)}
 .seg-rutina button.on[data-v="ausente"]{color:var(--orange)}
 .seg-rutina button:disabled{opacity:.45}
@@ -286,6 +290,7 @@ td.pasado .cell{opacity:.55}
       <div class="tile"><span class="l">Agendadas</span><span class="n num" id="kAgend">0</span></div>
       <div class="tile"><span class="l">Completas</span><span class="n num" id="kComp" style="color:var(--green)">0</span></div>
       <div class="tile"><span class="l">Incompletas</span><span class="n num" id="kInc" style="color:var(--red)">0</span></div>
+      <div class="tile"><span class="l">Solo medición</span><span class="n num" id="kSolo" style="color:var(--purple)">0</span></div>
       <div class="tile"><span class="l">Ausentes</span><span class="n num" id="kAus" style="color:var(--orange)">0</span></div>
       <div class="tile"><span class="l">Pendientes</span><span class="n num" id="kPend">0</span></div>
       <div class="tile"><span class="l">Libres</span><span class="n num" id="kLibres" style="color:var(--sec)">0</span></div>
@@ -299,6 +304,7 @@ td.pasado .cell{opacity:.55}
       <span><span class="dot" style="background:var(--orange)"></span>Ausente / sin marcar</span>
       <span><span class="dot" style="background:var(--green)"></span>Rutina completa</span>
       <span><span class="dot" style="background:var(--red)"></span>Rutina incompleta</span>
+      <span><span class="dot" style="background:var(--purple)"></span>Solo medición (sin rutina)</span>
       <span><span class="dot" style="background:var(--sec)"></span>🔒 Bloqueado <span id="leyBloq"></span></span>
       <span id="leyRol"></span>
     </div>
@@ -463,7 +469,7 @@ function init(){
   }else ctrl.innerHTML=`<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
   document.getElementById('sedeTitle').textContent='· '+currentSede;
   document.getElementById('leyRol').textContent = puedeRutina()&&!puedeAgendar()
-    ? 'Como instructor podés marcar la rutina y si el cliente llegó (presente).'
+    ? 'Como instructor podés marcar la rutina (o solo medición) y si el cliente llegó (presente).'
     : puedeAgendar()&&!puedeRutina() ? 'La rutina la marca el instructor.' : '';
   document.getElementById('app').hidden=false;
   cargar();
@@ -520,6 +526,7 @@ function citaPasada(c){ const hoy=todayStr(); if(c.fecha<hoy)return true; if(c.f
 function estadoCita(c){
   if(c.rutina==='completa')   return {cls:'completa',  lbl:'✓ Completa',  pill:'<span class="pill ok">✓ Completa</span>'};
   if(c.rutina==='incompleta') return {cls:'incompleta',lbl:'✗ Incompleta',pill:'<span class="pill bad">✗ Incompleta</span>'};
+  if(c.rutina==='sin_rutina') return {cls:'solomed',  lbl:'📏 Solo medición',pill:'<span class="pill solomed">📏 Solo medición</span>'};
   if(c.asistencia==='ausente')  return {cls:'ausente', lbl:'Ausente',             pill:'<span class="pill warn">Ausente</span>'};
   if(c.asistencia==='presente') return {cls:'presente',lbl:'Presente · sin rutina',pill:'<span class="pill info">Presente</span>'};
   if(citaPasada(c))             return {cls:'pend sinmarcar',lbl:'Sin marcar',   pill:'<span class="pill warn">Sin marcar</span>'};
@@ -531,6 +538,8 @@ function render(){
   document.getElementById('contenido').innerHTML = vistaSemana ? htmlSemana() : htmlDia();
   const list=Object.values(citas);
   const comp=list.filter(c=>c.rutina==='completa').length, inc=list.filter(c=>c.rutina==='incompleta').length;
+  const solo=list.filter(c=>c.rutina==='sin_rutina').length;
+  document.getElementById('kSolo').textContent=solo;
   // Espacios bloqueados de la semana visible (los permanentes cuentan una vez por día)
   let nBloq=0;
   let nLibres=0;
@@ -541,7 +550,7 @@ function render(){
   document.getElementById('kInc').textContent=inc;
   const aus=list.filter(c=>!c.rutina&&c.asistencia==='ausente').length;
   document.getElementById('kAus').textContent=aus;
-  document.getElementById('kPend').textContent=list.length-comp-inc-aus;
+  document.getElementById('kPend').textContent=list.length-comp-inc-solo-aus;
   document.getElementById('kLibres').textContent=nLibres;
   document.getElementById('leyBloq').textContent = nBloq ? `${nBloq} espacio(s) bloqueado(s) esta semana` : '';
 }
@@ -728,10 +737,11 @@ function abrir(f,h){
       </div>
       <div class="sect" style="gap:7px">
         <div class="hdr" style="padding:0 4px">Rutina${puedeRutina()?'':' · la marca el instructor'}</div>
-        <div class="seg-rutina" id="segRutina">
+        <div class="seg-rutina" id="segRutina" style="grid-template-columns:repeat(2,1fr)">
           <button data-v="" onclick="setRutina('')" ${puedeRutina()?'':'disabled'}>Pendiente</button>
           <button data-v="completa" onclick="setRutina('completa')" ${puedeRutina()?'':'disabled'}>✓ Completa</button>
           <button data-v="incompleta" onclick="setRutina('incompleta')" ${puedeRutina()?'':'disabled'}>✗ Incompleta</button>
+          <button data-v="sin_rutina" onclick="setRutina('sin_rutina')" ${puedeRutina()?'':'disabled'} title="Se le hizo la medición, pero sin rutina">📏 Solo medición</button>
         </div>
         ${c.rutina_por?`<div class="hint">Marcada por ${esc(c.rutina_por)}${c.rutina_at?' · '+new Date(c.rutina_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</div>`:''}
       </div>`;
@@ -861,7 +871,7 @@ function imprimirSemana(){
   const fila=m=>{let tr=`<tr><td class="h">${hhmm(m)}</td>`;
     for(let i=0;i<NDIAS;i++){const f=ymd(diaDe(i)),h=hhmm(m),c=citas[f+'|'+h];
       if(!c&&!haySlot(i,m)){ tr+='<td class="na"></td>'; continue; }
-      if(c){ tr+=`<td class="${c.rutina||(c.asistencia==='ausente'?'ausente':'pend')}"><b>${esc(c.nombre)}</b>${c.telefono?'<br><span class="tel">'+esc(c.telefono)+'</span>':''}${c.pin?'<br><span class="tel">PIN '+esc(c.pin)+'</span>':''}<br><span class="rt">${c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':c.asistencia==='ausente'?'Ausente':c.asistencia==='presente'?'Presente · ☐ rutina':'☐ Pendiente'}</span></td>`; continue; }
+      if(c){ tr+=`<td class="${c.rutina==='sin_rutina'?'solomed':c.rutina||(c.asistencia==='ausente'?'ausente':'pend')}"><b>${esc(c.nombre)}</b>${c.telefono?'<br><span class="tel">'+esc(c.telefono)+'</span>':''}${c.pin?'<br><span class="tel">PIN '+esc(c.pin)+'</span>':''}<br><span class="rt">${c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':c.rutina==='sin_rutina'?'Solo medición':c.asistencia==='ausente'?'Ausente':c.asistencia==='presente'?'Presente · ☐ rutina':'☐ Pendiente'}</span></td>`; continue; }
       const b=bloqueoDe(f,h);
       tr+= b ? `<td class="bloq">🔒 ${esc(b.motivo||'Bloqueado')}</td>` : '<td></td>';}
     return tr+'</tr>';};
@@ -877,7 +887,7 @@ function imprimirSemana(){
   th{background:#eee;font-size:10px;}td.h{background:#f4f4f4;text-align:center;font-weight:700;width:52px;}
   tr.blk td{background:#e8eef6;font-weight:800;font-size:11px;letter-spacing:.3px;height:auto;}
   .tel{color:#555;font-size:9px;}.rt{font-size:9px;color:#333;}
-  td.completa{background:#eafaf1;}td.incompleta{background:#fdecec;}td.pend{background:#fafafa;}td.ausente{background:#fff4e5;}
+  td.completa{background:#eafaf1;}td.solomed{background:#f5ecfb;}td.incompleta{background:#fdecec;}td.pend{background:#fafafa;}td.ausente{background:#fff4e5;}
   td.bloq{background:#ececec;color:#666;font-size:9px;}td.na{background:repeating-linear-gradient(135deg,#fff,#fff 5px,#f1f1f1 5px,#f1f1f1 10px);}
   @page{size:landscape;margin:10mm;}@media print{.noprint{display:none;}}</style></head><body>
   <h1>📏 Mediciones — ${esc(currentSede)}</h1>

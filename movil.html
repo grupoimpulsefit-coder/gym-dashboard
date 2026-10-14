@@ -87,6 +87,7 @@
   .pill{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:12px;font-size:12px;font-weight:600;white-space:nowrap}
   .pill.ok{background:var(--green-tint);color:var(--green)} .pill.bad{background:var(--red-tint);color:var(--red)}
   .pill.warn{background:var(--orange-tint);color:var(--orange)} .pill.info{background:var(--blue-tint);color:var(--blue)}
+  .pill.solomed{background:rgba(175,82,222,.16);color:var(--purple)}
   .pill.status{background:var(--status-fill);color:var(--status-ink)}
   .pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
   .live .dot{animation:pulse 1.6s ease-in-out infinite}
@@ -193,7 +194,7 @@
 <script src="/sesion.js"></script>
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-10-14a';
+const APP_VER='2026-10-14b';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -466,6 +467,7 @@ function medPasada(c){ const hoy=todayStr(); if(c.fecha<hoy)return true; if(c.fe
   const n=new Date(); return String(c.hora).slice(0,5) < `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`; }
 const medPill=c=>c.rutina==='completa'?'<span class="pill ok">✓ Completa</span>'
                :c.rutina==='incompleta'?'<span class="pill bad">✗ Incompleta</span>'
+               :c.rutina==='sin_rutina'?'<span class="pill solomed">📏 Solo medición</span>'
                :c.asistencia==='ausente'?'<span class="pill warn">Ausente</span>'
                :c.asistencia==='presente'?'<span class="pill info">Presente</span>'
                :medPasada(c)?'<span class="pill warn">Sin marcar</span>'
@@ -495,6 +497,7 @@ async function renderMedicionesMod(){
   if(seq!==medSeq) return;
   const by={}; medRows.forEach(r=>{ by[String(r.hora||'').slice(0,5)]=r; });
   const comp=medRows.filter(r=>r.rutina==='completa').length, inc=medRows.filter(r=>r.rutina==='incompleta').length;
+  const solo=medRows.filter(r=>r.rutina==='sin_rutina').length;
   const aus=medRows.filter(r=>!r.rutina&&r.asistencia==='ausente').length;
   // Bloqueos que caen en un espacio sin cita (los que ya tienen cita no restan)
   const amHoy=MED_AM, pmHoy=medPMDe(dow), validos=[...amHoy,...pmHoy].map(medHH);
@@ -519,6 +522,7 @@ async function renderMedicionesMod(){
       <div class="tile"><span class="l">Libres</span><span class="n num">${libres}</span></div>
       <div class="tile"><span class="l">Completas</span><span class="n num" style="color:var(--green)">${comp}</span></div>
       <div class="tile"><span class="l">Incompletas</span><span class="n num" style="color:var(--red)">${inc}</span></div>
+      <div class="tile"><span class="l">Solo medición</span><span class="n num" style="color:var(--purple)">${solo}</span></div>
       <div class="tile"><span class="l">Ausentes</span><span class="n num" style="color:var(--orange)">${aus}</span></div>
     </div>
     ${fuera.length?`<div class="sect"><div class="hdr">⚠ Fuera del horario</div><div class="group">${fuera.map(r=>fila(medMin(r.hora))).join('')}</div><div class="ftr">Se agendaron antes del cambio de horario. Abrilas para eliminarlas y volver a agendarlas en un espacio válido.</div></div>`:''}
@@ -562,10 +566,11 @@ function medAbrir(h){
           ${c.asistencia_por?`<div class="ftr" style="padding:8px 0 0">Marcado por ${esc(c.asistencia_por)}</div>`:''}
           ${!puedeAusenteMed()?'<div class="ftr" style="padding:6px 0 0">Solo recepción puede marcar ausente.</div>':''}
           <div class="hdr" style="padding:16px 0 6px">Rutina</div>
-          <div class="seg" id="medSeg">
+          <div class="seg" id="medSeg" style="grid-auto-flow:row;grid-template-columns:1fr 1fr">
             <button data-v="" onclick="medSetRutina('')" ${puedeRutinaMed()?'':'disabled'}>Pendiente</button>
             <button data-v="completa" onclick="medSetRutina('completa')" ${puedeRutinaMed()?'':'disabled'}>✓ Completa</button>
             <button data-v="incompleta" onclick="medSetRutina('incompleta')" ${puedeRutinaMed()?'':'disabled'}>✗ Incompleta</button>
+            <button data-v="sin_rutina" onclick="medSetRutina('sin_rutina')" ${puedeRutinaMed()?'':'disabled'}>📏 Solo medición</button>
           </div>
           ${c.rutina_por?`<div class="ftr" style="padding:8px 0 0">Marcada por ${esc(c.rutina_por)}</div>`:''}`:''}
         <div class="err" id="medErr" style="text-align:left"></div>
