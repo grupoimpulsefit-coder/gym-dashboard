@@ -73,8 +73,11 @@ Deno.serve(async (req) => {
     }
 
     // 3) Crear el usuario (ya confirmado, sin correo de verificación) --------
+    // debe_cambiar_clave: la contraseña la eligió el admin (temporal); al primer
+    // ingreso la app le pide a la persona crear la suya (ver sesion.js).
     const { data: created, error: crErr } = await admin.auth.admin.createUser({
-      email, password, email_confirm: true, user_metadata: { nombre },
+      email, password, email_confirm: true,
+      user_metadata: { nombre, debe_cambiar_clave: body.forzar_cambio !== false },
     });
     if (crErr || !created?.user) {
       return json({ error: crErr?.message || 'No se pudo crear el usuario' }, 400);

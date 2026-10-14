@@ -190,9 +190,10 @@
 <div id="sheet" hidden></div>
 <div class="toast" id="toast"></div>
 
+<script src="/sesion.js"></script>
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-10-13a';
+const APP_VER='2026-10-14a';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -303,7 +304,13 @@ async function boot(){
   }
   document.getElementById('login').hidden=false;
 }
-function enterApp(){ document.getElementById('login').hidden=true; document.getElementById('app').hidden=false; goSedes(); }
+function enterApp(){ document.getElementById('login').hidden=true; document.getElementById('app').hidden=false; goSedes(); revisarClave(); }
+// Contraseña: la app maneja su propia sesión; el cambio usa la ventana compartida de /sesion.js
+function clavePara(forzado){ if(!window.Sesion) return;
+  Sesion.cambiarClave({ forzado, url:SUPA_URL, key:SUPA_KEY, token:auth?.access_token, email:auth?.email,
+    onListo:d=>saveAuth({access_token:d.access_token,refresh_token:d.refresh_token,expires_at:Date.now()+(d.expires_in||3600)*1000,user_id:d.user?.id||auth.user_id,email:d.user?.email||auth.email}),
+    onSalir:doLogout }); }
+function revisarClave(){ if(window.Sesion&&auth?.access_token&&Sesion.debeCambiarClave(auth.access_token)) clavePara(true); }
 
 // ── Datos ──
 async function loadDia(){ cierres=(await supaFetch(`/cierres_caja?fecha=eq.${selDate}&order=sede.asc,turno_num.asc&select=${SEL_CIERRE}`))||[]; }
@@ -1169,6 +1176,7 @@ function renderCuenta(){
       <div class="cell"><div class="main"><span class="t">Sedes</span><span class="s">${esc(sedes.join(' · ')||'—')}</span></div></div></div></div>
     <div class="sect"><div class="hdr">En este iPhone</div><div class="group">
       <div class="cell"><div class="main"><span class="t">${standalone?'Instalada como app':'Abierta en Safari'}</span><span class="s">${standalone?'Se abre desde el icono de inicio.':'Compartir → "Agregar a pantalla de inicio" para tener el icono.'}</span></div><span class="pill ${standalone?'ok':'status'}">${standalone?'✓':'Safari'}</span></div>
+      <button class="cell" onclick="clavePara(false)"><div class="main"><span class="t" style="color:var(--brand-text)">🔑 Cambiar contraseña</span></div></button>
       <button class="cell" onclick="location.reload()"><div class="main"><span class="t" style="color:var(--brand-text)">Recargar datos</span></div></button></div></div>
     ${puedeAsignarSedes()?`<div class="sect"><div class="hdr">Administración</div><div class="group">
       <button class="cell" onclick="abrirSedesUsuario()"><div class="main"><span class="t">🏢🔀 Sedes de usuarios</span><span class="s">Habilitar sedes adicionales a alguien</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>
