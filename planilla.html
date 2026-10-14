@@ -24,6 +24,8 @@ tr.tot td { background: var(--fill); font-weight: 700; }
 .aviso { margin: 12px var(--gut) 0; padding: 11px 14px; border-radius: 10px; font-size: 13px; background: var(--fill); color: var(--sec); }
 .aviso.feriado { background: var(--blue-tint); color: var(--blue); }
 .aviso.cerrada { background: var(--green-tint); color: var(--green); font-weight: 600; }
+.aviso.doc { background: var(--orange-tint, rgba(255,149,0,.14)); color: var(--label); }
+.aviso.doc .fila { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
 .btn-mini { min-height: 30px; padding: 0 10px; font-size: 13px; }
 </style>
 </head>
@@ -342,6 +344,7 @@ async function loadPlanilla(){
     empleados = (emps || []).filter(e => e.activo !== false && e.tipo_pago !== 'semanal');
     novedades = novs || [];
     cierre = cier?.[0] || null;
+    docsIncap = (await supaFetch(`/rrhh_documentos?sede=eq.${sede}&tipo=eq.incapacidad&estado=neq.rechazado&fecha_inicio=lte.${ymd(periodoActual.fin)}&order=fecha_inicio.asc&select=*`).catch(() => [])) || [];
     // Registro de boletas enviadas (si la tabla aún no existe, se sigue sin él)
     envios = cierre ? ((await supaFetch(`/planilla_boletas_envios?sede=eq.${sede}&periodo=eq.${per}&order=enviado_at.desc&select=*`).catch(() => [])) || []) : [];
     document.getElementById('loading').style.display='none';
@@ -413,6 +416,11 @@ function render(){
   const fer = feriadosEn(q);
   let av = '';
   if (cerrada) av += `<div class="aviso cerrada">🔒 Quincena cerrada por ${esc(cierre.cerrada_por||'—')} el ${new Date(cierre.cerrada_at).toLocaleString('es-CR')}. Se muestran los montos tal como se pagaron.</div>`;
+  if (!cerrada){ const pend = docsSinRegistrar();
+    if (pend.length) av += `<div class="aviso doc">📎 <b>Incapacidades enviadas desde Mi Portal</b> que todavía no están en esta quincena:${pend.map(d=>{ const e=empleados.find(x=>x.id===d.empleado_id);
+      return `<div class="fila"><span><b>${esc(e?.nombre||'—')}</b> · ${fmtFecha(parseFecha(d.fecha_inicio))}${d.fecha_fin&&d.fecha_fin!==d.fecha_inicio?' – '+fmtFecha(parseFecha(d.fecha_fin)):''}${d.ente?' · '+esc(String(d.ente).toUpperCase()):''}${d.numero?' · boleta '+esc(d.numero):''}${d.estado==='pendiente'?' · <i>sin revisar en RRHH</i>':''}</span>
+        <button class="btn-ghost btn-mini" onclick="verDocPlanilla('${esc(d.archivo_path)}')">👁 Ver</button>
+        <button class="btn-primary btn-mini" onclick="usarDocIncap('${d.id}')">＋ Agregar a la planilla</button></div>`; }).join('')}</div>`; }
   if (fer.length) av += `<div class="aviso feriado">🎉 Feriados en esta quincena: ${fer.map(x=>`<b>${x.f.getDate()} de ${MESES[x.f.getMonth()].toLowerCase()}</b> (${esc(x.n)}${x.ob?'':', pago no obligatorio'})`).join(' · ')}. Si alguien lo trabajó, agréguelo como novedad.</div>`;
   document.getElementById('avisos').innerHTML = av;
 
@@ -508,6 +516,7 @@ function switchTab(t){
 // ── Modal de novedad ──
 function openNovedad(empId){
   if (cierre) return;
+  window._docNov = null;   // se vuelve a poner solo si se abre desde un documento del portal
   if (!empleados.length){ alert('No hay empleados de pago mensual en esta sede.'); return; }
   const sel = document.getElementById('nEmpleado');
   sel.innerHTML = empleados.map(e=>`<option value="${e.id}">${esc(e.nombre)}</option>`).join('');
@@ -527,7 +536,45 @@ function openNovedad(empId){
   onTipoChange();
   document.getElementById('novModal').classList.add('open');
 }
-function closeNovedad(){ document.getElementById('novModal').classList.remove('open'); }
+function closeNovedad(){ window._docNov = null; document.getElementById('novModal').classList.remove('open'); }
+
+// ── Incapacidades enviadas desde Mi Portal ──
+let docsIncap = [];
+// Las que se cruzan con la quincena y todavía no tienen una novedad de incapacidad de esa persona en esas fechas
+function docsSinRegistrar(){
+  const q = periodoActual;
+  return (docsIncap || []).filter(d => {
+    const a = parseFecha(d.fecha_inicio), b = parseFecha(d.fecha_fin || d.fecha_inicio);
+    if (!a || !b || b < q.ini || a > q.fin) return false;
+    if (!empleados.some(e => e.id === d.empleado_id)) return false;
+    return !novedades.some(n => n.tipo === 'incapacidad' && n.empleado_id === d.empleado_id
+      && parseFecha(n.fecha_inicio) <= b && parseFecha(n.fecha_fin || n.fecha_inicio) >= a);
+  });
+}
+function usarDocIncap(id){
+  const d = (docsIncap || []).find(x => x.id === id); if (!d) return;
+  const q = periodoActual;
+  openNovedad(d.empleado_id);
+  const a = parseFecha(d.fecha_inicio), b = parseFecha(d.fecha_fin || d.fecha_inicio);
+  document.getElementById('nTipo').value = 'incapacidad';
+  // Solo los días de ESTA quincena; si sigue en la próxima, allá vuelve a aparecer
+  document.getElementById('nDesde').value = ymd(a < q.ini ? q.ini : a);
+  document.getElementById('nHasta').value = ymd(b > q.fin ? q.fin : b);
+  document.getElementById('nEnte').value = ['ccss','ins','maternidad'].includes(d.ente) ? d.ente : 'ccss';
+  document.getElementById('nNota').value = (d.numero ? 'Boleta ' + d.numero + ' · ' : '') + 'enviada desde Mi Portal';
+  onTipoChange(); autoDias();
+  window._docNov = d.id;
+}
+async function verDocPlanilla(path){
+  const w = window.open('', '_blank');
+  try {
+    const r = await fetch(`${SUPA_URL}/storage/v1/object/sign/rrhh-documentos/${path.split('/').map(encodeURIComponent).join('/')}`, { method:'POST',
+      headers:{ 'apikey':SUPA_KEY, 'Authorization':'Bearer '+currentToken, 'Content-Type':'application/json' }, body: JSON.stringify({ expiresIn: 600 }) });
+    const j = await r.json().catch(() => ({}));
+    if (!j.signedURL) throw new Error(j.message || j.error || 'sin enlace');
+    if (w) w.location = `${SUPA_URL}/storage/v1${j.signedURL}`;
+  } catch(e){ if (w) w.close(); alert('No se pudo abrir el archivo: ' + e.message); }
+}
 
 function onTipoChange(){
   const t = document.getElementById('nTipo').value;
@@ -608,7 +655,12 @@ async function guardarNovedad(){
   n.created_by = currentEmail || null;
   const btn = document.getElementById('novBtn'); btn.disabled = true; btn.textContent = 'Guardando...';
   try {
-    await supaFetch('/planilla_novedades', { method:'POST', body: n });
+    const docId = window._docNov;
+    const res = await supaFetch('/planilla_novedades', { method:'POST', body: n, prefer: docId ? 'return=representation' : undefined });
+    if (docId){   // el documento queda recibido y ligado a la novedad
+      const nov = Array.isArray(res) ? res[0] : res;
+      try { await supaFetch(`/rrhh_documentos?id=eq.${encodeURIComponent(docId)}`, { method:'PATCH', body:{ novedad_id: nov?.id || null, estado:'revisado' } }); } catch(_){}
+    }
     closeNovedad(); await loadPlanilla();
   } catch(x){ err.textContent = x.message; } finally { btn.disabled = false; btn.textContent = 'Guardar'; }
 }

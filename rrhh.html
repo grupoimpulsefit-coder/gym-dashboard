@@ -88,6 +88,7 @@
   <div class="tabs">
     <div class="tab active" id="tabBtnEmp" onclick="switchTab('emp')">👤 Empleados</div>
     <div class="tab" id="tabBtnVac" onclick="switchTab('vac')">🌴 Solicitudes de vacaciones</div>
+    <div class="tab" id="tabBtnDoc" onclick="switchTab('doc')">📎 Incapacidades y citas <span id="nDocsPend"></span></div>
   </div>
 
   <div class="tab-panel active" id="panelEmp">
@@ -113,6 +114,19 @@
       <thead><tr><th>Empleado</th><th>Desde</th><th>Hasta</th><th class="num">Días</th><th>Motivo</th><th>Estado</th><th>Solicitada</th><th></th></tr></thead>
       <tbody id="vacBody"></tbody>
     </table></div>
+  </div>
+
+  <div class="tab-panel" id="panelDoc">
+    <div class="section"><div class="section-title">📎 Incapacidades, citas médicas y comprobantes
+      <select id="docFiltro" class="ui" onchange="renderDocsAdmin()" style="margin-left:auto;">
+        <option value="pendiente">Por revisar</option><option value="all">Todos</option>
+        <option value="revisado">Recibidos</option><option value="rechazado">Rechazados</option>
+      </select></div></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Empleado</th><th>Tipo</th><th>Fechas</th><th class="num">Días</th><th>Detalle</th><th>Nota</th><th>Archivo</th><th>Estado</th><th>Enviado</th><th></th></tr></thead>
+      <tbody id="docBody"></tbody>
+    </table></div>
+    <div class="hint" style="margin:8px var(--gut) 0;">Las incapacidades recibidas aparecen en <b>Planilla</b>, en la quincena que les toca, listas para agregarlas como novedad.</div>
   </div>
 </div>
 
@@ -143,6 +157,35 @@
   <div class="tbl-wrap"><table class="tbl">
     <thead><tr><th>Desde</th><th>Hasta</th><th class="num">Días</th><th>Motivo</th><th>Estado</th><th>Comentario</th><th>Solicitada</th></tr></thead>
     <tbody id="misBody"></tbody>
+  </table></div>
+
+  <div class="section"><div class="section-title">📎 Incapacidades y citas médicas</div></div>
+  <div class="form-card">
+    <div class="form-grid">
+      <div class="f-field"><label>Tipo <span class="req">*</span></label>
+        <select id="dTipo" onchange="onDocTipo()">
+          <option value="incapacidad">🩺 Incapacidad</option>
+          <option value="cita_medica">📅 Cita médica</option>
+          <option value="comprobante_cita">🧾 Comprobante de cita</option>
+          <option value="otro">📄 Otro documento</option>
+        </select></div>
+      <div class="f-field"><label id="dDesdeLbl">Desde <span class="req">*</span></label><input type="date" id="dDesde"></div>
+      <div class="f-field d-incap"><label>Hasta <span class="req">*</span></label><input type="date" id="dHasta"></div>
+      <div class="f-field d-incap"><label>Emitida por</label>
+        <select id="dEnte"><option value="ccss">CCSS</option><option value="ins">INS (riesgo del trabajo)</option><option value="maternidad">Maternidad</option></select></div>
+      <div class="f-field"><label>N.º de boleta / comprobante</label><input type="text" id="dNumero" placeholder="Opcional" maxlength="60"></div>
+      <div class="f-field full"><label>Nota (opcional)</label><input type="text" id="dNota" maxlength="200" placeholder="Ej. cita en el EBAIS de 8 a 10 a. m."></div>
+      <div class="f-field full"><label>Archivo: foto o PDF <span class="req">*</span></label><input type="file" id="dArchivo" accept="image/*,application/pdf"></div>
+    </div>
+    <div class="hint" id="dHint" style="margin-top:8px;"></div>
+    <div class="form-actions">
+      <div class="form-msg" id="dMsg"></div>
+      <button class="btn-primary" id="dBtn" onclick="enviarDocumento()">📎 Enviar documento</button>
+    </div>
+  </div>
+  <div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>Tipo</th><th>Fechas</th><th>Boleta</th><th>Nota</th><th>Archivo</th><th>Estado</th><th>Comentario</th><th>Enviado</th><th></th></tr></thead>
+    <tbody id="misDocsBody"></tbody>
   </table></div>
 </div>
 
@@ -402,9 +445,12 @@ async function loadAdmin(){
   try {
     empleados = (await supaFetch(`/empleados?sede=eq.${encodeURIComponent(currentSede)}&order=nombre.asc&select=*`)) || [];
     solicitudes = (await supaFetch(`/vacaciones_solicitudes?sede=eq.${encodeURIComponent(currentSede)}&order=created_at.desc&select=*`)) || [];
+    // Documentos (si rrhh_documentos.sql aún no corrió, la pestaña lo avisa)
+    try { documentos = (await supaFetch(`/rrhh_documentos?sede=eq.${encodeURIComponent(currentSede)}&order=created_at.desc&limit=300&select=*`)) || []; }
+    catch(_) { documentos = null; }
     document.getElementById('loading').style.display='none';
     document.getElementById('empSedeLabel').textContent = `— ${currentSede}`;
-    renderKpis(); renderEmpleados(); renderSolicitudes();
+    renderKpis(); renderEmpleados(); renderSolicitudes(); renderDocsAdmin();
   } catch(e){
     document.getElementById('loading').style.display='none';
     document.getElementById('emptyState').style.display='block';
@@ -756,16 +802,16 @@ async function crearAcceso(id){
 }
 
 function switchTab(t){
-  document.getElementById('tabBtnEmp').classList.toggle('active', t==='emp');
-  document.getElementById('tabBtnVac').classList.toggle('active', t==='vac');
-  document.getElementById('panelEmp').classList.toggle('active', t==='emp');
-  document.getElementById('panelVac').classList.toggle('active', t==='vac');
+  [['emp','tabBtnEmp','panelEmp'],['vac','tabBtnVac','panelVac'],['doc','tabBtnDoc','panelDoc']].forEach(([k,tab,pan])=>{
+    document.getElementById(tab).classList.toggle('active', t===k);
+    document.getElementById(pan).classList.toggle('active', t===k);
+  });
 }
 
 // ══ PORTAL EMPLEADO ══
 async function initPortal(){
   document.getElementById('hTitle').textContent = 'Mi Portal';
-  document.getElementById('hSub').textContent = 'Vacaciones y solicitudes';
+  document.getElementById('hSub').textContent = 'Vacaciones, incapacidades y citas médicas';
   document.getElementById('portal').style.display='block';
   document.getElementById('loading').style.display='block';
   try {
@@ -786,6 +832,7 @@ async function initPortal(){
     }
     misSolicitudes = (await supaFetch(`/vacaciones_solicitudes?empleado_id=eq.${miEmpleado.id}&order=created_at.desc&select=*`)) || [];
     renderPortal();
+    onDocTipo(); cargarMisDocs();
   } catch(e){
     document.getElementById('loading').style.display='none';
     document.getElementById('emptyState').style.display='block';
@@ -836,6 +883,157 @@ async function enviarSolicitud(){
     setTimeout(()=>{ if (msg.textContent.startsWith('✅')) msg.textContent=''; }, 4000);
   } catch(e){ msg.className='form-msg err'; msg.textContent='⚠️ ' + e.message; }
   finally { btn.disabled=false; btn.textContent='📨 Enviar solicitud'; }
+}
+
+// ══ Documentos: incapacidades, citas médicas y comprobantes ══
+// El archivo va al bucket privado rrhh-documentos, en la carpeta de la cuenta (<user_id>/...);
+// la fila queda "pendiente" hasta que RRHH la revisa (ver rrhh_documentos.sql).
+const DOC_TIPO = { incapacidad:'🩺 Incapacidad', cita_medica:'📅 Cita médica', comprobante_cita:'🧾 Comprobante de cita', otro:'📄 Otro' };
+const DOC_ENTE = { ccss:'CCSS', ins:'INS', maternidad:'Maternidad' };
+const DOC_BUCKET = 'rrhh-documentos';
+let documentos = [], misDocs = [];
+const docPill = e => e==='revisado' ? '<span class="pill apr">Recibido</span>' : e==='rechazado' ? '<span class="pill rec">Rechazado</span>' : '<span class="pill pend">Por revisar</span>';
+const docFechas = d => (d.fecha_fin && d.fecha_fin!==d.fecha_inicio) ? `${fmtFecha(d.fecha_inicio)} – ${fmtFecha(d.fecha_fin)}` : fmtFecha(d.fecha_inicio);
+const docDias = d => d.fecha_fin ? Math.round((parseFecha(d.fecha_fin)-parseFecha(d.fecha_inicio))/864e5)+1 : 1;
+const sinTablaDocs = 'Todavía no está habilitado: falta correr rrhh_documentos.sql en Supabase.';
+
+function onDocTipo(){
+  const t = document.getElementById('dTipo').value, inc = t==='incapacidad';
+  document.querySelectorAll('.d-incap').forEach(el=>{ el.hidden = !inc; });
+  document.getElementById('dDesdeLbl').innerHTML = (inc ? 'Desde' : t==='otro' ? 'Fecha' : 'Fecha de la cita') + ' <span class="req">*</span>';
+  document.getElementById('dHint').textContent =
+    inc ? 'Adjunte la foto o el PDF de la boleta de incapacidad. RRHH la registra en la planilla de la quincena.'
+    : t==='cita_medica' ? 'Adjunte la cita (comprobante de que fue programada) para avisar con anticipación.'
+    : t==='comprobante_cita' ? 'Adjunte la constancia de que asistió a la cita (hora de entrada y salida, si la tiene).'
+    : 'Cualquier otro documento médico que RRHH le haya pedido.';
+}
+// Fotos del celular: se reducen antes de subir (lado mayor 2000 px, JPEG). Un PDF o un formato que el
+// navegador no pueda leer (p. ej. HEIC en Chrome) se sube tal cual.
+async function reducirImagen(file){
+  try{
+    if(!/^image\/(jpeg|png|webp)$/.test(file.type||'') || file.size < 900*1024) return file;
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 2000/Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width*k); c.height = Math.round(bmp.height*k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); if (bmp.close) bmp.close();
+    const blob = await new Promise(r=>c.toBlob(r, 'image/jpeg', 0.85));
+    return (blob && blob.size < file.size) ? new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type:'image/jpeg' }) : file;
+  }catch(_){ return file; }
+}
+const storageUrl = path => `${SUPA_URL}/storage/v1/object/${DOC_BUCKET}/${path.split('/').map(encodeURIComponent).join('/')}`;
+
+async function cargarMisDocs(){
+  try { misDocs = (await supaFetch(`/rrhh_documentos?empleado_id=eq.${miEmpleado.id}&order=created_at.desc&select=*`)) || []; }
+  catch(_) { misDocs = null; }
+  renderMisDocs();
+}
+function renderMisDocs(){
+  const tb = document.getElementById('misDocsBody'); tb.innerHTML = '';
+  if (misDocs === null){ tb.innerHTML = `<tr><td colspan="9" class="tbl-empty">${sinTablaDocs}</td></tr>`; document.getElementById('dBtn').disabled = true; return; }
+  if (!misDocs.length){ tb.innerHTML = '<tr><td colspan="9" class="tbl-empty">Aún no ha enviado documentos.</td></tr>'; return; }
+  misDocs.forEach(d=>{
+    const tr = tb.insertRow();
+    tr.innerHTML = `<td>${DOC_TIPO[d.tipo]||esc(d.tipo)}</td><td>${docFechas(d)}</td><td>${esc(d.numero)||'—'}</td><td>${esc(d.nota)||'—'}</td>
+      <td><button class="btn-edit" onclick="verDocumento('${esc(d.archivo_path)}')">👁 Ver</button></td>
+      <td>${docPill(d.estado)}</td><td>${esc(d.comentario_admin)||'—'}</td>
+      <td style="font-size:12px;color:var(--muted);">${new Date(d.created_at).toLocaleDateString('es-CR')}</td>
+      <td>${d.estado==='pendiente' ? `<button class="btn-del" title="Eliminar (solo mientras está por revisar)" onclick="borrarMiDocumento('${d.id}')">🗑</button>` : ''}</td>`;
+  });
+}
+
+async function enviarDocumento(){
+  const msg = document.getElementById('dMsg'), err = t => { msg.className='form-msg err'; msg.textContent = t; };
+  const tipo = document.getElementById('dTipo').value, inc = tipo==='incapacidad';
+  const desde = document.getElementById('dDesde').value, hasta = inc ? document.getElementById('dHasta').value : '';
+  let file = document.getElementById('dArchivo').files[0];
+  if (!desde) return err(inc ? 'Indique desde qué día es la incapacidad.' : 'Indique la fecha.');
+  if (inc && !hasta) return err('Indique hasta qué día es la incapacidad.');
+  if (inc && parseFecha(hasta) < parseFecha(desde)) return err('La fecha final no puede ser antes de la inicial.');
+  if (!file) return err('Adjunte la foto o el PDF del documento.');
+  if (!/^image\//.test(file.type||'') && file.type !== 'application/pdf') return err('El archivo debe ser una foto o un PDF.');
+  const btn = document.getElementById('dBtn'); btn.disabled = true; btn.textContent = 'Enviando...'; msg.className='form-msg'; msg.textContent='';
+  let path = null;
+  try {
+    file = await reducirImagen(file);
+    if (file.size > 10*1024*1024) throw new Error('El archivo pesa más de 10 MB. Tome la foto de nuevo o reduzca el PDF.');
+    const nombre = (file.name||'documento').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\w.-]+/g,'_').slice(-60);
+    path = `${currentUserId}/${Date.now()}_${nombre}`;
+    const up = await fetch(storageUrl(path), { method:'POST',
+      headers:{ 'apikey':SUPA_KEY, 'Authorization':'Bearer '+currentToken, 'Content-Type':file.type||'application/octet-stream', 'x-upsert':'false' }, body:file });
+    if (!up.ok){ const t = await up.text(); throw new Error(/bucket|not found/i.test(t) ? sinTablaDocs : 'No se pudo subir el archivo: ' + t); }
+    await supaFetch('/rrhh_documentos', { method:'POST', body:{
+      empleado_id: miEmpleado.id, tipo, fecha_inicio: desde, fecha_fin: inc ? hasta : null,
+      ente: inc ? document.getElementById('dEnte').value : null,
+      numero: document.getElementById('dNumero').value.trim() || null,
+      nota: document.getElementById('dNota').value.trim() || null,
+      archivo_path: path, archivo_nombre: file.name || null, archivo_tipo: file.type || null } });
+    path = null;
+    msg.className='form-msg ok'; msg.textContent='✅ Documento enviado. RRHH lo va a revisar.';
+    ['dDesde','dHasta','dNumero','dNota','dArchivo'].forEach(id=>{ document.getElementById(id).value=''; });
+    await cargarMisDocs();
+    setTimeout(()=>{ if (msg.textContent.startsWith('✅')) msg.textContent=''; }, 5000);
+  } catch(e){
+    if (path) { try { await fetch(storageUrl(path), { method:'DELETE', headers:{ 'apikey':SUPA_KEY, 'Authorization':'Bearer '+currentToken } }); } catch(_){} }
+    err('⚠️ ' + (/rrhh_documentos/.test(e.message) && /relation|exist|schema cache/i.test(e.message) ? sinTablaDocs : mensajeError(e)));
+  } finally { btn.disabled = false; btn.textContent = '📎 Enviar documento'; }
+}
+
+// Abre el archivo con un enlace firmado de 10 minutos (el bucket es privado)
+async function verDocumento(path){
+  const w = window.open('', '_blank');   // se abre ya, para que el navegador no la bloquee
+  try {
+    const r = await fetch(`${SUPA_URL}/storage/v1/object/sign/${DOC_BUCKET}/${path.split('/').map(encodeURIComponent).join('/')}`, { method:'POST',
+      headers:{ 'apikey':SUPA_KEY, 'Authorization':'Bearer '+currentToken, 'Content-Type':'application/json' }, body: JSON.stringify({ expiresIn: 600 }) });
+    const d = await r.json().catch(()=>({}));
+    if (!d.signedURL) throw new Error(d.message || d.error || 'sin enlace');
+    if (w) w.location = `${SUPA_URL}/storage/v1${d.signedURL}`; else location.href = `${SUPA_URL}/storage/v1${d.signedURL}`;
+  } catch(e){ if (w) w.close(); alert('No se pudo abrir el archivo: ' + e.message); }
+}
+
+async function borrarMiDocumento(id){
+  const d = (misDocs||[]).find(x=>x.id===id); if (!d || d.estado!=='pendiente') return;
+  if (!confirm('¿Eliminar este documento? Solo se puede mientras está por revisar.')) return;
+  try {
+    const out = await supaFetch(`/rrhh_documentos?id=eq.${encodeURIComponent(id)}&estado=eq.pendiente`, { method:'DELETE', prefer:'return=representation' });
+    if (!out || !out.length) throw new Error('RRHH ya lo revisó; ya no se puede eliminar.');
+    try { await fetch(storageUrl(d.archivo_path), { method:'DELETE', headers:{ 'apikey':SUPA_KEY, 'Authorization':'Bearer '+currentToken } }); } catch(_){}
+    await cargarMisDocs();
+  } catch(e){ alert('No se pudo eliminar: ' + mensajeError(e)); await cargarMisDocs(); }
+}
+
+// ── Vista RRHH ──
+function renderDocsAdmin(){
+  const tb = document.getElementById('docBody'); if (!tb) return; tb.innerHTML = '';
+  const nPend = (documentos||[]).filter(d=>d.estado==='pendiente').length;
+  document.getElementById('nDocsPend').innerHTML = nPend ? `<span class="pill pend" style="margin-left:4px;">${nPend}</span>` : '';
+  if (documentos === null){ tb.innerHTML = `<tr><td colspan="10" class="tbl-empty">${sinTablaDocs}</td></tr>`; return; }
+  const filtro = document.getElementById('docFiltro').value;
+  const rows = documentos.filter(d => filtro==='all' || d.estado===filtro);
+  if (!rows.length){ tb.innerHTML = `<tr><td colspan="10" class="tbl-empty">${filtro==='pendiente' ? 'No hay documentos por revisar.' : 'Sin documentos.'}</td></tr>`; return; }
+  const empName = id => (empleados.find(e=>e.id===id)?.nombre) || '—';
+  rows.forEach(d=>{
+    const det = [d.ente ? DOC_ENTE[d.ente] : '', d.numero ? 'boleta ' + esc(d.numero) : ''].filter(Boolean).join(' · ') || '—';
+    const acc = d.estado==='pendiente'
+      ? `<button class="btn-ok" onclick="resolverDoc('${d.id}','revisado')">✓ Recibido</button> <button class="btn-no" onclick="resolverDoc('${d.id}','rechazado')">✕ Rechazar</button>`
+      : `${d.comentario_admin ? esc(d.comentario_admin) + ' ' : ''}<button class="btn-ghost" style="min-height:28px;padding:0 8px;font-size:12px;" title="Volver a por revisar" onclick="resolverDoc('${d.id}','pendiente')">↺</button>`;
+    const tr = tb.insertRow();
+    tr.innerHTML = `<td><strong>${esc(empName(d.empleado_id))}</strong></td><td>${DOC_TIPO[d.tipo]||esc(d.tipo)}</td><td>${docFechas(d)}</td>
+      <td class="num">${d.tipo==='incapacidad' ? docDias(d) : '—'}</td><td style="font-size:13px;">${det}</td><td style="font-size:13px;">${esc(d.nota)||'—'}</td>
+      <td><button class="btn-edit" onclick="verDocumento('${esc(d.archivo_path)}')">👁 Ver</button></td>
+      <td>${docPill(d.estado)}${d.novedad_id ? '<div class="s-sub">en planilla</div>' : ''}</td>
+      <td style="font-size:12px;color:var(--muted);">${new Date(d.created_at).toLocaleDateString('es-CR')}</td>
+      <td style="white-space:nowrap;">${acc}</td>`;
+  });
+}
+async function resolverDoc(id, estado){
+  const d = (documentos||[]).find(x=>x.id===id); if (!d) return;
+  let comentario = d.comentario_admin || null;
+  if (estado==='rechazado'){ const c = prompt('Motivo del rechazo (lo ve el empleado):', ''); if (c===null) return; comentario = c.trim() || null; }
+  if (estado==='revisado') comentario = null;
+  try {
+    await supaFetch(`/rrhh_documentos?id=eq.${encodeURIComponent(id)}`, { method:'PATCH', body:{ estado, comentario_admin: comentario } });
+    await loadAdmin();
+  } catch(e){ alert('No se pudo actualizar: ' + mensajeError(e)); }
 }
 
 // ══ Reporte de planilla (Excel) ══

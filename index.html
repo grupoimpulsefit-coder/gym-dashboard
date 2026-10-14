@@ -1239,7 +1239,7 @@ async function portalSiPlanilla(cardsEl, mk) {
     try {
         const r = await supaFetch(`/empleados?user_id=eq.${encodeURIComponent(currentUserId)}&select=id,activo`, { userToken: currentToken });
         if (r && r.some(x => x.activo !== false))
-            cardsEl.appendChild(mk('🌴','Mi Portal','Mis vacaciones','Ver saldo y solicitar días libres','#e8f7ee','#2e7d32','/rrhh'));
+            cardsEl.appendChild(mk('🌴','Mi Portal','Mis vacaciones','Vacaciones, incapacidades y citas médicas','#e8f7ee','#2e7d32','/rrhh'));
     } catch (_) {}
 }
 
@@ -1369,14 +1369,14 @@ async function showSedePicker() {
         cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
         cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar / ver gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
         cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agendar citas','Agenda semanal cada 15 minutos','#e8f4fd','#1a5276','/mediciones'));
-        cardsEl.appendChild(makeHandoffCard('🌴','Mi Portal','Mis vacaciones','Ver saldo y solicitar días libres','#e8f7ee','#2e7d32','/rrhh'));
+        cardsEl.appendChild(makeHandoffCard('🌴','Mi Portal','Mis vacaciones','Vacaciones, incapacidades y citas médicas','#e8f7ee','#2e7d32','/rrhh'));
         return;
     }
 
     // Empleado: solo su portal de RRHH (vacaciones)
     if (currentRole === 'empleado') {
         statusEl.textContent = 'Su portal:';
-        cardsEl.appendChild(makeHandoffCard('🌴','Mi Portal','Vacaciones y solicitudes','Ver saldo y solicitar días libres','#e8f7ee','#2e7d32','/rrhh'));
+        cardsEl.appendChild(makeHandoffCard('🌴','Mi Portal','Vacaciones y solicitudes','Vacaciones, incapacidades y citas médicas','#e8f7ee','#2e7d32','/rrhh'));
         return;
     }
 
