@@ -632,7 +632,7 @@ table.hist tbody tr:hover td { background:var(--fill); }
     </div>
     <div class="mf">
       <button class="btn-ghost" onclick="document.getElementById('conteoCierreModal').style.display='none'">Cancelar</button>
-      <button class="btn-primary" onclick="guardarConteoCierre()">✔️ Guardar y comparar</button>
+      <button class="btn-primary" id="btnGuardarConteoCierre" onclick="guardarConteoCierre()">✔️ Guardar y comparar</button>
     </div>
   </div>
 </div>
@@ -733,6 +733,41 @@ const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(currentRole);
 // Quién ve la cantidad REAL del sistema en los conteos de inventario (apertura y cierre).
 // Recepción cuenta a ciegas: solo ve su conteo y si difiere. Admins y coordinador ven el número real.
 const verInventarioReal=()=>esAdmin()||currentRole==='coordinador';
+// La base decide qué ve cada rol (inventario_ciego.sql): recepción recibe los productos SIN la cantidad
+// y el conteo se compara en el servidor. Si ese SQL todavía no se corrió, se usa la forma anterior.
+let invLegacy=false;
+const faltaFnInv=e=>/inventario_caja|registrar_conteo|PGRST202|Could not find the function|does not exist/i.test(String(e&&e.message||e));
+async function cargarInvCaja(sede){
+  if(!invLegacy){
+    try{ return (await supaFetch('/rpc/inventario_caja',{method:'POST',prefer:'return=representation',body:{p_sede:sede}}))||[]; }
+    catch(e){ if(!faltaFnInv(e)) throw e; invLegacy=true; }
+  }
+  return (await supaFetch(`/inventario?sede=eq.${encodeURIComponent(sede)}&order=producto.asc&select=id,producto,precio,cantidad,cantidad_minima,activo`))||[];
+}
+// contados: { producto: cantidad | null }. Devuelve el conteo como quedó guardado: { producto: {contado, difiere} }
+// (en la forma anterior: {contado, sistema}). A quien ve el stock, la base le devuelve también el sistema.
+async function registrarConteo(cierreId, tipo, contados, inv){
+  if(!invLegacy){
+    try{ const r=await supaFetch('/rpc/registrar_conteo',{method:'POST',prefer:'return=representation',body:{p_cierre:cierreId,p_tipo:tipo,p_contados:contados}});
+      window._invSis=window._invSis||{}; if(r&&r.sistema) window._invSis[tipo]=r.sistema;
+      return (r&&r.conteo)||{}; }
+    catch(e){ if(!faltaFnInv(e)) throw e; invLegacy=true; }
+  }
+  const out={}; (inv||[]).forEach(p=>{ if(p.producto in contados) out[p.producto]={contado:contados[p.producto],sistema:Number(p.cantidad)||0}; });
+  return out;
+}
+// Lo que tenía el sistema en un conteo: en cierres viejos viene en el mismo JSON; en los nuevos, aparte
+const sisDe=(o,prod,tipo)=>(o&&o.sistema!=null)?o.sistema:((window._invSis&&window._invSis[tipo]&&window._invSis[tipo][prod]!=null)?window._invSis[tipo][prod]:null);
+const invDifiere=(o,prod,tipo)=>{ if(!o||o.contado==null) return false; if(o.difiere!=null) return !!o.difiere; const s=sisDe(o,prod,tipo); return s!=null&&Number(o.contado)!==Number(s); };
+async function cargarSistemaConteos(cierreId){
+  window._invSis={};
+  if(!verInventarioReal()||!cierreId||invLegacy) return;
+  try{ const rows=(await supaFetch(`/cierres_inventario?cierre_id=eq.${encodeURIComponent(cierreId)}&select=tipo,sistema`))||[];
+    if(window._formCierreId!==cierreId) return;
+    rows.forEach(r=>{ window._invSis[r.tipo]=r.sistema||{}; });
+    const t=_formCierre(); if(t) renderAperturaInv(t); renderConteoCierreResumen(); }
+  catch(_){}   // tabla aún no creada: se sigue con lo que traiga el cierre
+}
 const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function parseFecha(s){const[y,m,d]=String(s).split('-').map(Number);return new Date(y,m-1,d);}
@@ -830,7 +865,7 @@ async function cambiarSede(nueva){
 function limpiarEstadoSede(){
   turnoActual=null; cierres=[]; window._formCierreId=null; _lastServerUpd=null; _lastEditTs=0;
   window._sinpeReporte=null; window._ventasDetalle=null; window._informeVentas=null; window._otrosResumen=null;
-  window._factCierre=null; fotoDatafono=null; inventarioCierre=null; window._enviosPend=[]; window._envioActual=null;
+  window._factCierre=null; fotoDatafono=null; inventarioCierre=null; window._invSis={}; window._enviosPend=[]; window._envioActual=null;
   fxState.prods=[]; fxState.cart={}; fxState.facturas=[]; fxState.errFacturas=null; fxState.eventos=[]; fxState.evento=null;
   ['sinpeResumen','fotoResumen','ventasHint','saveMsg','conteoCierreResumen','liveInfo','aperturaInvBody','factCierreBox'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=''; });
   ['fileVentas','fileSinpe','fileFoto'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
@@ -863,7 +898,7 @@ function cargarTurnoEnForm(t){
   // Billetes/monedas: conteo de cierre en curso (del servidor) si existe; si no, arranca con el CONTEO DE APERTURA.
   const baseDen=(t.denominaciones&&Object.keys(t.denominaciones).length)?t.denominaciones:(t.denominaciones_apertura||null);
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=baseDen?(baseDen[d]||0):0;});
-  inventarioCierre=t.inventario_cierre||null;
+  inventarioCierre=t.inventario_cierre||null; cargarSistemaConteos(t.id);
   _lastServerUpd=t.updated_at||null; _lastEditTs=0;
   document.getElementById('cajaInicialHint').textContent='Fondo del primer turno del día (base del cuadre del día completo).';
   renderOtrosResumen(window._otrosResumen);
@@ -905,7 +940,7 @@ async function openAbrirModal(){
   calcAperturaEfectivo();
   // Inventario a ciegas (no se muestra el sistema; no se actualiza el stock)
   document.getElementById('aInvList').innerHTML='<div style="padding:12px;color:var(--muted);">Cargando inventario…</div>';
-  try{ window._invAp=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(currentSede)}&order=producto.asc&select=*`))||[]; }catch(_){ window._invAp=[]; }
+  try{ window._invAp=await cargarInvCaja(currentSede); }catch(_){ window._invAp=[]; }
   const inv=window._invAp;
   document.getElementById('aInvList').innerHTML = inv.length ? inv.map((p,i)=>`
     <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--hair);">
@@ -952,17 +987,27 @@ async function abrirTurno(){
   const efectivo=calcAperturaEfectivo();
   if(efectivo<=0){ err.textContent='Cuente el efectivo inicial por denominación.'; return; }
   const inv=window._invAp||[]; const denom={}; DENOMS.forEach(d=>denom[d]=Number(document.getElementById('aden_'+d).value)||0);
-  const conteo={}, discrep=[];
+  const contados={}, discrep=[]; let avisoConteo='';
   const btn=document.getElementById('btnConfirmarApertura'); btn.disabled=true; btn.textContent='Abriendo...';
   try{
-    inv.forEach((p,i)=>{ const raw=document.getElementById('ainv_'+i).value; const contado=raw===''?null:(Number(raw)||0); const sistema=Number(p.cantidad)||0;
-      conteo[p.producto]={contado,sistema}; if(contado!=null && contado!==sistema) discrep.push(verInventarioReal()?`${p.producto}: contó ${contado} vs sistema ${sistema}`:`${p.producto} (contaste ${contado})`); });
-    const rec={ sede:currentSede, fecha:todayStr(), turno:'Turno '+window._turnoNum, turno_num:window._turnoNum, estado:'abierto', hora_apertura:new Date().toISOString(), caja_inicial:efectivo, denominaciones_apertura:denom, inventario_apertura:conteo, created_by:currentEmail||null };
-    await supaFetch('/cierres_caja',{method:'POST',body:rec});
+    inv.forEach((p,i)=>{ const raw=document.getElementById('ainv_'+i).value; contados[p.producto]=raw===''?null:(Number(raw)||0); });
+    const rec={ sede:currentSede, fecha:todayStr(), turno:'Turno '+window._turnoNum, turno_num:window._turnoNum, estado:'abierto', hora_apertura:new Date().toISOString(), caja_inicial:efectivo, denominaciones_apertura:denom, created_by:currentEmail||null };
+    const creado=await supaFetch('/cierres_caja',{method:'POST',prefer:'return=representation',body:rec});
+    const nuevo=Array.isArray(creado)?creado[0]:creado;
+    // El conteo se compara en la base (recepción no recibe las cantidades del sistema)
+    if(inv.length&&nuevo&&nuevo.id){
+      try{
+        window._invSis={};
+        const conteo=await registrarConteo(nuevo.id,'apertura',contados,inv);
+        if(invLegacy) await supaFetch(`/cierres_caja?id=eq.${nuevo.id}`,{method:'PATCH',body:{inventario_apertura:conteo}});
+        Object.keys(conteo).forEach(prod=>{ const o=conteo[prod]; if(!invDifiere(o,prod,'apertura')) return; const sis=sisDe(o,prod,'apertura');
+          discrep.push(verInventarioReal()&&sis!=null?`${prod}: contó ${o.contado} vs sistema ${sis}`:`${prod} (contaste ${o.contado})`); });
+      }catch(ce){ avisoConteo=' ⚠ El turno se abrió, pero no se pudo guardar el conteo de inventario: '+mensajeError(ce); }
+    }
     document.getElementById('abrirModal').style.display='none';
     await loadCierres();
     const sm=document.getElementById('saveMsg'); sm.className='msg ok';
-    sm.innerHTML=`✅ Turno ${window._turnoNum} abierto (efectivo ${fmt(efectivo)}). Arriba, en <b>🟢 Para WStudio</b>, están los montos para abrir allá.`+(inv.length?(discrep.length?` <span style="color:var(--warn);">⚠ Inventario con ${discrep.length} diferencia(s): ${discrep.slice(0,5).map(esc).join('; ')}${discrep.length>5?'…':''}</span>`:' <span style="color:var(--success);">Inventario cuadra ✓</span>'):'');
+    sm.innerHTML=`✅ Turno ${window._turnoNum} abierto (efectivo ${fmt(efectivo)}). Arriba, en <b>🟢 Para WStudio</b>, están los montos para abrir allá.`+esc(avisoConteo)+(inv.length&&!avisoConteo?(discrep.length?` <span style="color:var(--warn);">⚠ Inventario con ${discrep.length} diferencia(s): ${discrep.slice(0,5).map(esc).join('; ')}${discrep.length>5?'…':''}</span>`:' <span style="color:var(--success);">Inventario cuadra ✓</span>'):'');
   }catch(e){ err.textContent='No se pudo abrir: '+e.message; }
   finally{ btn.disabled=false; btn.textContent='🔓 Abrir turno'; }
 }
@@ -999,7 +1044,7 @@ async function serverSave(showErr){
       total_tarjeta:blank('cTarjeta')?null:c.tarjeta, total_sinpe:blank('cSinpe')?null:c.sinpe, total_transferencia:blank('cTransfer')?null:c.transfer,
       efectivo:c.efectivo, denominaciones, gastos, ingresos, total_gastos:c.totGastos, total_ingresos:c.totIngresos,
       minita:c.minita, otros_vendidos:c.otros, otros_desglose:window._otrosResumen||null, sobre_modo:c.sobreModo,
-      inventario_cierre:inventarioCierre||null,
+      ...(invLegacy?{inventario_cierre:inventarioCierre||null}:{}),
       informe_ventas:window._informeVentas||null, updated_at:upd, ...facturadoPayload() };
     await supaFetch(`/cierres_caja?id=eq.${t.id}`,{method:'PATCH',body:payload});
     t.updated_at=upd;
@@ -1048,7 +1093,9 @@ function applyRowToForm(row){
     gastos=(Array.isArray(row.gastos)&&row.gastos.length?row.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros'}));
     ingresos=(Array.isArray(row.ingresos)&&row.ingresos.length?row.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc||'',monto:g.monto??''}));
     window._otrosResumen=row.otros_desglose||null; renderOtrosResumen(window._otrosResumen);
+    const invCambio=JSON.stringify(row.inventario_cierre||null)!==JSON.stringify(inventarioCierre||null);
     inventarioCierre=row.inventario_cierre||null; renderConteoCierreResumen();
+    if(invCambio) cargarSistemaConteos(row.id);
     window._informeVentas=row.informe_ventas||null; window._ventasDetalle=(row.informe_ventas&&row.informe_ventas.detalle)||null;
     renderGastos(); renderIngresos(); calc();
   } finally { _noSave=false; }
@@ -1554,9 +1601,9 @@ function renderAperturaInv(t){
   const showReal=verInventarioReal();   // admins y coordinador ven la cantidad del sistema
   let difs=0;
   const rows=keys.map(prod=>{ const o=inv[prod]||{}; const contado=o.contado;
-    const dif=(contado!=null && Number(contado)!==Number(o.sistema)); if(dif)difs++;
+    const dif=invDifiere(o,prod,'apertura'); if(dif)difs++; const sis=sisDe(o,prod,'apertura');
     const right = showReal
-      ? `contó <b>${contado==null?'—':contado}</b> · sistema <b>${o.sistema}</b>${dif?` <span style="color:var(--red);">(dif ${Math.abs(Number(contado)-Number(o.sistema))})</span>`:''}`
+      ? `contó <b>${contado==null?'—':contado}</b> · sistema <b>${sis==null?'—':sis}</b>${dif&&sis!=null?` <span style="color:var(--red);">(dif ${Math.abs(Number(contado)-Number(sis))})</span>`:dif?' <span style="color:var(--red);">(no coincide)</span>':''}`
       : `contaste <b>${contado==null?'—':contado}</b>${dif?' <span style="color:var(--red);font-weight:700;">⚠ no coincide</span>':''}`;
     return `<div style="display:flex;justify-content:space-between;padding:5px 12px;font-size:12px;${dif?'background:var(--red-tint);':''}"><span>${esc(prod)}</span><span>${right}</span></div>`;
   }).join('');
@@ -1572,7 +1619,7 @@ async function openConteoCierre(){
   list.innerHTML='<div style="padding:12px;color:var(--muted);">Cargando inventario…</div>';
   document.getElementById('conteoCierreModal').style.display='flex';
   let inv=[];
-  try{ inv=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(currentSede)}&order=producto.asc&select=id,producto,cantidad`))||[]; }
+  try{ inv=await cargarInvCaja(currentSede); }
   catch(e){ err.textContent='No se pudo cargar el inventario: '+e.message; }
   window._ccInv=inv;
   list.innerHTML = inv.length ? inv.map((p,i)=>{
@@ -1582,27 +1629,35 @@ async function openConteoCierre(){
       <input type="number" step="1" id="cc_${i}" value="${val}" placeholder="conteo" style="width:82px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:right;font-weight:700;"></div>`;
   }).join('') : '<div style="padding:12px;color:var(--muted);">Esta sede no tiene productos en inventario.</div>';
 }
-function guardarConteoCierre(){
+async function guardarConteoCierre(){
   const inv=window._ccInv||[]; const err=document.getElementById('ccErr'); err.textContent='';
-  // Sede sin productos: queda verificado (objeto vacío) para no bloquear el cierre.
-  if(!inv.length){ inventarioCierre={}; renderConteoCierreResumen(); document.getElementById('conteoCierreModal').style.display='none'; saveDraft(); return; }
-  const conteo={}; const faltan=[];
+  const t=turnoActual;
+  if(!t||window._formCierreId!==t.id){ err.textContent='El conteo de cierre se hace sobre el turno abierto.'; return; }
+  const contados={}; const faltan=[];
   inv.forEach((p,i)=>{ const raw=document.getElementById('cc_'+i).value; const contado=raw===''?null:(Number(raw)||0);
-    if(contado==null)faltan.push(p.producto); conteo[p.producto]={contado,sistema:Number(p.cantidad)||0}; });
+    if(contado==null)faltan.push(p.producto); contados[p.producto]=contado; });
   if(faltan.length){ err.textContent=`Debe contar TODOS los productos antes de guardar (${faltan.length} sin contar). Anote 0 si no hay unidades.`; return; }
-  inventarioCierre = conteo;
-  renderConteoCierreResumen();
-  document.getElementById('conteoCierreModal').style.display='none';
-  saveDraft();
+  const btn=document.getElementById('btnGuardarConteoCierre'); if(btn){ btn.disabled=true; }
+  try{
+    // La base compara con el sistema y guarda; a recepción solo le dice qué productos no coinciden.
+    // Sede sin productos: queda verificado (objeto vacío) para no bloquear el cierre.
+    const conteo=inv.length?await registrarConteo(t.id,'cierre',contados,inv):{};
+    if(turnoActual!==t) return;   // cambió de sede mientras se guardaba
+    inventarioCierre=conteo;
+    renderConteoCierreResumen();
+    document.getElementById('conteoCierreModal').style.display='none';
+    saveDraft();
+  }catch(e){ err.textContent='No se pudo guardar el conteo: '+mensajeError(e); }
+  finally{ if(btn) btn.disabled=false; }
 }
 function renderConteoCierreResumen(){
   const box=document.getElementById('conteoCierreResumen'); const inv=inventarioCierre; const keys=inv?Object.keys(inv):[];
   const conCont=keys.filter(k=>inv[k].contado!=null);
   if(!conCont.length){ box.innerHTML=''; return; }
   const showReal=verInventarioReal(); let difs=0;
-  const rows=conCont.map(prod=>{ const o=inv[prod]||{}; const dif=(o.contado!=null && Number(o.contado)!==Number(o.sistema)); if(dif)difs++;
+  const rows=conCont.map(prod=>{ const o=inv[prod]||{}; const dif=invDifiere(o,prod,'cierre'); if(dif)difs++; const sis=sisDe(o,prod,'cierre');
     const right = showReal
-      ? `contó <b>${o.contado}</b> · sistema <b>${o.sistema}</b>${dif?` <span style="color:var(--red);">(dif ${Math.abs(Number(o.contado)-Number(o.sistema))})</span>`:''}`
+      ? `contó <b>${o.contado}</b> · sistema <b>${sis==null?'—':sis}</b>${dif&&sis!=null?` <span style="color:var(--red);">(dif ${Math.abs(Number(o.contado)-Number(sis))})</span>`:dif?' <span style="color:var(--red);">(no coincide)</span>':''}`
       : `contaste <b>${o.contado}</b>${dif?' <span style="color:var(--red);font-weight:700;">⚠ no coincide</span>':''}`;
     return `<div style="display:flex;justify-content:space-between;padding:5px 12px;font-size:12px;${dif?'background:var(--red-tint);':''}"><span>${esc(prod)}</span><span>${right}</span></div>`;
   }).join('');
@@ -1699,7 +1754,7 @@ async function cerrarTurno(estado){
     total_tarjeta:c.tarjeta, total_sinpe:c.sinpe, total_transferencia:c.transfer, efectivo:c.efectivo,
     denominaciones, gastos:gastosLimpios, ingresos:ingresosLimpios,
     total_gastos:c.totGastos, total_ingresos:c.totIngresos, minita:c.minita,
-    efectivo_final:efectivoFinal, otros_vendidos:c.otros, otros_desglose:window._otrosResumen||null, inventario_cierre:inventarioCierre||null, sobre_retirado:esFinal&&c.sobreRetirado, sobre_modo:esFinal?c.sobreModo:'no',
+    efectivo_final:efectivoFinal, otros_vendidos:c.otros, otros_desglose:window._otrosResumen||null, ...(invLegacy?{inventario_cierre:inventarioCierre||null}:{}), sobre_retirado:esFinal&&c.sobreRetirado, sobre_modo:esFinal?c.sobreModo:'no',
     diferencia, estado_dif:diferencia===0?'OK':(diferencia>0?'Faltante':'Sobrante'),
     informe_ventas:window._informeVentas||null, estado, hora_cierre:new Date().toISOString(), ...facturadoPayload()
   };
@@ -1826,7 +1881,7 @@ function cargarCierre(id){
   window._factCierre=c.facturado||null;   // tal como quedó guardado en ese cierre
   document.getElementById('cCajaInicial').value=c.caja_inicial||0; document.getElementById('cMembresias').value=c.membresias||0; document.getElementById('cOtros').value=sinFacturado(c,'otros_vendidos','productos')||0;
   window._otrosResumen=c.otros_desglose||null; renderOtrosResumen(window._otrosResumen);
-  inventarioCierre=c.inventario_cierre||null; renderConteoCierreResumen();
+  inventarioCierre=c.inventario_cierre||null; renderConteoCierreResumen(); cargarSistemaConteos(c.id);
   renderAperturaInv(c);
   document.getElementById('cTarjeta').value=sinFacturado(c,'total_tarjeta','tarjeta')||0; document.getElementById('cSinpe').value=sinFacturado(c,'total_sinpe','sinpe')||0; document.getElementById('cTransfer').value=c.total_transferencia||0;
   document.getElementById('cTotalVentas').value=sinFacturado(c,'total_ventas','total')||0;
@@ -1922,7 +1977,7 @@ async function loadFxProds(){
   if(!turnoActual) return;
   loadFxEventos();
   const sede=currentSede;
-  try{ const rows=(await supaFetch(`/inventario?sede=eq.${encodeURIComponent(sede)}&order=producto.asc&select=id,producto,precio,cantidad,cantidad_minima,activo`))||[];
+  try{ const rows=await cargarInvCaja(sede);
     if(sede!==currentSede) return;
     fxState.prods=rows.filter(p=>p.activo!==false); }
   catch(e){ fxState.prods=[]; document.getElementById('fxProdInfo').textContent='⚠ No se pudo cargar el inventario'; }
@@ -1960,12 +2015,12 @@ function renderFxProds(){
   const html=cats.filter(c=>fxState.cat==='todos'||fxState.cat===c).map(c=>{
     const items=conCat.filter(p=>p.cat===c&&(!q||normP(p.producto).includes(q))); if(!items.length) return '';
     return `<div class="fx-cat">${esc(CAT_LABEL[c])}</div><div class="fx-prods">`+items.map(p=>{
-      const stock=Number(p.cantidad)||0, precio=Number(p.precio)||0, left=stock-(fxState.cart[p.id]||0);
+      const stock=p.cantidad==null?null:(Number(p.cantidad)||0), precio=Number(p.precio)||0, left=stock==null?null:stock-(fxState.cart[p.id]||0);
       let s='', cls='', off=false;
       if(precio<=0){ s='Sin precio'; off=true; }
-      else if(stock<=0){ s='Agotado'; off=true; }
-      else if(left<=0){ s='No hay más en el sistema'; off=true; }
-      else if(verReal){ s='Quedan '+left; if(left<=Math.max(Number(p.cantidad_minima)||0,3)) cls='low'; }
+      else if(p.agotado||(stock!=null&&stock<=0)){ s='Agotado'; off=true; }
+      else if(left!=null&&left<=0){ s='No hay más en el sistema'; off=true; }
+      else if(verReal&&left!=null){ s='Quedan '+left; if(left<=Math.max(Number(p.cantidad_minima)||0,3)) cls='low'; }
       return `<button type="button" class="fx-prod" ${off?'disabled':''} onclick="fxAgregar('${p.id}')"><span class="n">${esc(p.producto)}</span><span class="p">${precio>0?fmt(precio):'—'}</span><span class="s ${cls}">${s}</span></button>`;
     }).join('')+'</div>';
   }).join('');
@@ -1976,7 +2031,7 @@ function renderFxProds(){
 function fxProd(id){ return fxState.prods.find(p=>p.id===id); }
 function fxAgregar(id){ const p=fxProd(id); if(!p) return; const q=fxState.cart[id]||0;
   if(fxState.evento){ const m=document.getElementById('fxMsg'); m.className='msg err'; m.textContent='Cobre o quite el evento antes de vender productos (van en cobros separados).'; return; }
-  if(q>=(Number(p.cantidad)||0)) return; fxState.cart[id]=q+1; document.getElementById('fxMsg').textContent=''; renderFxProds(); renderFxTicket(); }
+  if(p.agotado) return; if(p.cantidad!=null&&q>=(Number(p.cantidad)||0)) return; fxState.cart[id]=q+1; document.getElementById('fxMsg').textContent=''; renderFxProds(); renderFxTicket(); }
 function fxQuitar(id){ if(!fxState.cart[id]) return; fxState.cart[id]--; if(fxState.cart[id]<=0) delete fxState.cart[id]; renderFxProds(); renderFxTicket(); }
 function fxVaciar(){ fxState.cart={}; fxState.evento=null; renderFxEventos(); renderFxProds(); renderFxTicket(); }
 function fxTotal(){ if(fxState.evento){ const e=fxEvento(); return e?Number(fxState.evento.tipo==='miembro'?e.precio_miembro:e.precio_no_miembro)||0:0; }

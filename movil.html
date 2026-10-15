@@ -194,7 +194,7 @@
 <script src="/sesion.js"></script>
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-10-14b';
+const APP_VER='2026-10-15a';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -223,7 +223,9 @@ const MODS=[
   {id:'envios',label:'Envíos',color:'var(--teal)'},
   {id:'proyecciones',label:'Proyecciones',color:'var(--purple)',admin:true}
 ];
-const modVisible=m=>m.arqueo?puedeArquear():m.med?puedeVerMed():(!m.admin||esAdmin());
+// Ven el stock real: admins, coordinador y admin de sucursal (recepción cuenta a ciegas; lo cuida la base)
+const puedeVerStock=()=>esAdmin()||['coordinador','admin_sucursal'].includes(me?.role);
+const modVisible=m=>m.arqueo?puedeArquear():m.med?puedeVerMed():m.id==='inventario'?puedeVerStock():(!m.admin||esAdmin());
 
 // ── Helpers (van ANTES del estado: el estado inicial los usa) ──
 const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
@@ -330,6 +332,7 @@ function difInfo(c){ if(!c) return null; const d=Math.round(Number(c.diferencia)
 function estadoPill(c){ if(!c) return '<span class="pill warn">Sin turno</span>'; if(c.estado==='abierto') return '<span class="pill status live"><span class="dot"></span>Abierto '+hora(c.hora_apertura)+'</span>'; if(c.estado==='parcial') return '<span class="pill status">Parcial '+hora(c.hora_cierre)+'</span>'; return '<span class="pill status">Final '+hora(c.hora_cierre)+'</span>'; }
 // Cruce SINPE guardado en el cierre final: cobros SINPE sin su transferencia
 const cruceFaltan=c=>{ const g=c?.sinpe_reporte?.cruce; return g?((g.sinTrans||[]).length+(g.refSinTrans||[]).length):0; };
+const invDifiere=o=>!!o&&o.contado!=null&&(o.difiere!=null?!!o.difiere:(o.sistema!=null&&Number(o.contado)!==Number(o.sistema)));
 function sinpePill(c){ const sr=c?.sinpe_reporte; if(!sr) return null; const pa=Math.round(sr.pendAfter!=null?sr.pendAfter:((Number(sr.pendPrev)||0)+(Number(sr.nuevosMonto)||0)-(Number(sr.facturado)||0))); return pa<0?{cls:'bad',txt:'SINPE faltó '+fmt(-pa),pa}:pa===0?{cls:'ok',txt:'SINPE cuadró',pa}:{cls:'info',txt:'SINPE +'+fmt(pa)+' por facturar',pa}; }
 // Alertas automáticas de un cierre (misma lógica para cards, hub y auditoría). prev = turno anterior del mismo día.
 function prevDe(s,c){ if(!c) return null; return turnosDe(s).find(t=>t.turno_num===(c.turno_num||0)-1)||null; }
@@ -340,7 +343,7 @@ function alertasDe(c,prev){ const a=[]; if(!c) return a; const cerrado=c.estado!
   const nf=cruceFaltan(c); if(nf) a.push({cls:'bad',t:`SINPE: ${nf} cobro(s) sin transferencia`});
   if(cerrado){ const inv=c.inventario_cierre||{}; const k=Object.keys(inv);
     if(!k.length) a.push({cls:'warn',t:'Sin conteo de inventario'});
-    else { const n=k.filter(x=>inv[x]&&inv[x].contado!=null&&Number(inv[x].contado)!==Number(inv[x].sistema)).length; if(n) a.push({cls:'warn',t:n+' producto(s) con diferencia en el conteo'}); } }
+    else { const n=k.filter(x=>invDifiere(inv[x])).length; if(n) a.push({cls:'warn',t:n+' producto(s) con diferencia en el conteo'}); } }
   if(cerrado&&!(c.foto_datafono||c.foto_cierre)) a.push({cls:'warn',t:'Sin foto del datáfono'});
   if(cerrado&&(c.foto_datafono||c.foto_cierre)){ const st=estadoDatafono(c);
     if(st.k==='nocalza') a.push({cls:'bad',t:'Datáfono verificado: NO calza con tarjeta'});
@@ -406,7 +409,7 @@ async function renderHub(showLoading){
   document.getElementById('nav').innerHTML=`<div class="row"><button class="back" onclick="back()"><svg viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(backLabel())}</button><span class="tt">${esc(s)}</span><button class="act" onclick="abrirCaja()">Abrir caja</button></div><div class="row"><span class="st">${esc(fechaLarga(selDate))}</span><span id="hubEstado"></span></div>`;
   const v=document.getElementById('view');
   if(showLoading) v.innerHTML='<div class="tiles"><div class="skel" style="margin:0;height:70px"></div><div class="skel" style="margin:0;height:70px"></div></div><div class="mods">'+'<div class="skel" style="margin:0;width:60px;height:60px;border-radius:14px"></div>'.repeat(4)+'</div>';
-  const [r1,r2,r3]=await Promise.allSettled([loadDia(), supaFetch(`/envios_mercaderia?sede=eq.${encodeURIComponent(s)}&estado=eq.pendiente&select=id`), invCache[s]?Promise.resolve(invCache[s]):loadInventario(s)]);
+  const [r1,r2,r3]=await Promise.allSettled([loadDia(), supaFetch(`/envios_mercaderia?sede=eq.${encodeURIComponent(s)}&estado=eq.pendiente&select=id`), !puedeVerStock()?Promise.resolve([]):invCache[s]?Promise.resolve(invCache[s]):loadInventario(s)]);
   if(r1.status==='rejected'){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(r1.reason?.message||'error')}</div>`; return; }
   const c=ultimoTurno(s); const di=difInfo(c);
   const nEnv=r2.status==='fulfilled'?(r2.value||[]).length:0;
@@ -719,12 +722,17 @@ async function renderCaja(showLoading){
       (g.sinCobro||[]).forEach(x=>{ sinpeHtml+=fila('🕒 '+esc(x.origen||'Sin nombre'),'Recibido sin cobro identificado'+(x.detalle?' · '+esc(x.detalle):''),fmt(x.monto),'var(--blue)'); }); }
   }
   else sinpeHtml=`<div class="cell"><div class="main"><span class="t">Sin reporte SINPE</span><span class="s">${c.estado==='final'?'Obligatorio en el cierre final':'Se concilia en el cierre final'}</span></div><span class="pill ${c.estado==='final'?'warn':'status'}">${c.estado==='final'?'Falta':'Aún no'}</span></div>`;
-  const inv=c.inventario_cierre||{}; const invKeys=Object.keys(inv); const invDifs=invKeys.filter(k=>inv[k]&&inv[k].contado!=null&&Number(inv[k].contado)!==Number(inv[k].sistema));
+  const inv=c.inventario_cierre||{}; const invKeys=Object.keys(inv); const invDifs=invKeys.filter(k=>invDifiere(inv[k]));
+  // Lo que tenía el sistema se guarda aparte (cierres_inventario); solo quien ve el stock lo puede leer
+  let sisCierre={};
+  if(verInventarioReal()&&invDifs.length&&invDifs.some(k=>inv[k].sistema==null)){
+    try{ const r=await supaFetch(`/cierres_inventario?cierre_id=eq.${c.id}&tipo=eq.cierre&select=sistema`); sisCierre=(r&&r[0]&&r[0].sistema)||{}; }catch(_){}
+  }
   let invHtml='';
   if(!invKeys.length) invHtml=`<div class="cell"><div class="main"><span class="t">Sin conteo de inventario</span><span class="s">Obligatorio en cada cierre</span></div><span class="pill ${c.estado==='abierto'?'status':'warn'}">${c.estado==='abierto'?'Aún no':'Falta'}</span></div>`;
   else if(!invDifs.length) invHtml=`<div class="cell"><div class="main"><span class="t">Conteo coincide con el sistema</span><span class="s">${invKeys.length} productos contados</span></div><span class="pill ok">✓ Cuadra</span></div>`;
   else invHtml=`<div class="cell"><div class="main"><span class="t">${invDifs.length} producto(s) con diferencia</span><span class="s">${invKeys.length} contados</span></div><span class="pill bad">Revisar</span></div>`+
-    (verInventarioReal()?invDifs.slice(0,12).map(k=>`<div class="cell"><div class="main"><span class="t">${esc(k)}</span></div><span class="v num">contó ${inv[k].contado} · sistema ${inv[k].sistema}</span></div>`).join(''):`<div class="cell"><span class="s">Solo un administrador ve las cantidades del sistema.</span></div>`);
+    (verInventarioReal()?invDifs.slice(0,12).map(k=>`<div class="cell"><div class="main"><span class="t">${esc(k)}</span></div><span class="v num">contó ${inv[k].contado} · sistema ${inv[k].sistema??sisCierre[k]??'—'}</span></div>`).join(''):`<div class="cell"><span class="s">Solo un administrador ve las cantidades del sistema.</span></div>`);
   const fa=c.foto_analisis||null;
   const reqs=[{ok:!!(c.foto_datafono||c.foto_cierre),t:'Foto datáfono'},{ok:estadoDatafono(c).k==='ok',t:'Datáfono verificado'},{ok:!!invKeys.length,t:'Conteo inventario'},{ok:!!sr,t:'Reporte SINPE'},{ok:c.total_tarjeta!=null&&c.total_sinpe!=null,t:'Informe de Ventas'}];
   v.innerHTML=`
