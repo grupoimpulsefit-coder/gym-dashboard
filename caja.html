@@ -1362,11 +1362,22 @@ function conciliarSinpe(){
   fxSinpe.forEach(f=>{ const d=new Date(f.created_at); cobros.push({ fecha:horaCorta(d), d, cliente:`Factura #${f.numero} (caja)`, total:Math.round(fxMontoMetodo(f,'sinpe')),
     metodo:'sinpe', refs:[String(f.referencia||'').replace(/\D/g,'')].filter(x=>x.length>=4), productos:(f.items||[]).map(it=>it.producto) }); });
   const trans=s.all.map(t=>({...t, d:fechaHora(t.fecha_tx), usada:false}));
-  const pares=[], refSinTrans=[];
-  // 1) Por referencia
+  const pares=[], refSinTrans=[], compartidas=[];
+  // 1) Por referencia. Varios cobros pueden traer la MISMA referencia (p. ej. un plan en pareja pagado
+  //    con un solo SINPE): se agrupan por transferencia y se aceptan si juntos suman lo transferido o menos.
+  const porTrans=new Map();
   cobros.filter(c=>c.refs.length).forEach(c=>{
-    const t=trans.find(t=>!t.usada&&c.refs.some(d=>t.referencia===d||t.referencia.endsWith(d)));
-    if(t){ t.usada=true; c.par=t; pares.push({c,t,por:'referencia'}); } else refSinTrans.push(c);
+    const t=trans.find(t=>c.refs.some(d=>t.referencia===d||t.referencia.endsWith(d)));
+    if(!t){ refSinTrans.push(c); return; }
+    if(!porTrans.has(t)) porTrans.set(t,[]);
+    porTrans.get(t).push(c);
+  });
+  porTrans.forEach((grupo,t)=>{
+    t.usada=true;
+    if(grupo.length===1){ const c=grupo[0]; c.par=t; pares.push({c,t,por:'referencia'}); return; }
+    const suma=grupo.reduce((a,c)=>a+c.total,0);
+    grupo.forEach(c=>{ c.par=t; pares.push({c,t,por:'referencia',compartida:true}); });
+    compartidas.push({t,grupo,suma});
   });
   // 2) Sin referencia: cada transferencia busca su cobro por monto + nombre + hora
   const pool=cobros.filter(c=>!c.refs.length&&!c.par&&c.total>0&&(!v.agrupado||c.metodo==='sinpe'));
@@ -1385,8 +1396,9 @@ function conciliarSinpe(){
   });
   const sinTrans=v.agrupado?cobros.filter(c=>c.metodo==='sinpe'&&c.total>0&&!c.par&&!c.refs.length):[];
   const sinCobro=trans.filter(t=>!t.usada&&!t.ya&&!(t.d&&v.fecha&&ymd(t.d)>v.fecha));   // las de días posteriores no son de este cierre
-  const difMonto=pares.filter(x=>x.t.monto!==x.c.total);
-  return { pares, refSinTrans, sinTrans, sinCobro, difMonto, agrupado:v.agrupado, desde:s.desde, fecha:v.fecha,
+  const difMonto=pares.filter(x=>!x.compartida&&x.t.monto!==x.c.total);
+  compartidas.filter(g=>g.suma>g.t.monto+5).forEach(g=>difMonto.push({c:{cliente:g.grupo.map(c=>c.cliente).join(' + '),total:g.suma},t:g.t}));
+  return { pares, refSinTrans, sinTrans, sinCobro, difMonto, compartidas, agrupado:v.agrupado, desde:s.desde, fecha:v.fecha,
     conRef:cobros.filter(c=>c.refs.length).length };
 }
 // Resultado del cruce en formato plano (sin fechas como objeto): se muestra en vivo y se guarda
@@ -1401,7 +1413,8 @@ function cruceGuardable(r){
     refSinTrans:r.refSinTrans.map(c=>({cliente:c.cliente, ref:String(c.refs[0]||'').slice(-6), total:c.total, aviso:aviso(c)})),
     difMonto:r.difMonto.map(x=>({cliente:x.c.cliente, facturado:x.c.total, recibido:x.t.monto, origen:x.t.origen||''})),
     sinCobro:r.sinCobro.map(t=>({origen:t.origen||'', cuando:horaCorta(t.d)||t.fecha_tx||'', monto:t.monto, detalle:t.detalle||'', ref:String(t.referencia||'').slice(-6)})),
-    verificar:r.pares.filter(x=>x.por==='monto (verificar)').map(x=>({cliente:x.c.cliente, origen:x.t.origen||'', monto:x.t.monto})) };
+    verificar:r.pares.filter(x=>x.por==='monto (verificar)').map(x=>({cliente:x.c.cliente, origen:x.t.origen||'', monto:x.t.monto})),
+    compartidas:(r.compartidas||[]).map(g=>({clientes:g.grupo.map(c=>c.cliente), suma:g.suma, recibido:g.t.monto, ref:String(g.t.referencia||'').slice(-6)})) };
 }
 // Faltante = cobro SINPE sin su transferencia (con o sin referencia anotada)
 const faltantesCruce=g=>g?((g.sinTrans||[]).length+(g.refSinTrans||[]).length):0;
@@ -1414,13 +1427,16 @@ function htmlCruce(g, guardado){
   (g.difMonto||[]).forEach(x=>{ const d=x.recibido-x.facturado; h+=fila(`≠ <b>${esc(x.cliente)}</b>`, (d>0?'+':'−')+fmt(Math.abs(d)), `Facturado ${fmt(x.facturado)} · recibido ${fmt(x.recibido)} (${esc(x.origen)})`, 'var(--orange)'); });
   (g.sinCobro||[]).forEach(t=>{ h+=fila(`🕒 <b>${esc(t.origen||'Sin nombre')}</b>${t.cuando?' · '+esc(t.cuando):''}`, fmt(t.monto), `Recibido sin cobro identificado${t.detalle?' · "'+esc(t.detalle)+'"':''}${t.ref?' · ref …'+esc(t.ref):''}`, 'var(--blue)'); });
   (g.verificar||[]).forEach(x=>{ h+=fila(`? <b>${esc(x.cliente)}</b> ↔ ${esc(x.origen)}`, fmt(x.monto), 'Emparejado solo por monto: confirme que sea de esta persona.', 'var(--muted)'); });
+  // Un solo SINPE para varios cobros: informativo (si suman más de lo transferido ya sale arriba como ≠)
+  const comp=(g.compartidas||[]).filter(x=>x.suma<=x.recibido+5);
+  const hComp=comp.map(x=>fila(`👥 ${x.clientes.map(esc).join(' + ')}`, fmt(x.recibido), `Un solo SINPE (ref …${esc(x.ref)}) para ${x.clientes.length} cobros que suman ${fmt(x.suma)}${x.recibido-x.suma>5?` · sobran ${fmt(x.recibido-x.suma)} sin facturar`:' · calza'}`, 'var(--muted)')).join('');
   const nFalt=faltantesCruce(g);
   const limpio=!nFalt&&!(g.difMonto||[]).length&&!(g.sinCobro||[]).length;
   const cab=nFalt?`<span style="color:var(--red);">⚠ ${nFalt} sin transferencia</span>`:`<span>✓ ${g.calzan} calzan</span>`;
   return `<div style="margin-top:10px;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;">
     <div style="display:flex;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--fill);font-weight:700;"><span>🔗 Cruce por transacción${guardado?' <span style="font-weight:500;color:var(--muted);">(guardado)</span>':''}</span>${cab}</div>
     <div style="padding:6px 12px;font-size:11px;color:var(--muted);">${g.calzan} calzan: ${g.porRef} por referencia anotada · ${g.porMonto} por monto y nombre${g.conRef?'':' · Anotar la referencia SINPE en "Notas" del sistema de ventas hace el cruce exacto.'}${g.agrupado?'':'<br>Sin el detalle por método de pago: solo se ve lo que calza y lo recibido sin cobro.'}</div>
-    ${limpio?`<div style="padding:8px 12px;border-top:1px solid var(--border);color:var(--green);font-weight:700;">✓ Cada cobro SINPE tiene su transferencia</div>`:h}
+    ${limpio?`<div style="padding:8px 12px;border-top:1px solid var(--border);color:var(--green);font-weight:700;">✓ Cada cobro SINPE tiene su transferencia</div>`:h}${hComp}
   </div>`;
 }
 function htmlConciliacion(){ return htmlCruce(cruceGuardable(conciliarSinpe()), false); }
