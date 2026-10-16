@@ -370,7 +370,7 @@ async function initGastos() {
   document.getElementById('btnEditInstr').style.display = esAdmin() ? '' : 'none';
   document.getElementById('btnDelInstr').style.display = esAdmin() ? '' : 'none';
   // Fecha por defecto = hoy
-  document.getElementById('fFecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('fFecha').value = new Date().toLocaleDateString('en-CA');
   await cargarInstructores();
   await loadGastos();
 }
@@ -623,7 +623,7 @@ function salirModoEdicion() {
 function cancelarEdicionGasto() {
   salirModoEdicion();
   resetForm();
-  document.getElementById('fFecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('fFecha').value = new Date().toLocaleDateString('en-CA');
   document.getElementById('formMsg').textContent = '';
 }
 

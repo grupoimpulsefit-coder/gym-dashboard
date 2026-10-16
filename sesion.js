@@ -201,7 +201,7 @@
       if (!/[a-zA-Z]/.test(nva) || !/\d/.test(nva)) { err.textContent = 'Use letras y números.'; return; }
       if (nva !== rep) { err.textContent = 'Las dos contraseñas nuevas no coinciden.'; return; }
       if (nva === act) { err.textContent = 'La nueva contraseña debe ser distinta a la actual.'; return; }
-      if (/^impulse\d{4}$/i.test(nva)) { err.textContent = 'No use el formato de la contraseña temporal.'; return; }
+      if (/^impulse\d{4,6}$/i.test(nva)) { err.textContent = 'No use el formato de la contraseña temporal.'; return; }
       if (!email) { err.textContent = 'No se pudo identificar la cuenta. Cierre sesión y vuelva a entrar.'; return; }
       var b = $('sesClaveSi'); b.disabled = true; b.textContent = 'Guardando…'; err.textContent = '';
       var login = function (pwd) {

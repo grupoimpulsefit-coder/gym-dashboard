@@ -1124,7 +1124,7 @@ function exportPlanilla(){
   }
 
   const slug = currentSede.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'_');
-  XLSX.writeFile(wb, `planilla_${slug}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, `planilla_${slug}_${new Date().toLocaleDateString('en-CA')}.xlsx`);
 }
 
 // ══ Liquidación laboral (Costa Rica) ══
@@ -1152,7 +1152,7 @@ function openLiquidacion(id){
   liqEmp = empleados.find(e=>e.id===id); if(!liqEmp) return;
   document.getElementById('liqNombre').textContent = liqEmp.nombre + ' · ' + liqEmp.sede
     + (esSemanal(liqEmp) ? ' · servicios profesionales (base = equivalente mensual)' : '');
-  document.getElementById('lqFecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('lqFecha').value = new Date().toLocaleDateString('en-CA');
   document.getElementById('lqTipo').value = 'patronal';
   document.getElementById('lqSalario').value = Math.round(baseMensual(liqEmp)) || '';
   document.getElementById('lqVac').value = Number(saldoALaFecha(liqEmp, new Date()).toFixed(1));

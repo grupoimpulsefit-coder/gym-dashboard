@@ -1,0 +1,6 @@
+# No publicar en el sitio: SQL de la base, scripts locales, funciones del servidor
+# y configuración de Claude. (build.js y package.json sí hacen falta para el build.)
+*.sql
+*.py
+supabase/
+.claude/

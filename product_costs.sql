@@ -1,5 +1,6 @@
 -- Tabla de costos por producto para el reporte otros.html
--- Ejecutar UNA sola vez en Supabase → SQL Editor.
+-- Ejecutar en Supabase → SQL Editor, DESPUÉS de seguridad_rls.sql (usa mi_rol()).
+-- Se puede repetir sin problema.
 
 create table if not exists public.product_costs (
   producto    text primary key,
@@ -10,15 +11,19 @@ create table if not exists public.product_costs (
 
 alter table public.product_costs enable row level security;
 
--- Lectura: cualquier sesión autenticada (y la clave anon usada por la app)
+-- Solo administradores leen y cambian costos (otros.html lo abre admin_sedes,
+-- siempre con sesión). Antes cualquier sesión podía reescribirlos y los
+-- visitantes sin sesión podían leerlos.
 drop policy if exists product_costs_select on public.product_costs;
 create policy product_costs_select on public.product_costs
-  for select using (true);
+  for select to authenticated
+  using (public.mi_rol() in ('admin','admin_sedes','admin_g'));
 
--- Escritura (insert/update/delete): usuarios autenticados
 drop policy if exists product_costs_write on public.product_costs;
 create policy product_costs_write on public.product_costs
-  for all to authenticated using (true) with check (true);
+  for all to authenticated
+  using      (public.mi_rol() in ('admin','admin_sedes','admin_g'))
+  with check (public.mi_rol() in ('admin','admin_sedes','admin_g'));
 
-grant select on public.product_costs to anon, authenticated;
-grant insert, update, delete on public.product_costs to authenticated;
+revoke all on public.product_costs from anon;
+grant select, insert, update, delete on public.product_costs to authenticated;
