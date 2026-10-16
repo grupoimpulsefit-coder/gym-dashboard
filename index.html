@@ -771,8 +771,6 @@
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px;">
             <div><label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Rol por defecto</label>
                 <select id="bkRolDef"></select></div>
-            <div><label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Contraseña temporal (para todos)</label>
-                <input type="text" id="bkPass" autocomplete="off"></div>
         </div>
         <div id="bkFilas" style="display:flex;flex-direction:column;gap:8px;"></div>
         <div class="modal-buttons" style="justify-content:flex-start;margin-top:10px;"><button class="btn btn-orange" onclick="bkAgregar();bkRender()">＋ Agregar fila</button></div>
@@ -1059,11 +1057,11 @@ const BK_ROLES = { instructor:'🏋️ Instructor', recepcion:'🧾 Recepción',
 const BK_SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
 let bkFilas = [];
 const bkNorm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-function bkClave() { return 'Impulse' + Math.floor(1000 + Math.random() * 9000); }
+// Contraseña temporal distinta para cada persona (aleatoria de verdad, no Math.random)
+function bkClave() { return 'Impulse' + String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0'); }
 function openCrearVariasModal() {
     const def = document.getElementById('bkRolDef');
     def.innerHTML = Object.entries(BK_ROLES).map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
-    document.getElementById('bkPass').value = bkClave();
     document.getElementById('bkPegado').value = '';
     document.getElementById('bkMsg').textContent = '';
     document.getElementById('bkCopiar').style.display = 'none';
@@ -1117,10 +1115,8 @@ function bkPegar() {
 }
 async function bkCrear() {
     const msg = document.getElementById('bkMsg');
-    const pass = document.getElementById('bkPass').value.trim();
     const pend = bkFilas.filter(f => !f.ok && (f.email || f.nombre).trim());
     if (!pend.length) { msg.style.color = 'var(--red)'; msg.textContent = 'No hay cuentas por crear.'; return; }
-    if (pass.length < 6) { msg.style.color = 'var(--red)'; msg.textContent = 'La contraseña temporal debe tener al menos 6 caracteres.'; return; }
     const vistos = new Set(bkFilas.filter(f => f.ok).map(f => f.email.trim().toLowerCase()));
     for (const f of pend) {
         const e = f.email.trim().toLowerCase();
@@ -1132,7 +1128,7 @@ async function bkCrear() {
     let ok = 0, err = 0;
     for (const f of pend) {
         f.estado = 'Creando…'; f.color = 'var(--sec)'; bkRender(); btn.textContent = `Creando ${ok + err + 1} de ${pend.length}…`;
-        const email = f.email.trim().toLowerCase(), nombre = f.nombre.trim();
+        const email = f.email.trim().toLowerCase(), nombre = f.nombre.trim(), pass = bkClave();
         try {
             const res = await fetch(`${SUPA_URL}/functions/v1/crear-usuario`, { method: 'POST',
                 headers: { 'Authorization': 'Bearer ' + currentToken, 'apikey': SUPA_KEY, 'Content-Type': 'application/json' },
@@ -1146,15 +1142,15 @@ async function bkCrear() {
                 catch (_) { notas.push('⚠ no se le pudo asignar la sede'); }
             }
             if (f.planilla) notas.push(await bkLigarFicha(data.id, nombre, email, f.sede));
-            f.ok = true; f.email = email; ok++;
-            f.estado = '✓ Cuenta creada' + (f.planilla ? '' : ' · sin planilla (no ve Mi Portal)') + (notas.length ? ' · ' + notas.join(' · ') : '');
+            f.ok = true; f.email = email; f.clave = pass; ok++;
+            f.estado = '✓ Cuenta creada · contraseña: ' + pass + (f.planilla ? '' : ' · sin planilla (no ve Mi Portal)') + (notas.length ? ' · ' + notas.join(' · ') : '');
             f.color = 'var(--green)';
         } catch (e2) { err++; f.estado = '⚠ ' + e2.message; f.color = 'var(--red)'; }
         bkRender();
     }
     btn.disabled = false; bkRender();
     msg.style.color = err ? 'var(--red)' : 'var(--green)';
-    msg.textContent = `${ok} cuenta(s) creada(s)${err ? ` · ${err} con error` : ''}. Contraseña temporal para todos: ${pass}`;
+    msg.textContent = `${ok} cuenta(s) creada(s)${err ? ` · ${err} con error` : ''}. Cada persona tiene su propia contraseña temporal (cópielas con el botón).`;
     document.getElementById('bkCopiar').style.display = bkFilas.some(f => f.ok) ? '' : 'none';
 }
 // Liga (o crea) la ficha de RRHH por correo. Devuelve una nota para el estado de la fila.
@@ -1170,8 +1166,7 @@ async function bkLigarFicha(uid, nombre, email, sede) {
     } catch (e) { return '⚠ no se pudo ligar la ficha de RRHH: ' + e.message; }
 }
 function bkCopiar() {
-    const pass = document.getElementById('bkPass').value.trim();
-    const txt = bkFilas.filter(f => f.ok).map(f => `${f.nombre.trim()} — ${f.email} — contraseña: ${pass}`).join('\n')
+    const txt = bkFilas.filter(f => f.ok).map(f => `${f.nombre.trim()} — ${f.email} — contraseña: ${f.clave}`).join('\n')
         + `\n\nEntrar en ${location.origin} y cambiar la contraseña.`;
     navigator.clipboard.writeText(txt).then(() => { const m = document.getElementById('bkMsg'); m.style.color = 'var(--green)'; m.textContent = '📋 Accesos copiados: péguelos en WhatsApp o correo.'; })
         .catch(() => prompt('Copie los accesos:', txt));
@@ -3183,7 +3178,7 @@ function showSnapshotDetail(id) {
 // ══════════════════════════════════════════════════════
 //  HELPERS
 // ══════════════════════════════════════════════════════
-function hoy() { return new Date().toISOString().slice(0,10); }
+function hoy() { return new Date().toLocaleDateString('en-CA'); }
 function dlBlob(content, filename, type) {
     let blob=new Blob(['﻿'+content],{type});
     let a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); URL.revokeObjectURL(a.href);

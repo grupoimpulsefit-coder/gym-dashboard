@@ -57,13 +57,13 @@ Deno.serve(async (req) => {
     const { data: rolRow } = await admin.from('user_roles').select('role').eq('id', caller.user.id).single();
     if (!rolRow || !ROLES_OK.includes(rolRow.role)) return json({ error: 'Sin permiso' }, 403);
 
-    // 2) Obtener la imagen: por {bucket, path} en Storage o base64 directo ----
+    // 2) Obtener la imagen: por path en Storage (cierres-caja) o base64 directo ----
     const body = await req.json().catch(() => ({}));
     let b64 = String(body.image_base64 || '');
     let mediaType = String(body.media_type || 'image/jpeg');
     if (!b64 && body.path) {
-      const bucket = String(body.bucket || 'cierres-caja');
-      const { data: file, error: dlErr } = await admin.storage.from(bucket).download(String(body.path));
+      // Siempre la carpeta de cierres: quien llama no elige otra (p. ej. documentos de RRHH)
+      const { data: file, error: dlErr } = await admin.storage.from('cierres-caja').download(String(body.path));
       if (dlErr || !file) return json({ error: 'No se pudo leer la imagen del Storage: ' + (dlErr?.message || '') }, 400);
       mediaType = file.type || mediaType;
       b64 = encodeBase64(new Uint8Array(await file.arrayBuffer()));
