@@ -502,7 +502,7 @@ function pintar(){
 }
 
 // ══ Lado a lado ═══════════════════════════════════════════════════════════════
-// Azul: referencia y monto exacto (o confirmado a mano) · Morado: un SINPE con varias facturas
+// Azul: referencia y monto exacto (o confirmado a mano uno a uno) · Morado: un SINPE con varias facturas
 // (o varias transferencias para una factura) y el total cuadra · Amarillo: por cédula o nombre
 // y monto exacto · Rojo: sin pareja, el monto no cuadra o calzó solo por monto · Gris: marcado a
 // mano como "no es de una factura" / "se pagó por otro medio".
@@ -513,7 +513,8 @@ function verTab(t){ tabA=t; document.getElementById('paneRes').hidden=t!=='res';
   if(t!=='lado') document.getElementById('ladBar').hidden=true;
   [['tabRes','res'],['tabLado','lado']].forEach(([id,k])=>{ const b=document.getElementById(id); b.setAttribute('aria-selected',t===k); b.classList.toggle('active',t===k); }); }
 function colorGrupo(g){
-  if(g.por==='manual') return 'azul';   // ya lo revisó una persona, aunque haya diferencia de monto
+  // Ya lo revisó una persona, aunque haya diferencia de monto: morado si son varias, azul si es uno a uno
+  if(g.por==='manual') return g.sinpes.length>1||g.facts.length>1?'morado':'azul';
   if(g.por==='monto (verificar)'||sum(g.sinpes)!==sum(g.facts)) return 'rojo';
   if(g.sinpes.length>1||g.facts.length>1) return 'morado';
   return g.por==='referencia'?'azul':'amarillo';
