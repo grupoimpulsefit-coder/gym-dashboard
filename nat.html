@@ -2720,7 +2720,7 @@ function analizar(wb) {
   const totalMembresias = ventasMembresias.reduce((s,r) => s + r.total, 0);
   document.getElementById('cTotalMembresias').textContent = '₡' + Math.round(totalMembresias).toLocaleString('es-CR');
   document.getElementById('cTotalMembresiasCount').textContent = ventasMembresias.length + ' transacciones';
-  const hoy = new Date().toISOString().substring(0,10);
+  const hoy = new Date().toLocaleDateString('en-CA');
   const ventasHoy = ventasMembresias.filter(r => (r.fecha||'').substring(0,10) === hoy);
   const totalHoy = ventasHoy.reduce((s,r) => s + r.total, 0);
   document.getElementById('cMembresiasHoy').textContent = '₡' + Math.round(totalHoy).toLocaleString('es-CR');
@@ -3464,7 +3464,7 @@ function pdfResumenPlanes() {
     doc.text(`Página ${p} de ${totalPages}`, pageW/2, doc.internal.pageSize.getHeight()-6, { align:'center' });
   }
 
-  doc.save('resumen_planes_junio_' + new Date().toISOString().slice(0,10) + '.pdf');
+  doc.save('resumen_planes_junio_' + new Date().toLocaleDateString('en-CA') + '.pdf');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -4037,7 +4037,7 @@ function printSeguimiento() {
   setTimeout(() => win.print(), 250);
 }
 
-function hoy() { return new Date().toISOString().slice(0,10); }
+function hoy() { return new Date().toLocaleDateString('en-CA'); }
 function dlBlob(content, filename, type) {
   const blob = new Blob(['﻿'+content], { type });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href);
@@ -4244,7 +4244,7 @@ function pdfUsuarios() {
     doc.text(`Página ${p} de ${totalPages}`, pageW/2, doc.internal.pageSize.getHeight()-6, { align:'center' });
   }
 
-  doc.save('usuarios_' + new Date().toISOString().slice(0,10) + '.pdf');
+  doc.save('usuarios_' + new Date().toLocaleDateString('en-CA') + '.pdf');
 }
 
 // ─────────────────────────────────────────
@@ -4371,7 +4371,7 @@ function pdfProyeccion() {
     doc.text(`Página ${p} de ${totalPages}`, pageW/2, doc.internal.pageSize.getHeight()-6, { align:'center' });
   }
 
-  doc.save('proyeccion-junio-' + new Date().toISOString().slice(0,10) + '.pdf');
+  doc.save('proyeccion-junio-' + new Date().toLocaleDateString('en-CA') + '.pdf');
 }
 
 // ─────────────────────────────────────────

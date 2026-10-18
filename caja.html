@@ -1102,6 +1102,17 @@ function applyRowToForm(row){
 }
 
 // ── Cálculo ──
+// Cuadre de caja: lo que hay (+ lo que salió − lo que entró − el fondo) contra lo facturado.
+// diferencia > 0 = faltante; < 0 = sobrante.
+function cuadre({efectivo,tarjeta,sinpe,transfer,sobreOut,gastos,ingresos,cajaIni,totalVentas}){
+  const conciliado=efectivo+tarjeta+sinpe+transfer+sobreOut+gastos-ingresos-cajaIni;
+  return {conciliado, diferencia:totalVentas-conciliado};
+}
+(()=>{ const base={efectivo:60000,tarjeta:30000,sinpe:10000,transfer:0,sobreOut:0,gastos:5000,ingresos:2000,cajaIni:20000,totalVentas:83000};
+  console.assert(cuadre(base).diferencia===0,'cuadre: la caja debería cuadrar');
+  console.assert(cuadre({...base,efectivo:50000}).diferencia===10000,'cuadre: faltan 10 000 en efectivo');
+  console.assert(cuadre({...base,ingresos:0}).diferencia===-2000,'cuadre: un ingreso sin anotar es sobrante');
+})();
 function calc(){
   let efectivo=0;
   DENOMS.forEach(d=>{const c=Number(document.getElementById('den_'+d).value)||0; const sub=c*d; efectivo+=sub; document.getElementById('sub_'+d).textContent=fmt(sub);});
@@ -1124,8 +1135,7 @@ function calc(){
   const sobreRetirado=sobreModo==='ya';                          // compat con datos previos
   // El sobre solo sale en el cierre FINAL (= minita total del día). En parciales la minita queda en caja.
   const sobreOut=sobreModo==='ya'?minita:0;
-  const conciliado=efectivo+tarjeta+sinpe+transfer+sobreOut+totGastosDia-totIngresosDia-cajaIni;
-  const diferencia=totalVentas-conciliado;
+  const {conciliado,diferencia}=cuadre({efectivo,tarjeta,sinpe,transfer,sobreOut,gastos:totGastosDia,ingresos:totIngresosDia,cajaIni,totalVentas});
   document.getElementById('cCajaInicial').value=Math.round(cajaIni);
   document.getElementById('rEfectivo').textContent=fmt(efectivo);
   document.getElementById('rTarjeta').textContent=fmt(tarjeta);

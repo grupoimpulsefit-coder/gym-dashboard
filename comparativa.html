@@ -616,7 +616,7 @@ function exportDetalleCSV(sede) {
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `comparativa_${sede.replace(/\s/g,'_')}_${filtro}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `comparativa_${sede.replace(/\s/g,'_')}_${filtro}_${new Date().toLocaleDateString('en-CA')}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
