@@ -1263,8 +1263,7 @@ async function cargarSinpeHistorico(file){
         all.push({ referencia:ref, monto:Math.round(Number(r[cMonto])||0), fecha_tx:cFecha>=0?String(r[cFecha]||'').trim():'', detalle:cDet>=0?String(r[cDet]||'').trim():'' }); }
       if(!all.length)throw new Error('El archivo no tiene filas de SINPE.');
       // Referencias ya registradas de la sede
-      const reg=(await supaFetch(`/sinpe_registrados?sede=eq.${encodeURIComponent(currentSede)}&select=referencia`))||[];
-      const ya=new Set(reg.map(x=>String(x.referencia)));
+      const ya=await refsRegistradas(currentSede, all.map(x=>x.referencia));
       const nuevos=all.filter(x=>!ya.has(x.referencia));
       if(!nuevos.length){ alert(`Todas las referencias del archivo (${all.length}) ya estaban registradas. No hay nada nuevo que cargar.`); return; }
       const filas=nuevos.map(x=>({ sede:currentSede, referencia:x.referencia, monto:x.monto, fecha_tx:x.fecha_tx||null, detalle:(x.detalle?x.detalle+' ':'')+'[histórico]', cierre_id:null, created_by:currentEmail||null }));
@@ -1337,6 +1336,18 @@ function cargarInformeVentas(file){
   reader.readAsArrayBuffer(file);
 }
 
+// Cuáles de estas referencias ya están registradas en la sede. Se pregunta SOLO por las del reporte, en
+// tandas: pedir la tabla entera fallaba en silencio, porque la base devuelve como máximo 1000 filas por
+// consulta y en las sedes con más movimiento quedaban afuera referencias ya contadas (se volvían a sumar).
+async function refsRegistradas(sede, refs){
+  const ya=new Set(), unicas=[...new Set(refs.map(String))];
+  for(let i=0;i<unicas.length;i+=80){
+    const lote=unicas.slice(i,i+80).map(r=>'"'+r.replace(/"/g,'')+'"').join(',');
+    const rows=(await supaFetch(`/sinpe_registrados?sede=eq.${encodeURIComponent(sede)}&referencia=in.(${encodeURIComponent(lote)})&select=referencia`))||[];
+    rows.forEach(x=>ya.add(String(x.referencia)));
+  }
+  return ya;
+}
 // ── Reporte SINPE (obligatorio en cierre final): dedup por ReferenciaSinpe + comparación ──
 function normHdr(s){ return String(s||'').toLowerCase().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n').replace(/\s+/g,' ').trim(); }
 async function cargarReporteSinpe(file){
@@ -1361,7 +1372,7 @@ async function cargarReporteSinpe(file){
       }
       if(!all.length)throw new Error('El reporte no tiene filas de SINPE.');
       let yaSet=new Set();
-      try{ const reg=(await supaFetch(`/sinpe_registrados?sede=eq.${encodeURIComponent(currentSede)}&select=referencia`))||[]; reg.forEach(x=>yaSet.add(String(x.referencia))); }
+      try{ yaSet=await refsRegistradas(currentSede, all.map(x=>x.referencia)); }
       catch(err){ hintEl.innerHTML='⚠ No se pudieron leer las referencias registradas: '+esc(err.message)+' (¿corrió el SQL de <code>sinpe_registrados</code>?).'; window._sinpeReporte=null; renderSinpeResumen(); return; }
       all.forEach(x=>{ x.ya=yaSet.has(x.referencia); });
       const nuevos=all.filter(x=>!yaSet.has(x.referencia));
