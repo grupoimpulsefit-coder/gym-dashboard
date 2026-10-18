@@ -1346,6 +1346,7 @@ async function showSedePicker() {
         cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
         cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agendar citas','Agenda semanal cada 15 minutos','#e8f4fd','#1a5276','/mediciones'));
         cardsEl.appendChild(makeHandoffCard('📦','Inventario','Consultar stock','Solo lectura: productos, precios y faltantes','#fff8e1','#b9770e','/inventario'));
+        cardsEl.appendChild(makeHandoffCard('🔷','Auditoría SINPE','Facturas vs transferencias','Qué facturas tienen su SINPE y cuáles no','#e8f4ff','#0c447c','/conciliacion'));
         portalSiPlanilla(cardsEl, makeHandoffCard);
         return;
     }
@@ -1415,6 +1416,7 @@ async function showSedePicker() {
             cardsEl.appendChild(makeHandoffCard('💸','Planilla','Pago quincenal','Feriados, incapacidades y permisos','#eafaf1','#1e8449','/planilla'));
             cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre de caja','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
             cardsEl.appendChild(makeHandoffCard('📦','Inventario','Productos por sede','Stock, precios y faltantes','#fff8e1','#b9770e','/inventario'));
+            cardsEl.appendChild(makeHandoffCard('🔷','Auditoría SINPE','Facturas vs transferencias','Qué facturas tienen su SINPE y cuáles no','#e8f4ff','#0c447c','/conciliacion'));
             cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agenda por sede','Citas cada 15 min y estado de rutina','#e8f4fd','#1a5276','/mediciones'));
             // Crear cuenta de acceso — abre modal (no navega)
             const cc = document.createElement('div');
@@ -1452,6 +1454,7 @@ async function showSedePicker() {
             cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar / ver gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
             cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre de caja','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
             cardsEl.appendChild(makeHandoffCard('📦','Inventario','Productos por sede','Stock, precios y faltantes','#fff8e1','#b9770e','/inventario'));
+            cardsEl.appendChild(makeHandoffCard('🔷','Auditoría SINPE','Facturas vs transferencias','Qué facturas tienen su SINPE y cuáles no','#e8f4ff','#0c447c','/conciliacion'));
         }
     } catch(e) {
         statusEl.textContent = '⚠️ Error al cargar sedes: ' + e.message;

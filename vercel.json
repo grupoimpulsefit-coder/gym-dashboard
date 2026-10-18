@@ -13,6 +13,7 @@
     { "source": "/inventario", "destination": "/inventario.html" },
     { "source": "/movil", "destination": "/movil.html" },
     { "source": "/mediciones", "destination": "/mediciones.html" },
-    { "source": "/planilla", "destination": "/planilla.html" }
+    { "source": "/planilla", "destination": "/planilla.html" },
+    { "source": "/conciliacion", "destination": "/conciliacion.html" }
   ]
 }
