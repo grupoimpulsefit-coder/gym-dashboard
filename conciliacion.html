@@ -136,6 +136,7 @@ table.lad tr.foco td{outline:2px solid var(--brand);outline-offset:-2px}
     <div class="desglose" id="desglose"></div>
 
     <div class="section"><div class="section-title">📅 Por día</div></div>
+    <div class="hint" style="margin:-6px 0 8px;">El SINPE de una factura cuenta el día de la factura, aunque haya entrado antes o después. El saldo del día es lo pagado de más o de menos más lo que sigue sin pareja.</div>
     <div class="tbl-wrap"><table class="tbl" style="min-width:560px;">
       <thead><tr><th>Día</th><th class="num">Recibido</th><th class="num">Facturado</th><th class="num">Saldo del día</th><th class="num">Saldo acumulado</th><th class="num">Por confirmar</th></tr></thead>
       <tbody id="tDias"></tbody>
@@ -372,6 +373,17 @@ function cruzar(F,S,dec){
       if(libreF(f)&&(c[i].ced&&c[i].ced===c[j].ced||norm(c[i].nombre)===norm(c[j].nombre))&&Math.abs(c[i].monto+c[j].monto-f.monto)<=100){
         unir(c[i],f,'dos SINPE'); unir(c[j],f,'dos SINPE'); } }
   });
+  // 4b) Factura pagada en partes: si a un grupo le falta plata, sumar otras transferencias libres
+  // de la misma persona (cédula o nombre) que completen justo lo que falta.
+  grupos.filter(g=>g.por!=='manual'&&g.facts.length&&g.sinpes.length).forEach(g=>{
+    const falta=g.facts.reduce((a,f)=>a+f.monto,0)-g.sinpes.reduce((a,s)=>a+s.monto,0); if(falta<=100) return;
+    const d=g.facts[0].ymd, mismo=s=>g.sinpes.some(x=>(x.ced&&x.ced===s.ced)||norm(x.nombre)===norm(s.nombre));
+    const c=S.filter(s=>libreS(s)&&mismo(s)&&diasEntre(s.ymd,d)<=3).slice(0,8);
+    let hit=null;
+    for(let m=1;m<(1<<c.length)&&!hit;m++){ const sub=c.filter((_,i)=>m&(1<<i));
+      if(sub.length<=3&&Math.abs(sub.reduce((a,s)=>a+s.monto,0)-falta)<=100) hit=sub; }
+    if(hit) hit.forEach(s=>unir(s,g.facts[0],g.por));
+  });
   // 5) Mismo monto y mismo día (clientes sin nombre: sesión diaria, caja…) → verificar
   F.filter(libreF).forEach(f=>{ const c=S.filter(s=>libreS(s)&&s.monto===f.monto&&s.ymd===f.ymd); if(c.length) unir(c[0],f,'monto (verificar)'); });
   return { grupos, sinpesLibres:S.filter(libreS), factsLibres:F.filter(libreF), sinFactura, sinSinpe };
@@ -440,13 +452,19 @@ function pintar(){
     <div class="fila"><span>Facturas confirmadas como pagadas por otro medio</span><span>${fmtS(-sum(ss))}</span></div>
     <div class="fila"><span>Saldo</span><span>${fmtS(dif)}</span></div>`;
 
-  // Por día
-  const dias=[...new Set([...A.S.map(s=>s.ymd),...A.F.map(f=>f.ymd)])].filter(Boolean).sort();
+  // Por día: el SINPE de una factura ya conciliada cuenta el día de la factura, aunque haya entrado
+  // otro día (p. ej. la noche anterior). Así el saldo del día muestra solo lo pagado de más o de menos
+  // y lo que sigue sin pareja.
+  const diaS=new Map(); A.S.forEach(s=>diaS.set(s,s.ymd));
+  grupos.forEach(g=>{ const d=g.facts.map(f=>f.ymd).sort().pop(); if(d) g.sinpes.forEach(s=>diaS.set(s,d)); });
+  const dias=[...new Set([...diaS.values(),...A.F.map(f=>f.ymd)])].filter(Boolean).sort();
   let acum=0;
   document.getElementById('tDias').innerHTML=dias.map(d=>{
-    const r=sum(A.S.filter(s=>s.ymd===d)), f=sum(A.F.filter(x=>x.ymd===d)); acum+=r-f;
+    const ss=A.S.filter(s=>diaS.get(s)===d), otro=ss.filter(s=>s.ymd!==d);
+    const r=sum(ss), f=sum(A.F.filter(x=>x.ymd===d)); acum+=r-f;
+    const nota=otro.length?`<div class="sub">incluye ${fmt(sum(otro))} que entró ${[...new Set(otro.map(s=>diaTxt(s.ymd)))].join(', ')}</div>`:'';
     const p=sinpesLibres.filter(s=>s.ymd===d).length+factsLibres.filter(x=>x.ymd===d).length+verif.filter(g=>(g.facts[0]||{}).ymd===d).length;
-    return `<tr><td>${diaTxt(d)}</td><td class="num">${fmt(r)}</td><td class="num">${fmt(f)}</td><td class="num ${r-f<0?'neg':r-f>0?'pos':''}">${fmtS(r-f)}</td><td class="num"><b>${fmtS(acum)}</b></td><td class="num">${p?`<span class="pill-s warn">${p}</span>`:'<span class="pill-s ok">0</span>'}</td></tr>`;
+    return `<tr><td>${diaTxt(d)}</td><td class="num">${fmt(r)}${nota}</td><td class="num">${fmt(f)}</td><td class="num ${r-f<0?'neg':r-f>0?'pos':''}">${fmtS(r-f)}</td><td class="num"><b>${fmtS(acum)}</b></td><td class="num">${p?`<span class="pill-s warn">${p}</span>`:'<span class="pill-s ok">0</span>'}</td></tr>`;
   }).join('');
 
   // Filtro por día de los pendientes
