@@ -172,7 +172,7 @@ table.lad tr.foco td{outline:2px solid var(--brand);outline-offset:-2px}
     </div>
     <div class="modal-foot">
       <button class="btn-ghost" onclick="document.getElementById('vModal').classList.remove('open')">Cancelar</button>
-      <button class="btn-primary" onclick="guardarVinculo()">Vincular</button>
+      <button class="btn-primary" id="vBtn" onclick="guardarVinculo()">Vincular</button>
     </div>
   </div>
 </div>
@@ -339,6 +339,9 @@ function cruzar(F,S,dec){
   };
   F.forEach(f=>{ delete f.refNoEsta; });
   const libreS=s=>!gDeS.has(s.ref)&&!sinFactura.has(s.ref), libreF=f=>!gDeF.has(f.key)&&!sinSinpe.has(f.key);
+  // Parejas que una persona separó: el cruce automático no las vuelve a juntar
+  const separado=new Set(); dec.filter(d=>d.estado==='separado').forEach(d=>(d.facturas||[]).forEach(x=>separado.add(d.referencia+'|'+x.clave)));
+  const ok=(s,f)=>!separado.has(s.ref+'|'+f.key);
   // 0) Decisiones guardadas
   dec.forEach(d=>{
     if(d.estado==='sin_factura'&&porRef.has(d.referencia)) sinFactura.set(d.referencia,d);
@@ -350,25 +353,25 @@ function cruzar(F,S,dec){
   // 1) Referencia anotada en Notas (completa o los últimos dígitos)
   F.filter(f=>libreF(f)&&f.ref.length>=4).forEach(f=>{
     const s=porRef.get(f.ref)||S.find(x=>(f.ref.length>=6||f.origen==='caja')&&x.ref.endsWith(f.ref));
-    if(s&&!sinFactura.has(s.ref)) unir(s,f,'referencia'); else if(!s) f.refNoEsta=true;
+    if(s&&!sinFactura.has(s.ref)&&ok(s,f)) unir(s,f,'referencia'); else if(!s) f.refNoEsta=true;
   });
   // 2) Cédula y 3) nombre: una transferencia libre por factura, la de monto más parecido
   const mejor=(f,c)=>c.sort((a,b)=>Math.abs(a.monto-f.monto)-Math.abs(b.monto-f.monto)||diasEntre(a.ymd,f.ymd)-diasEntre(b.ymd,f.ymd))[0];
   const coinciden=(f,s)=>{ const fs=tokens(f.cliente), ss=tokens(s.nombre+' '+s.detalle);
     return fs.filter(t=>ss.some(u=>u.startsWith(t.slice(0,4))||(u.length>=3&&t.startsWith(u)))).length; };
   F.filter(libreF).forEach(f=>{ if(!f.ced) return;
-    const c=S.filter(s=>libreS(s)&&s.ced===f.ced&&diasEntre(s.ymd,f.ymd)<=3); if(c.length) unir(mejor(f,c),f,'cédula'); });
+    const c=S.filter(s=>libreS(s)&&ok(s,f)&&s.ced===f.ced&&diasEntre(s.ymd,f.ymd)<=3); if(c.length) unir(mejor(f,c),f,'cédula'); });
   // Por nombre se arman todas las parejas posibles y se asignan de la mejor a la peor (más palabras
   // en común, monto más parecido, días más cerca), así "Luis Felipe Vega" no se queda con la factura
   // de "Luis Carlos Vega" solo porque esa venía antes en el informe.
   const parejas=[];
-  F.filter(libreF).forEach(f=>S.filter(s=>libreS(s)&&diasEntre(s.ymd,f.ymd)<=3).forEach(s=>{ const n=coinciden(f,s);
+  F.filter(libreF).forEach(f=>S.filter(s=>libreS(s)&&ok(s,f)&&diasEntre(s.ymd,f.ymd)<=3).forEach(s=>{ const n=coinciden(f,s);
     if(n>=2||(n>=1&&Math.abs(s.monto-f.monto)<=100)) parejas.push({f,s,n}); }));
   parejas.sort((a,b)=>b.n-a.n||Math.abs(a.s.monto-a.f.monto)-Math.abs(b.s.monto-b.f.monto)||diasEntre(a.s.ymd,a.f.ymd)-diasEntre(b.s.ymd,b.f.ymd))
     .forEach(({f,s})=>{ if(libreF(f)&&libreS(s)) unir(s,f,'nombre'); });
   // 4) Dos transferencias de la misma persona para una factura
   F.filter(libreF).forEach(f=>{
-    const c=S.filter(s=>libreS(s)&&diasEntre(s.ymd,f.ymd)<=3&&((f.ced&&s.ced===f.ced)||coinciden(f,s)>=1));
+    const c=S.filter(s=>libreS(s)&&ok(s,f)&&diasEntre(s.ymd,f.ymd)<=3&&((f.ced&&s.ced===f.ced)||coinciden(f,s)>=1));
     for(let i=0;i<c.length;i++) for(let j=i+1;j<c.length;j++){
       if(libreF(f)&&(c[i].ced&&c[i].ced===c[j].ced||norm(c[i].nombre)===norm(c[j].nombre))&&Math.abs(c[i].monto+c[j].monto-f.monto)<=100){
         unir(c[i],f,'dos SINPE'); unir(c[j],f,'dos SINPE'); } }
@@ -378,14 +381,14 @@ function cruzar(F,S,dec){
   grupos.filter(g=>g.por!=='manual'&&g.facts.length&&g.sinpes.length).forEach(g=>{
     const falta=g.facts.reduce((a,f)=>a+f.monto,0)-g.sinpes.reduce((a,s)=>a+s.monto,0); if(falta<=100) return;
     const d=g.facts[0].ymd, mismo=s=>g.sinpes.some(x=>(x.ced&&x.ced===s.ced)||norm(x.nombre)===norm(s.nombre));
-    const c=S.filter(s=>libreS(s)&&mismo(s)&&diasEntre(s.ymd,d)<=3).slice(0,8);
+    const c=S.filter(s=>libreS(s)&&mismo(s)&&g.facts.every(f=>ok(s,f))&&diasEntre(s.ymd,d)<=3).slice(0,8);
     let hit=null;
     for(let m=1;m<(1<<c.length)&&!hit;m++){ const sub=c.filter((_,i)=>m&(1<<i));
       if(sub.length<=3&&Math.abs(sub.reduce((a,s)=>a+s.monto,0)-falta)<=100) hit=sub; }
     if(hit) hit.forEach(s=>unir(s,g.facts[0],g.por));
   });
   // 5) Mismo monto y mismo día (clientes sin nombre: sesión diaria, caja…) → verificar
-  F.filter(libreF).forEach(f=>{ const c=S.filter(s=>libreS(s)&&s.monto===f.monto&&s.ymd===f.ymd); if(c.length) unir(c[0],f,'monto (verificar)'); });
+  F.filter(libreF).forEach(f=>{ const c=S.filter(s=>libreS(s)&&ok(s,f)&&s.monto===f.monto&&s.ymd===f.ymd); if(c.length) unir(c[0],f,'monto (verificar)'); });
   return { grupos, sinpesLibres:S.filter(libreS), factsLibres:F.filter(libreF), sinFactura, sinSinpe };
 }
 
@@ -475,7 +478,7 @@ function pintar(){
   // Por confirmar
   const filas=[];
   sinpesLibres.filter(s=>enDia(s.ymd)).forEach(s=>filas.push({ymd:s.ymd,html:`<tr><td><span class="pill-s bad">SINPE sin factura</span></td><td>${diaTxt(s.ymd)}</td><td>${sinpeTxt(s)}</td><td class="num">${fmt(s.monto)}</td>
-    <td style="white-space:nowrap;"><button class="btn-ghost mini" onclick="abrirVinculo('s','${esc(s.ref)}')">Vincular a factura</button> <button class="btn-ghost mini" onclick="marcar('sin_factura','${esc(s.ref)}')">No es de una factura</button></td></tr>`}));
+    <td style="white-space:nowrap;"><button class="btn-ghost mini" onclick="abrirVinculo('s','${esc(s.ref)}')">Vincular a factura</button> <button class="btn-ghost mini" onclick="marcar('sin_factura','${esc(s.ref)}')">No es de una factura</button>${A.decisiones.some(d=>d.clave==='sep:'+s.ref)?` <button class="btn-ghost mini" onclick="deshacer(['sep:${esc(s.ref)}'])">Quitar separación</button>`:''}</td></tr>`}));
   factsLibres.filter(f=>enDia(f.ymd)).forEach(f=>filas.push({ymd:f.ymd,html:`<tr><td><span class="pill-s bad">Factura sin SINPE</span></td><td>${diaTxt(f.ymd)}</td><td>${factTxt(f)}</td><td class="num">${fmt(f.monto)}</td>
     <td style="white-space:nowrap;"><button class="btn-ghost mini" onclick="abrirVinculo('f','${esc(f.key)}')">Vincular a SINPE</button> <button class="btn-ghost mini" onclick="marcar('sin_sinpe','${esc(f.key)}')">Se pagó por otro medio</button></td></tr>`}));
   verif.filter(g=>enDia(g.facts[0].ymd)).forEach(g=>{ const i=A.r.grupos.indexOf(g); filas.push({ymd:g.facts[0].ymd,html:`<tr><td><span class="pill-s warn">Verificar</span></td><td>${diaTxt(g.facts[0].ymd)}</td>
@@ -492,7 +495,8 @@ function pintar(){
     return `<tr><td>${g.sinpes.map(sinpeTxt).join('<div style="height:6px"></div>')}</td><td class="num">${fmt(sum(g.sinpes))}</td>
       <td>${g.facts.map(factTxt).join('<div style="height:6px"></div>')}</td><td class="num">${fmt(sum(g.facts))}</td>
       <td class="num ${d<0?'neg':d>0?'pos':''}">${d?fmtS(d):'—'}</td><td>${como[g.por]||esc(g.por)}</td>
-      <td>${man?`<button class="btn-ghost mini" onclick="deshacer(${JSON.stringify(g.sinpes.map(s=>'ref:'+s.ref)).replace(/"/g,'&quot;')})">Deshacer</button>`:''}</td></tr>`; }).join('');
+      <td>${man?`<button class="btn-ghost mini" onclick="deshacer(${JSON.stringify(g.sinpes.map(s=>'ref:'+s.ref)).replace(/"/g,'&quot;')})">Deshacer</button>`
+        :`<button class="btn-ghost mini" onclick="separar(${A.r.grupos.indexOf(g)})">Separar</button>`}</td></tr>`; }).join('');
   sf.filter(s=>enDia(s.ymd)).forEach(s=>{ const d=sinFactura.get(s.ref); h+=`<tr><td>${sinpeTxt(s)}</td><td class="num">${fmt(s.monto)}</td><td><span class="pill-s">No es de una factura</span><div class="sub">${esc(d.nota||'')} · ${esc(d.creado_por||'')}</div></td><td class="num">—</td><td class="num pos">${fmtS(s.monto)}</td><td>${como.manual}</td>
     <td><button class="btn-ghost mini" onclick="deshacer(['ref:${esc(s.ref)}'])">Deshacer</button></td></tr>`; });
   ss.filter(f=>enDia(f.ymd)).forEach(f=>{ const d=sinSinpe.get(f.key); h+=`<tr><td><span class="pill-s">Se pagó por otro medio</span><div class="sub">${esc(d.nota||'')} · ${esc(d.creado_por||'')}</div></td><td class="num">—</td><td>${factTxt(f)}</td><td class="num">${fmt(f.monto)}</td><td class="num neg">${fmtS(-f.monto)}</td><td>${como.manual}</td>
@@ -553,14 +557,16 @@ function barraLado(tr){
     const g=A.r.grupos[Number(gi)], d=sum(g.sinpes)-sum(g.facts);
     t=`<b>${g.sinpes.map(s=>esc(s.nombre)).join(' + ')}</b> ${fmt(sum(g.sinpes))} ↔ ${g.facts.map(f=>esc(f.numero)+' '+esc(f.cliente)).join(' + ')} ${fmt(sum(g.facts))}${d?` · <span class="${d<0?'neg':'pos'}">dif. ${fmtS(d)}</span>`:''}`;
     if(g.por==='manual') acc=b('Deshacer',`deshacer(${JSON.stringify(g.sinpes.map(s=>'ref:'+s.ref)).replace(/"/g,'&quot;')})`);
-    else if(c!=='azul') acc=b('✓ Confirmar',`confirmarGrupo(${gi})`,true);
-    else t+=' · <span class="sub">calzó por referencia y monto</span>';
+    else{ if(c!=='azul') acc=b('✓ Confirmar',`confirmarGrupo(${gi})`,true); else t+=' · <span class="sub">calzó por referencia y monto</span>';
+      acc+=b('Separar',`separar(${gi})`); }
   } else if(c==='gris'){
     t=esS?'SINPE marcado como <b>no es de una factura</b>':'Factura marcada como <b>pagada por otro medio</b>';
     acc=b('Deshacer',`deshacer(['${esS?'ref:'+esc(clave):esc(clave)}'])`);
   } else if(esS){
-    const s=A.Stodos.find(x=>x.ref===clave); t=`SINPE sin factura: <b>${esc(s.nombre)}</b> ${fmt(s.monto)}`;
-    acc=b('Vincular a factura',`abrirVinculo('s','${esc(clave)}')`,true)+b('No es de una factura',`marcar('sin_factura','${esc(clave)}')`);
+    const s=A.Stodos.find(x=>x.ref===clave), sep=A.decisiones.find(d=>d.clave==='sep:'+clave);
+    t=`SINPE sin factura: <b>${esc(s.nombre)}</b> ${fmt(s.monto)}`+(sep?` · <span class="sub">separado a mano de ${sep.facturas.map(x=>esc(x.numero)).join(', ')}</span>`:'');
+    acc=b('Vincular a factura',`abrirVinculo('s','${esc(clave)}')`,true)+b('No es de una factura',`marcar('sin_factura','${esc(clave)}')`)
+      +(sep?b('Quitar separación',`deshacer(['sep:${esc(clave)}'])`):'');
   } else {
     const f=A.Ftodos.find(x=>x.key===clave); t=`Factura sin SINPE: <b>${esc(f.numero)} ${esc(f.cliente)}</b> ${fmt(f.monto)}`;
     acc=b('Vincular a SINPE',`abrirVinculo('f','${esc(clave)}')`,true)+b('Se pagó por otro medio',`marcar('sin_sinpe','${esc(clave)}')`);
@@ -612,9 +618,12 @@ function vConjunto(){
     g.sinpes.forEach(s=>{ if(!S.includes(s)) S.push(s); }); g.facts.forEach(f=>{ if(!F.includes(f)) F.push(f); }); });
   return {ch,S,F};
 }
+const TOPE_VINCULO=100;   // las facturas pueden pasar el monto del SINPE en ₡100 como máximo
 function vSuma(){
   const {ch,S,F}=vConjunto(), d=sum(S)-sum(F);
-  document.getElementById('vSum').innerHTML=ch.length?`SINPE ${fmt(sum(S))} (${S.length}) · facturas ${fmt(sum(F))} (${F.length}) · ${d===0?'<span class="pos">cuadra exacto</span>':`diferencia ${fmtS(d)}`}`:'';
+  document.getElementById('vSum').innerHTML=ch.length?`SINPE ${fmt(sum(S))} (${S.length}) · facturas ${fmt(sum(F))} (${F.length}) · ${d===0?'<span class="pos">cuadra exacto</span>':`diferencia ${fmtS(d)}`}`
+    +(-d>TOPE_VINCULO?`<div class="neg" style="font-weight:500;">Las facturas pasan el SINPE por ${fmt(-d)}: no se puede vincular (máximo ${fmt(TOPE_VINCULO)}).</div>`:''):'';
+  document.getElementById('vBtn').disabled=!ch.length||-d>TOPE_VINCULO;
 }
 const factJson=f=>({clave:f.key,numero:f.numero,cliente:f.cliente,monto:f.monto,fecha:f.ymd});
 async function guardar(filas){
@@ -624,6 +633,7 @@ async function guardar(filas){
 async function guardarVinculo(){
   const ch=[...document.querySelectorAll('#vList input:checked')].map(i=>i.value); if(!ch.length) return;
   const {S,F}=vConjunto(), fs=F.map(factJson);
+  if(sum(F)-sum(S)>TOPE_VINCULO){ alert(`Las facturas (${fmt(sum(F))}) pasan el monto del SINPE (${fmt(sum(S))}) por más de ${fmt(TOPE_VINCULO)}. Revise la selección.`); return; }
   const filas=S.map(s=>({clave:'ref:'+s.ref,estado:'vinculado',referencia:s.ref,facturas:fs}));   // el grupo completo queda confirmado
   if(await guardar(filas)){ document.getElementById('vModal').classList.remove('open'); await recalcular(); }
 }
@@ -638,6 +648,16 @@ async function marcar(estado,id){
   const fila=estado==='sin_factura'?{clave:'ref:'+id,estado,referencia:id,facturas:[],nota:nota.trim()}
     :{clave:id,estado,referencia:null,facturas:[factJson(A.Ftodos.find(f=>f.key===id))],nota:nota.trim()};
   if(await guardar([fila])) await recalcular();
+}
+// Separa un cruce automático equivocado: queda guardado, así al volver a subir los archivos esos
+// SINPE no se vuelven a juntar con esas facturas y quedan libres para vincularlos bien.
+async function separar(i){
+  const g=A.r.grupos[i]; if(!g) return;
+  if(!confirm(`¿Separar ${g.sinpes.map(s=>s.nombre).join(' + ')} (${fmt(sum(g.sinpes))}) de ${g.facts.map(f=>f.numero).join(', ')} (${fmt(sum(g.facts))})?\nNo se volverán a cruzar solos.`)) return;
+  const filas=g.sinpes.map(s=>{ const prev=A.decisiones.find(d=>d.clave==='sep:'+s.ref);
+    const fs=[...(prev?.facturas||[])]; g.facts.forEach(f=>{ if(!fs.some(x=>x.clave===f.key)) fs.push(factJson(f)); });
+    return {clave:'sep:'+s.ref,estado:'separado',referencia:s.ref,facturas:fs}; });
+  if(await guardar(filas)){ cerrarBarra(); await recalcular(); }
 }
 async function deshacer(claves){
   if(!confirm('¿Deshacer esta confirmación manual?')) return;

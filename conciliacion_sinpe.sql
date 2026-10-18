@@ -10,19 +10,24 @@
 --                    adelantado, otra sede, devolución…), con nota
 --    • sin_sinpe   → una factura marcada SINPE que se pagó por otro medio o
 --                    se registró mal (clave = 'fac:<origen>:<número>'), con nota
+--    • separado    → un cruce automático equivocado: ese SINPE no se vuelve a
+--                    juntar solo con esas facturas (clave = 'sep:<referencia>')
 -- ══════════════════════════════════════════════════════════════════════════
 
 create table if not exists sinpe_conciliacion (
   id          uuid primary key default gen_random_uuid(),
   sede        text not null,
   clave       text not null,                 -- 'ref:<ReferenciaSinpe>' o 'fac:<origen>:<numero>'
-  estado      text not null check (estado in ('vinculado','sin_factura','sin_sinpe')),
+  estado      text not null,
   referencia  text,                          -- ReferenciaSinpe (vinculado / sin_factura)
   facturas    jsonb not null default '[]',   -- [ { clave, numero, cliente, monto, fecha } ]
   nota        text,
   creado_por  text default (auth.jwt() ->> 'email'),
   created_at  timestamptz default now()
 );
+alter table sinpe_conciliacion drop constraint if exists sinpe_conciliacion_estado_check;
+alter table sinpe_conciliacion add constraint sinpe_conciliacion_estado_check
+  check (estado in ('vinculado','sin_factura','sin_sinpe','separado'));
 create unique index if not exists sinpe_conciliacion_clave_idx on sinpe_conciliacion (sede, clave);
 
 alter table sinpe_conciliacion enable row level security;
