@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F2F2F7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icons/favicon-64.png">
+<title>Auditoría SINPE</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="/ui.css">
+<style>
+/* Propio de la auditoría SINPE (el resto del diseño vive en /ui.css) */
+.wrap-a{padding:0 var(--gut) 40px}
+.arch{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--sec);padding:10px var(--gut) 0}
+.arch .ok{color:var(--green);font-weight:600}
+.desglose{background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:14px 18px;margin-top:14px}
+.desglose .fila{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:.5px solid var(--hair);font-variant-numeric:tabular-nums}
+.desglose .fila:last-child{border-bottom:0;font-weight:700;border-top:.5px solid var(--sep);margin-top:2px}
+.desglose .fila span:first-child{color:var(--sec)}
+.desglose .fila:last-child span:first-child{color:var(--label)}
+.pill-s{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;background:var(--fill);color:var(--label)}
+.pill-s.ok{background:var(--green-tint);color:var(--green)} .pill-s.warn{background:var(--orange-tint);color:var(--orange)}
+.pill-s.bad{background:var(--red-tint);color:var(--red)} .pill-s.info{background:var(--blue-tint);color:var(--blue)}
+.sub{font-size:12px;color:var(--sec)}
+.mini{font-size:12px;padding:4px 10px;min-height:28px}
+.pos{color:var(--blue)} .neg{color:var(--red)}
+.cand{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:.5px solid var(--hair);cursor:pointer}
+.cand:last-child{border-bottom:0}
+.cand .t{flex:1;min-width:0;font-size:14px}
+.cand .m{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.seg-f{display:flex;gap:6px;flex-wrap:wrap}
+.seg-f button{border:0;background:var(--fill);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--label)}
+.seg-f button[aria-pressed="true"]{background:var(--brand-tint);color:var(--brand-text)}
+</style>
+</head>
+<body>
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">🔷</div>
+    <h2>Auditoría SINPE</h2>
+    <p class="login-sub">Qué facturas tienen su SINPE y cuáles no</p>
+    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="correo@ejemplo.com" autocomplete="username"></div>
+    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+<div class="header">
+  <div class="header-icon">🔷</div>
+  <div><h1>Auditoría SINPE <span id="sedeTitle"></span></h1><p>Cruce de facturas SINPE con las transferencias recibidas</p></div>
+  <div class="header-right"><span>👤 <span id="userNombre">—</span></span><button class="logout-btn" onclick="doLogout()">Cerrar sesión</button></div>
+</div>
+<div class="topbar">
+  <div class="topbar-controls">
+    <label>🏢 Sede:</label><select id="sedeSel"></select>
+  </div>
+  <div class="topbar-controls">
+    <label class="btn-ghost" for="fileInf" style="cursor:pointer;">📤 Informe de Ventas (wstudio)</label>
+    <input type="file" id="fileInf" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) leerInforme(this.files[0]); this.value='';">
+    <label class="btn-ghost" for="fileSin" style="cursor:pointer;">🔷 Reporte SINPE (Ridivi)</label>
+    <input type="file" id="fileSin" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) leerSinpe(this.files[0]); this.value='';">
+  </div>
+</div>
+<div class="arch" id="arch"></div>
+<div class="msg" id="msg" style="padding:6px var(--gut) 0;"></div>
+
+<div id="vacio" class="wrap-a" style="padding-top:30px;">
+  <div class="desglose">
+    <b>Cómo se usa</b>
+    <ol style="margin:8px 0 0 18px;line-height:1.6;font-size:14px;">
+      <li>Descargue de wstudio el <b>Informe de Ventas</b> y de Ridivi el <b>Reporte SINPE</b>, del mismo rango de fechas.</li>
+      <li>Súbalos con los dos botones de arriba. Las facturas SINPE de <b>esta caja</b> (minita y eventos) de esas fechas se suman solas.</li>
+      <li>El sistema cruza por <b>referencia</b> (en Notas), luego por <b>cédula</b>, <b>nombre</b> y <b>monto</b>. Lo que no calce queda para confirmar a mano.</li>
+    </ol>
+  </div>
+</div>
+
+<div id="res" style="display:none;">
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-label">SINPE recibido</div><div class="kpi-value" id="kRec">—</div><div class="kpi-sub" id="kRecN"></div></div>
+    <div class="kpi"><div class="kpi-label">Facturado por SINPE</div><div class="kpi-value" id="kFac">—</div><div class="kpi-sub" id="kFacN"></div></div>
+    <div class="kpi green"><div class="kpi-label">Saldo (recibido − facturado)</div><div class="kpi-value" id="kDif">—</div><div class="kpi-sub" id="kDifS"></div></div>
+    <div class="kpi orange"><div class="kpi-label">Por confirmar</div><div class="kpi-value" id="kPend">—</div><div class="kpi-sub">SINPE y facturas sin pareja</div></div>
+  </div>
+
+  <div class="wrap-a">
+    <div class="desglose" id="desglose"></div>
+
+    <div class="section"><div class="section-title">📅 Por día</div></div>
+    <div class="tbl-wrap"><table class="tbl" style="min-width:560px;">
+      <thead><tr><th>Día</th><th class="num">Recibido</th><th class="num">Facturado</th><th class="num">Saldo del día</th><th class="num">Saldo acumulado</th><th class="num">Por confirmar</th></tr></thead>
+      <tbody id="tDias"></tbody>
+    </table></div>
+
+    <div class="section" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div class="section-title" style="margin:0;">⚠ Por confirmar</div>
+      <div class="seg-f" id="fDia"></div>
+    </div>
+    <div class="tbl-wrap"><table class="tbl" style="min-width:720px;">
+      <thead><tr><th>Tipo</th><th>Fecha</th><th>Detalle</th><th class="num">Monto</th><th></th></tr></thead>
+      <tbody id="tPend"></tbody>
+    </table></div>
+
+    <div class="section"><div class="section-title">✓ Conciliados</div></div>
+    <div class="tbl-wrap"><table class="tbl" style="min-width:860px;">
+      <thead><tr><th>SINPE recibido</th><th class="num">Monto</th><th>Factura(s)</th><th class="num">Facturado</th><th class="num">Dif.</th><th>Cómo</th><th></th></tr></thead>
+      <tbody id="tOk"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- Modal: vincular a mano -->
+<div class="modal-back" id="vModal">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-head" id="vTit">Vincular</div>
+    <div class="modal-body" style="max-height:62vh;overflow-y:auto;gap:8px;">
+      <div class="hint" id="vHint"></div>
+      <div id="vList"></div>
+      <div id="vSum" style="font-weight:600;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" onclick="document.getElementById('vModal').classList.remove('open')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarVinculo()">Vincular</button>
+    </div>
+  </div>
+</div>
+
+<script src="/sesion.js"></script>
+<script>
+const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
+let currentToken=null,currentRole=null,currentSede=null,currentEmail='',currentSedesExtra=[];
+
+/* ── Sesión: renovación silenciosa + cierre por inactividad (ver sesion.js) ── */
+Sesion.init({ url: SUPA_URL, key: SUPA_KEY, idleMin: 30,
+  onToken: function (t) { currentToken = t; },
+  onExpira: function (m) { _sesionExpirada(m); } });
+function _sesionExpirada(motivo) {
+  var msg = motivo === 'inactividad' ? 'Su sesión se cerró por 30 minutos de inactividad. Vuelva a entrar.'
+          : motivo === 'cerrada'     ? 'La sesión se cerró en otra pestaña.'
+          :                            'Su sesión expiró. Vuelva a entrar.';
+  try { doLogout(true); } catch (_) {}
+  var e = document.getElementById('loginError'); if (e) e.textContent = msg;
+}
+async function supaFetch(path,opts={}){
+  const token=currentToken||SUPA_KEY;
+  const res=await fetch(SUPA_URL+'/rest/v1'+path,{method:opts.method||'GET',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':opts.prefer||'return=minimal',...(opts.headers||{})},body:opts.body!=null?JSON.stringify(opts.body):undefined});
+  if(res.status===401&&!opts._retry&&await Sesion.renovar())return supaFetch(path,{...opts,_retry:true});
+  if(!res.ok){const t=await res.text();throw new Error(t);} const txt=await res.text(); return txt?JSON.parse(txt):null;
+}
+function mensajeError(e){ try{ const j=JSON.parse(e.message); return j.message||e.message; }catch(_){ return e.message; } }
+const ROLES_PERMITIDOS=['admin','admin_sedes','admin_g','coordinador'];
+const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
+const SEDE_META={'3 Ríos':{icon:'🌊'},'Natación':{icon:'🏊'},'Pinares':{icon:'🌲'},'Sabanilla':{icon:'🏙️'}};
+const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(currentRole);
+function sedesDisponibles(){
+  if(esAdmin()||!currentSede) return SEDES;
+  return [...new Set([currentSede,...(Array.isArray(currentSedesExtra)?currentSedesExtra:[])].filter(s=>SEDES.includes(s)))];
+}
+const fmt=n=>(Number(n)<0?'−':'')+'₡'+Math.abs(Math.round(Number(n)||0)).toLocaleString('es-CR');
+const fmtS=n=>(Math.round(n)>0?'+':'')+fmt(n);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim(),pwd=document.getElementById('loginPassword').value;
+  const btn=document.getElementById('loginBtn'),errEl=document.getElementById('loginError');
+  if(!email||!pwd){errEl.textContent='Complete todos los campos.';return;}
+  btn.textContent='Ingresando...';btn.disabled=true;errEl.textContent='';
+  try{
+    const res=await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password:pwd})});
+    const data=await res.json(); if(!data.access_token)throw new Error(data.error_description||data.msg||'Credenciales incorrectas');
+    currentToken=data.access_token; Sesion.set(data);currentEmail=email;
+    const roles=await supaFetch(`/user_roles?id=eq.${data.user.id}&select=role,nombre,sede,sedes_extra`);
+    currentRole=roles?.[0]?.role||null;currentSede=roles?.[0]?.sede||null;
+    currentSedesExtra=Array.isArray(roles?.[0]?.sedes_extra)?roles[0].sedes_extra:[];
+    if(!ROLES_PERMITIDOS.includes(currentRole)){errEl.textContent='Su cuenta no tiene acceso a la auditoría SINPE.';await doLogout(true);return;}
+    document.getElementById('userNombre').textContent=roles?.[0]?.nombre||email;
+    document.getElementById('loginScreen').style.display='none'; init();
+  }catch(e){errEl.textContent=e.message;}finally{btn.textContent='Entrar';btn.disabled=false;}
+}
+document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+(function(){try{const auth=JSON.parse(sessionStorage.getItem('gymAuth')||'null');
+  if(auth?.token&&ROLES_PERMITIDOS.includes(auth.role)){sessionStorage.removeItem('gymAuth');currentToken=auth.token; Sesion.adoptar(auth);currentRole=auth.role;currentSede=auth.sede||null;currentEmail=auth.email||'';currentSedesExtra=Array.isArray(auth.sedes_extra)?auth.sedes_extra:[];
+    document.getElementById('userNombre').textContent=auth.nombre||'—';document.getElementById('loginScreen').style.display='none';setTimeout(init,0);}}catch(_){}})();
+async function doLogout(silent){ Sesion.cerrar();try{await fetch(`${SUPA_URL}/auth/v1/logout`,{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}});}catch(_){}
+  currentToken=null;currentRole=null;currentSede=null;currentEmail='';currentSedesExtra=[];
+  if(!silent){document.getElementById('loginEmail').value='';document.getElementById('loginPassword').value='';}document.getElementById('loginScreen').style.display='flex';}
+
+function init(){
+  const opciones=sedesDisponibles();
+  if(!currentSede||!opciones.includes(currentSede))currentSede=opciones[0];
+  const sel=document.getElementById('sedeSel');
+  sel.innerHTML=opciones.map(s=>`<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
+  sel.onchange=()=>{ currentSede=sel.value; document.getElementById('sedeTitle').textContent='· '+currentSede; recalcular(); };
+  document.getElementById('sedeTitle').textContent='· '+currentSede;
+  pintarArchivos();
+}
+
+// ══ Lectura de archivos ══════════════════════════════════════════════════════
+const A={ informe:null, sinpe:null, caja:[], decisiones:[], errCaja:null, errDec:null, dia:'todos' };
+const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/_/g,' ').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+const tokens=s=>norm(s).split(' ').filter(t=>t.length>=3&&!/^\d+$/.test(t));
+const digitos=s=>String(s??'').replace(/\D/g,'');
+const cedula=s=>{ const d=digitos(s).replace(/^0+/,''); return d.length>=8?d:''; };
+function ymdDe(v){
+  if(v instanceof Date&&!isNaN(v)) return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;
+  const m=String(v||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:'';
+}
+const diaTxt=ymd=>{ if(!ymd) return '—'; const [y,m,d]=ymd.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString('es-CR',{weekday:'short',day:'numeric',month:'short'}); };
+const diasEntre=(a,b)=>(a&&b)?Math.abs((new Date(a)-new Date(b))/864e5):99;
+function leerXlsx(file){ return new Promise((ok,mal)=>{ const r=new FileReader();
+  r.onload=e=>{ try{ const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true}); ok(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''})); }catch(x){ mal(x); } };
+  r.onerror=()=>mal(new Error('No se pudo leer el archivo.')); r.readAsArrayBuffer(file); }); }
+function msg(t,cls){ const m=document.getElementById('msg'); m.className='msg '+(cls||''); m.innerHTML=t||''; }
+
+// Informe de Ventas de wstudio: solo la sección "Cuenta SINPE"
+async function leerInforme(file){
+  try{
+    const rows=await leerXlsx(file); let metodo=null, col=null; const F=[];
+    rows.forEach(r=>{
+      const t=r.map(c=>String(c??'').trim()).filter(Boolean);
+      if(t[0]==='Cuenta'&&t.length>=2){ metodo=norm(t[1]); col=null; return; }
+      if(t.includes('Notas')&&t.includes('#')){ const h=r.map(c=>String(c??'').trim());
+        col={num:h.indexOf('#'),fecha:h.indexOf('Fecha'),cli:h.indexOf('Cliente'),notas:h.indexOf('Notas'),tot:h.indexOf('Total CRC')}; return; }
+      if(metodo!=='sinpe'||!col||!r[col.fecha]||!String(r[col.cli]??'').trim()) return;
+      const cli=String(r[col.cli]).trim(), m=cli.match(/-\s*(\d{8,})\s*$/);
+      F.push({ origen:'wstudio', key:`fac:wstudio:${String(r[col.num]).trim()}`, numero:String(r[col.num]).trim(), ymd:ymdDe(r[col.fecha]),
+        cliente:cli.replace(/\s*-\s*\d{8,}\s*$/,''), ced:m?m[1].replace(/^0+/,''):'', ref:digitos(r[col.notas]), monto:Math.round(Number(r[col.tot])||0) });
+    });
+    if(!F.length) throw new Error('No se encontró la sección SINPE. ¿Es el Informe de Ventas de wstudio?');
+    A.informe={ nombre:file.name, F }; pintarArchivos(); await recalcular();
+  }catch(e){ msg('⚠ '+esc(e.message),'err'); }
+}
+// Reporte SINPE de Ridivi
+async function leerSinpe(file){
+  try{
+    const rows=await leerXlsx(file);
+    const hi=rows.findIndex(r=>r.some(c=>norm(c).includes('referenciasinpe'))); if(hi<0) throw new Error('No se encontró la columna ReferenciaSinpe. ¿Es el reporte SINPE de Ridivi?');
+    const h=rows[hi].map(norm), ix=k=>h.findIndex(c=>c===k), ixs=k=>h.findIndex(c=>c.includes(k));
+    const c={ref:ixs('referenciasinpe'),fecha:ixs('fecha de transacc'),det:ix('detalle'),ced:ixs('identificacion origen'),nom:ixs('cliente origen'),monto:ix('monto'),suc:ix('sucursal')};
+    const S=[], vistos=new Set();
+    rows.slice(hi+1).forEach(r=>{ const ref=String(r[c.ref]??'').trim(); if(!ref||vistos.has(ref)) return; vistos.add(ref);
+      const f=String(r[c.fecha]??'');
+      S.push({ ref, ymd:ymdDe(r[c.fecha]), hora:(f.match(/\d{1,2}:\d{2}/)||[''])[0], detalle:String(r[c.det]??'').trim(), ced:cedula(r[c.ced]),
+        nombre:String(r[c.nom]??'').replace(/_/g,' ').trim(), monto:Math.round(Number(r[c.monto])||0), sucursal:c.suc>=0?String(r[c.suc]??''):'' }); });
+    if(!S.length) throw new Error('El reporte no tiene transferencias.');
+    A.sinpe={ nombre:file.name, S }; pintarArchivos(); await recalcular();
+  }catch(e){ msg('⚠ '+esc(e.message),'err'); }
+}
+function pintarArchivos(){
+  const f=(x,lbl)=>x?`<span class="ok">✓ ${lbl}: ${esc(x.nombre)}</span>`:`<span>○ ${lbl}: sin cargar</span>`;
+  document.getElementById('arch').innerHTML=f(A.informe,'Informe de Ventas')+' · '+f(A.sinpe,'Reporte SINPE');
+}
+function rango(){
+  const ds=[...(A.informe?.F||[]).map(x=>x.ymd),...(A.sinpe?.S||[]).map(x=>x.ymd)].filter(Boolean).sort();
+  return ds.length?{desde:ds[0],hasta:ds[ds.length-1]}:null;
+}
+// Facturas SINPE de esta caja (minita y eventos) y decisiones guardadas
+async function cargarBase(){
+  const r=rango(); A.caja=[]; A.errCaja=null; A.decisiones=[]; A.errDec=null; if(!r) return;
+  try{
+    const fs=(await supaFetch(`/facturas_caja?sede=eq.${encodeURIComponent(currentSede)}&fecha=gte.${r.desde}&fecha=lte.${r.hasta}&estado=eq.activa&select=numero,fecha,metodo,pagos,total,referencia,tipo,cliente_nombre,items`))||[];
+    fs.forEach(f=>{ const P=Array.isArray(f.pagos)&&f.pagos.length?f.pagos:[{metodo:f.metodo,monto:f.total,referencia:f.referencia}];
+      const p=P.filter(x=>x.metodo==='sinpe'); if(!p.length) return;
+      const det=f.tipo==='evento'?`🎟️ ${(f.items&&f.items[0]&&f.items[0].producto)||'Evento'} · ${f.cliente_nombre||''}`:(f.items||[]).map(it=>it.producto+(Number(it.cantidad)>1?' ×'+it.cantidad:'')).join(', ');
+      A.caja.push({ origen:'caja', key:`fac:caja:${f.fecha}:${f.numero}`, numero:`Caja #${f.numero}`, ymd:f.fecha, cliente:det, ced:'',
+        ref:digitos(p[0].referencia||f.referencia), monto:Math.round(p.reduce((a,x)=>a+(Number(x.monto)||0),0)) }); });
+  }catch(e){ A.errCaja=mensajeError(e); }
+  try{ A.decisiones=(await supaFetch(`/sinpe_conciliacion?sede=eq.${encodeURIComponent(currentSede)}&select=*`))||[]; }
+  catch(e){ A.errDec=mensajeError(e); }
+}
+
+// ══ Cruce ═════════════════════════════════════════════════════════════════════
+// Grupos: { sinpes:[...], facts:[...], por } — un SINPE puede pagar varias facturas
+// y una factura puede pagarse con varios SINPE.
+function cruzar(F,S,dec){
+  const grupos=[], gDeS=new Map(), gDeF=new Map(), sinFactura=new Map(), sinSinpe=new Map();
+  const porRef=new Map(S.map(s=>[s.ref,s])), porKey=new Map(F.map(f=>[f.key,f]));
+  const unir=(s,f,por)=>{
+    let g=(s&&gDeS.get(s.ref))||(f&&gDeF.get(f.key));
+    if(!g){ g={sinpes:[],facts:[],por}; grupos.push(g); }
+    if(s&&!gDeS.has(s.ref)){ g.sinpes.push(s); gDeS.set(s.ref,g); }
+    if(f&&!gDeF.has(f.key)){ g.facts.push(f); gDeF.set(f.key,g); }
+    if(por==='manual') g.por='manual';
+    return g;
+  };
+  F.forEach(f=>{ delete f.refNoEsta; });
+  const libreS=s=>!gDeS.has(s.ref)&&!sinFactura.has(s.ref), libreF=f=>!gDeF.has(f.key)&&!sinSinpe.has(f.key);
+  // 0) Decisiones guardadas
+  dec.forEach(d=>{
+    if(d.estado==='sin_factura'&&porRef.has(d.referencia)) sinFactura.set(d.referencia,d);
+    else if(d.estado==='sin_sinpe'&&porKey.has(d.clave)) sinSinpe.set(d.clave,d);
+  });
+  dec.filter(d=>d.estado==='vinculado').forEach(d=>{ const s=porRef.get(d.referencia); if(!s) return;
+    const fs=(d.facturas||[]).map(x=>porKey.get(x.clave)).filter(Boolean);
+    if(!fs.length) return; fs.forEach(f=>unir(s,f,'manual')); });
+  // 1) Referencia anotada en Notas (completa o los últimos dígitos)
+  F.filter(f=>libreF(f)&&f.ref.length>=4).forEach(f=>{
+    const s=porRef.get(f.ref)||S.find(x=>(f.ref.length>=6||f.origen==='caja')&&x.ref.endsWith(f.ref));
+    if(s&&!sinFactura.has(s.ref)) unir(s,f,'referencia'); else if(!s) f.refNoEsta=true;
+  });
+  // 2) Cédula y 3) nombre: una transferencia libre por factura, la de monto más parecido
+  const mejor=(f,c)=>c.sort((a,b)=>Math.abs(a.monto-f.monto)-Math.abs(b.monto-f.monto)||diasEntre(a.ymd,f.ymd)-diasEntre(b.ymd,f.ymd))[0];
+  const coinciden=(f,s)=>{ const fs=tokens(f.cliente), ss=tokens(s.nombre+' '+s.detalle);
+    return fs.filter(t=>ss.some(u=>u.startsWith(t.slice(0,4))||(u.length>=3&&t.startsWith(u)))).length; };
+  F.filter(libreF).forEach(f=>{ if(!f.ced) return;
+    const c=S.filter(s=>libreS(s)&&s.ced===f.ced&&diasEntre(s.ymd,f.ymd)<=3); if(c.length) unir(mejor(f,c),f,'cédula'); });
+  F.filter(libreF).forEach(f=>{
+    const c=S.filter(s=>libreS(s)&&diasEntre(s.ymd,f.ymd)<=3&&(coinciden(f,s)>=2||(coinciden(f,s)>=1&&Math.abs(s.monto-f.monto)<=100)));
+    if(c.length) unir(mejor(f,c),f,'nombre'); });
+  // 4) Dos transferencias de la misma persona para una factura
+  F.filter(libreF).forEach(f=>{
+    const c=S.filter(s=>libreS(s)&&diasEntre(s.ymd,f.ymd)<=3&&((f.ced&&s.ced===f.ced)||coinciden(f,s)>=1));
+    for(let i=0;i<c.length;i++) for(let j=i+1;j<c.length;j++){
+      if(libreF(f)&&(c[i].ced&&c[i].ced===c[j].ced||norm(c[i].nombre)===norm(c[j].nombre))&&Math.abs(c[i].monto+c[j].monto-f.monto)<=100){
+        unir(c[i],f,'dos SINPE'); unir(c[j],f,'dos SINPE'); } }
+  });
+  // 5) Mismo monto y mismo día (clientes sin nombre: sesión diaria, caja…) → verificar
+  F.filter(libreF).forEach(f=>{ const c=S.filter(s=>libreS(s)&&s.monto===f.monto&&s.ymd===f.ymd); if(c.length) unir(c[0],f,'monto (verificar)'); });
+  return { grupos, sinpesLibres:S.filter(libreS), factsLibres:F.filter(libreF), sinFactura, sinSinpe };
+}
+
+async function recalcular(){
+  if(!A.informe&&!A.sinpe){ document.getElementById('vacio').style.display=''; document.getElementById('res').style.display='none'; return; }
+  await cargarBase();
+  const avisos=[];
+  if(!A.informe) avisos.push('Falta el <b>Informe de Ventas</b> de wstudio.');
+  if(!A.sinpe) avisos.push('Falta el <b>Reporte SINPE</b>.');
+  if(A.errCaja) avisos.push('No se pudieron leer las facturas de la caja: '+esc(A.errCaja));
+  if(A.errDec) avisos.push('No se pudieron leer las confirmaciones guardadas ('+esc(A.errDec)+'). ¿Ya se corrió <code>conciliacion_sinpe.sql</code>?');
+  const ri=A.informe&&A.informe.F.map(f=>f.ymd).sort(), rs=A.sinpe&&A.sinpe.S.map(s=>s.ymd).sort();
+  if(ri&&rs&&(ri[0]<rs[0]||ri[ri.length-1]>rs[rs.length-1])) avisos.push('Los dos archivos no cubren las mismas fechas: use el mismo rango en wstudio y en Ridivi.');
+  msg(avisos.join('<br>'),avisos.length?'err':'');
+  A.F=[...(A.informe?.F||[]),...A.caja]; A.S=A.sinpe?.S||[];
+  A.r=cruzar(A.F,A.S,A.decisiones);
+  pintar();
+}
+
+// ══ Pintar ════════════════════════════════════════════════════════════════════
+const sum=(a,k='monto')=>a.reduce((s,x)=>s+(Number(x[k])||0),0);
+const sinpeTxt=s=>`${esc(s.nombre||'—')}<div class="sub">${diaTxt(s.ymd)} ${esc(s.hora)} · ref …${esc(s.ref.slice(-6))}${s.detalle?` · “${esc(s.detalle)}”`:''}</div>`;
+const factTxt=f=>`${esc(f.numero)} · ${esc(f.cliente||'—')}<div class="sub">${diaTxt(f.ymd)} · ${f.origen==='caja'?'Facturación de caja':'wstudio'}${f.ref?` · notas …${esc(f.ref.slice(-6))}`:''}${f.refNoEsta?' · <span class="neg">la referencia de Notas no está en el reporte</span>':''}</div>`;
+function pintar(){
+  document.getElementById('vacio').style.display='none'; document.getElementById('res').style.display='';
+  const {grupos,sinpesLibres,factsLibres,sinFactura,sinSinpe}=A.r;
+  const rec=sum(A.S), fac=sum(A.F), dif=rec-fac;
+  document.getElementById('kRec').textContent=fmt(rec); document.getElementById('kRecN').textContent=`${A.S.length} transferencias`;
+  document.getElementById('kFac').textContent=fmt(fac); document.getElementById('kFacN').textContent=`${A.F.length} facturas (${A.caja.length} de la caja)`;
+  document.getElementById('kDif').textContent=fmtS(dif); document.getElementById('kDifS').textContent=dif>0?'a favor: recibido sin facturar':dif<0?'en contra: facturado sin recibir':'cuadra';
+  const verif=grupos.filter(g=>g.por==='monto (verificar)');
+  document.getElementById('kPend').textContent=sinpesLibres.length+factsLibres.length+verif.length;
+
+  // De dónde sale el saldo: cada SINPE y cada factura cae en un solo grupo
+  const difPagos=grupos.reduce((a,g)=>a+sum(g.sinpes)-sum(g.facts),0);
+  const sf=[...sinFactura.keys()].map(r=>A.S.find(s=>s.ref===r)).filter(Boolean), ss=[...sinSinpe.keys()].map(k=>A.F.find(f=>f.key===k)).filter(Boolean);
+  document.getElementById('desglose').innerHTML=`<b>¿De dónde sale el saldo de ${fmtS(dif)}?</b>
+    <div class="fila"><span>Pagaron de más (+) o de menos (−) en SINPE ya conciliados</span><span>${fmtS(difPagos)}</span></div>
+    <div class="fila"><span>SINPE recibidos sin factura (por confirmar)</span><span>${fmtS(sum(sinpesLibres))}</span></div>
+    <div class="fila"><span>SINPE confirmados que no son de una factura</span><span>${fmtS(sum(sf))}</span></div>
+    <div class="fila"><span>Facturas SINPE sin transferencia (por confirmar)</span><span>${fmtS(-sum(factsLibres))}</span></div>
+    <div class="fila"><span>Facturas confirmadas como pagadas por otro medio</span><span>${fmtS(-sum(ss))}</span></div>
+    <div class="fila"><span>Saldo</span><span>${fmtS(dif)}</span></div>`;
+
+  // Por día
+  const dias=[...new Set([...A.S.map(s=>s.ymd),...A.F.map(f=>f.ymd)])].filter(Boolean).sort();
+  let acum=0;
+  document.getElementById('tDias').innerHTML=dias.map(d=>{
+    const r=sum(A.S.filter(s=>s.ymd===d)), f=sum(A.F.filter(x=>x.ymd===d)); acum+=r-f;
+    const p=sinpesLibres.filter(s=>s.ymd===d).length+factsLibres.filter(x=>x.ymd===d).length+verif.filter(g=>(g.facts[0]||{}).ymd===d).length;
+    return `<tr><td>${diaTxt(d)}</td><td class="num">${fmt(r)}</td><td class="num">${fmt(f)}</td><td class="num ${r-f<0?'neg':r-f>0?'pos':''}">${fmtS(r-f)}</td><td class="num"><b>${fmtS(acum)}</b></td><td class="num">${p?`<span class="pill-s warn">${p}</span>`:'<span class="pill-s ok">0</span>'}</td></tr>`;
+  }).join('');
+
+  // Filtro por día de los pendientes
+  if(A.dia!=='todos'&&!dias.includes(A.dia)) A.dia='todos';
+  document.getElementById('fDia').innerHTML=['todos',...dias].map(d=>`<button type="button" aria-pressed="${A.dia===d}" onclick="A.dia='${d}';pintar()">${d==='todos'?'Todos':diaTxt(d)}</button>`).join('');
+  const enDia=ymd=>A.dia==='todos'||ymd===A.dia;
+
+  // Por confirmar
+  const filas=[];
+  sinpesLibres.filter(s=>enDia(s.ymd)).forEach(s=>filas.push({ymd:s.ymd,html:`<tr><td><span class="pill-s bad">SINPE sin factura</span></td><td>${diaTxt(s.ymd)}</td><td>${sinpeTxt(s)}</td><td class="num">${fmt(s.monto)}</td>
+    <td style="white-space:nowrap;"><button class="btn-ghost mini" onclick="abrirVinculo('s','${esc(s.ref)}')">Vincular a factura</button> <button class="btn-ghost mini" onclick="marcar('sin_factura','${esc(s.ref)}')">No es de una factura</button></td></tr>`}));
+  factsLibres.filter(f=>enDia(f.ymd)).forEach(f=>filas.push({ymd:f.ymd,html:`<tr><td><span class="pill-s bad">Factura sin SINPE</span></td><td>${diaTxt(f.ymd)}</td><td>${factTxt(f)}</td><td class="num">${fmt(f.monto)}</td>
+    <td style="white-space:nowrap;"><button class="btn-ghost mini" onclick="abrirVinculo('f','${esc(f.key)}')">Vincular a SINPE</button> <button class="btn-ghost mini" onclick="marcar('sin_sinpe','${esc(f.key)}')">Se pagó por otro medio</button></td></tr>`}));
+  verif.filter(g=>enDia(g.facts[0].ymd)).forEach(g=>{ const i=A.r.grupos.indexOf(g); filas.push({ymd:g.facts[0].ymd,html:`<tr><td><span class="pill-s warn">Verificar</span></td><td>${diaTxt(g.facts[0].ymd)}</td>
+    <td>${g.sinpes.map(sinpeTxt).join('')}<div class="sub" style="margin-top:4px;">↔ ${g.facts.map(f=>esc(f.numero)+' · '+esc(f.cliente)).join(', ')}</div><div class="sub">Calza solo por monto y día: confirme que sea esta persona.</div></td>
+    <td class="num">${fmt(sum(g.sinpes))}</td><td style="white-space:nowrap;"><button class="btn-ghost mini" onclick="confirmarGrupo(${i})">Confirmar</button></td></tr>`}); });
+  filas.sort((a,b)=>a.ymd.localeCompare(b.ymd));
+  document.getElementById('tPend').innerHTML=filas.length?filas.map(x=>x.html).join(''):'<tr><td colspan="5" class="hint" style="text-align:center;padding:14px;">Nada por confirmar 🎉</td></tr>';
+
+  // Conciliados (y lo marcado a mano sin pareja)
+  const ok=grupos.filter(g=>g.por!=='monto (verificar)').filter(g=>enDia((g.sinpes[0]||g.facts[0]).ymd))
+    .sort((a,b)=>(a.sinpes[0]||{}).ymd>(b.sinpes[0]||{}).ymd?1:-1);
+  const como={referencia:'<span class="pill-s ok">referencia</span>','cédula':'<span class="pill-s ok">cédula</span>',nombre:'<span class="pill-s info">nombre</span>','dos SINPE':'<span class="pill-s info">dos SINPE</span>',manual:'<span class="pill-s info">a mano</span>'};
+  let h=ok.map(g=>{ const d=sum(g.sinpes)-sum(g.facts); const man=g.por==='manual';
+    return `<tr><td>${g.sinpes.map(sinpeTxt).join('<div style="height:6px"></div>')}</td><td class="num">${fmt(sum(g.sinpes))}</td>
+      <td>${g.facts.map(factTxt).join('<div style="height:6px"></div>')}</td><td class="num">${fmt(sum(g.facts))}</td>
+      <td class="num ${d<0?'neg':d>0?'pos':''}">${d?fmtS(d):'—'}</td><td>${como[g.por]||esc(g.por)}</td>
+      <td>${man?`<button class="btn-ghost mini" onclick="deshacer(${JSON.stringify(g.sinpes.map(s=>'ref:'+s.ref)).replace(/"/g,'&quot;')})">Deshacer</button>`:''}</td></tr>`; }).join('');
+  sf.filter(s=>enDia(s.ymd)).forEach(s=>{ const d=sinFactura.get(s.ref); h+=`<tr><td>${sinpeTxt(s)}</td><td class="num">${fmt(s.monto)}</td><td><span class="pill-s">No es de una factura</span><div class="sub">${esc(d.nota||'')} · ${esc(d.creado_por||'')}</div></td><td class="num">—</td><td class="num pos">${fmtS(s.monto)}</td><td>${como.manual}</td>
+    <td><button class="btn-ghost mini" onclick="deshacer(['ref:${esc(s.ref)}'])">Deshacer</button></td></tr>`; });
+  ss.filter(f=>enDia(f.ymd)).forEach(f=>{ const d=sinSinpe.get(f.key); h+=`<tr><td><span class="pill-s">Se pagó por otro medio</span><div class="sub">${esc(d.nota||'')} · ${esc(d.creado_por||'')}</div></td><td class="num">—</td><td>${factTxt(f)}</td><td class="num">${fmt(f.monto)}</td><td class="num neg">${fmtS(-f.monto)}</td><td>${como.manual}</td>
+    <td><button class="btn-ghost mini" onclick="deshacer(['${esc(f.key)}'])">Deshacer</button></td></tr>`; });
+  document.getElementById('tOk').innerHTML=h||'<tr><td colspan="7" class="hint" style="text-align:center;padding:14px;">Todavía no hay nada conciliado.</td></tr>';
+}
+
+// ══ Confirmación manual ═══════════════════════════════════════════════════════
+let vSel=null;   // { lado:'s'|'f', id }
+const montoTxt=x=>fmt(x.monto);
+function abrirVinculo(lado,id){
+  vSel={lado,id};
+  const libresF=new Set(A.r.factsLibres.map(f=>f.key)), libresS=new Set(A.r.sinpesLibres.map(s=>s.ref));
+  let base, cands;
+  if(lado==='s'){ base=A.S.find(s=>s.ref===id);
+    cands=A.F.filter(f=>libresF.has(f.key)).sort((a,b)=>diasEntre(a.ymd,base.ymd)-diasEntre(b.ymd,base.ymd)||Math.abs(a.monto-base.monto)-Math.abs(b.monto-base.monto));
+    document.getElementById('vTit').textContent='Vincular SINPE a factura(s)';
+    document.getElementById('vHint').innerHTML=`SINPE de <b>${esc(base.nombre)}</b> por <b>${fmt(base.monto)}</b> (${diaTxt(base.ymd)}). Marque la factura o facturas que paga. Solo aparecen las facturas que aún no tienen SINPE.`;
+    document.getElementById('vList').innerHTML=cands.length?cands.map(f=>`<label class="cand"><input type="checkbox" value="${esc(f.key)}" onchange="vSuma()"><span class="t">${factTxt(f)}</span><span class="m">${fmt(f.monto)}</span></label>`).join(''):'<div class="hint">No hay facturas libres.</div>';
+  } else { base=A.F.find(f=>f.key===id);
+    cands=A.S.filter(s=>libresS.has(s.ref)).sort((a,b)=>diasEntre(a.ymd,base.ymd)-diasEntre(b.ymd,base.ymd)||Math.abs(a.monto-base.monto)-Math.abs(b.monto-base.monto));
+    document.getElementById('vTit').textContent='Vincular factura a SINPE';
+    document.getElementById('vHint').innerHTML=`Factura <b>${esc(base.numero)}</b> de <b>${esc(base.cliente)}</b> por <b>${fmt(base.monto)}</b> (${diaTxt(base.ymd)}). Marque la transferencia o transferencias que la pagan.`;
+    document.getElementById('vList').innerHTML=cands.length?cands.map(s=>`<label class="cand"><input type="checkbox" value="${esc(s.ref)}" onchange="vSuma()"><span class="t">${sinpeTxt(s)}</span><span class="m">${fmt(s.monto)}</span></label>`).join(''):'<div class="hint">No hay transferencias libres.</div>';
+  }
+  vSel.base=base; vSuma(); document.getElementById('vModal').classList.add('open');
+}
+function vSuma(){
+  const ch=[...document.querySelectorAll('#vList input:checked')].map(i=>i.value);
+  const tot=vSel.lado==='s'?sum(A.F.filter(f=>ch.includes(f.key))):sum(A.S.filter(s=>ch.includes(s.ref)));
+  const d=vSel.lado==='s'?vSel.base.monto-tot:tot-vSel.base.monto;
+  document.getElementById('vSum').innerHTML=ch.length?`Seleccionado ${fmt(tot)} · ${d===0?'<span class="pos">cuadra exacto</span>':`diferencia ${fmtS(d)}`}`:'';
+}
+const factJson=f=>({clave:f.key,numero:f.numero,cliente:f.cliente,monto:f.monto,fecha:f.ymd});
+async function guardar(filas){
+  try{ await supaFetch('/sinpe_conciliacion?on_conflict=sede,clave',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:filas.map(x=>({sede:currentSede,...x}))}); return true; }
+  catch(e){ alert('No se pudo guardar: '+mensajeError(e)+'\n¿Ya se corrió conciliacion_sinpe.sql en Supabase?'); return false; }
+}
+async function guardarVinculo(){
+  const ch=[...document.querySelectorAll('#vList input:checked')].map(i=>i.value); if(!ch.length) return;
+  let filas;
+  if(vSel.lado==='s'){ const fs=A.F.filter(f=>ch.includes(f.key)).map(factJson);
+    filas=[{clave:'ref:'+vSel.base.ref,estado:'vinculado',referencia:vSel.base.ref,facturas:fs}]; }
+  else { filas=ch.map(ref=>({clave:'ref:'+ref,estado:'vinculado',referencia:ref,facturas:[factJson(vSel.base)]})); }
+  if(await guardar(filas)){ document.getElementById('vModal').classList.remove('open'); await recalcular(); }
+}
+async function confirmarGrupo(i){
+  const g=A.r.grupos[i]; if(!g) return;
+  if(await guardar(g.sinpes.map(s=>({clave:'ref:'+s.ref,estado:'vinculado',referencia:s.ref,facturas:g.facts.map(factJson)})))) await recalcular();
+}
+async function marcar(estado,id){
+  const nota=prompt(estado==='sin_factura'?'¿Por qué este SINPE no es de una factura? (ej. pago adelantado, otra sede, devolución)':'¿Cómo se pagó esta factura? (ej. efectivo, tarjeta, se registró mal el método)');
+  if(nota==null) return;
+  if(!nota.trim()){ alert('Escriba una nota para dejar registro.'); return; }
+  const fila=estado==='sin_factura'?{clave:'ref:'+id,estado,referencia:id,facturas:[],nota:nota.trim()}
+    :{clave:id,estado,referencia:null,facturas:[factJson(A.F.find(f=>f.key===id))],nota:nota.trim()};
+  if(await guardar([fila])) await recalcular();
+}
+async function deshacer(claves){
+  if(!confirm('¿Deshacer esta confirmación manual?')) return;
+  try{ await supaFetch(`/sinpe_conciliacion?sede=eq.${encodeURIComponent(currentSede)}&clave=in.(${claves.map(c=>'"'+c.replace(/"/g,'')+'"').join(',')})`,{method:'DELETE'}); await recalcular(); }
+  catch(e){ alert('No se pudo deshacer: '+mensajeError(e)); }
+}
+</script>
+</body>
+</html>
