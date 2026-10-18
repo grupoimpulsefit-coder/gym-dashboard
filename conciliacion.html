@@ -53,6 +53,9 @@ table.lad tr.foco td{outline:2px solid var(--brand);outline-offset:-2px}
 .leyenda{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 12px}
 .leyenda span{display:inline-flex;gap:6px;align-items:center;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px}
 .lad-scroll{max-height:70vh;overflow:auto;background:var(--card);border-radius:12px;box-shadow:var(--shadow)}
+.lad-bar{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-top:.5px solid var(--sep);padding:10px var(--gut) calc(env(safe-area-inset-bottom,0px) + 10px);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.lad-bar .t{flex:1 1 260px;min-width:0;font-size:13px}
 </style>
 </head>
 <body>
@@ -121,7 +124,8 @@ table.lad tr.foco td{outline:2px solid var(--brand);outline-offset:-2px}
         <thead><tr><th>Fecha</th><th>#</th><th>Cliente</th><th>Notas</th><th class="num">Monto</th></tr></thead>
         <tbody id="ladF"></tbody></table></div></div>
     </div>
-    <div class="hint" style="margin-top:10px;">Toque una fila para ver su pareja del otro lado. Lo que está en rojo hay que revisarlo en la pestaña Resumen → Por confirmar.</div>
+    <div class="hint" style="margin-top:10px;margin-bottom:80px;">Toque una fila para ver su pareja del otro lado y las opciones para confirmarla abajo.</div>
+    <div class="lad-bar" id="ladBar" hidden></div>
   </div>
 
   <div class="wrap-a" id="paneRes">
@@ -156,6 +160,8 @@ table.lad tr.foco td{outline:2px solid var(--brand);outline-offset:-2px}
     <div class="modal-head" id="vTit">Vincular</div>
     <div class="modal-body" style="max-height:62vh;overflow-y:auto;gap:8px;">
       <div class="hint" id="vHint"></div>
+      <input type="search" id="vBuscar" placeholder="Buscar por nombre, número o monto…" oninput="vFiltrar()"
+        style="width:100%;min-height:38px;border:1.5px solid transparent;border-radius:10px;background:var(--fill);padding:0 12px;font-size:15px;color:var(--label);outline:none;">
       <div id="vList"></div>
       <div id="vSum" style="font-weight:600;"></div>
     </div>
@@ -453,6 +459,7 @@ const COLORES={azul:['var(--c-azul)','Referencia y monto'],morado:['var(--c-mora
   amarillo:['var(--c-amarillo)','Nombre o cédula y monto'],rojo:['var(--c-rojo)','Revisar'],gris:['var(--c-gris)','Confirmado sin pareja']};
 let tabA='res';
 function verTab(t){ tabA=t; document.getElementById('paneRes').hidden=t!=='res'; document.getElementById('paneLado').hidden=t!=='lado';
+  if(t!=='lado') document.getElementById('ladBar').hidden=true;
   [['tabRes','res'],['tabLado','lado']].forEach(([id,k])=>{ const b=document.getElementById(id); b.setAttribute('aria-selected',t===k); b.classList.toggle('active',t===k); }); }
 function colorGrupo(g){
   if(g.por==='manual') return 'azul';   // ya lo revisó una persona, aunque haya diferencia de monto
@@ -467,7 +474,7 @@ function pintarLado(){
   sinFactura.forEach((_,ref)=>info.set('s:'+ref,{c:'gris'})); sinSinpe.forEach((_,k)=>info.set('f:'+k,{c:'gris'}));
   const cuenta={azul:0,morado:0,amarillo:0,rojo:0,gris:0};
   const fila=(id,cells)=>{ const x=info.get(id)||{c:'rojo'}; cuenta[x.c]++;
-    return `<tr class="c-${x.c}" data-g="${x.i??''}" data-id="${esc(id)}" onclick="enfocar(this)">${cells}</tr>`; };
+    return `<tr class="c-${x.c}" data-c="${x.c}" data-g="${x.i??''}" data-id="${esc(id)}" onclick="enfocar(this)">${cells}</tr>`; };
   const S=[...A.S].sort((a,b)=>(a.ymd+a.hora).localeCompare(b.ymd+b.hora)), F=[...A.F].sort((a,b)=>a.ymd.localeCompare(b.ymd));
   document.getElementById('ladS').innerHTML=S.filter(s=>enDia(s.ymd)).map(s=>fila('s:'+s.ref,
     `<td style="white-space:nowrap;">${diaTxt(s.ymd)}<div class="sub">${esc(s.hora)}</div></td><td>${esc(s.detalle)}</td><td class="ref">${esc(s.ref)}</td><td>${esc(s.nombre)}</td><td class="num">${fmt(s.monto)}</td>`)).join('');
@@ -475,39 +482,87 @@ function pintarLado(){
     `<td style="white-space:nowrap;">${diaTxt(f.ymd)}</td><td class="ref">${esc(f.numero)}</td><td>${esc(f.cliente)}${f.origen==='caja'?'<div class="sub">Facturación de caja</div>':''}</td><td class="ref">${esc(f.ref)}</td><td class="num">${fmt(f.monto)}</td>`)).join('');
   document.getElementById('leyenda').innerHTML=Object.entries(COLORES).map(([k,[c,l]])=>`<span style="background:${c};">${l} · ${cuenta[k]}</span>`).join('');
   document.getElementById('fDia2').innerHTML=document.getElementById('fDia').innerHTML;
+  document.getElementById('ladBar').hidden=true;
 }
 function enfocar(tr){
   document.querySelectorAll('table.lad tr.foco').forEach(x=>x.classList.remove('foco'));
-  const g=tr.dataset.g; if(g===''){ tr.classList.add('foco'); return; }
+  const g=tr.dataset.g; if(g===''){ tr.classList.add('foco'); barraLado(tr); return; }
   const filas=[...document.querySelectorAll(`table.lad tr[data-g="${g}"]`)]; filas.forEach(x=>x.classList.add('foco'));
   const otro=filas.find(x=>x.closest('tbody')!==tr.closest('tbody')); if(otro) otro.scrollIntoView({block:'nearest',behavior:'smooth'});
+  barraLado(tr);
 }
+// Barra de acciones de la fila tocada: las mismas opciones de Resumen → Por confirmar
+function barraLado(tr){
+  const bar=document.getElementById('ladBar'), id=tr.dataset.id, c=tr.dataset.c, gi=tr.dataset.g;
+  const esS=id.startsWith('s:'), clave=id.slice(2);
+  const b=(txt,fn,prim)=>`<button class="${prim?'btn-primary':'btn-ghost'} mini" onclick="${fn}">${txt}</button>`;
+  let t='', acc='';
+  if(gi!==''){
+    const g=A.r.grupos[Number(gi)], d=sum(g.sinpes)-sum(g.facts);
+    t=`<b>${g.sinpes.map(s=>esc(s.nombre)).join(' + ')}</b> ${fmt(sum(g.sinpes))} ↔ ${g.facts.map(f=>esc(f.numero)+' '+esc(f.cliente)).join(' + ')} ${fmt(sum(g.facts))}${d?` · <span class="${d<0?'neg':'pos'}">dif. ${fmtS(d)}</span>`:''}`;
+    if(g.por==='manual') acc=b('Deshacer',`deshacer(${JSON.stringify(g.sinpes.map(s=>'ref:'+s.ref)).replace(/"/g,'&quot;')})`);
+    else if(c!=='azul') acc=b('✓ Confirmar',`confirmarGrupo(${gi})`,true);
+    else t+=' · <span class="sub">calzó por referencia y monto</span>';
+  } else if(c==='gris'){
+    t=esS?'SINPE marcado como <b>no es de una factura</b>':'Factura marcada como <b>pagada por otro medio</b>';
+    acc=b('Deshacer',`deshacer(['${esS?'ref:'+esc(clave):esc(clave)}'])`);
+  } else if(esS){
+    const s=A.S.find(x=>x.ref===clave); t=`SINPE sin factura: <b>${esc(s.nombre)}</b> ${fmt(s.monto)}`;
+    acc=b('Vincular a factura',`abrirVinculo('s','${esc(clave)}')`,true)+b('No es de una factura',`marcar('sin_factura','${esc(clave)}')`);
+  } else {
+    const f=A.F.find(x=>x.key===clave); t=`Factura sin SINPE: <b>${esc(f.numero)} ${esc(f.cliente)}</b> ${fmt(f.monto)}`;
+    acc=b('Vincular a SINPE',`abrirVinculo('f','${esc(clave)}')`,true)+b('Se pagó por otro medio',`marcar('sin_sinpe','${esc(clave)}')`);
+  }
+  bar.innerHTML=`<span class="t">${t}</span>${acc}${b('✕','cerrarBarra()')}`; bar.hidden=false;
+}
+function cerrarBarra(){ document.getElementById('ladBar').hidden=true; document.querySelectorAll('table.lad tr.foco').forEach(x=>x.classList.remove('foco')); }
 
 // ══ Confirmación manual ═══════════════════════════════════════════════════════
 let vSel=null;   // { lado:'s'|'f', id }
 const montoTxt=x=>fmt(x.monto);
+// Muestra TODAS las facturas (o transferencias): primero las que no tienen pareja y luego
+// las que ya tienen, con lo que llevan pagado, para poder sumar un abono a una factura que
+// ya tenía otro SINPE (ej. dos o tres transferencias para una factura de ₡60 000).
+const grupoDeF=k=>A.r.grupos.find(g=>g.facts.some(f=>f.key===k));
+const grupoDeS=r=>A.r.grupos.find(g=>g.sinpes.some(s=>s.ref===r));
 function abrirVinculo(lado,id){
-  vSel={lado,id};
-  const libresF=new Set(A.r.factsLibres.map(f=>f.key)), libresS=new Set(A.r.sinpesLibres.map(s=>s.ref));
-  let base, cands;
+  vSel={lado,id}; document.getElementById('vBuscar').value='';
+  const cerca=(base)=>(a,b)=>(!!(lado==='s'?grupoDeF(a.key):grupoDeS(a.ref))-!!(lado==='s'?grupoDeF(b.key):grupoDeS(b.ref)))
+    ||diasEntre(a.ymd,base.ymd)-diasEntre(b.ymd,base.ymd)||Math.abs(a.monto-base.monto)-Math.abs(b.monto-base.monto);
+  let base, html;
   if(lado==='s'){ base=A.S.find(s=>s.ref===id);
-    cands=A.F.filter(f=>libresF.has(f.key)).sort((a,b)=>diasEntre(a.ymd,base.ymd)-diasEntre(b.ymd,base.ymd)||Math.abs(a.monto-base.monto)-Math.abs(b.monto-base.monto));
+    html=A.F.filter(f=>!A.r.sinSinpe.has(f.key)).sort(cerca(base)).map(f=>{ const g=grupoDeF(f.key);
+      const ya=g?`<div class="sub" style="color:var(--orange);">Ya tiene ${g.sinpes.map(s=>esc(s.nombre)+' '+fmt(s.monto)).join(' + ')} · falta ${fmt(sum(g.facts)-sum(g.sinpes))}</div>`:'';
+      return `<label class="cand" data-q="${esc(norm(f.numero+' '+f.cliente+' '+f.monto))}"><input type="checkbox" value="${esc(f.key)}" onchange="vSuma()"><span class="t">${factTxt(f)}${ya}</span><span class="m">${fmt(f.monto)}</span></label>`; }).join('');
     document.getElementById('vTit').textContent='Vincular SINPE a factura(s)';
-    document.getElementById('vHint').innerHTML=`SINPE de <b>${esc(base.nombre)}</b> por <b>${fmt(base.monto)}</b> (${diaTxt(base.ymd)}). Marque la factura o facturas que paga. Solo aparecen las facturas que aún no tienen SINPE.`;
-    document.getElementById('vList').innerHTML=cands.length?cands.map(f=>`<label class="cand"><input type="checkbox" value="${esc(f.key)}" onchange="vSuma()"><span class="t">${factTxt(f)}</span><span class="m">${fmt(f.monto)}</span></label>`).join(''):'<div class="hint">No hay facturas libres.</div>';
+    document.getElementById('vHint').innerHTML=`SINPE de <b>${esc(base.nombre)}</b> por <b>${fmt(base.monto)}</b> (${diaTxt(base.ymd)}). Marque la factura o facturas que paga. Primero salen las que no tienen SINPE; si la factura ya tiene otro SINPE (un abono), también puede elegirla y se suman.`;
   } else { base=A.F.find(f=>f.key===id);
-    cands=A.S.filter(s=>libresS.has(s.ref)).sort((a,b)=>diasEntre(a.ymd,base.ymd)-diasEntre(b.ymd,base.ymd)||Math.abs(a.monto-base.monto)-Math.abs(b.monto-base.monto));
+    html=A.S.filter(s=>!A.r.sinFactura.has(s.ref)).sort(cerca(base)).map(s=>{ const g=grupoDeS(s.ref);
+      const ya=g?`<div class="sub" style="color:var(--orange);">Ya vinculado a ${g.facts.map(f=>esc(f.numero)+' '+esc(f.cliente)).join(' + ')}</div>`:'';
+      return `<label class="cand" data-q="${esc(norm(s.nombre+' '+s.detalle+' '+s.ref+' '+s.monto))}"><input type="checkbox" value="${esc(s.ref)}" onchange="vSuma()"><span class="t">${sinpeTxt(s)}${ya}</span><span class="m">${fmt(s.monto)}</span></label>`; }).join('');
     document.getElementById('vTit').textContent='Vincular factura a SINPE';
     document.getElementById('vHint').innerHTML=`Factura <b>${esc(base.numero)}</b> de <b>${esc(base.cliente)}</b> por <b>${fmt(base.monto)}</b> (${diaTxt(base.ymd)}). Marque la transferencia o transferencias que la pagan.`;
-    document.getElementById('vList').innerHTML=cands.length?cands.map(s=>`<label class="cand"><input type="checkbox" value="${esc(s.ref)}" onchange="vSuma()"><span class="t">${sinpeTxt(s)}</span><span class="m">${fmt(s.monto)}</span></label>`).join(''):'<div class="hint">No hay transferencias libres.</div>';
   }
+  document.getElementById('vList').innerHTML=html||'<div class="hint">No hay nada para elegir en estas fechas.</div>';
   vSel.base=base; vSuma(); document.getElementById('vModal').classList.add('open');
 }
-function vSuma(){
+function vFiltrar(){
+  const q=norm(document.getElementById('vBuscar').value);
+  document.querySelectorAll('#vList .cand').forEach(l=>{ l.style.display=!q||l.dataset.q.includes(q)?'':'none'; });
+}
+// Todo lo que queda junto al guardar: lo elegido más los grupos a los que ya pertenecía
+function vConjunto(){
   const ch=[...document.querySelectorAll('#vList input:checked')].map(i=>i.value);
-  const tot=vSel.lado==='s'?sum(A.F.filter(f=>ch.includes(f.key))):sum(A.S.filter(s=>ch.includes(s.ref)));
-  const d=vSel.lado==='s'?vSel.base.monto-tot:tot-vSel.base.monto;
-  document.getElementById('vSum').innerHTML=ch.length?`Seleccionado ${fmt(tot)} · ${d===0?'<span class="pos">cuadra exacto</span>':`diferencia ${fmtS(d)}`}`:'';
+  let S=[], F=[];
+  if(vSel.lado==='s'){ S=[vSel.base]; F=A.F.filter(f=>ch.includes(f.key)); }
+  else { F=[vSel.base]; S=A.S.filter(s=>ch.includes(s.ref)); }
+  [...F.map(f=>grupoDeF(f.key)),...S.map(s=>grupoDeS(s.ref))].filter(Boolean).forEach(g=>{
+    g.sinpes.forEach(s=>{ if(!S.includes(s)) S.push(s); }); g.facts.forEach(f=>{ if(!F.includes(f)) F.push(f); }); });
+  return {ch,S,F};
+}
+function vSuma(){
+  const {ch,S,F}=vConjunto(), d=sum(S)-sum(F);
+  document.getElementById('vSum').innerHTML=ch.length?`SINPE ${fmt(sum(S))} (${S.length}) · facturas ${fmt(sum(F))} (${F.length}) · ${d===0?'<span class="pos">cuadra exacto</span>':`diferencia ${fmtS(d)}`}`:'';
 }
 const factJson=f=>({clave:f.key,numero:f.numero,cliente:f.cliente,monto:f.monto,fecha:f.ymd});
 async function guardar(filas){
@@ -516,10 +571,8 @@ async function guardar(filas){
 }
 async function guardarVinculo(){
   const ch=[...document.querySelectorAll('#vList input:checked')].map(i=>i.value); if(!ch.length) return;
-  let filas;
-  if(vSel.lado==='s'){ const fs=A.F.filter(f=>ch.includes(f.key)).map(factJson);
-    filas=[{clave:'ref:'+vSel.base.ref,estado:'vinculado',referencia:vSel.base.ref,facturas:fs}]; }
-  else { filas=ch.map(ref=>({clave:'ref:'+ref,estado:'vinculado',referencia:ref,facturas:[factJson(vSel.base)]})); }
+  const {S,F}=vConjunto(), fs=F.map(factJson);
+  const filas=S.map(s=>({clave:'ref:'+s.ref,estado:'vinculado',referencia:s.ref,facturas:fs}));   // el grupo completo queda confirmado
   if(await guardar(filas)){ document.getElementById('vModal').classList.remove('open'); await recalcular(); }
 }
 async function confirmarGrupo(i){
