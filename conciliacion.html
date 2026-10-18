@@ -33,6 +33,26 @@
 .seg-f{display:flex;gap:6px;flex-wrap:wrap}
 .seg-f button{border:0;background:var(--fill);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--label)}
 .seg-f button[aria-pressed="true"]{background:var(--brand-tint);color:var(--brand-text)}
+/* Lado a lado: color de cada fila según cómo calzó */
+:root{--c-azul:rgba(0,122,255,.13);--c-morado:rgba(175,82,222,.16);--c-amarillo:rgba(255,204,0,.26);--c-rojo:rgba(255,59,48,.14);--c-gris:rgba(120,120,128,.14)}
+@media (prefers-color-scheme: dark){:root{--c-azul:rgba(10,132,255,.24);--c-morado:rgba(191,90,242,.26);--c-amarillo:rgba(255,214,10,.22);--c-rojo:rgba(255,69,58,.24);--c-gris:rgba(120,120,128,.26)}}
+.tabs-a{display:flex;justify-content:center;margin:16px 0 4px}
+.lado{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+@media (max-width:1100px){.lado{grid-template-columns:1fr}}
+.lado>*{min-width:0}
+.lado h4{font-size:13px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin:6px 2px 8px}
+table.lad{width:100%;border-collapse:collapse;font-size:13px}
+table.lad th{font-size:11px;font-weight:600;color:var(--sec);text-align:left;padding:7px 8px;border-bottom:.5px solid var(--sep);position:sticky;top:0;background:var(--card)}
+table.lad td{padding:6px 8px;border-bottom:1px solid var(--card);vertical-align:top}
+table.lad td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.lad tr{cursor:pointer}
+table.lad tr.c-azul td{background:var(--c-azul)} table.lad tr.c-morado td{background:var(--c-morado)}
+table.lad tr.c-amarillo td{background:var(--c-amarillo)} table.lad tr.c-rojo td{background:var(--c-rojo)} table.lad tr.c-gris td{background:var(--c-gris)}
+table.lad tr.foco td{outline:2px solid var(--brand);outline-offset:-2px}
+.ref{font-family:ui-monospace,Menlo,monospace;font-size:11px;word-break:break-all}
+.leyenda{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 12px}
+.leyenda span{display:inline-flex;gap:6px;align-items:center;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px}
+.lad-scroll{max-height:70vh;overflow:auto;background:var(--card);border-radius:12px;box-shadow:var(--shadow)}
 </style>
 </head>
 <body>
@@ -85,7 +105,26 @@
     <div class="kpi orange"><div class="kpi-label">Por confirmar</div><div class="kpi-value" id="kPend">—</div><div class="kpi-sub">SINPE y facturas sin pareja</div></div>
   </div>
 
-  <div class="wrap-a">
+  <div class="tabs-a"><div class="tabs" role="tablist" style="margin:0;">
+    <button role="tab" class="tab active" id="tabRes" aria-selected="true" onclick="verTab('res')">Resumen</button>
+    <button role="tab" class="tab" id="tabLado" aria-selected="false" onclick="verTab('lado')">Lado a lado</button>
+  </div></div>
+
+  <div class="wrap-a" id="paneLado" hidden>
+    <div class="leyenda" id="leyenda"></div>
+    <div class="seg-f" id="fDia2" style="margin-bottom:10px;"></div>
+    <div class="lado">
+      <div><h4>🔷 SINPE recibidos (Ridivi)</h4><div class="lad-scroll"><table class="lad">
+        <thead><tr><th>Fecha</th><th>Detalle</th><th>Referencia</th><th>Cliente origen</th><th class="num">Monto</th></tr></thead>
+        <tbody id="ladS"></tbody></table></div></div>
+      <div><h4>🧾 Facturas por SINPE (wstudio y caja)</h4><div class="lad-scroll"><table class="lad">
+        <thead><tr><th>Fecha</th><th>#</th><th>Cliente</th><th>Notas</th><th class="num">Monto</th></tr></thead>
+        <tbody id="ladF"></tbody></table></div></div>
+    </div>
+    <div class="hint" style="margin-top:10px;">Toque una fila para ver su pareja del otro lado. Lo que está en rojo hay que revisarlo en la pestaña Resumen → Por confirmar.</div>
+  </div>
+
+  <div class="wrap-a" id="paneRes">
     <div class="desglose" id="desglose"></div>
 
     <div class="section"><div class="section-title">📅 Por día</div></div>
@@ -401,7 +440,47 @@ function pintar(){
     <td><button class="btn-ghost mini" onclick="deshacer(['ref:${esc(s.ref)}'])">Deshacer</button></td></tr>`; });
   ss.filter(f=>enDia(f.ymd)).forEach(f=>{ const d=sinSinpe.get(f.key); h+=`<tr><td><span class="pill-s">Se pagó por otro medio</span><div class="sub">${esc(d.nota||'')} · ${esc(d.creado_por||'')}</div></td><td class="num">—</td><td>${factTxt(f)}</td><td class="num">${fmt(f.monto)}</td><td class="num neg">${fmtS(-f.monto)}</td><td>${como.manual}</td>
     <td><button class="btn-ghost mini" onclick="deshacer(['${esc(f.key)}'])">Deshacer</button></td></tr>`; });
+  pintarLado();
   document.getElementById('tOk').innerHTML=h||'<tr><td colspan="7" class="hint" style="text-align:center;padding:14px;">Todavía no hay nada conciliado.</td></tr>';
+}
+
+// ══ Lado a lado ═══════════════════════════════════════════════════════════════
+// Azul: referencia y monto exacto (o confirmado a mano) · Morado: un SINPE con varias facturas
+// (o varias transferencias para una factura) y el total cuadra · Amarillo: por cédula o nombre
+// y monto exacto · Rojo: sin pareja, el monto no cuadra o calzó solo por monto · Gris: marcado a
+// mano como "no es de una factura" / "se pagó por otro medio".
+const COLORES={azul:['var(--c-azul)','Referencia y monto'],morado:['var(--c-morado)','Varias facturas o SINPE, total cuadra'],
+  amarillo:['var(--c-amarillo)','Nombre o cédula y monto'],rojo:['var(--c-rojo)','Revisar'],gris:['var(--c-gris)','Confirmado sin pareja']};
+let tabA='res';
+function verTab(t){ tabA=t; document.getElementById('paneRes').hidden=t!=='res'; document.getElementById('paneLado').hidden=t!=='lado';
+  [['tabRes','res'],['tabLado','lado']].forEach(([id,k])=>{ const b=document.getElementById(id); b.setAttribute('aria-selected',t===k); b.classList.toggle('active',t===k); }); }
+function colorGrupo(g){
+  if(g.por==='manual') return 'azul';   // ya lo revisó una persona, aunque haya diferencia de monto
+  if(g.por==='monto (verificar)'||sum(g.sinpes)!==sum(g.facts)) return 'rojo';
+  if(g.sinpes.length>1||g.facts.length>1) return 'morado';
+  return g.por==='referencia'?'azul':'amarillo';
+}
+function pintarLado(){
+  const {grupos,sinFactura,sinSinpe}=A.r, enDia=ymd=>A.dia==='todos'||ymd===A.dia;
+  const info=new Map();   // ref|key → { color, g }
+  grupos.forEach((g,i)=>{ const c=colorGrupo(g); g.sinpes.forEach(s=>info.set('s:'+s.ref,{c,i})); g.facts.forEach(f=>info.set('f:'+f.key,{c,i})); });
+  sinFactura.forEach((_,ref)=>info.set('s:'+ref,{c:'gris'})); sinSinpe.forEach((_,k)=>info.set('f:'+k,{c:'gris'}));
+  const cuenta={azul:0,morado:0,amarillo:0,rojo:0,gris:0};
+  const fila=(id,cells)=>{ const x=info.get(id)||{c:'rojo'}; cuenta[x.c]++;
+    return `<tr class="c-${x.c}" data-g="${x.i??''}" data-id="${esc(id)}" onclick="enfocar(this)">${cells}</tr>`; };
+  const S=[...A.S].sort((a,b)=>(a.ymd+a.hora).localeCompare(b.ymd+b.hora)), F=[...A.F].sort((a,b)=>a.ymd.localeCompare(b.ymd));
+  document.getElementById('ladS').innerHTML=S.filter(s=>enDia(s.ymd)).map(s=>fila('s:'+s.ref,
+    `<td style="white-space:nowrap;">${diaTxt(s.ymd)}<div class="sub">${esc(s.hora)}</div></td><td>${esc(s.detalle)}</td><td class="ref">${esc(s.ref)}</td><td>${esc(s.nombre)}</td><td class="num">${fmt(s.monto)}</td>`)).join('');
+  document.getElementById('ladF').innerHTML=F.filter(f=>enDia(f.ymd)).map(f=>fila('f:'+f.key,
+    `<td style="white-space:nowrap;">${diaTxt(f.ymd)}</td><td class="ref">${esc(f.numero)}</td><td>${esc(f.cliente)}${f.origen==='caja'?'<div class="sub">Facturación de caja</div>':''}</td><td class="ref">${esc(f.ref)}</td><td class="num">${fmt(f.monto)}</td>`)).join('');
+  document.getElementById('leyenda').innerHTML=Object.entries(COLORES).map(([k,[c,l]])=>`<span style="background:${c};">${l} · ${cuenta[k]}</span>`).join('');
+  document.getElementById('fDia2').innerHTML=document.getElementById('fDia').innerHTML;
+}
+function enfocar(tr){
+  document.querySelectorAll('table.lad tr.foco').forEach(x=>x.classList.remove('foco'));
+  const g=tr.dataset.g; if(g===''){ tr.classList.add('foco'); return; }
+  const filas=[...document.querySelectorAll(`table.lad tr[data-g="${g}"]`)]; filas.forEach(x=>x.classList.add('foco'));
+  const otro=filas.find(x=>x.closest('tbody')!==tr.closest('tbody')); if(otro) otro.scrollIntoView({block:'nearest',behavior:'smooth'});
 }
 
 // ══ Confirmación manual ═══════════════════════════════════════════════════════
