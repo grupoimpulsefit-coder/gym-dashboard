@@ -357,9 +357,14 @@ function cruzar(F,S,dec){
     return fs.filter(t=>ss.some(u=>u.startsWith(t.slice(0,4))||(u.length>=3&&t.startsWith(u)))).length; };
   F.filter(libreF).forEach(f=>{ if(!f.ced) return;
     const c=S.filter(s=>libreS(s)&&s.ced===f.ced&&diasEntre(s.ymd,f.ymd)<=3); if(c.length) unir(mejor(f,c),f,'cédula'); });
-  F.filter(libreF).forEach(f=>{
-    const c=S.filter(s=>libreS(s)&&diasEntre(s.ymd,f.ymd)<=3&&(coinciden(f,s)>=2||(coinciden(f,s)>=1&&Math.abs(s.monto-f.monto)<=100)));
-    if(c.length) unir(mejor(f,c),f,'nombre'); });
+  // Por nombre se arman todas las parejas posibles y se asignan de la mejor a la peor (más palabras
+  // en común, monto más parecido, días más cerca), así "Luis Felipe Vega" no se queda con la factura
+  // de "Luis Carlos Vega" solo porque esa venía antes en el informe.
+  const parejas=[];
+  F.filter(libreF).forEach(f=>S.filter(s=>libreS(s)&&diasEntre(s.ymd,f.ymd)<=3).forEach(s=>{ const n=coinciden(f,s);
+    if(n>=2||(n>=1&&Math.abs(s.monto-f.monto)<=100)) parejas.push({f,s,n}); }));
+  parejas.sort((a,b)=>b.n-a.n||Math.abs(a.s.monto-a.f.monto)-Math.abs(b.s.monto-b.f.monto)||diasEntre(a.s.ymd,a.f.ymd)-diasEntre(b.s.ymd,b.f.ymd))
+    .forEach(({f,s})=>{ if(libreF(f)&&libreS(s)) unir(s,f,'nombre'); });
   // 4) Dos transferencias de la misma persona para una factura
   F.filter(libreF).forEach(f=>{
     const c=S.filter(s=>libreS(s)&&diasEntre(s.ymd,f.ymd)<=3&&((f.ced&&s.ced===f.ced)||coinciden(f,s)>=1));
