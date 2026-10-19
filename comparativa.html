@@ -340,6 +340,7 @@ function marcarRapido(tipo) {
 const tonoPct = p => p >= 70 ? 'var(--green)' : p >= 40 ? 'var(--orange)' : 'var(--red)';
 const pillPct = p => `<span class="pill ${p >= 70 ? 'ok' : p >= 40 ? 'low' : 'falt'}">${p.toFixed(1)}%</span>`;
 const escQ = s => s.replace(/'/g, "\\'");
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const idSede = s => norm(s).replace(/\s/g, '-');
 
 // ── Precios de respaldo desde plan_prices (cuando el snapshot trae ValorPlan 0) ──
@@ -593,10 +594,10 @@ function renderDetalle(sede) {
   el.innerHTML = filtros + `<div class="det-card"><table class="det">
     <thead><tr><th>Cliente</th><th>Teléfono</th><th>Plan</th><th>Vence</th><th class="num">Valor</th><th>Estado</th></tr></thead>
     <tbody>${filtered.map(u => `<tr>
-      <td><strong>${u.nombre}</strong></td>
-      <td>${u.telefono}</td>
-      <td>${u.plan}</td>
-      <td>${u.expira}</td>
+      <td><strong>${esc(u.nombre)}</strong></td>
+      <td>${esc(u.telefono)}</td>
+      <td>${esc(u.plan)}</td>
+      <td>${esc(u.expira)}</td>
       <td class="num">${u.valor > 0 ? fmt(u.valor) : '—'}</td>
       <td>${u.pagado ? '<span class="pill ok">✓ Pagó</span>' : '<span class="pill falt">Pendiente</span>'}</td>
     </tr>`).join('')}</tbody>

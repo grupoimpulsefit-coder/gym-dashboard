@@ -162,6 +162,7 @@ tr.tot td { background: var(--fill); font-weight: 700; }
 </div>
 
 <script src="/sesion.js"></script>
+<script src="/tasas.js"></script>
 <script>
 // ── Supabase ──
 const SUPA_URL = '__SUPA_URL__';
@@ -199,9 +200,7 @@ const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
 const SEDE_META = { '3 Ríos':{icon:'🌊'}, 'Natación':{icon:'🏊'}, 'Pinares':{icon:'🌲'}, 'Sabanilla':{icon:'🏙️'} };
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-// ── Mismas tasas y bases que RRHH (rrhh.html) — si cambian allá, cambiarlas aquí ──
-const CCSS_TRABAJADOR = (5.50 + 4.33 + 1.00) / 100;                                  // 10.83%
-const CCSS_PATRONO    = (9.25 + 5.42 + 5.00 + 1.50 + 0.50 + 0.50 + 1.50 + 1.50 + 1.50) / 100; // 26.67%
+// ── Tasas CCSS (CCSS_TRABAJADOR, CCSS_PATRONO): las mismas que RRHH, en tasas.js ──
 const DIAS_POR_MES = 30;
 const DIAS_QUINCENA = 15;
 const aseguradoCCSS = e => e.asegurado_ccss !== false;
@@ -382,7 +381,8 @@ function calcLinea(e){
   const ing = parseFecha(e.fecha_ingreso);
   if (ing && ing > q.fin) return null;
   if (ing && ing > q.ini){
-    const d = Math.min(DIAS_QUINCENA, diasEntre(ing, q.fin));
+    // Quincena comercial de 15 días (mes de 30), como el resto de la planilla
+    const d = Math.max(1, DIAS_QUINCENA - (ing.getDate() - q.ini.getDate()));
     base = d * diario; notaBase = `ingresó ${fmtFecha(ing)} · ${d} días`;
   }
   const t = { feriado:0, sinGoce:0, incap:0, subsidio:0, bono:0, deduccion:0 };
