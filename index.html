@@ -2072,6 +2072,7 @@ function getFilteredUsers() {
 }
 function clearDateFilters() { document.getElementById('dateFrom').value=''; document.getElementById('dateTo').value=''; renderTable(); }
 function sortTable(col) { if (currentSortColumn===col) currentSortDirection=currentSortDirection==='asc'?'desc':'asc'; else { currentSortColumn=col; currentSortDirection='asc'; } renderTable(); }
+let _filasUsuarios = [];   // filas de la tabla de usuarios (el botón de precio va por índice, no con el nombre en el código)
 function openPriceModal(user) { currentEditingUser=user; document.getElementById('modalPlanName').textContent=user.ÚltimoProducto; document.getElementById('modalUserName').textContent=user.Nombre; document.getElementById('modalPriceValue').value=user.ValorPlan||''; document.getElementById('priceModal').style.display='block'; }
 function saveManualPrice() {
     if (!currentEditingUser) return;
@@ -2120,16 +2121,17 @@ function renderTable() {
         return 0;
     });
     let tbody = document.getElementById('tableBody'); tbody.innerHTML='';
-    filtered.forEach(u => {
+    _filasUsuarios = filtered;
+    filtered.forEach((u, i) => {
         let r = tbody.insertRow();
         const isAdmin = esRolAdmin();
         const priceCols = isAdmin ? `
         <td style="font-weight:600;">${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString():'<span style="color:var(--ter);">Sin definir</span>'}
           ${manualPrices[`${u.ÚltimoProducto}|${u.PIN}`]?'<span style="color:var(--orange);font-size:11px;"> ✏️</span>':''}</td>
-        <td><button class="price-edit-btn" onclick='openPriceModal({PIN:"${u.PIN}",Nombre:"${u.Nombre.replace(/"/g,'&quot;')}",ÚltimoProducto:"${u.ÚltimoProducto.replace(/"/g,'&quot;')}",ValorPlan:${u.ValorPlan}})'>Editar precio</button></td>` : '';
-        r.innerHTML=`<td>${u.PIN}</td><td><strong>${u.Nombre}</strong></td><td style="color:var(--brand-text);">${u.Email||'-'}</td>
+        <td><button class="price-edit-btn" onclick="openPriceModal(_filasUsuarios[${i}])">Editar precio</button></td>` : '';
+        r.innerHTML=`<td>${_suEsc(u.PIN)}</td><td><strong>${_suEsc(u.Nombre)}</strong></td><td style="color:var(--brand-text);">${_suEsc(u.Email||'-')}</td>
         <td class="${u.Activo==='Sí'?'status-active':'status-inactive'}">${u.Activo==='Sí'?'✓ Activo':'✗ Inactivo'}</td>
-        <td>${u.Expira||'-'}</td><td>${u.ÚltimoProducto||'-'}</td><td>${u.Ingreso||'-'}</td>${priceCols}`;
+        <td>${_suEsc(u.Expira||'-')}</td><td>${_suEsc(u.ÚltimoProducto||'-')}</td><td>${_suEsc(u.Ingreso||'-')}</td>${priceCols}`;
     });
     updateStats(filtered);
 }
@@ -2178,12 +2180,12 @@ function printRenewalList() {
 
     const rows = f.map(u => `
         <tr>
-            <td>${u.PIN}</td>
-            <td>${u.Nombre}</td>
-            <td>${u.Telefono||'—'}</td>
-            <td>${u.ÚltimoProducto||'-'}</td>
+            <td>${_suEsc(u.PIN)}</td>
+            <td>${_suEsc(u.Nombre)}</td>
+            <td>${_suEsc(u.Telefono||'—')}</td>
+            <td>${_suEsc(u.ÚltimoProducto||'-')}</td>
             <td style="text-align:right;">${u.ValorPlan>0 ? '₡'+u.ValorPlan.toLocaleString() : '—'}</td>
-            <td>${u.Expira||'-'}</td>
+            <td>${_suEsc(u.Expira||'-')}</td>
             <td class="chk"></td>
             <td class="notas"></td>
         </tr>`).join('');
@@ -2242,7 +2244,7 @@ function printRenewalSummary() {
         .sort((a,b) => b[1].total - a[1].total)
         .map(([plan, d]) => `
         <tr>
-            <td><strong>${plan}</strong></td>
+            <td><strong>${_suEsc(plan)}</strong></td>
             <td style="text-align:center;">${d.count}</td>
             <td style="text-align:right;">${d.total > 0 ? '₡'+d.total.toLocaleString() : '—'}</td>
             <td style="text-align:center;color:${d.sinPrecio > 0 ? 'var(--red)' : 'var(--sec)'}">${d.sinPrecio > 0 ? d.sinPrecio + ' sin precio' : '✓'}</td>
@@ -2409,20 +2411,20 @@ function renderRenovaciones() {
     filtered.forEach(r => {
         let tr=tbody.insertRow();
         let gap=r.GapDias!==null&&r.GapDias!==undefined?`<span style="color:var(--orange);font-weight:700;">${r.GapDias} días</span>`:'<span style="color:var(--ter);">—</span>';
-        let ingreso=r.User?.Ingreso||'<span style="color:var(--ter);">No encontrado</span>';
-        let expira =r.User?.Expira||'<span style="color:var(--ter);">—</span>';
-        let clienteDisplay=r.User?`<strong>${r.Cliente}</strong>`:
-            `<strong>${r.Cliente}</strong> <span style="background:var(--orange-tint);color:var(--orange);font-size:11px;padding:2px 6px;border-radius:10px;">¿nuevo?</span>`;
+        let ingreso=r.User?.Ingreso?_suEsc(r.User.Ingreso):'<span style="color:var(--ter);">No encontrado</span>';
+        let expira =r.User?.Expira?_suEsc(r.User.Expira):'<span style="color:var(--ter);">—</span>';
+        let clienteDisplay=r.User?`<strong>${_suEsc(r.Cliente)}</strong>`:
+            `<strong>${_suEsc(r.Cliente)}</strong> <span style="background:var(--orange-tint);color:var(--orange);font-size:11px;padding:2px 6px;border-radius:10px;">¿nuevo?</span>`;
         tr.innerHTML=`
-            <td style="white-space:nowrap;font-size:12px;color:var(--sec);">${r.FechaStr}</td>
+            <td style="white-space:nowrap;font-size:12px;color:var(--sec);">${_suEsc(r.FechaStr)}</td>
             <td>${clienteDisplay}</td>
-            <td style="font-size:12.5px;">${r.Producto}</td>
+            <td style="font-size:12.5px;">${_suEsc(r.Producto)}</td>
             <td><span class="badge ${r.Badge}">${r.Icon} ${r.Tipo}</span></td>
             <td style="font-weight:700;color:var(--label);">₡${r.Total.toLocaleString()}</td>
             <td>${gap}</td>
             <td style="font-size:12px;">${ingreso}</td>
             <td style="font-size:12px;">${expira}</td>
-            <td style="font-size:12px;color:var(--sec);">${r.RegistradoPor}</td>`;
+            <td style="font-size:12px;color:var(--sec);">${_suEsc(r.RegistradoPor)}</td>`;
     });
     document.getElementById('renoTableInfo').textContent = `Mostrando ${filtered.length} transacciones — Nuevos: ${nv} · Renovaciones: ${rv} · Reingresos: ${ri} · Total: ₡${filtered.reduce((s,r)=>s+r.Total,0).toLocaleString()}`;
 
@@ -2432,11 +2434,11 @@ function renderRenovaciones() {
     clasesSorted.forEach(c => {
         let tr = csBody.insertRow();
         tr.innerHTML = `
-            <td style="white-space:nowrap;font-size:12px;color:var(--sec);">${c.FechaStr}</td>
-            <td>${c.Cliente}</td>
-            <td style="font-size:12.5px;">${c.Producto}</td>
+            <td style="white-space:nowrap;font-size:12px;color:var(--sec);">${_suEsc(c.FechaStr)}</td>
+            <td>${_suEsc(c.Cliente)}</td>
+            <td style="font-size:12.5px;">${_suEsc(c.Producto)}</td>
             <td style="font-weight:700;color:var(--label);">₡${c.Total.toLocaleString()}</td>
-            <td style="font-size:12px;color:var(--sec);">${c.RegistradoPor}</td>`;
+            <td style="font-size:12px;color:var(--sec);">${_suEsc(c.RegistradoPor)}</td>`;
     });
     document.getElementById('clasesSueltasInfo').textContent =
         `Mostrando ${filteredClases.length} clases/sesiones sueltas — Total: ₡${totalClasesFiltrado.toLocaleString()} (no se suma al total de membresías)`;
@@ -2447,11 +2449,11 @@ function renderRenovaciones() {
     sinClasifSorted.forEach(c => {
         let tr = scBody.insertRow();
         tr.innerHTML = `
-            <td style="white-space:nowrap;font-size:12px;color:var(--sec);">${c.FechaStr}</td>
-            <td>${c.Cliente}</td>
-            <td style="font-size:12.5px;">${c.Producto}</td>
+            <td style="white-space:nowrap;font-size:12px;color:var(--sec);">${_suEsc(c.FechaStr)}</td>
+            <td>${_suEsc(c.Cliente)}</td>
+            <td style="font-size:12.5px;">${_suEsc(c.Producto)}</td>
             <td style="font-weight:700;color:var(--red);">₡${c.Total.toLocaleString()}</td>
-            <td style="font-size:12px;color:var(--sec);">${c.RegistradoPor}</td>`;
+            <td style="font-size:12px;color:var(--sec);">${_suEsc(c.RegistradoPor)}</td>`;
     });
     document.getElementById('sinClasificarInfo').textContent =
         `Mostrando ${filteredSinClasif.length} transacciones sin clasificar — Total: ₡${totalSinClasifFiltrado.toLocaleString()} (revisar nombres de producto, no calzan con ningún plan ni clase conocida)`;
@@ -2532,7 +2534,7 @@ function openSummaryModal() {
     let rows=buildPlanSummary();
     let tU=rows.reduce((s,r)=>s+r.usuarios,0), tC=rows.reduce((s,r)=>s+r.conPrecio,0), tS=rows.reduce((s,r)=>s+r.sinPrecio,0), tI=rows.reduce((s,r)=>s+r.total,0);
     let html=`<table class="summary-table"><thead><tr><th>Plan</th><th>Usuarios Activos</th><th>Con Precio</th><th>Sin Precio</th><th>Precio Unitario</th><th>Total Mensual</th></tr></thead><tbody>`;
-    rows.forEach(r=>{ html+=`<tr><td><strong>${r.plan}</strong></td><td>${r.usuarios}</td><td>${r.conPrecio}</td><td>${r.sinPrecio>0?'<span style="color:var(--red);font-weight:700;">'+r.sinPrecio+'</span>':'0'}</td><td>${r.precio>0?'₡'+r.precio.toLocaleString():'<span style="color:var(--ter);">—</span>'}</td><td style="font-weight:700;">${r.total>0?'₡'+r.total.toLocaleString():'<span style="color:var(--ter);">—</span>'}</td></tr>`; });
+    rows.forEach(r=>{ html+=`<tr><td><strong>${_suEsc(r.plan)}</strong></td><td>${r.usuarios}</td><td>${r.conPrecio}</td><td>${r.sinPrecio>0?'<span style="color:var(--red);font-weight:700;">'+r.sinPrecio+'</span>':'0'}</td><td>${r.precio>0?'₡'+r.precio.toLocaleString():'<span style="color:var(--ter);">—</span>'}</td><td style="font-weight:700;">${r.total>0?'₡'+r.total.toLocaleString():'<span style="color:var(--ter);">—</span>'}</td></tr>`; });
     html+=`</tbody><tfoot><tr><td>TOTAL GENERAL</td><td>${tU}</td><td>${tC}</td><td>${tS>0?'<span style="color:var(--red);">'+tS+'</span>':'0'}</td><td>—</td><td style="color:var(--brand-text);">₡${tI.toLocaleString()}</td></tr></tfoot></table>`;
     document.getElementById('summaryTableContainer').innerHTML=html;
     document.getElementById('summaryModal').style.display='block';
@@ -2674,9 +2676,9 @@ function renderValTable(rows) {
             ? `${r.expiraStr}${r.dias != null ? ` <span style="color:var(--ter);font-size:11px;">(${r.dias < 0 ? r.dias : '+' + r.dias}d)</span>` : ''}`
             : '—';
         tr.innerHTML = `
-            <td>${r.pin}</td>
-            <td><strong>${r.cliente}</strong></td>
-            <td style="font-size:12.5px;">${r.plan}</td>
+            <td>${_suEsc(r.pin)}</td>
+            <td><strong>${_suEsc(r.cliente)}</strong></td>
+            <td style="font-size:12.5px;">${_suEsc(r.plan)}</td>
             <td>${r.precioEsperado != null ? '₡' + r.precioEsperado.toLocaleString() : '<span style="color:var(--ter);">—</span>'}</td>
             <td>${pagoCell}</td>
             <td style="font-size:12px;">${fechaCell}</td>
@@ -2768,12 +2770,12 @@ function renderSeguimiento() {
         const diasVencido = Math.round((today - u.ExpiraDate) / 864e5);
         const tr = tbody.insertRow();
         tr.innerHTML = `
-            <td>${u.PIN}</td>
-            <td><strong>${u.Nombre}</strong></td>
-            <td style="font-size:12.5px;white-space:nowrap;">${u.Telefono||'<span style="color:var(--ter);">—</span>'}</td>
-            <td style="color:var(--brand-text);font-size:12px;">${u.Email||'-'}</td>
-            <td style="font-size:12.5px;">${u.ÚltimoProducto||'-'}</td>
-            <td>${u.Expira||'-'}</td>
+            <td>${_suEsc(u.PIN)}</td>
+            <td><strong>${_suEsc(u.Nombre)}</strong></td>
+            <td style="font-size:12.5px;white-space:nowrap;">${u.Telefono?_suEsc(u.Telefono):'<span style="color:var(--ter);">—</span>'}</td>
+            <td style="color:var(--brand-text);font-size:12px;">${_suEsc(u.Email||'-')}</td>
+            <td style="font-size:12.5px;">${_suEsc(u.ÚltimoProducto||'-')}</td>
+            <td>${_suEsc(u.Expira||'-')}</td>
             <td style="font-weight:700;color:${diasVencido>60?'var(--red)':'var(--orange)'};">${diasVencido} días</td>
             <td>${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString():'<span style="color:var(--ter);">—</span>'}</td>`;
     });
@@ -2857,11 +2859,11 @@ function printSeguimiento() {
     const rows = f.map(u => {
         const dias = Math.round((today - u.ExpiraDate) / 864e5);
         return `<tr>
-            <td>${u.PIN}</td>
-            <td>${u.Nombre}</td>
-            <td>${u.Telefono||'—'}</td>
-            <td>${u.ÚltimoProducto||'-'}</td>
-            <td>${u.Expira||'-'}</td>
+            <td>${_suEsc(u.PIN)}</td>
+            <td>${_suEsc(u.Nombre)}</td>
+            <td>${_suEsc(u.Telefono||'—')}</td>
+            <td>${_suEsc(u.ÚltimoProducto||'-')}</td>
+            <td>${_suEsc(u.Expira||'-')}</td>
             <td>${dias}</td>
             <td>${u.ValorPlan>0?'₡'+u.ValorPlan.toLocaleString():'—'}</td>
             <td class="notas"></td>

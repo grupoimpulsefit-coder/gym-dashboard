@@ -286,6 +286,7 @@
 </div>
 
 <script src="/sesion.js"></script>
+<script src="/tasas.js"></script>
 <script>
 // ── Supabase ──
 const SUPA_URL = '__SUPA_URL__';
@@ -329,27 +330,7 @@ let miEmpleado = null, misSolicitudes = []; // portal
 const esAdmin = () => currentRole === 'admin' || currentRole === 'admin_sedes';
 const fmtCRC = n => n ? '₡' + Math.round(n).toLocaleString('es-CR') : '—';
 
-// ── Cargas sociales CCSS (Costa Rica) ── DESGLOSE por rubro; el total se calcula sumando.
-// Tasas configurables — verificar con la CCSS/contador (cambian con el tiempo).
-const RUBROS_TRABAJADOR = [
-  { n: 'SEM (Salud)',      p: 5.50 },
-  { n: 'IVM (Pensiones)',  p: 4.33 },   // subió de 4.17% → total trabajador 10.83%
-  { n: 'Banco Popular',    p: 1.00 },
-];
-const RUBROS_PATRONO = [
-  { n: 'SEM (Salud)',                       p: 9.25 },
-  { n: 'IVM (Pensiones)',                   p: 5.42 },
-  { n: 'Asignaciones Familiares (FODESAF)', p: 5.00 },
-  { n: 'INA',                               p: 1.50 },
-  { n: 'IMAS',                              p: 0.50 },
-  { n: 'Banco Popular Patronal',            p: 0.50 },
-  { n: 'Fondo Capitalización Laboral (FCL)',p: 1.50 },
-  { n: 'Pensión Complementaria (ROP)',      p: 1.50 },
-  { n: 'Otros aportes patronales',          p: 1.50 },
-];
-const sumaRubros = arr => arr.reduce((a,r)=>a+r.p,0);
-const CCSS_TRABAJADOR = sumaRubros(RUBROS_TRABAJADOR) / 100; // 10.83%
-const CCSS_PATRONO    = sumaRubros(RUBROS_PATRONO) / 100;    // 26.67% (solo CCSS; sin póliza de Riesgos del INS)
+// Cargas sociales CCSS (RUBROS_*, CCSS_TRABAJADOR, CCSS_PATRONO): ver tasas.js
 const aseguradoCCSS = e => e.asegurado_ccss !== false;   // por defecto asegurado
 
 /* ── Modalidad de pago ──────────────────────────────────────────────────────
@@ -1129,7 +1110,9 @@ function exportPlanilla(){
 
 // ══ Liquidación laboral (Costa Rica) ══
 let liqEmp = null, liqResult = null;
-const TABLA_CESANTIA = [19.5, 20, 20.5, 21, 21.24, 21.5, 22, 22]; // días por año trabajado (años 1..8, tope 8)
+// Art. 29 c): días POR AÑO según la antigüedad total (año 1..12; del 13 en adelante, 20).
+// Se pagan tasa × años, con tope de 8 años (art. 29 d).
+const TABLA_CESANTIA = [19.5, 20, 20.5, 21, 21.24, 21.5, 22, 22, 22, 21.5, 21, 20.5, 20];
 
 function saldoALaFecha(emp, hasta){
   const fi = parseFecha(emp.fecha_ingreso); if(!fi) return 0;
@@ -1137,16 +1120,25 @@ function saldoALaFecha(emp, hasta){
 }
 function mesesEntre(a, b){ let m=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth()); if(b.getDate()<a.getDate()) m--; return Math.max(0,m); }
 function diasPreaviso(meses){ if(meses<3) return 0; if(meses<6) return 7; if(meses<12) return 15; return 30; }
-function diasCesantia(meses){
+function diasCesantia(fi, salida){
+  const meses = mesesEntre(fi, salida);
   if (meses < 3) return 0;
   if (meses < 6) return 7;
   if (meses < 12) return 14;
-  const anios = meses/12, full = Math.floor(anios), frac = anios - full, cap = 8;
-  let dias = 0;
-  for (let y=1; y<=Math.min(full,cap); y++) dias += TABLA_CESANTIA[y-1];
-  if (full < cap && frac > 0) dias += (TABLA_CESANTIA[full] || TABLA_CESANTIA[TABLA_CESANTIA.length-1]) * frac;
-  return dias;
+  // Años completos; desde el año 2 la fracción superior a seis meses cuenta como un año más
+  let anios = Math.floor(meses / 12);
+  const seisMeses = new Date(fi.getFullYear() + anios, fi.getMonth() + 6, fi.getDate());
+  if (anios >= 1 && salida > seisMeses) anios++;
+  return TABLA_CESANTIA[Math.min(anios, TABLA_CESANTIA.length) - 1] * Math.min(anios, 8);
 }
+(()=>{ const c=(i,f)=>Math.round(diasCesantia(parseFecha(i),parseFecha(f))*100)/100;
+  console.assert(c('2020-01-10','2020-05-10')===7,      'cesantía: 4 meses = 7 días');
+  console.assert(c('2020-01-10','2021-08-20')===40,     'cesantía: 1 año 7 meses cuenta como 2 años × 20');
+  console.assert(c('2020-01-10','2021-07-05')===19.5,   'cesantía: 1 año 6 meses no llega a la fracción');
+  console.assert(c('2018-01-10','2023-01-10')===106.2,  'cesantía: 5 años × 21,24');
+  console.assert(c('2013-01-10','2023-01-10')===172,    'cesantía: 10 años → 21,5 × tope de 8');
+  console.assert(c('2000-01-10','2023-01-10')===160,    'cesantía: 13+ años → 20 × tope de 8');
+})();
 
 function openLiquidacion(id){
   liqEmp = empleados.find(e=>e.id===id); if(!liqEmp) return;
@@ -1172,7 +1164,7 @@ function calcLiquidacion(){
   const anios = meses/12;
   const conCesantia = tipo === 'patronal';
   const preavDias = conCesantia ? diasPreaviso(meses) : 0;
-  const cesDias = conCesantia ? diasCesantia(meses) : 0;
+  const cesDias = conCesantia && fi ? diasCesantia(fi, salida) : 0;
   const montoPreaviso = preavDias * salDiario;
   const montoCesantia = cesDias * salDiario;
   const periodStart = new Date(salida.getMonth()>=11 ? salida.getFullYear() : salida.getFullYear()-1, 11, 1);

@@ -303,6 +303,7 @@ function aplicarTemaGraficas() {
 }
 let _ultimoLatest = null;
 _mqOscuro.addEventListener('change', () => { if (_ultimoLatest) buildDashboard(_ultimoLatest); });
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const SEDES = ['3 Ríos','Natación','Pinares','Sabanilla'];
 
 const PT_KW = ['personal training','personal 2026'];
@@ -571,7 +572,7 @@ function buildDashboard(latest) {
     const body = d.vRank.length
       ? d.vRank.slice(0,8).map((v,i) => `<div class="vend-row">
           <span class="vend-rank">${medalla(i)}</span>
-          <span class="vend-name" title="${v[0]}">${v[0]}</span>
+          <span class="vend-name" title="${esc(v[0])}">${esc(v[0])}</span>
           <span class="vend-amt" style="grid-row:span 2">${fmt(v[1])}<small>${pct(v[1],d.tot)}</small></span>
           <span class="vend-bar"><i style="width:${(v[1]/max*100).toFixed(1)}%;background:${m.color}"></i></span>
         </div>`).join('')
