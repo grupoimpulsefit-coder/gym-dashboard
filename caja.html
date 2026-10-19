@@ -347,6 +347,7 @@ table.hist tbody tr:hover td { background:var(--fill); }
     <div class="mb">
       <div class="hint" style="margin-bottom:10px;">El saldo de cada sede se arrastra de cierre en cierre. <b>Excedente</b>: entró SINPE que no se facturó; se aclara con una nota. <b>Faltante</b>: se facturó más SINPE del que entró; se aclara cargando el reporte donde salen los SINPE que faltaban por contar. Todo queda registrado con su autor.</div>
       <div id="aclSedes"></div>
+      <div id="aclDesglose" style="margin-top:14px;"></div>
       <div id="aclDetalle" style="margin-top:14px;"></div>
       <div id="aclMsg" style="font-size:14px;min-height:18px;margin-top:10px;"></div>
       <div style="margin-top:16px;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;">Aclaraciones registradas</div>
@@ -1382,7 +1383,7 @@ const aclSaldoTxt=v=>v>0?`<span style="color:var(--blue);font-weight:700;">+${fm
 async function abrirAclaraciones(){
   if(!esAdmin()) return;
   document.getElementById('aclModal').style.display='flex';
-  ACL.sede=null; document.getElementById('aclDetalle').innerHTML=''; document.getElementById('aclMsg').textContent='';
+  ACL.sede=null; document.getElementById('aclDetalle').innerHTML=''; document.getElementById('aclDesglose').innerHTML=''; document.getElementById('aclMsg').textContent='';
   await cargarAclaraciones();
 }
 async function cargarAclaraciones(){
@@ -1410,6 +1411,7 @@ async function cargarAclaraciones(){
 }
 function aclElegir(sede){
   ACL.sede=sede; ACL.trans=[]; ACL.archivo=null; document.getElementById('aclMsg').textContent='';
+  aclDesglose(sede);
   const x=ACL.saldos.find(y=>y.sede===sede); if(!x) return;
   cargarAclaraciones();   // repinta la lista con la sede marcada
   const d=document.getElementById('aclDetalle');
@@ -1431,6 +1433,52 @@ function aclElegir(sede){
       <div style="margin-top:10px;display:flex;align-items:center;gap:10px;justify-content:flex-end;flex-wrap:wrap;"><span id="aclSuma" class="hint"></span><button class="btn-primary" id="aclBtn" type="button" onclick="aclConfirmar('faltante')" disabled>Registrar y aclarar</button></div></div>`;
   }
 }
+// ── Desglose del saldo por día ──
+// Cada cierre final guarda en sinpe_reporte lo recibido y lo facturado ese día. El saldo vigente se armó
+// desde el último día en que estuvo en 0: se muestran esos días con lo que aportó cada uno y, desde el
+// 13/10, los cobros SINPE que quedaron sin transferencia en el cruce (los candidatos a faltante).
+async function aclDesglose(sede){
+  const box=document.getElementById('aclDesglose'); box.innerHTML='<div class="hint">Cargando días…</div>';
+  ACL.dias=[]; ACL.cobrosSinTrans=[];
+  let rows=[];
+  try{ rows=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(sede)}&estado=eq.final&sinpe_reporte=not.is.null&order=fecha.desc,created_at.desc&limit=60&select=id,fecha,turno_num,sinpe_pendiente,sinpe_reporte`))||[]; }
+  catch(e){ box.innerHTML=`<div class="hint" style="color:var(--red);">No se pudo cargar el historial: ${esc(mensajeError(e))}</div>`; return; }
+  if(ACL.sede!==sede) return;
+  const dias=rows.map(c=>{ const sr=c.sinpe_reporte||{}; const acl=(sr.aclaraciones||[]);
+    const recibido=Math.round(Number(sr.nuevosMonto)||0), facturado=Math.round(Number(sr.facturado)||0);
+    const g=sr.cruce||null;
+    const faltan=g?[...(g.sinTrans||[]).map(x=>({cliente:x.cliente,monto:x.total,cuando:x.cuando,tipo:'sin transferencia'})),
+                    ...(g.refSinTrans||[]).map(x=>({cliente:x.cliente,monto:x.total,cuando:'ref …'+x.ref,tipo:'referencia no está en el reporte'}))]:[];
+    const sobran=g?(g.sinCobro||[]).map(x=>({cliente:x.origen||'Sin nombre',monto:x.monto,cuando:x.cuando})):[];
+    return { id:c.id, fecha:c.fecha, turno:c.turno_num, recibido, facturado, delta:recibido-facturado, antes:Math.round(Number(sr.pendPrev)||0),
+             despues:Math.round(Number(c.sinpe_pendiente)||0), acl, cruce:!!g, faltan, sobran };
+  });
+  if(!dias.length){ box.innerHTML='<div class="hint">Esta sede no tiene cierres finales con reporte SINPE.</div>'; return; }
+  // Desde el último día en que el saldo arrancó en 0 (o cambió de signo) hasta hoy
+  const signo=Math.sign(dias[0].despues); let corte=dias.length;
+  for(let i=0;i<dias.length;i++){ if(dias[i].antes===0||Math.sign(dias[i].antes)!==signo){ corte=i+1; break; } }
+  const tramo=dias.slice(0,Math.min(corte,30));
+  ACL.dias=tramo; ACL.cobrosSinTrans=tramo.flatMap(d=>d.faltan.map(f=>({...f,fecha:d.fecha})));
+  const col=v=>v<0?'var(--red)':v>0?'var(--blue)':'var(--muted)';
+  const sumF=tramo.filter(d=>d.delta<0).reduce((a,d)=>a+d.delta,0), sumE=tramo.filter(d=>d.delta>0).reduce((a,d)=>a+d.delta,0);
+  box.innerHTML=`<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+    <div style="padding:9px 12px;background:var(--fill);font-weight:700;font-size:13px;">📅 De dónde viene el saldo de ${esc(sede)}
+      <div style="font-weight:400;font-size:12px;color:var(--muted);">${corte<=dias.length&&tramo.length<dias.length?`Desde el ${esc(tramo[tramo.length-1].fecha)}, último día que arrancó en 0`:`Últimos ${tramo.length} cierres`} · días con faltante ${fmt(-sumF)} · con excedente ${fmt(sumE)}</div></div>
+    ${tramo.map(d=>`
+      <div style="padding:8px 12px;border-top:1px solid var(--border);font-size:13px;">
+        <div style="display:flex;justify-content:space-between;gap:10px;">
+          <span><b>${esc(d.fecha)}</b> <span style="color:var(--muted);font-size:12px;">· recibido ${fmt(d.recibido)} · facturado ${fmt(d.facturado)}</span></span>
+          <span style="white-space:nowrap;font-weight:700;color:${col(d.delta)};">${d.delta===0?'cuadró':(d.delta<0?'faltó ':'sobró ')+fmt(Math.abs(d.delta))}</span></div>
+        <div style="font-size:11px;color:var(--muted);">saldo ${fmt(d.antes)} → ${fmt(d.despues)}${d.acl.length?' · incluye '+d.acl.length+' aclaración(es)':''}</div>
+        ${d.faltan.length?`<div style="margin-top:4px;">${d.faltan.map(f=>`<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--red);"><span>⚠ ${esc(f.cliente)} · ${esc(f.cuando||'')} <span style="color:var(--muted);">(${f.tipo})</span></span><b>${fmt(f.monto)}</b></div>`).join('')}</div>`:''}
+        ${d.delta>0&&d.sobran.length?`<div style="margin-top:4px;">${d.sobran.map(f=>`<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--blue);"><span>🕒 ${esc(f.cliente)} · ${esc(f.cuando||'')} <span style="color:var(--muted);">(entró sin cobro)</span></span><b>${fmt(f.monto)}</b></div>`).join('')}</div>`:''}
+        ${d.delta<0&&!d.cruce?'<div style="font-size:11px;color:var(--muted);margin-top:2px;">Cierre anterior al 13/10: no tiene el detalle de cada cobro.</div>':''}
+      </div>`).join('')}
+  </div>`;
+}
+// Para el faltante: ¿esta transferencia del reporte coincide con un cobro que quedó sin transferencia?
+function aclCoincide(t){ return (ACL.cobrosSinTrans||[]).find(f=>Math.abs((Number(f.monto)||0)-t.monto)<=100)||null; }
+
 // Lee el reporte y deja solo los SINPE que todavía no están contados en esa sede
 async function aclLeerReporte(file){
   const box=document.getElementById('aclTrans'); box.innerHTML='<div class="hint">Leyendo…</div>';
@@ -1453,7 +1501,7 @@ async function aclLeerReporte(file){
          <div class="lista-box" style="max-height:240px;margin-top:6px;">${ACL.trans.map((t,i)=>`
            <label style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid var(--hair);font-size:13px;cursor:pointer;">
              <input type="checkbox" data-i="${i}" onchange="aclSumar()" style="width:auto;">
-             <span style="flex:1;"><b>${esc(t.origen||'Sin nombre')}</b> · ${esc(t.fecha_tx)}<div style="color:var(--muted);font-size:12px;">${esc(t.detalle||'')} · ref …${esc(t.referencia.slice(-6))}</div></span>
+             <span style="flex:1;"><b>${esc(t.origen||'Sin nombre')}</b> · ${esc(t.fecha_tx)}<div style="color:var(--muted);font-size:12px;">${esc(t.detalle||'')} · ref …${esc(t.referencia.slice(-6))}</div>${(()=>{ const f=aclCoincide(t); return f?`<div style="color:var(--green);font-size:12px;">💡 Coincide con ${esc(f.cliente)} del ${esc(f.fecha)} (${fmt(f.monto)})</div>`:''; })()}</span>
              <b>${fmt(t.monto)}</b></label>`).join('')}</div>`
       : `<div class="hint" style="color:var(--orange);">Los ${all.length} SINPE de este reporte ya están contados: no explican el faltante. Pruebe con un reporte de otras fechas.</div>`;
     aclSumar();
@@ -1484,7 +1532,7 @@ async function aclConfirmar(tipo){
   try{
     const r=await supaFetch('/rpc/aclarar_sinpe',{method:'POST',prefer:'return=representation',body:{p_sede:x.sede,p_tipo:tipo,p_monto:monto,p_nota:nota,p_refs:refs,p_archivo:ACL.archivo}});
     msg.style.color='var(--green)'; msg.textContent=`✅ ${x.sede}: saldo ${fmt(r.antes)} → ${fmt(r.despues)}. Quedó registrado.`;
-    ACL.sede=null; document.getElementById('aclDetalle').innerHTML='';
+    ACL.sede=null; document.getElementById('aclDetalle').innerHTML=''; document.getElementById('aclDesglose').innerHTML='';
     await cargarAclaraciones();
     if(x.sede===currentSede) loadCierres();
   }catch(e){
