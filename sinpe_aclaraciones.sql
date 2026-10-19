@@ -12,6 +12,10 @@
 --    · FALTANTE (saldo negativo: se facturó más SINPE del que entró): solo con
 --      respaldo: los SINPE del reporte que faltaban por contar. Se registran en
 --      sinpe_registrados (no se pueden volver a contar) y suben el saldo.
+--    · FACTURA ANULADA O DUPLICADA (también saldo negativo): se facturó SINPE de
+--      más y la factura se eliminó después. Respaldo: el Informe de Ventas de ese
+--      día descargado de nuevo (la página compara el SINPE con el original) y el
+--      número de la factura. Sube el saldo por la diferencia.
 --    · Guarda cada aclaración en sinpe_aclaraciones: quién, cuándo, saldo antes
 --      y después, monto, nota y referencias. Nadie la puede editar ni borrar
 --      desde la app.
@@ -22,7 +26,7 @@ create table if not exists sinpe_aclaraciones (
   sede              text not null,
   cierre_id         uuid references cierres_caja(id) on delete set null,
   cierre_fecha      date,
-  tipo              text not null check (tipo in ('excedente','faltante')),
+  tipo              text not null,             -- 'excedente' | 'faltante' | 'factura'
   pendiente_antes   numeric not null,
   monto             numeric not null,          -- cuánto se aclaró (siempre positivo)
   pendiente_despues numeric not null,
@@ -33,6 +37,8 @@ create table if not exists sinpe_aclaraciones (
   created_at        timestamptz default now()
 );
 create index if not exists sinpe_acl_sede_idx on sinpe_aclaraciones (sede, created_at desc);
+alter table sinpe_aclaraciones drop constraint if exists sinpe_aclaraciones_tipo_check;
+alter table sinpe_aclaraciones add constraint sinpe_aclaraciones_tipo_check check (tipo in ('excedente','faltante','factura'));
 
 alter table sinpe_aclaraciones enable row level security;
 drop policy if exists sinpe_acl_admin_select on sinpe_aclaraciones;
@@ -44,6 +50,7 @@ create policy sinpe_acl_admin_select on sinpe_aclaraciones
 -- ── Aclarar el saldo de una sede ───────────────────────────────────────────
 -- p_tipo 'excedente': p_monto (0 < monto ≤ saldo) y p_nota.
 -- p_tipo 'faltante':  p_refs con los SINPE del reporte que faltaban; el monto es su suma.
+-- p_tipo 'factura':   factura anulada/duplicada: p_monto (≤ faltante), p_refs [{factura, fecha, cliente, monto}].
 create or replace function public.aclarar_sinpe(p_sede text, p_tipo text, p_monto numeric,
                                                 p_nota text, p_refs jsonb default '[]'::jsonb, p_archivo text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
@@ -61,7 +68,7 @@ begin
   if public.mi_rol() not in ('admin','admin_sedes','admin_g') then
     raise exception 'Solo un administrador puede aclarar el saldo SINPE.' using errcode = '42501';
   end if;
-  if p_tipo not in ('excedente','faltante') then raise exception 'Tipo de aclaración inválido.'; end if;
+  if p_tipo not in ('excedente','faltante','factura') then raise exception 'Tipo de aclaración inválido.'; end if;
   if length(btrim(coalesce(p_nota, ''))) < 8 then
     raise exception 'Escriba una nota que explique la aclaración (al menos 8 caracteres).';
   end if;
@@ -80,6 +87,18 @@ begin
       raise exception 'El monto a aclarar debe estar entre 1 y el excedente (%).', v_antes;
     end if;
     v_desp := v_antes - v_monto;
+  elsif p_tipo = 'factura' then
+    if v_antes >= 0 then raise exception 'La sede no tiene faltante de SINPE (saldo %).', v_antes; end if;
+    v_monto := round(coalesce(p_monto, 0));
+    if v_monto <= 0 or v_monto > -v_antes then
+      raise exception 'El monto a aclarar debe estar entre 1 y el faltante (%).', -v_antes;
+    end if;
+    if jsonb_typeof(p_refs) <> 'array' or jsonb_array_length(p_refs) = 0
+       or btrim(coalesce(p_refs -> 0 ->> 'factura', '')) = '' then
+      raise exception 'Indique el número de la factura anulada o duplicada.';
+    end if;
+    v_refs := p_refs;
+    v_desp := v_antes + v_monto;
   else
     if v_antes >= 0 then raise exception 'La sede no tiene faltante de SINPE (saldo %).', v_antes; end if;
     if jsonb_typeof(p_refs) <> 'array' or jsonb_array_length(p_refs) = 0 then

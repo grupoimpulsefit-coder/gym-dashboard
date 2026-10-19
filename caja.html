@@ -1404,8 +1404,8 @@ async function cargarAclaraciones(){
   try{
     const h=(await supaFetch('/sinpe_aclaraciones?order=created_at.desc&limit=30&select=*'))||[];
     document.getElementById('aclHist').innerHTML=h.length?h.map(a=>`<div style="padding:7px 2px;border-bottom:1px solid var(--hair);font-size:13px;">
-        <b>${esc(a.sede)}</b> · ${a.tipo==='faltante'?'faltante':'excedente'} de ${fmt(a.monto)} · saldo ${fmt(a.pendiente_antes)} → ${fmt(a.pendiente_despues)}
-        <div style="color:var(--muted);font-size:12px;">${esc(a.nota)}${(a.referencias||[]).length?` · ${a.referencias.length} SINPE registrados${a.archivo?' ('+esc(a.archivo)+')':''}`:''}<br>${esc(a.hecho_por||'—')} · ${new Date(a.created_at).toLocaleString('es-CR')} · cierre del ${esc(a.cierre_fecha||'—')}</div></div>`).join('')
+        <b>${esc(a.sede)}</b> · ${a.tipo==='faltante'?'faltante (SINPE sin contar)':a.tipo==='factura'?'faltante (factura anulada '+esc((a.referencias&&a.referencias[0]&&a.referencias[0].factura)||'')+')':'excedente'} de ${fmt(a.monto)} · saldo ${fmt(a.pendiente_antes)} → ${fmt(a.pendiente_despues)}
+        <div style="color:var(--muted);font-size:12px;">${esc(a.nota)}${a.tipo==='faltante'&&(a.referencias||[]).length?` · ${a.referencias.length} SINPE registrados${a.archivo?' ('+esc(a.archivo)+')':''}`:a.tipo==='factura'&&a.archivo?' · informe corregido: '+esc(a.archivo):''}<br>${esc(a.hecho_por||'—')} · ${new Date(a.created_at).toLocaleString('es-CR')} · cierre del ${esc(a.cierre_fecha||'—')}</div></div>`).join('')
       :'<div class="hint">Todavía no hay aclaraciones.</div>';
   }catch(e){ document.getElementById('aclHist').innerHTML=/sinpe_aclaraciones/.test(e.message)?'<div class="hint">Falta correr <b>sinpe_aclaraciones.sql</b> en Supabase.</div>':''; }
 }
@@ -1426,11 +1426,28 @@ function aclElegir(sede){
       <div style="margin-top:10px;text-align:right;"><button class="btn-primary" id="aclBtn" type="button" onclick="aclConfirmar('excedente')">Aclarar excedente</button></div></div>`;
   } else {
     d.innerHTML=`<div style="background:var(--red-tint);border-radius:10px;padding:12px;">
-      <b>${esc(sede)}: faltante de ${fmt(-x.saldo)}</b><div class="hint">Se facturó más SINPE del que se contó como recibido. Cargue el <b>Reporte SINPE</b> donde salen los SINPE que faltaban (p. ej. descargado desde un día antes) y marque los que explican el faltante. Quedan registrados y no se pueden volver a contar.</div>
-      <input type="file" id="aclArchivo" accept=".xlsx,.xls" style="margin-top:10px;" onchange="if(this.files[0]) aclLeerReporte(this.files[0])">
-      <div id="aclTrans" style="margin-top:10px;"></div>
+      <b>${esc(sede)}: faltante de ${fmt(-x.saldo)}</b><div class="hint">Se facturó más SINPE del que se contó como recibido. ¿Por qué?</div>
+      <div class="seg" style="margin-top:8px;" role="tablist">
+        <button type="button" id="aclModoS" aria-selected="true" onclick="aclModo('sinpe')">📥 Faltaban SINPE por contar</button>
+        <button type="button" id="aclModoF" aria-selected="false" onclick="aclModo('factura')">🧾 Factura anulada o duplicada</button>
+      </div>
+      <div id="aclPaneS">
+        <div class="hint" style="margin-top:8px;">Cargue el <b>Reporte SINPE</b> donde salen los SINPE que faltaban (p. ej. descargado desde un día antes) y marque los que explican el faltante. Quedan registrados y no se pueden volver a contar.</div>
+        <input type="file" id="aclArchivo" accept=".xlsx,.xls" style="margin-top:10px;" onchange="if(this.files[0]) aclLeerReporte(this.files[0])">
+        <div id="aclTrans" style="margin-top:10px;"></div>
+      </div>
+      <div id="aclPaneF" hidden>
+        <div class="hint" style="margin-top:8px;">Para una factura SINPE que se hizo de más (duplicada o por error) y después se eliminó. Elija el día y cargue el <b>Informe de Ventas de ese día descargado de nuevo</b> (ya sin la factura): se compara con el que se usó en el cierre.</div>
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 6px;">Día del cierre</label>
+        <select id="aclDia" class="ui" onchange="aclFact.res=null;document.getElementById('aclFactRes').innerHTML='';aclRevisarFactura()"></select>
+        <input type="file" id="aclInforme" accept=".xlsx,.xls" style="margin-top:10px;display:block;" onchange="if(this.files[0]) aclLeerInformeCorregido(this.files[0])">
+        <div id="aclFactRes" style="margin-top:10px;"></div>
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 6px;">N.º de la factura anulada o duplicada</label>
+        <input type="text" id="aclFactNum" maxlength="40" placeholder="Ej. 00200002010000001787" style="width:100%;padding:6px 10px;border:1.5px solid var(--border);border-radius:10px;" oninput="aclRevisarFactura()">
+      </div>
       ${notaHtml}
-      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;justify-content:flex-end;flex-wrap:wrap;"><span id="aclSuma" class="hint"></span><button class="btn-primary" id="aclBtn" type="button" onclick="aclConfirmar('faltante')" disabled>Registrar y aclarar</button></div></div>`;
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;justify-content:flex-end;flex-wrap:wrap;"><span id="aclSuma" class="hint"></span><button class="btn-primary" id="aclBtn" type="button" onclick="aclConfirmar(ACL.modo==='factura'?'factura':'faltante')" disabled>Registrar y aclarar</button></div></div>`;
+    ACL.modo='sinpe';
   }
 }
 // ── Desglose del saldo por día ──
@@ -1459,6 +1476,7 @@ async function aclDesglose(sede){
   for(let i=0;i<dias.length;i++){ if(dias[i].antes===0||Math.sign(dias[i].antes)!==signo){ corte=i+1; break; } }
   const tramo=dias.slice(0,Math.min(corte,30));
   ACL.dias=tramo; ACL.cobrosSinTrans=tramo.flatMap(d=>d.faltan.map(f=>({...f,fecha:d.fecha})));
+  aclLlenarDias();
   const col=v=>v<0?'var(--red)':v>0?'var(--blue)':'var(--muted)';
   const sumF=tramo.filter(d=>d.delta<0).reduce((a,d)=>a+d.delta,0), sumE=tramo.filter(d=>d.delta>0).reduce((a,d)=>a+d.delta,0);
   box.innerHTML=`<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
@@ -1476,6 +1494,74 @@ async function aclDesglose(sede){
       </div>`).join('')}
   </div>`;
 }
+// ── Faltante por factura anulada o duplicada ──
+// Respaldo: el Informe de Ventas de ese día descargado de nuevo, ya sin la factura. El SINPE de más es lo
+// que tenía el informe usado en el cierre menos lo que trae el corregido; se muestran los cobros que ya no están.
+const aclFact={ res:null };
+function aclModo(m){
+  ACL.modo=m;
+  document.getElementById('aclModoS').setAttribute('aria-selected',m==='sinpe');
+  document.getElementById('aclModoF').setAttribute('aria-selected',m==='factura');
+  document.getElementById('aclPaneS').hidden=m!=='sinpe';
+  document.getElementById('aclPaneF').hidden=m!=='factura';
+  document.getElementById('aclMsg').textContent='';
+  if(m==='factura'){ aclLlenarDias(); aclRevisarFactura(); } else aclSumar();
+}
+function aclLlenarDias(){
+  const sel=document.getElementById('aclDia'); if(!sel) return;
+  const dias=(ACL.dias||[]).filter(d=>d.delta<0).concat((ACL.dias||[]).filter(d=>d.delta>=0));   // primero los días con faltante
+  const prev=sel.value;
+  sel.innerHTML=dias.length?dias.map(d=>`<option value="${esc(d.id)}">${esc(d.fecha)} · ${d.delta<0?'faltó '+fmt(-d.delta):d.delta>0?'sobró '+fmt(d.delta):'cuadró'}</option>`).join(''):'<option value="">(cargando días…)</option>';
+  if(prev&&dias.some(d=>d.id===prev)) sel.value=prev;
+}
+// Totales por método de un Informe de Ventas (misma lectura que cargarInformeVentas)
+function totalesInforme(rows){
+  let colTotal=-1;
+  for(let i=0;i<Math.min(rows.length,15);i++){ const idx=(rows[i]||[]).findIndex(c=>String(c||'').trim().toLowerCase()==='total crc'); if(idx>=0){colTotal=idx;break;} }
+  const t={efectivo:0,sinpe:0,tarjeta:0,transfer:0};
+  rows.forEach(r=>{ const label=(r||[]).map(c=>String(c||'').trim()).find(x=>/^total\s+(efectivo|sinpe|tarjeta|transferencia)\b/i.test(x));
+    if(label){ const amt=colTotal>=0?(Number(r[colTotal])||0):(Number([...r].reverse().find(x=>typeof x==='number'))||0); const m=label.toLowerCase();
+      if(m.includes('efectivo'))t.efectivo+=amt; else if(m.includes('sinpe'))t.sinpe+=amt; else if(m.includes('transferencia'))t.transfer+=amt; else if(m.includes('tarjeta'))t.tarjeta+=amt; } });
+  Object.keys(t).forEach(k=>t[k]=Math.round(t[k])); return t;
+}
+async function aclLeerInformeCorregido(file){
+  const box=document.getElementById('aclFactRes'); box.innerHTML='<div class="hint">Leyendo…</div>'; aclFact.res=null;
+  const diaId=document.getElementById('aclDia').value; const dia=(ACL.dias||[]).find(d=>d.id===diaId);
+  try{
+    if(!dia) throw new Error('Elija primero el día del cierre.');
+    const wb=XLSX.read(new Uint8Array(await file.arrayBuffer()),{type:'array'});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+    const nuevo=totalesInforme(rows), det=detalleInforme(rows);
+    if(!(nuevo.efectivo+nuevo.sinpe+nuevo.tarjeta+nuevo.transfer)) throw new Error('No se encontraron los totales por método. ¿Es el Informe de Ventas?');
+    if(det.fecha&&det.fecha!==dia.fecha) throw new Error(`Ese informe es del ${det.fecha} y el cierre elegido es del ${dia.fecha}.`);
+    const r=(await supaFetch(`/cierres_caja?id=eq.${encodeURIComponent(dia.id)}&select=informe_ventas`))||[];
+    const viejo=r[0]&&r[0].informe_ventas; if(!viejo||viejo.sinpe==null) throw new Error('Ese cierre no guardó el Informe de Ventas original: no hay contra qué comparar.');
+    const dif=Math.round(Number(viejo.sinpe)||0)-nuevo.sinpe;
+    // Cobros SINPE que estaban en el informe original y ya no están en el corregido
+    const quitados=[]; const resta=(det.filas||[]).filter(f=>f.Metodo==='sinpe').map(f=>f.Cliente+'|'+Math.round(Number(f.Total)||0));
+    ((viejo.detalle&&viejo.detalle.filas)||[]).filter(f=>f.Metodo==='sinpe').forEach(f=>{ const k=f.Cliente+'|'+Math.round(Number(f.Total)||0); const i=resta.indexOf(k);
+      if(i>=0) resta.splice(i,1); else quitados.push({cliente:f.Cliente, monto:Math.round(Number(f.Total)||0), notas:f.Notas||''}); });
+    aclFact.res={ dia, dif, viejo:Math.round(Number(viejo.sinpe)||0), nuevo:nuevo.sinpe, quitados, archivo:file.name };
+    box.innerHTML=dif>0
+      ? `<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;">
+          SINPE del ${esc(dia.fecha)}: informe del cierre <b>${fmt(aclFact.res.viejo)}</b> → corregido <b>${fmt(nuevo.sinpe)}</b> · se facturó de más <b style="color:var(--red);">${fmt(dif)}</b>
+          ${quitados.length?`<div style="margin-top:6px;">Cobros que ya no están:${quitados.map(q=>`<div style="display:flex;justify-content:space-between;gap:10px;color:var(--muted);"><span>🧾 ${esc(q.cliente)}</span><b>${fmt(q.monto)}</b></div>`).join('')}</div>`:''}
+        </div>`
+      : `<div class="hint" style="color:var(--orange);">El informe corregido no tiene menos SINPE que el del cierre (${fmt(aclFact.res.viejo)} → ${fmt(nuevo.sinpe)}). Revise que la factura ya esté eliminada y que sea el día correcto.</div>`;
+    if(dif>0&&!document.getElementById('aclNota').value.trim()&&quitados.length===1)
+      document.getElementById('aclNota').value=`Factura SINPE duplicada/anulada de ${quitados[0].cliente} (${fmt(quitados[0].monto)}) del ${dia.fecha}`;
+  }catch(e){ box.innerHTML=`<div class="hint" style="color:var(--red);">${esc(e.message)}</div>`; }
+  aclRevisarFactura();
+}
+function aclRevisarFactura(){
+  if(ACL.modo!=='factura') return;
+  const x=ACL.saldos.find(y=>y.sede===ACL.sede); const r=aclFact.res; const num=(document.getElementById('aclFactNum')||{}).value||'';
+  const monto=r&&r.dif>0?Math.min(r.dif,-(x?x.saldo:0)):0;
+  const el=document.getElementById('aclSuma'); const b=document.getElementById('aclBtn');
+  if(el) el.innerHTML=monto?`Aclara ${fmt(monto)} → el saldo queda en <b>${fmt((x?x.saldo:0)+monto)}</b>`:'';
+  if(b) b.disabled=!(monto>0&&num.trim());
+}
+
 // Para el faltante: ¿esta transferencia del reporte coincide con un cobro que quedó sin transferencia?
 function aclCoincide(t){ return (ACL.cobrosSinTrans||[]).find(f=>Math.abs((Number(f.monto)||0)-t.monto)<=100)||null; }
 
@@ -1523,6 +1609,13 @@ async function aclConfirmar(tipo){
     monto=Math.round(Number(document.getElementById('aclMonto').value)||0);
     if(monto<=0||monto>x.saldo){ msg.style.color='var(--red)'; msg.textContent=`El monto debe estar entre 1 y ${fmt(x.saldo)}.`; return; }
     if(!confirm(`¿Aclarar ${fmt(monto)} del excedente SINPE de ${x.sede}?\n\nEl saldo queda en ${fmt(x.saldo-monto)}. Queda registrado con su usuario y la nota.`)) return;
+  } else if(tipo==='factura'){
+    const r=aclFact.res; const num=document.getElementById('aclFactNum').value.trim();
+    if(!r||r.dif<=0||!num) return;
+    monto=Math.min(r.dif,-x.saldo);
+    refs=[{ factura:num, fecha:r.dia.fecha, informe_antes:r.viejo, informe_corregido:r.nuevo, cobros:r.quitados }];
+    ACL.archivo=r.archivo;
+    if(!confirm(`¿Aclarar ${fmt(monto)} del faltante SINPE de ${x.sede} por la factura ${num} del ${r.dia.fecha}?\n\nEl saldo queda en ${fmt(x.saldo+monto)}. Queda registrado con su usuario, la nota y el informe corregido.`)) return;
   } else {
     refs=aclElegidos(); monto=refs.reduce((a,t)=>a+t.monto,0);
     if(!refs.length) return;
@@ -1537,6 +1630,7 @@ async function aclConfirmar(tipo){
     if(x.sede===currentSede) loadCierres();
   }catch(e){
     b.disabled=false; b.textContent=tipo==='excedente'?'Aclarar excedente':'Registrar y aclarar';
+    if(/Tipo de aclaración inválido/.test(e.message)){ msg.style.color='var(--red)'; msg.textContent='⚠ Vuelva a correr sinpe_aclaraciones.sql en Supabase (agrega la aclaración por factura anulada).'; return; }
     msg.style.color='var(--red)'; msg.textContent='⚠ '+(/aclarar_sinpe|PGRST202|Could not find the function/i.test(e.message)?'Falta correr sinpe_aclaraciones.sql en Supabase.':mensajeError(e));
   }
 }
@@ -1734,7 +1828,7 @@ function renderSinpeResumenHist(sr){
       <div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--muted);"><span>Pendiente arrastrado</span><span>${fmt(sr.pendPrev||0)}</span></div>
       <div style="padding:9px 12px;background:${bg};color:${cl};font-weight:800;border-top:1px solid var(--border);"><div style="display:flex;justify-content:space-between;"><span>${ic} Pendiente por facturar</span><span>${fmt(pendAfter)}</span></div><div style="font-weight:600;font-size:11px;margin-top:2px;opacity:.9;">${txt}</div></div>
       ${sr.ajuste_manual?`<div style="padding:6px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);">✎ Pendiente puesto en 0 a mano (antes ${fmt(sr.ajuste_manual.pendiente_antes||0)})</div>`:''}
-      ${(sr.aclaraciones||[]).map(a=>`<div style="padding:6px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);">✎ ${a.tipo==='faltante'?'Faltante':'Excedente'} aclarado: ${fmt(a.monto)} (saldo ${fmt(a.antes)} → ${fmt(a.despues)}) · ${esc(a.nota||'')} · ${esc(a.por||'')} · ${new Date(a.at).toLocaleDateString('es-CR')}</div>`).join('')}
+      ${(sr.aclaraciones||[]).map(a=>`<div style="padding:6px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);">✎ ${a.tipo==='faltante'?'Faltante':a.tipo==='factura'?'Faltante por factura anulada':'Excedente'} aclarado: ${fmt(a.monto)} (saldo ${fmt(a.antes)} → ${fmt(a.despues)}) · ${esc(a.nota||'')} · ${esc(a.por||'')} · ${new Date(a.at).toLocaleDateString('es-CR')}</div>`).join('')}
     </div>
     ${sr.cruce?htmlCruce(sr.cruce,true):'<div class="hint" style="margin-top:8px;">Este cierre no guardó el cruce por transacción (se guarda desde el 13/10/2026).</div>'}`;
 }
