@@ -47,6 +47,77 @@ create policy sinpe_acl_admin_select on sinpe_aclaraciones
   using (public.mi_rol() in ('admin','admin_sedes','admin_g'));
 -- Sin políticas de escritura: solo aclarar_sinpe() (security definer) escribe aquí.
 
+alter table sinpe_aclaraciones add column if not exists dias_marcados boolean not null default false;
+
+-- ── Marcar los días que una aclaración explica ─────────────────────────────
+-- El saldo se corrige en el último cierre, pero el faltante (o excedente) se
+-- generó en días anteriores: esos cierres siguen mostrando "faltó" en el
+-- historial y en la auditoría. Aquí se reparte el monto aclarado entre los
+-- días del tramo actual (desde el último día que arrancó en 0) que tuvieron
+-- ese tipo de diferencia, del más viejo al más nuevo (o primero el día
+-- indicado), y se guarda en su sinpe_reporte: aclarado (monto) y aclarado_detalle.
+create or replace function public.sinpe_marcar_dias(p_cierre uuid, p_tipo text, p_monto numeric,
+                                                    p_info jsonb, p_preferido uuid default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_last  cierres_caja%rowtype;
+  v_signo int := case when p_tipo = 'excedente' then 1 else -1 end;
+  v_rest  numeric := round(coalesce(p_monto, 0));
+  v_ids   uuid[] := '{}';
+  v_id    uuid;
+  v_x     uuid;
+  v_sr    jsonb;
+  v_delta numeric;
+  v_ya    numeric;
+  v_m     numeric;
+  r       record;
+begin
+  select * into v_last from cierres_caja where id = p_cierre;
+  if not found or v_rest <= 0 then return; end if;
+  -- Tramo: del cierre hacia atrás mientras el día haya arrancado con saldo del mismo signo
+  for r in select id, sinpe_reporte from cierres_caja
+            where sede = v_last.sede and estado = 'final' and sinpe_reporte is not null
+              and (fecha < v_last.fecha or (fecha = v_last.fecha and created_at <= v_last.created_at))
+            order by fecha desc, created_at desc limit 60 loop
+    v_ids := array_prepend(r.id, v_ids);     -- queda del más viejo al más nuevo
+    exit when sign(coalesce((r.sinpe_reporte ->> 'pendPrev')::numeric, 0)) <> v_signo;
+  end loop;
+  -- Primero el día indicado (p. ej. el de la factura anulada); si no hay, el día cuya diferencia
+  -- pendiente es exactamente el monto aclarado
+  v_m := null;
+  if p_preferido is not null and p_preferido = any(v_ids) then
+    v_id := p_preferido;
+  else
+    v_id := null;
+    foreach v_x in array v_ids loop
+      select sinpe_reporte into v_sr from cierres_caja where id = v_x;
+      v_delta := coalesce((v_sr ->> 'nuevosMonto')::numeric, 0) - coalesce((v_sr ->> 'facturado')::numeric, 0);
+      if sign(v_delta) = v_signo and abs(v_delta) - coalesce((v_sr ->> 'aclarado')::numeric, 0) = v_rest then
+        v_id := v_x; exit;
+      end if;
+    end loop;
+  end if;
+  if v_id is not null then v_ids := array_prepend(v_id, array_remove(v_ids, v_id)); end if;
+  foreach v_id in array v_ids loop
+    exit when v_rest <= 0;
+    select sinpe_reporte into v_sr from cierres_caja where id = v_id;
+    v_delta := coalesce((v_sr ->> 'nuevosMonto')::numeric, 0) - coalesce((v_sr ->> 'facturado')::numeric, 0);
+    continue when sign(v_delta) <> v_signo;
+    v_ya := coalesce((v_sr ->> 'aclarado')::numeric, 0);
+    v_m := least(v_rest, abs(v_delta) - v_ya);
+    continue when v_m <= 0;
+    update cierres_caja
+       set sinpe_reporte = coalesce(sinpe_reporte, '{}'::jsonb)
+             || jsonb_build_object('aclarado', v_ya + v_m,
+                                   'aclarado_detalle', coalesce(sinpe_reporte -> 'aclarado_detalle', '[]'::jsonb)
+                                                       || jsonb_build_array(p_info || jsonb_build_object('monto', v_m)))
+     where id = v_id;
+    v_rest := v_rest - v_m;
+  end loop;
+end;
+$$;
+revoke all on function public.sinpe_marcar_dias(uuid, text, numeric, jsonb, uuid) from public;
+
 -- ── Aclarar el saldo de una sede ───────────────────────────────────────────
 -- p_tipo 'excedente': p_monto (0 < monto ≤ saldo) y p_nota.
 -- p_tipo 'faltante':  p_refs con los SINPE del reporte que faltaban; el monto es su suma.
@@ -123,8 +194,8 @@ begin
   end if;
 
   insert into sinpe_aclaraciones (sede, cierre_id, cierre_fecha, tipo, pendiente_antes, monto, pendiente_despues,
-                                  nota, referencias, archivo, hecho_por)
-  values (p_sede, v_c.id, v_c.fecha, p_tipo, v_antes, v_monto, v_desp, btrim(p_nota), v_refs, p_archivo, v_email);
+                                  nota, referencias, archivo, hecho_por, dias_marcados)
+  values (p_sede, v_c.id, v_c.fecha, p_tipo, v_antes, v_monto, v_desp, btrim(p_nota), v_refs, p_archivo, v_email, true);
 
   -- El cierre queda con el saldo nuevo y la aclaración a la vista en su resumen SINPE
   v_acl := jsonb_build_object('tipo', p_tipo, 'antes', v_antes, 'monto', v_monto, 'despues', v_desp,
@@ -137,11 +208,33 @@ begin
            '{pendAfter}', to_jsonb(v_desp))
    where id = v_c.id;
 
+  -- Los días que generaron la diferencia quedan marcados como aclarados
+  perform public.sinpe_marcar_dias(v_c.id, p_tipo, v_monto,
+    jsonb_build_object('tipo', p_tipo, 'nota', btrim(p_nota), 'por', v_email, 'at', now()),
+    case when p_tipo = 'factura' then nullif(p_refs -> 0 ->> 'dia_id', '')::uuid end);
+
   return jsonb_build_object('sede', p_sede, 'cierre_fecha', v_c.fecha, 'antes', v_antes, 'monto', v_monto, 'despues', v_desp);
 end;
 $$;
 revoke all on function public.aclarar_sinpe(text, text, numeric, text, jsonb, text) from public;
 grant execute on function public.aclarar_sinpe(text, text, numeric, text, jsonb, text) to authenticated;
+
+-- ── Aclaraciones hechas antes de este cambio: marcar sus días una sola vez ──
+do $$
+declare a record; v_pref uuid;
+begin
+  for a in select * from sinpe_aclaraciones where not dias_marcados and cierre_id is not null order by created_at loop
+    v_pref := null;
+    if a.tipo = 'factura' and (a.referencias -> 0 ->> 'fecha') is not null then
+      select id into v_pref from cierres_caja
+       where sede = a.sede and estado = 'final' and fecha = (a.referencias -> 0 ->> 'fecha')::date
+       order by created_at desc limit 1;
+    end if;
+    perform public.sinpe_marcar_dias(a.cierre_id, a.tipo, a.monto,
+      jsonb_build_object('tipo', a.tipo, 'nota', a.nota, 'por', a.hecho_por, 'at', a.created_at), v_pref);
+    update sinpe_aclaraciones set dias_marcados = true where id = a.id;
+  end loop;
+end $$;
 
 -- Comprobación: saldo vigente de cada sede
 select distinct on (sede) sede, fecha, turno_num, sinpe_pendiente

@@ -1467,7 +1467,7 @@ async function aclDesglose(sede){
     const faltan=g?[...(g.sinTrans||[]).map(x=>({cliente:x.cliente,monto:x.total,cuando:x.cuando,tipo:'sin transferencia'})),
                     ...(g.refSinTrans||[]).map(x=>({cliente:x.cliente,monto:x.total,cuando:'ref …'+x.ref,tipo:'referencia no está en el reporte'}))]:[];
     const sobran=g?(g.sinCobro||[]).map(x=>({cliente:x.origen||'Sin nombre',monto:x.monto,cuando:x.cuando})):[];
-    return { id:c.id, fecha:c.fecha, turno:c.turno_num, recibido, facturado, delta:recibido-facturado, antes:Math.round(Number(sr.pendPrev)||0),
+    return { id:c.id, fecha:c.fecha, turno:c.turno_num, recibido, facturado, delta:recibido-facturado, aclarado:Math.round(Number(sr.aclarado)||0), antes:Math.round(Number(sr.pendPrev)||0),
              despues:Math.round(Number(c.sinpe_pendiente)||0), acl, cruce:!!g, faltan, sobran };
   });
   if(!dias.length){ box.innerHTML='<div class="hint">Esta sede no tiene cierres finales con reporte SINPE.</div>'; return; }
@@ -1486,7 +1486,7 @@ async function aclDesglose(sede){
       <div style="padding:8px 12px;border-top:1px solid var(--border);font-size:13px;">
         <div style="display:flex;justify-content:space-between;gap:10px;">
           <span><b>${esc(d.fecha)}</b> <span style="color:var(--muted);font-size:12px;">· recibido ${fmt(d.recibido)} · facturado ${fmt(d.facturado)}</span></span>
-          <span style="white-space:nowrap;font-weight:700;color:${col(d.delta)};">${d.delta===0?'cuadró':(d.delta<0?'faltó ':'sobró ')+fmt(Math.abs(d.delta))}</span></div>
+          <span style="white-space:nowrap;font-weight:700;color:${d.aclarado>=Math.abs(d.delta)&&d.delta?'var(--green)':col(d.delta)};">${d.delta===0?'cuadró':(d.delta<0?'faltó ':'sobró ')+fmt(Math.abs(d.delta))}${d.aclarado?(d.aclarado>=Math.abs(d.delta)?' · ✓ aclarado':' · aclarado '+fmt(d.aclarado)):''}</span></div>
         <div style="font-size:11px;color:var(--muted);">saldo ${fmt(d.antes)} → ${fmt(d.despues)}${d.acl.length?' · incluye '+d.acl.length+' aclaración(es)':''}</div>
         ${d.faltan.length?`<div style="margin-top:4px;">${d.faltan.map(f=>`<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--red);"><span>⚠ ${esc(f.cliente)} · ${esc(f.cuando||'')} <span style="color:var(--muted);">(${f.tipo})</span></span><b>${fmt(f.monto)}</b></div>`).join('')}</div>`:''}
         ${d.delta>0&&d.sobran.length?`<div style="margin-top:4px;">${d.sobran.map(f=>`<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--blue);"><span>🕒 ${esc(f.cliente)} · ${esc(f.cuando||'')} <span style="color:var(--muted);">(entró sin cobro)</span></span><b>${fmt(f.monto)}</b></div>`).join('')}</div>`:''}
@@ -1613,7 +1613,7 @@ async function aclConfirmar(tipo){
     const r=aclFact.res; const num=document.getElementById('aclFactNum').value.trim();
     if(!r||r.dif<=0||!num) return;
     monto=Math.min(r.dif,-x.saldo);
-    refs=[{ factura:num, fecha:r.dia.fecha, informe_antes:r.viejo, informe_corregido:r.nuevo, cobros:r.quitados }];
+    refs=[{ factura:num, fecha:r.dia.fecha, dia_id:r.dia.id, informe_antes:r.viejo, informe_corregido:r.nuevo, cobros:r.quitados }];
     ACL.archivo=r.archivo;
     if(!confirm(`¿Aclarar ${fmt(monto)} del faltante SINPE de ${x.sede} por la factura ${num} del ${r.dia.fecha}?\n\nEl saldo queda en ${fmt(x.saldo+monto)}. Queda registrado con su usuario, la nota y el informe corregido.`)) return;
   } else {
@@ -1811,12 +1811,21 @@ function renderSinpeResumen(){
   box.insertAdjacentHTML('beforeend', htmlConciliacion());
 }
 // Al auditar un cierre del historial se muestra el SINPE tal como quedó guardado (sr = c.sinpe_reporte).
+// Diferencia SINPE de ESE día (recibido − facturado) y cuánto de ella quedó aclarado después (sinpe_aclaraciones.sql)
+function sinpeDia(sr){
+  if(!sr||sr.nuevosMonto==null||sr.facturado==null) return null;
+  const delta=Math.round((Number(sr.nuevosMonto)||0)-(Number(sr.facturado)||0)), acl=Math.round(Number(sr.aclarado)||0);
+  const pend=delta<0?Math.max(0,-delta-acl):delta>0?Math.max(0,delta-acl):0;
+  return { delta, acl, pend, aclarado: delta!==0&&acl>0&&pend===0 };
+}
 function renderSinpeResumenHist(sr){
   const box=document.getElementById('sinpeResumen'); if(!box)return;
   if(!sr){ box.innerHTML=''; return; }
   const pendAfter=Math.round(sr.pendAfter!=null?sr.pendAfter:((Number(sr.pendPrev)||0)+(Number(sr.nuevosMonto)||0)-(Number(sr.facturado)||0)));
   let bg,cl,ic,txt;
-  if(pendAfter<0){ bg='var(--red-tint)'; cl='var(--red)'; ic='⚠'; txt='Se facturó más SINPE del recibido — faltó (revisar)'; }
+  const dia=sinpeDia(sr);
+  if(dia&&dia.aclarado){ bg='var(--green-tint)'; cl='var(--green)'; ic='✓'; txt=`La diferencia de este día (${dia.delta<0?'faltó':'sobró'} ${fmt(Math.abs(dia.delta))}) quedó aclarada (ver abajo)`; }
+  else if(pendAfter<0){ bg='var(--red-tint)'; cl='var(--red)'; ic='⚠'; txt=dia&&dia.acl?`Se facturó más SINPE del recibido — faltan ${fmt(dia.pend)} por aclarar`:'Se facturó más SINPE del recibido — faltó (revisar)'; }
   else if(pendAfter===0){ bg='var(--green-tint)'; cl='var(--green)'; ic='✓'; txt='Todo el SINPE recibido quedó facturado (cuadró)'; }
   else { bg='var(--blue-tint)'; cl='var(--blue)'; ic='🕒'; txt='SINPE recibido que sobró, pendiente de facturar (se factura después)'; }
   box.innerHTML=`
@@ -1828,6 +1837,7 @@ function renderSinpeResumenHist(sr){
       <div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--muted);"><span>Pendiente arrastrado</span><span>${fmt(sr.pendPrev||0)}</span></div>
       <div style="padding:9px 12px;background:${bg};color:${cl};font-weight:800;border-top:1px solid var(--border);"><div style="display:flex;justify-content:space-between;"><span>${ic} Pendiente por facturar</span><span>${fmt(pendAfter)}</span></div><div style="font-weight:600;font-size:11px;margin-top:2px;opacity:.9;">${txt}</div></div>
       ${sr.ajuste_manual?`<div style="padding:6px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);">✎ Pendiente puesto en 0 a mano (antes ${fmt(sr.ajuste_manual.pendiente_antes||0)})</div>`:''}
+      ${(sr.aclarado_detalle||[]).map(a=>`<div style="padding:6px 12px;font-size:11px;color:var(--green);border-top:1px solid var(--border);">✓ ${fmt(a.monto)} de la diferencia de este día aclarados (${a.tipo==='factura'?'factura anulada':a.tipo==='faltante'?'SINPE sin contar':'excedente'}) · ${esc(a.nota||'')} · ${esc(a.por||'')} · ${a.at?new Date(a.at).toLocaleDateString('es-CR'):''}</div>`).join('')}
       ${(sr.aclaraciones||[]).map(a=>`<div style="padding:6px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);">✎ ${a.tipo==='faltante'?'Faltante':a.tipo==='factura'?'Faltante por factura anulada':'Excedente'} aclarado: ${fmt(a.monto)} (saldo ${fmt(a.antes)} → ${fmt(a.despues)}) · ${esc(a.nota||'')} · ${esc(a.por||'')} · ${new Date(a.at).toLocaleDateString('es-CR')}</div>`).join('')}
     </div>
     ${sr.cruce?htmlCruce(sr.cruce,true):'<div class="hint" style="margin-top:8px;">Este cierre no guardó el cruce por transacción (se guarda desde el 13/10/2026).</div>'}`;
@@ -2168,7 +2178,7 @@ function renderHist(){
     <td class="num">${fmt(c.caja_inicial)}</td><td class="num">${fmt(c.efectivo)}</td>
     <td class="num">${fmt(c.total_ventas)}</td><td class="num">${fmt(c.minita)}</td>
     <td class="num" style="color:${Math.round(c.diferencia||0)===0?'var(--green)':'var(--red)'};">${fmt(c.diferencia)}</td>
-    <td>${Math.round(c.diferencia||0)===0?'<span class="pill ok">OK</span>':(Math.round(c.diferencia||0)>0?'<span class="pill dif">Faltante</span>':'<span class="pill dif" style="background:var(--blue-tint);color:var(--blue);">Sobrante</span>')}${faltantesCruce(c.sinpe_reporte&&c.sinpe_reporte.cruce)?` <span class="pill dif" title="Cobros SINPE sin transferencia: abra el cierre para ver quiénes">⚠ SINPE ${faltantesCruce(c.sinpe_reporte.cruce)}</span>`:''}</td>
+    <td>${Math.round(c.diferencia||0)===0?'<span class="pill ok">OK</span>':(Math.round(c.diferencia||0)>0?'<span class="pill dif">Faltante</span>':'<span class="pill dif" style="background:var(--blue-tint);color:var(--blue);">Sobrante</span>')}${faltantesCruce(c.sinpe_reporte&&c.sinpe_reporte.cruce)&&!(sinpeDia(c.sinpe_reporte)||{}).aclarado?` <span class="pill dif" title="Cobros SINPE sin transferencia: abra el cierre para ver quiénes">⚠ SINPE ${faltantesCruce(c.sinpe_reporte.cruce)}</span>`:''}</td>
     <td><button class="btn-ghost" onclick='cargarCierre(${JSON.stringify(c.id)})'>Ver</button></td>
   </tr>`).join('');
 }

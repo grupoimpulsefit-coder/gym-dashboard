@@ -194,7 +194,7 @@
 <script src="/sesion.js"></script>
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-10-15a';
+const APP_VER='2026-10-18a';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -331,9 +331,16 @@ const ultimoTurno=s=>{const ts=turnosDe(s);return ts[ts.length-1]||null;};
 function difInfo(c){ if(!c) return null; const d=Math.round(Number(c.diferencia)||0); if(d===0) return {cls:'ok',txt:'Cuadra'}; if(d>0) return {cls:'bad',txt:'Faltante '+fmt(d)}; return {cls:'info',txt:'Sobrante '+fmt(-d)}; }
 function estadoPill(c){ if(!c) return '<span class="pill warn">Sin turno</span>'; if(c.estado==='abierto') return '<span class="pill status live"><span class="dot"></span>Abierto '+hora(c.hora_apertura)+'</span>'; if(c.estado==='parcial') return '<span class="pill status">Parcial '+hora(c.hora_cierre)+'</span>'; return '<span class="pill status">Final '+hora(c.hora_cierre)+'</span>'; }
 // Cruce SINPE guardado en el cierre final: cobros SINPE sin su transferencia
-const cruceFaltan=c=>{ const g=c?.sinpe_reporte?.cruce; return g?((g.sinTrans||[]).length+(g.refSinTrans||[]).length):0; };
+const cruceFaltan=c=>{ const g=c?.sinpe_reporte?.cruce; if(!g||sinpePill(c)?.aclarado) return 0; return (g.sinTrans||[]).length+(g.refSinTrans||[]).length; };
 const invDifiere=o=>!!o&&o.contado!=null&&(o.difiere!=null?!!o.difiere:(o.sistema!=null&&Number(o.contado)!==Number(o.sistema)));
-function sinpePill(c){ const sr=c?.sinpe_reporte; if(!sr) return null; const pa=Math.round(sr.pendAfter!=null?sr.pendAfter:((Number(sr.pendPrev)||0)+(Number(sr.nuevosMonto)||0)-(Number(sr.facturado)||0))); return pa<0?{cls:'bad',txt:'SINPE faltó '+fmt(-pa),pa}:pa===0?{cls:'ok',txt:'SINPE cuadró',pa}:{cls:'info',txt:'SINPE +'+fmt(pa)+' por facturar',pa}; }
+// La alerta es por la diferencia de ESE día (recibido − facturado), descontando lo aclarado después en caja.
+// Un saldo negativo heredado de días anteriores no vuelve a alertar cada día.
+function sinpePill(c){ const sr=c?.sinpe_reporte; if(!sr) return null; const pa=Math.round(sr.pendAfter!=null?sr.pendAfter:((Number(sr.pendPrev)||0)+(Number(sr.nuevosMonto)||0)-(Number(sr.facturado)||0)));
+  if(sr.nuevosMonto!=null&&sr.facturado!=null){ const delta=Math.round((Number(sr.nuevosMonto)||0)-(Number(sr.facturado)||0)), acl=Math.round(Number(sr.aclarado)||0);
+    if(delta<0){ const f=Math.max(0,-delta-acl); return f>0?{cls:'bad',txt:'SINPE faltó '+fmt(f),pa:-f}:{cls:'ok',txt:'SINPE aclarado',pa:0,aclarado:true}; }
+    if(delta>0&&acl>=delta) return {cls:'ok',txt:'SINPE aclarado',pa:0,aclarado:true};
+    return pa>0?{cls:'info',txt:'SINPE +'+fmt(pa)+' por facturar',pa}:{cls:'ok',txt:'SINPE cuadró',pa:0}; }
+  return pa<0?{cls:'bad',txt:'SINPE faltó '+fmt(-pa),pa}:pa===0?{cls:'ok',txt:'SINPE cuadró',pa}:{cls:'info',txt:'SINPE +'+fmt(pa)+' por facturar',pa}; }
 // Alertas automáticas de un cierre (misma lógica para cards, hub y auditoría). prev = turno anterior del mismo día.
 function prevDe(s,c){ if(!c) return null; return turnosDe(s).find(t=>t.turno_num===(c.turno_num||0)-1)||null; }
 function alertasDe(c,prev){ const a=[]; if(!c) return a; const cerrado=c.estado!=='abierto';
