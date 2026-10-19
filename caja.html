@@ -321,6 +321,7 @@ table.hist tbody tr:hover td { background:var(--fill); }
     <input type="file" id="fileVentas" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarInformeVentas(this.files[0])">
     <label class="btn-ghost" for="fileSinpe" style="cursor:pointer;">🔷 Reporte SINPE</label>
     <input type="file" id="fileSinpe" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]) cargarReporteSinpe(this.files[0])">
+    <button class="btn-ghost" id="btnAclSinpe" type="button" style="display:none;" onclick="abrirAclaraciones()" title="Aclarar el saldo SINPE pendiente de una sede (queda registrado)">🔷 Saldo SINPE</button>
     <label class="btn-ghost" id="btnSinpeHist" for="fileSinpeHist" style="cursor:pointer;display:none;" title="Carga ÚNICA de SINPE históricos (para que no se recuenten)">🗄️ SINPE históricos</label>
     <input type="file" id="fileSinpeHist" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]){cargarSinpeHistorico(this.files[0]);this.value='';}">
     <button class="btn-ghost" onclick="loadCierres()">↻ Recargar</button>
@@ -339,6 +340,22 @@ table.hist tbody tr:hover td { background:var(--fill); }
 <div id="enviosBanner" style="display:none;padding:12px var(--gut);background:var(--orange-tint);border-bottom:.5px solid var(--hair);"></div>
 
 <!-- Modal recibir mercadería -->
+<!-- Modal: aclarar saldo SINPE (solo admins) -->
+<div id="aclModal" class="modal-bg">
+  <div class="modal-card" style="max-width:720px;">
+    <div class="mh">🔷 Saldo SINPE por sede</div>
+    <div class="mb">
+      <div class="hint" style="margin-bottom:10px;">El saldo de cada sede se arrastra de cierre en cierre. <b>Excedente</b>: entró SINPE que no se facturó; se aclara con una nota. <b>Faltante</b>: se facturó más SINPE del que entró; se aclara cargando el reporte donde salen los SINPE que faltaban por contar. Todo queda registrado con su autor.</div>
+      <div id="aclSedes"></div>
+      <div id="aclDetalle" style="margin-top:14px;"></div>
+      <div id="aclMsg" style="font-size:14px;min-height:18px;margin-top:10px;"></div>
+      <div style="margin-top:16px;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;">Aclaraciones registradas</div>
+      <div id="aclHist" style="margin-top:6px;"></div>
+    </div>
+    <div class="mf"><button class="btn-ghost" type="button" onclick="document.getElementById('aclModal').style.display='none'">Cerrar</button></div>
+  </div>
+</div>
+
 <div id="recibirModal" class="modal-bg">
   <div class="modal-card" style="max-width:540px;">
     <div class="mh">📥 Recibir mercadería</div>
@@ -818,6 +835,7 @@ async function init(){
   document.getElementById('sedeTitle').textContent='· '+currentSede;
   limpiarCacheVieja();   // borra borradores viejos en localStorage (ya no se usan)
   const bh=document.getElementById('btnSinpeHist'); if(bh)bh.style.display=esAdmin()?'':'none';   // carga única: solo admins
+  const ba=document.getElementById('btnAclSinpe'); if(ba)ba.style.display=esAdmin()?'':'none';   // aclarar saldo SINPE: solo admins
   renderDenoms(); renderGastos(); renderIngresos();
   document.getElementById('app').style.display='block';
   document.getElementById('tabEv').hidden=!esAdmin();   // eventos: los crea un administrador
@@ -1358,6 +1376,123 @@ async function refsRegistradas(sede, refs){
   }
   return ya;
 }
+// ── Aclarar el saldo SINPE de una sede (solo admins; aclarar_sinpe() en sinpe_aclaraciones.sql) ──
+const ACL={ saldos:[], sede:null, trans:[], archivo:null };
+const aclSaldoTxt=v=>v>0?`<span style="color:var(--blue);font-weight:700;">+${fmt(v)} excedente</span>`:v<0?`<span style="color:var(--red);font-weight:700;">−${fmt(-v)} faltante</span>`:'<span style="color:var(--green);font-weight:700;">✓ en 0</span>';
+async function abrirAclaraciones(){
+  if(!esAdmin()) return;
+  document.getElementById('aclModal').style.display='flex';
+  ACL.sede=null; document.getElementById('aclDetalle').innerHTML=''; document.getElementById('aclMsg').textContent='';
+  await cargarAclaraciones();
+}
+async function cargarAclaraciones(){
+  const box=document.getElementById('aclSedes'); box.innerHTML='<div class="hint">Cargando…</div>';
+  try{
+    // El saldo vigente de cada sede es el de su último cierre con pendiente
+    ACL.saldos=await Promise.all(SEDES.map(async sede=>{
+      const r=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(sede)}&sinpe_pendiente=not.is.null&order=fecha.desc,created_at.desc&limit=1&select=id,fecha,turno_num,sinpe_pendiente`))||[];
+      return { sede, c:r[0]||null, saldo:r[0]?Math.round(Number(r[0].sinpe_pendiente)||0):0 };
+    }));
+    box.innerHTML=`<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">${ACL.saldos.map(x=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid var(--border);${ACL.sede===x.sede?'background:var(--fill);':''}">
+        <div style="flex:1;"><b>${esc(x.sede)}</b><div style="font-size:12px;color:var(--muted);">${x.c?'Último cierre: '+esc(x.c.fecha)+' · turno '+x.c.turno_num:'Sin cierres con saldo SINPE'}</div></div>
+        <div>${aclSaldoTxt(x.saldo)}</div>
+        ${x.saldo?`<button class="btn-ghost" type="button" onclick="aclElegir('${esc(x.sede)}')">Aclarar</button>`:''}
+      </div>`).join('')}</div>`;
+  }catch(e){ box.innerHTML=`<div class="hint" style="color:var(--red);">No se pudo cargar: ${esc(mensajeError(e))}</div>`; }
+  try{
+    const h=(await supaFetch('/sinpe_aclaraciones?order=created_at.desc&limit=30&select=*'))||[];
+    document.getElementById('aclHist').innerHTML=h.length?h.map(a=>`<div style="padding:7px 2px;border-bottom:1px solid var(--hair);font-size:13px;">
+        <b>${esc(a.sede)}</b> · ${a.tipo==='faltante'?'faltante':'excedente'} de ${fmt(a.monto)} · saldo ${fmt(a.pendiente_antes)} → ${fmt(a.pendiente_despues)}
+        <div style="color:var(--muted);font-size:12px;">${esc(a.nota)}${(a.referencias||[]).length?` · ${a.referencias.length} SINPE registrados${a.archivo?' ('+esc(a.archivo)+')':''}`:''}<br>${esc(a.hecho_por||'—')} · ${new Date(a.created_at).toLocaleString('es-CR')} · cierre del ${esc(a.cierre_fecha||'—')}</div></div>`).join('')
+      :'<div class="hint">Todavía no hay aclaraciones.</div>';
+  }catch(e){ document.getElementById('aclHist').innerHTML=/sinpe_aclaraciones/.test(e.message)?'<div class="hint">Falta correr <b>sinpe_aclaraciones.sql</b> en Supabase.</div>':''; }
+}
+function aclElegir(sede){
+  ACL.sede=sede; ACL.trans=[]; ACL.archivo=null; document.getElementById('aclMsg').textContent='';
+  const x=ACL.saldos.find(y=>y.sede===sede); if(!x) return;
+  cargarAclaraciones();   // repinta la lista con la sede marcada
+  const d=document.getElementById('aclDetalle');
+  const notaHtml=`<label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 6px;">Nota (obligatoria)</label>
+    <textarea id="aclNota" rows="2" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:8px 10px;font:inherit;font-size:14px;background:var(--fill);color:var(--label);" placeholder="${x.saldo>0?'Ej. pago adelantado de noviembre de Ana Mora / SINPE de otra sede / devolución':'Ej. SINPE del 2/10 en la noche que quedó fuera del reporte'}"></textarea>`;
+  if(x.saldo>0){
+    d.innerHTML=`<div style="background:var(--blue-tint);border-radius:10px;padding:12px;">
+      <b>${esc(sede)}: excedente de ${fmt(x.saldo)}</b><div class="hint">Entró SINPE que no se facturó (pagos adelantados, de otra sede, devoluciones…). Explique por qué y elija cuánto aclarar.</div>
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 6px;">Monto a aclarar</label>
+      <input type="number" id="aclMonto" min="1" max="${x.saldo}" step="1" value="${x.saldo}" style="width:180px;padding:6px 10px;border:1.5px solid var(--border);border-radius:10px;font-weight:700;">
+      ${notaHtml}
+      <div style="margin-top:10px;text-align:right;"><button class="btn-primary" id="aclBtn" type="button" onclick="aclConfirmar('excedente')">Aclarar excedente</button></div></div>`;
+  } else {
+    d.innerHTML=`<div style="background:var(--red-tint);border-radius:10px;padding:12px;">
+      <b>${esc(sede)}: faltante de ${fmt(-x.saldo)}</b><div class="hint">Se facturó más SINPE del que se contó como recibido. Cargue el <b>Reporte SINPE</b> donde salen los SINPE que faltaban (p. ej. descargado desde un día antes) y marque los que explican el faltante. Quedan registrados y no se pueden volver a contar.</div>
+      <input type="file" id="aclArchivo" accept=".xlsx,.xls" style="margin-top:10px;" onchange="if(this.files[0]) aclLeerReporte(this.files[0])">
+      <div id="aclTrans" style="margin-top:10px;"></div>
+      ${notaHtml}
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;justify-content:flex-end;flex-wrap:wrap;"><span id="aclSuma" class="hint"></span><button class="btn-primary" id="aclBtn" type="button" onclick="aclConfirmar('faltante')" disabled>Registrar y aclarar</button></div></div>`;
+  }
+}
+// Lee el reporte y deja solo los SINPE que todavía no están contados en esa sede
+async function aclLeerReporte(file){
+  const box=document.getElementById('aclTrans'); box.innerHTML='<div class="hint">Leyendo…</div>';
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(new Uint8Array(buf),{type:'array'});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+    let hdr=-1,cRef=-1,cMonto=-1,cFecha=-1,cDet=-1,cOrig=-1;
+    for(let i=0;i<Math.min(rows.length,15);i++){ const nm=(rows[i]||[]).map(normHdr);
+      const ri=nm.findIndex(c=>c.includes('referencia')); const mi=nm.findIndex(c=>c==='monto');
+      if(ri>=0&&mi>=0){ hdr=i; cRef=ri; cMonto=mi; cFecha=nm.findIndex(c=>c.includes('fecha')&&c.includes('transacc')); if(cFecha<0)cFecha=nm.findIndex(c=>c.includes('fecha')); cDet=nm.findIndex(c=>c==='detalle'); cOrig=nm.findIndex(c=>c.includes('cliente origen')); break; } }
+    if(hdr<0) throw new Error('No se encontró el encabezado con "ReferenciaSinpe" y "Monto". ¿Es el reporte SINPE?');
+    const vistos=new Set(), all=[];
+    for(let i=hdr+1;i<rows.length;i++){ const r=rows[i]; if(!r) continue; const ref=String(r[cRef]==null?'':r[cRef]).trim(); if(!ref||vistos.has(ref)) continue; vistos.add(ref);
+      all.push({ referencia:ref, monto:Math.round(Number(r[cMonto])||0), fecha_tx:cFecha>=0?String(r[cFecha]||'').trim():'', detalle:cDet>=0?String(r[cDet]||'').trim():'', origen:cOrig>=0?String(r[cOrig]||'').trim():'' }); }
+    const ya=await refsRegistradas(ACL.sede, all.map(x=>x.referencia));
+    ACL.trans=all.filter(x=>!ya.has(x.referencia)&&x.monto>0); ACL.archivo=file.name;
+    box.innerHTML=ACL.trans.length
+      ? `<div class="hint">${all.length} SINPE en el reporte · ${ACL.trans.length} sin contar todavía. Marque los que explican el faltante:</div>
+         <div class="lista-box" style="max-height:240px;margin-top:6px;">${ACL.trans.map((t,i)=>`
+           <label style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid var(--hair);font-size:13px;cursor:pointer;">
+             <input type="checkbox" data-i="${i}" onchange="aclSumar()" style="width:auto;">
+             <span style="flex:1;"><b>${esc(t.origen||'Sin nombre')}</b> · ${esc(t.fecha_tx)}<div style="color:var(--muted);font-size:12px;">${esc(t.detalle||'')} · ref …${esc(t.referencia.slice(-6))}</div></span>
+             <b>${fmt(t.monto)}</b></label>`).join('')}</div>`
+      : `<div class="hint" style="color:var(--orange);">Los ${all.length} SINPE de este reporte ya están contados: no explican el faltante. Pruebe con un reporte de otras fechas.</div>`;
+    aclSumar();
+  }catch(e){ box.innerHTML=`<div class="hint" style="color:var(--red);">${esc(e.message)}</div>`; }
+}
+function aclElegidos(){ return [...document.querySelectorAll('#aclTrans input[type=checkbox]:checked')].map(c=>ACL.trans[Number(c.dataset.i)]).filter(Boolean); }
+function aclSumar(){
+  const x=ACL.saldos.find(y=>y.sede===ACL.sede); const sel=aclElegidos(); const suma=sel.reduce((a,t)=>a+t.monto,0);
+  const el=document.getElementById('aclSuma'); const b=document.getElementById('aclBtn');
+  if(el) el.innerHTML=sel.length?`${sel.length} SINPE · ${fmt(suma)} → el saldo queda en <b>${fmt((x?x.saldo:0)+suma)}</b>`:'';
+  if(b) b.disabled=!sel.length;
+}
+async function aclConfirmar(tipo){
+  const x=ACL.saldos.find(y=>y.sede===ACL.sede); if(!x) return;
+  const msg=document.getElementById('aclMsg'); const nota=(document.getElementById('aclNota').value||'').trim();
+  if(nota.length<8){ msg.style.color='var(--red)'; msg.textContent='Escriba una nota que explique la aclaración (al menos 8 caracteres).'; return; }
+  let monto=0, refs=[];
+  if(tipo==='excedente'){
+    monto=Math.round(Number(document.getElementById('aclMonto').value)||0);
+    if(monto<=0||monto>x.saldo){ msg.style.color='var(--red)'; msg.textContent=`El monto debe estar entre 1 y ${fmt(x.saldo)}.`; return; }
+    if(!confirm(`¿Aclarar ${fmt(monto)} del excedente SINPE de ${x.sede}?\n\nEl saldo queda en ${fmt(x.saldo-monto)}. Queda registrado con su usuario y la nota.`)) return;
+  } else {
+    refs=aclElegidos(); monto=refs.reduce((a,t)=>a+t.monto,0);
+    if(!refs.length) return;
+    if(!confirm(`¿Registrar ${refs.length} SINPE (${fmt(monto)}) en ${x.sede} y aclarar el faltante?\n\nEl saldo queda en ${fmt(x.saldo+monto)}. Esos SINPE quedan contados y registrados con su usuario.`)) return;
+  }
+  const b=document.getElementById('aclBtn'); b.disabled=true; b.textContent='Guardando…';
+  try{
+    const r=await supaFetch('/rpc/aclarar_sinpe',{method:'POST',prefer:'return=representation',body:{p_sede:x.sede,p_tipo:tipo,p_monto:monto,p_nota:nota,p_refs:refs,p_archivo:ACL.archivo}});
+    msg.style.color='var(--green)'; msg.textContent=`✅ ${x.sede}: saldo ${fmt(r.antes)} → ${fmt(r.despues)}. Quedó registrado.`;
+    ACL.sede=null; document.getElementById('aclDetalle').innerHTML='';
+    await cargarAclaraciones();
+    if(x.sede===currentSede) loadCierres();
+  }catch(e){
+    b.disabled=false; b.textContent=tipo==='excedente'?'Aclarar excedente':'Registrar y aclarar';
+    msg.style.color='var(--red)'; msg.textContent='⚠ '+(/aclarar_sinpe|PGRST202|Could not find the function/i.test(e.message)?'Falta correr sinpe_aclaraciones.sql en Supabase.':mensajeError(e));
+  }
+}
+
 // ── Reporte SINPE (obligatorio en cierre final): dedup por ReferenciaSinpe + comparación ──
 function normHdr(s){ return String(s||'').toLowerCase().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n').replace(/\s+/g,' ').trim(); }
 async function cargarReporteSinpe(file){
@@ -1551,6 +1686,7 @@ function renderSinpeResumenHist(sr){
       <div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--muted);"><span>Pendiente arrastrado</span><span>${fmt(sr.pendPrev||0)}</span></div>
       <div style="padding:9px 12px;background:${bg};color:${cl};font-weight:800;border-top:1px solid var(--border);"><div style="display:flex;justify-content:space-between;"><span>${ic} Pendiente por facturar</span><span>${fmt(pendAfter)}</span></div><div style="font-weight:600;font-size:11px;margin-top:2px;opacity:.9;">${txt}</div></div>
       ${sr.ajuste_manual?`<div style="padding:6px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);">✎ Pendiente puesto en 0 a mano (antes ${fmt(sr.ajuste_manual.pendiente_antes||0)})</div>`:''}
+      ${(sr.aclaraciones||[]).map(a=>`<div style="padding:6px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);">✎ ${a.tipo==='faltante'?'Faltante':'Excedente'} aclarado: ${fmt(a.monto)} (saldo ${fmt(a.antes)} → ${fmt(a.despues)}) · ${esc(a.nota||'')} · ${esc(a.por||'')} · ${new Date(a.at).toLocaleDateString('es-CR')}</div>`).join('')}
     </div>
     ${sr.cruce?htmlCruce(sr.cruce,true):'<div class="hint" style="margin-top:8px;">Este cierre no guardó el cruce por transacción (se guarda desde el 13/10/2026).</div>'}`;
 }
