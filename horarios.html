@@ -314,6 +314,17 @@ const dowDe=f=>{const [y,m,d]=f.split('-').map(Number);return new Date(y,m-1,d).
 const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(currentRole);
 const puedeMarcar=()=>esAdmin()||['recepcion','admin_sucursal','coordinador'].includes(currentRole);
 const puedeRegistro=()=>esAdmin()||['admin_sucursal','coordinador'].includes(currentRole);
+// Celular o tablet: por marca del navegador, iPad/iPhone que se presentan como Mac, o pantalla
+// táctil chica (Android en "sitio de escritorio"). Una laptop táctil tiene puntero fino y no cuenta.
+function esCelular(){
+  const ua=navigator.userAgent||'';
+  if(navigator.userAgentData&&navigator.userAgentData.mobile)return true;
+  if(/Android|iPhone|iPad|iPod|Mobile|Windows Phone|webOS|BlackBerry|Opera Mini|IEMobile/i.test(ua))return true;
+  if(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1)return true;
+  return !!(window.matchMedia&&matchMedia('(pointer:coarse)').matches&&Math.min(screen.width,screen.height)<900);
+}
+// Recepción solo usa este módulo desde la computadora de la sede
+const bloqueadoEnCelular=()=>currentRole==='recepcion'&&esCelular();
 function computeSedes(sede,extra){const set=[];[sede,...(Array.isArray(extra)?extra:[])].forEach(s=>{if(s&&SEDES.includes(s)&&!set.includes(s))set.push(s);});return set;}
 function aviso(txt,ok){const t=document.getElementById('toast');t.textContent=txt;t.className='toast show'+(ok?'':' bad');clearTimeout(t._h);t._h=setTimeout(()=>{t.className='toast'+(ok?'':' bad');},3600);}
 const colorDe=h=>COLORES[Math.max(0,horarios.indexOf(h))%COLORES.length];
@@ -372,6 +383,15 @@ async function doLogout(silent){ Sesion.cerrar();
 
 // ── Init ──
 function init(){
+  // Sin cerrar la sesión: es compartida con el menú y las demás pestañas
+  if(bloqueadoEnCelular()){
+    document.getElementById('app').hidden=true;
+    document.getElementById('loginScreen').hidden=false;
+    document.querySelector('.login-card').innerHTML=`<div class="login-logo">📵</div><h2>Solo en computadora</h2>
+      <div class="login-sub">Horarios no se puede usar desde el celular con una cuenta de recepción. Use la computadora de la sede.</div>
+      <button class="btn-fill" onclick="history.length>1?history.back():location.href='/'">Volver</button>`;
+    return;
+  }
   document.getElementById('userNombre').textContent=currentNombre||currentEmail;
   document.getElementById('userRol').textContent=ROL_LABEL[currentRole]||'';
   const ctrl=document.getElementById('sedeControl');
