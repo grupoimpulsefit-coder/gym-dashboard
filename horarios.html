@@ -280,7 +280,6 @@ const PUESTO={recepcion:'Recepción',instructor:'Instructor',otro:'Otro'};
 const TIPO={disponible:'Disponible',sale_comer:'Salió a comer',vuelve_comer:'Volvió de comer',fin:'Fin de turno'};
 const COLORES=['#007AFF','#34C759','#FF9500','#AF52DE','#FF2D55','#30B0C7','#5856D6','#A2845E','#64C466','#FFB800'];
 const PX=56;         // alto de una hora en la línea de tiempo
-const DESHACER_MIN=5;   // minutos para deshacer una marca propia (lo hace cumplir horarios.sql)
 
 let currentToken=null,currentRole=null,currentSede=null,currentEmail='',currentNombre='',currentSedes=[],currentUserId=null;
 let tab='horario', dia=new Date().getDay(), horarios=[], marcas=[], usuarios=[], reqSeq=0, marcando=false;
@@ -550,9 +549,7 @@ function htmlMarcar(){
     else if(ult==='fin')est=`<span class="dim">Turno terminado a las ${tTxt(new Date(ms[ms.length-1].marcado_at))}</span>`;
     else { const b=tramos(h.bloques)[0]; est=hoyToca&&b&&n>b.ini?`<span class="warnc">Sin marcar · entraba a las ${hTxt(b.ini)}</span>`:'<span class="dim">Sin marcar hoy</span>'; }
     const acts=(SIGUIENTE[ult]||[]).map(t=>`<button class="bt ${BTN[t][0]}" ${marcando?'disabled':''} onclick="marcar('${h.id}','${t}')">${BTN[t][1]}</button>`).join('');
-    // Historial del día; la última marca propia se puede deshacer unos minutos
-    const ultM=ms[ms.length-1];
-    const puedeDeshacer=ultM&&!esAdmin()&&ultM.registrado_por===currentEmail&&(Date.now()-new Date(ultM.created_at))<DESHACER_MIN*60000;
+    // Historial del día (una marca equivocada solo la corrige un admin)
     const hist=ms.map(m=>`<span class="h">${TIPO[m.tipo]} ${tTxt(new Date(m.marcado_at))}${m.manual?' ✎':''}</span>`).join('');
     const comidasTxt=an.comidas.filter(c=>!c.abierta&&c.dur!=null).map(c=>c.exceso>0
       ?`<span class="exc">Comida de ${durTxt(c.dur)}: se pasó ${durTxt(c.exceso)}</span>`
@@ -563,12 +560,12 @@ function htmlMarcar(){
         ${esAdmin()?`<button class="lnk" onclick="verDia(${dk(h.persona,hoy)})">✎ Marcas</button>`:''}</div>
       <div class="est">${est}</div>
       <div class="acts">${acts}</div>
-      ${hist?`<div class="hist">${hist}${puedeDeshacer?` <button class="lnk red" onclick="deshacer('${ultM.id}')">Deshacer</button>`:''}</div>`:''}
+      ${hist?`<div class="hist">${hist}</div>`:''}
       ${comidasTxt?`<div style="font-size:14px">${comidasTxt}</div>`:''}
     </div>`;
   };
   const a=conTurno.map(card).join(''), b=sinTurno.map(card).join('');
-  return `<div class="hint">Cada quien marca al quedar <b>disponible</b>, al <b>salir a comer</b> y al <b>volver</b>. La hora la pone el sistema; si se marca algo por error hay ${DESHACER_MIN} minutos para deshacerlo.</div>
+  return `<div class="hint">Cada quien marca al quedar <b>disponible</b>, al <b>salir a comer</b> y al <b>volver</b>. La hora la pone el sistema. Revise antes de tocar: una marca equivocada solo la puede corregir un administrador.</div>
     ${a?`<div class="sect"><div class="hdr">Con turno hoy</div><div class="cards">${a}</div></div>`:''}
     ${b?`<div class="sect"><div class="hdr">Sin turno hoy en el horario</div><div class="cards">${b}</div></div>`:''}`;
 }
@@ -584,16 +581,6 @@ async function marcar(hid,tipo){
     aviso(/fuera de orden/i.test(e.message)?'Esa marca ya estaba hecha (¿desde otra pantalla?). Se actualizó la lista.':'No se pudo marcar: '+e.message);
   }
   marcando=false; await cargar();
-}
-
-async function deshacer(id){
-  if(!confirm('¿Deshacer la última marca?'))return;
-  try{
-    const r=await supaFetch(`/marcas_horario?id=eq.${id}`,{method:'DELETE',prefer:'return=representation'});
-    if(!r||!r.length)aviso(`Ya pasaron los ${DESHACER_MIN} minutos. Pídale a un administrador que la corrija.`);
-    else aviso('Marca deshecha',true);
-  }catch(e){aviso('No se pudo deshacer: '+e.message);}
-  cargar();
 }
 
 // ═════════ Vista: registro (excesos) ═════════

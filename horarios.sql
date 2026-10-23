@@ -8,7 +8,7 @@
 --                    para que cambiar el horario después no altere los excesos ya medidos.
 --
 --  Roles:
---    admin / admin_sedes / admin_g  → editan horarios, ven todo, marcas manuales y borran
+--    admin / admin_sedes / admin_g  → editan horarios, ven todo, marcas manuales y borran (solo ellos corrigen)
 --    recepcion / coordinador / admin_sucursal → ven el horario de su sede y marcan
 --    instructor → solo consulta el horario de su sede
 --
@@ -138,12 +138,10 @@ create policy marcas_insert on marcas_horario for insert to authenticated
          or (ur.role in ('recepcion','admin_sucursal','coordinador')
              and (ur.sede = marcas_horario.sede or marcas_horario.sede = any(ur.sedes_extra))))));
 
--- Sin UPDATE: una marca no se edita. Se borra: admins siempre; quien la hizo, solo
--- en los primeros 5 minutos (para deshacer un toque equivocado).
+-- Sin UPDATE: una marca no se edita. Solo los admins la borran o la corrigen (sin tiempo de gracia).
 drop policy if exists marcas_delete on marcas_horario;
 create policy marcas_delete on marcas_horario for delete to authenticated
-  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('admin','admin_sedes','admin_g'))
-         or (registrado_por = auth.jwt() ->> 'email' and created_at > now() - interval '5 minutes'));
+  using (exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('admin','admin_sedes','admin_g')));
 
 
 -- ── Horario inicial de 3 Ríos (de la hoja de Excel). Solo si la sede aún no tiene horario.
