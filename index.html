@@ -1335,6 +1335,7 @@ async function showSedePicker() {
         cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
         cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
         cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agendar citas','Agenda semanal cada 15 minutos','#e8f4fd','#1a5276','/mediciones'));
+        cardsEl.appendChild(makeHandoffCard('🕒','Horarios','Marcar disponible y comida','Horario de la sede','#e8f4fd','#1565c0','/horarios'));
         portalSiPlanilla(cardsEl, makeHandoffCard);
         return;
     }
@@ -1347,6 +1348,7 @@ async function showSedePicker() {
         cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agendar citas','Agenda semanal cada 15 minutos','#e8f4fd','#1a5276','/mediciones'));
         cardsEl.appendChild(makeHandoffCard('📦','Inventario','Consultar stock','Solo lectura: productos, precios y faltantes','#fff8e1','#b9770e','/inventario'));
         cardsEl.appendChild(makeHandoffCard('🔷','Auditoría SINPE','Facturas vs transferencias','Qué facturas tienen su SINPE y cuáles no','#e8f4ff','#0c447c','/conciliacion'));
+        cardsEl.appendChild(makeHandoffCard('🕒','Horarios','Horario y marcas','Tiempo de comida de más','#e8f4fd','#1565c0','/horarios'));
         portalSiPlanilla(cardsEl, makeHandoffCard);
         return;
     }
@@ -1355,6 +1357,7 @@ async function showSedePicker() {
     if (currentRole === 'instructor') {
         statusEl.textContent = 'Su módulo' + (currentSede ? ` (${currentSede})` : '') + ':';
         cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agenda de la semana','Marcar rutina completa o incompleta','#e8f4fd','#1a5276','/mediciones'));
+        cardsEl.appendChild(makeHandoffCard('🕒','Horarios','Horario de la sede','Turnos y tiempos de comida','#e8f4fd','#1565c0','/horarios'));
         portalSiPlanilla(cardsEl, makeHandoffCard);
         return;
     }
@@ -1365,6 +1368,7 @@ async function showSedePicker() {
         cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
         cardsEl.appendChild(makeHandoffCard('🧾','Gastos','Registrar / ver gastos','Clases grupales e instructores de planta','#fff3e0','#e67e22','/gastos'));
         cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agendar citas','Agenda semanal cada 15 minutos','#e8f4fd','#1a5276','/mediciones'));
+        cardsEl.appendChild(makeHandoffCard('🕒','Horarios','Horario y marcas','Tiempo de comida de más','#e8f4fd','#1565c0','/horarios'));
         cardsEl.appendChild(makeHandoffCard('🌴','Mi Portal','Mis vacaciones','Vacaciones, incapacidades y citas médicas','#e8f7ee','#2e7d32','/rrhh'));
         return;
     }
@@ -1418,6 +1422,7 @@ async function showSedePicker() {
             cardsEl.appendChild(makeHandoffCard('📦','Inventario','Productos por sede','Stock, precios y faltantes','#fff8e1','#b9770e','/inventario'));
             cardsEl.appendChild(makeHandoffCard('🔷','Auditoría SINPE','Facturas vs transferencias','Qué facturas tienen su SINPE y cuáles no','#e8f4ff','#0c447c','/conciliacion'));
             cardsEl.appendChild(makeHandoffCard('📏','Mediciones','Agenda por sede','Citas cada 15 min y estado de rutina','#e8f4fd','#1a5276','/mediciones'));
+            cardsEl.appendChild(makeHandoffCard('🕒','Horarios','Horario por sede','Marcas de recepción y comida de más','#e8f4fd','#1565c0','/horarios'));
             // Crear cuenta de acceso — abre modal (no navega)
             const cc = document.createElement('div');
             cc.className = 'pick-card punteada';
