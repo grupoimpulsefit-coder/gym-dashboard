@@ -267,6 +267,8 @@
                        expires_in: Math.max(60, segs) }, false);
     },
     token: function () { return estado().access_token || null; },
+    url: function () { return cfg.url; },   // para asistente.js
+    key: function () { return cfg.key; },
     renovar: renovar,
     paraHandoff: function () { var s = estado(); return { refresh_token: s.refresh_token || null, exp: s.exp || 0 }; },
     cerrar: function () { detener(); borrar(); },
