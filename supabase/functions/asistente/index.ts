@@ -1,18 +1,27 @@
 // ════════════════════════════════════════════════════════════════════════
-//  Edge Function: asistente
+//  Edge Function: asistente  (Chloe)
 //  Chat de ayuda dentro de la app: responde dudas del personal con el Manual
 //  Operativo (manual.ts) y lo que se sabe de cómo funciona jykc.dev. Si la
 //  respuesta no está, o el trámite necesita a Administración (anular una
 //  venta, revisar un SINPE, un descuadre…), crea un ticket en
 //  asistente_tickets (ver asistente.sql) para que Administración lo atienda.
+//  Si la persona ya tiene una consulta pendiente del mismo asunto, le agrega
+//  los datos nuevos en vez de crear otra.
 //
-//  Requiere el secreto ANTHROPIC_API_KEY (el mismo de analizar-datafono).
+//  Además de { mensaje, historial, pagina } acepta:
+//    { accion: 'agregar', ticket, texto }  → botón "Agregar detalle" de Mis consultas
+//    { accion: 'probar_push' }             → notificación de prueba a los teléfonos de quien llama
+//
+//  Secretos: ANTHROPIC_API_KEY (el mismo de analizar-datafono) y, para las
+//  notificaciones push, VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY (la pública es la
+//  misma que VAPID_PUBLIC en movil.html). Sin las VAPID el chat funciona igual.
 //  Se publica con el nombre exacto: asistente  (incluye manual.ts)
 //    supabase functions deploy asistente
 //  (SUPABASE_URL, SUPABASE_ANON_KEY y SUPABASE_SERVICE_ROLE_KEY ya vienen inyectadas.)
 // ════════════════════════════════════════════════════════════════════════
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Anthropic from 'npm:@anthropic-ai/sdk';
+import webpush from 'npm:web-push@3.6.7';
 import { MANUAL } from './manual.ts';
 
 const CORS = {
@@ -24,6 +33,7 @@ const MODEL = 'claude-opus-5-5';
 const MAX_MENSAJES = 40;          // historial que se acepta del navegador (unos 10 intercambios)
 const MAX_HISTORIAL_BYTES = 300_000;
 const TIPOS = ['duda', 'anular_venta', 'revisar_sinpe', 'descuadre_caja', 'error_app', 'otro'] as const;
+const ADMIN_ROLES = ['admin', 'admin_sedes', 'admin_g'];
 
 const MAPA_APP = `Módulos de jykc.dev (cada uno es una pantalla; se entra desde el menú principal):
 • /caja — Cierre de Caja. Pestañas Cierre y Facturación. Abrir turno (denominaciones + inventario inicial), facturar productos/minita/eventos, cargar Informe de Ventas de WStudio, Reporte SINPE de Ridivi, foto del datáfono, conteo de inventario, opción de minita, recuadro verde «Para WStudio», cierre parcial y cierre final (definitivo; descargar el PDF antes).
@@ -37,7 +47,7 @@ Sedes: 3 Ríos, Pinares, Sabanilla (gimnasio) y Natación (academia).
 Roles: recepcion, admin_sucursal, instructor, coordinador, colaborador y Administración (admin, admin_sedes, admin_g).
 Sistemas externos: WStudio (membresías y su caja), Ridivi (SINPE Móvil). La sesión se cierra sola tras un rato sin actividad; si una pantalla falla con "sesión vencida", volver a iniciar sesión.`;
 
-const INSTRUCCIONES = `Sos el asistente de ayuda de jykc.dev, el sistema de gestión de Fit and Train Fitness Club (Costa Rica). Te escribe el personal del club (recepcionistas, instructores, coordinadores) desde dentro de la app.
+const INSTRUCCIONES = `Te llamás Chloe y sos la asistente de ayuda de jykc.dev, el sistema de gestión de Fit and Train Fitness Club (Costa Rica). Te escribe el personal del club (recepcionistas, instructores, coordinadores) desde dentro de la app.
 
 Cómo responder:
 • Respondé solo con lo que dicen el Manual Operativo y el mapa de la app de abajo, más las respuestas de Administración que se te den. No inventes pasos, montos, botones, plazos ni políticas.
@@ -50,6 +60,7 @@ Cuándo crear un ticket (herramienta crear_ticket):
 • Si pide algo que solo Administración puede hacer o autorizar (anular o corregir una venta o un cierre, revisar un SINPE que no aparece o no cuadra, un descuadre de caja, reembolsos, descuentos fuera de tarifa, excepciones al reglamento, un error de la app): creá el ticket con el tipo que corresponda. Nunca digas que la acción ya se hizo: decí que quedó solicitada.
 • Antes de crear un ticket de trámite, pedí los datos que falten si son necesarios para que Administración actúe (fecha, sede, monto, número de factura o los últimos 6 dígitos de la referencia SINPE, nombre del cliente). Si ya los tiene, no los vuelvas a pedir.
 • Un ticket por asunto. Si es una simple duda que sí está en el manual, respondé sin ticket.
+• Si la persona trae más datos o una corrección sobre un asunto que ya tiene una consulta pendiente (lista "CONSULTAS PENDIENTES DE ESTA PERSONA"), usá agregar_a_ticket con ese número en vez de crear otro, y decile a qué número se agregó. Si no está claro que sea el mismo asunto, preguntale. Las consultas ya respondidas no se reabren: un asunto nuevo lleva ticket nuevo.
 • Emergencias médicas o accidentes: indicá de inmediato el procedimiento del manual (sección 11) y que avise a Administración; no esperes a un ticket.
 • No compartas datos personales de colaboradores, clientes ni dueños.`;
 
@@ -67,10 +78,62 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [{
       detalle: { type: 'string', description: 'Datos útiles para Administración: fecha, sede, monto, factura, referencia SINPE, cliente, qué intentó. Vacío si no hay.' },
     },
   },
+}, {
+  name: 'agregar_a_ticket',
+  description: 'Agrega datos nuevos a una consulta PENDIENTE de esta misma persona (de la lista de consultas pendientes), en vez de crear otro ticket del mismo asunto.',
+  strict: true,
+  input_schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['ticket', 'detalle'],
+    properties: {
+      ticket: { type: 'integer', description: 'Número de la consulta pendiente.' },
+      detalle: { type: 'string', description: 'Lo nuevo que aporta la persona, completo y claro para Administración.' },
+    },
+  },
 }];
 
 function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
+}
+
+// ── Notificaciones push (Web Push) ───────────────────────────────────────
+type Aviso = { title: string; body: string; tag?: string; url?: string };
+async function enviarPush(admin: SupabaseClient, userIds: string[], aviso: Aviso) {
+  const pub = Deno.env.get('VAPID_PUBLIC_KEY'), priv = Deno.env.get('VAPID_PRIVATE_KEY');
+  if (!pub || !priv || !userIds.length) return 0;
+  const { data: subs } = await admin.from('push_suscripciones').select('endpoint, p256dh, auth').in('user_id', userIds);
+  if (!subs?.length) return 0;
+  webpush.setVapidDetails(Deno.env.get('VAPID_SUBJECT') || 'https://jykc.dev', pub, priv);
+  const r = await Promise.allSettled(subs.map(s =>
+    webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(aviso), { TTL: 86400 })
+      .catch(async (e: { statusCode?: number }) => {
+        // El teléfono desinstaló la app o revocó el permiso: la suscripción ya no sirve
+        if (e?.statusCode === 404 || e?.statusCode === 410) await admin.from('push_suscripciones').delete().eq('endpoint', s.endpoint);
+        throw e;
+      })));
+  return r.filter(x => x.status === 'fulfilled').length;
+}
+// A Administración, menos a quien hizo el cambio. Nunca rompe el chat si falla.
+async function avisarAdmins(admin: SupabaseClient, salvo: string, aviso: Aviso) {
+  try {
+    const { data } = await admin.from('user_roles').select('id').in('role', ADMIN_ROLES);
+    await enviarPush(admin, (data || []).map(a => a.id).filter(id => id !== salvo), aviso);
+  } catch (_) { /* sin aviso */ }
+}
+const recorte = (s: string, n = 140) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+
+// Agrega un detalle con la sesión de quien llama (la base valida que sea suya y siga pendiente)
+async function agregarDetalle(asCaller: SupabaseClient, admin: SupabaseClient, uid: string, ticket: number, texto: string) {
+  const { data, error } = await asCaller.rpc('asistente_agregar_detalle', { p_ticket: ticket, p_texto: texto });
+  if (error) throw new Error(error.message);
+  const t = data as { id: number; resumen: string; usuario: string; sede: string | null };
+  await avisarAdmins(admin, uid, {
+    title: `Chloe · Consulta #${t.id} actualizada`,
+    body: recorte(`${t.usuario}${t.sede ? ' (' + t.sede + ')' : ''} agregó: ${texto}`),
+    tag: 'ticket-' + t.id, url: '/movil?asistente=pend',
+  });
+  return t;
 }
 
 Deno.serve(async (req) => {
@@ -82,7 +145,6 @@ Deno.serve(async (req) => {
     const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const ANON = Deno.env.get('SUPABASE_ANON_KEY')!;
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!ANTHROPIC_API_KEY) return json({ error: 'Falta configurar ANTHROPIC_API_KEY en los secretos de la función.' }, 500);
 
     // 1) Quién pregunta: cualquier cuenta con rol en user_roles ---------------
     const token = (req.headers.get('Authorization') || '').replace('Bearer ', '').trim();
@@ -94,8 +156,23 @@ Deno.serve(async (req) => {
     const { data: yo } = await admin.from('user_roles').select('role, nombre, sede').eq('id', caller.user.id).single();
     if (!yo?.role) return json({ error: 'Sin permiso' }, 403);
 
-    // 2) Mensaje nuevo + historial que guarda el navegador ---------------------
     const body = await req.json().catch(() => ({}));
+
+    // Acciones sin chat ---------------------------------------------------------
+    if (body.accion === 'agregar') {
+      try {
+        const t = await agregarDetalle(asCaller, admin, caller.user.id, Number(body.ticket), String(body.texto || ''));
+        return json({ ok: true, id: t.id });
+      } catch (e) { return json({ error: (e as Error).message }, 400); }
+    }
+    if (body.accion === 'probar_push') {
+      const n = await enviarPush(admin, [caller.user.id], { title: 'Chloe', body: 'Las notificaciones de consultas están activas en este teléfono.', tag: 'prueba', url: '/movil' });
+      return json({ enviadas: n });
+    }
+
+    if (!ANTHROPIC_API_KEY) return json({ error: 'Falta configurar ANTHROPIC_API_KEY en los secretos de la función.' }, 500);
+
+    // 2) Mensaje nuevo + historial que guarda el navegador ---------------------
     const mensaje = String(body.mensaje || '').trim().slice(0, 4000);
     if (!mensaje) return json({ error: 'Mensaje vacío.' }, 400);
     const historial: Anthropic.Beta.BetaMessageParam[] = Array.isArray(body.historial) ? body.historial : [];
@@ -111,11 +188,20 @@ Deno.serve(async (req) => {
       .order('resuelto_at', { ascending: false }).limit(200);
     const extra = (aprendidas || []).map(t => `P: ${t.resumen}\nR: ${t.respuesta}`).join('\n\n');
 
+    // Consultas pendientes de quien pregunta: para agregarles datos en vez de duplicarlas
+    const { data: abiertas } = await admin.from('asistente_tickets')
+      .select('id, tipo, resumen, detalle, agregados, created_at').eq('user_id', caller.user.id).eq('estado', 'pendiente')
+      .order('created_at', { ascending: false }).limit(10);
+    const pendientes = (abiertas || []).map(t =>
+      `#${t.id} (${t.tipo}, ${String(t.created_at).slice(0, 10)}): ${t.resumen}` +
+      (t.detalle ? `\n   Detalle: ${recorte(String(t.detalle), 400)}` : '') +
+      ((t.agregados || []).length ? `\n   Agregado después: ${(t.agregados as { texto: string }[]).map(a => recorte(a.texto, 200)).join(' | ')}` : '')).join('\n');
+
     // El bloque grande (instrucciones + mapa + manual) va primero y en caché; lo que
     // cambia (respuestas aprendidas, quién pregunta) va después del punto de caché.
     const system: Anthropic.Beta.BetaTextBlockParam[] = [
       { type: 'text', text: `${INSTRUCCIONES}\n\n═══ MAPA DE LA APP ═══\n${MAPA_APP}\n\n═══ MANUAL OPERATIVO ═══\n${MANUAL}`, cache_control: { type: 'ephemeral' } },
-      { type: 'text', text: `═══ RESPUESTAS DE ADMINISTRACIÓN (valen igual que el manual; si chocan, mandan estas) ═══\n${extra || '(ninguna todavía)'}\n\n═══ QUIÉN PREGUNTA ═══\nNombre: ${yo.nombre || caller.user.email}\nRol: ${yo.role}\nSede: ${yo.sede || 'sin sede fija'}\nPantalla abierta: ${pagina || 'menú principal'}` },
+      { type: 'text', text: `═══ RESPUESTAS DE ADMINISTRACIÓN (valen igual que el manual; si chocan, mandan estas) ═══\n${extra || '(ninguna todavía)'}\n\n═══ QUIÉN PREGUNTA ═══\nNombre: ${yo.nombre || caller.user.email}\nRol: ${yo.role}\nSede: ${yo.sede || 'sin sede fija'}\nPantalla abierta: ${pagina || 'menú principal'}\n\n═══ CONSULTAS PENDIENTES DE ESTA PERSONA ═══\n${pendientes || '(ninguna)'}` },
     ];
 
     const messages: Anthropic.Beta.BetaMessageParam[] = [...historial, { role: 'user', content: mensaje }];
@@ -144,6 +230,17 @@ Deno.serve(async (req) => {
       const resultados: Anthropic.Beta.BetaToolResultBlockParam[] = [];
       for (const b of msg.content) {
         if (b.type !== 'tool_use') continue;
+        if (b.name === 'agregar_a_ticket') {
+          const inp = b.input as { ticket?: number; detalle?: string };
+          try {
+            const t = await agregarDetalle(asCaller, admin, caller.user.id, Number(inp.ticket), String(inp.detalle || ''));
+            tickets.push(t.id);
+            resultados.push({ type: 'tool_result', tool_use_id: b.id, content: `Se agregó a la consulta #${t.id}. Administración ya fue avisada.` });
+          } catch (e) {
+            resultados.push({ type: 'tool_result', tool_use_id: b.id, is_error: true, content: (e as Error).message });
+          }
+          continue;
+        }
         const inp = b.input as { tipo?: string; resumen?: string; detalle?: string };
         const tipo = (TIPOS as readonly string[]).includes(String(inp.tipo)) ? String(inp.tipo) : 'otro';
         const { data: t, error } = await admin.from('asistente_tickets').insert({
@@ -155,6 +252,11 @@ Deno.serve(async (req) => {
         } else {
           tickets.push(t.id);
           resultados.push({ type: 'tool_result', tool_use_id: b.id, content: `Ticket #${t.id} creado. Administración lo verá en su lista de pendientes.` });
+          await avisarAdmins(admin, caller.user.id, {
+            title: `Chloe · Nueva consulta #${t.id}`,
+            body: recorte(`${yo.nombre || caller.user.email}${yo.sede ? ' (' + yo.sede + ')' : ''}: ${String(inp.resumen || mensaje)}`),
+            tag: 'ticket-' + t.id, url: '/movil?asistente=pend',
+          });
         }
       }
       messages.push({ role: 'user', content: resultados });

@@ -1,6 +1,6 @@
 // Service worker mínimo para la app móvil (/movil).
 // Cachea SOLO la carcasa (página, manifest, iconos). Nunca cachea Supabase ni otras páginas.
-const VERSION = 'impulse-movil-2026-10-18a';
+const VERSION = 'impulse-movil-2026-10-28a';
 const SHELL = ['/movil', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png', '/icons/favicon-64.png'];
 
 self.addEventListener('install', (e) => {
@@ -21,4 +21,24 @@ self.addEventListener('fetch', (e) => {
     fetch(e.request).then((res) => { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(e.request, copy)); return res; })
       .catch(() => caches.match(e.request).then((r) => r || caches.match('/movil')))
   );
+});
+
+// Notificaciones push de Chloe (Edge Function asistente): { title, body, tag, url }
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Chloe', {
+    body: d.body || '', tag: d.tag, renotify: !!d.tag,
+    icon: '/icons/icon-192.png', badge: '/icons/favicon-64.png', data: { url: d.url || '/movil' },
+  }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || '/movil', self.location.origin);
+  const tab = url.searchParams.get('asistente');
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((ws) => {
+    const w = ws.find((c) => new URL(c.url).pathname.startsWith('/movil'));
+    if (w) { if (tab) w.postMessage({ tipo: 'abrir-asistente', tab }); return w.focus(); }   // app abierta: abrir el panel ahí
+    return self.clients.openWindow(url.href);
+  }));
 });

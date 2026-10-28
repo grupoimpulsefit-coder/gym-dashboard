@@ -195,7 +195,7 @@
 <script src="/asistente.js" defer></script>
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-10-28a';
+const APP_VER='2026-10-28b';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -1288,11 +1288,65 @@ function renderCuenta(){
       <div class="cell"><div class="main"><span class="t">${standalone?'Instalada como app':'Abierta en Safari'}</span><span class="s">${standalone?'Se abre desde el icono de inicio.':'Compartir → "Agregar a pantalla de inicio" para tener el icono.'}</span></div><span class="pill ${standalone?'ok':'status'}">${standalone?'✓':'Safari'}</span></div>
       <button class="cell" onclick="clavePara(false)"><div class="main"><span class="t" style="color:var(--brand-text)">🔑 Cambiar contraseña</span></div></button>
       <button class="cell" onclick="location.reload()"><div class="main"><span class="t" style="color:var(--brand-text)">Recargar datos</span></div></button></div></div>
+    ${esAdmin()?`<div class="sect"><div class="hdr">Notificaciones</div><div class="group" id="pushBox"><div class="cell"><span class="s">Revisando…</span></div></div>
+      <div class="ftr">Aviso en este teléfono cuando alguien crea una consulta a Chloe o le agrega datos.</div></div>`:''}
     ${puedeAsignarSedes()?`<div class="sect"><div class="hdr">Administración</div><div class="group">
       <button class="cell" onclick="abrirSedesUsuario()"><div class="main"><span class="t">🏢🔀 Sedes de usuarios</span><span class="s">Habilitar sedes adicionales a alguien</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>
       </div><div class="ftr">Por ejemplo, que recepción cubra un turno en otra sede. No cambia su sede principal.</div></div>`:''}
     <div class="sect"><div class="group"><button class="cell" onclick="doLogout()"><div class="main"><span class="t" style="color:var(--red)">Cerrar sesión</span></div></button></div>
       <div class="ftr">Cerrar sesión borra la sesión guardada en este teléfono.</div></div>`;
+  if(esAdmin()) pintarPush();
+}
+
+/* ══ Notificaciones push (consultas a Chloe) ══
+   La clave pública es la pareja de VAPID_PRIVATE_KEY en los secretos de la Edge Function asistente.
+   En iPhone solo funciona con la app instalada en la pantalla de inicio (iOS 16.4+). */
+const VAPID_PUBLIC='BBX820JtQuRSEVfc6U9H_k7moMca6DuCvmv95GMWLh6l3tKad1evUtgKHIr6cWbMgU_np-Y6ohQF0T7ZJ5bJ4Tw';
+const pushSoportado=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+// serviceWorker.ready no termina nunca si el sw no se registró: se registra aquí y se corta a los 8 s
+async function swReg(){
+  let reg=await navigator.serviceWorker.getRegistration(); if(!reg) reg=await navigator.serviceWorker.register('/sw.js');
+  if(reg.active) return reg;
+  return Promise.race([navigator.serviceWorker.ready,new Promise((_,no)=>setTimeout(()=>no(new Error('la app no terminó de cargar; recargue e intente de nuevo')),8000))]);
+}
+async function pushSub(){ const reg=await swReg(); return reg.pushManager.getSubscription(); }
+async function pintarPush(){
+  const box=document.getElementById('pushBox'); if(!box) return;
+  const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+  const cel=(t,s,der)=>`<div class="cell"><div class="main"><span class="t">${t}</span>${s?`<span class="s">${s}</span>`:''}</div>${der||''}</div>`;
+  if(!pushSoportado()){ box.innerHTML=cel('No disponible aquí',/iPhone|iPad/.test(navigator.userAgent)&&!standalone?'Agregue la app a la pantalla de inicio (Compartir → "Agregar a pantalla de inicio") y ábrala desde el icono.':'Este navegador no recibe notificaciones.'); return; }
+  let sub=null; try{ sub=await pushSub(); }catch(_){}
+  if(sub){ box.innerHTML=cel('Activadas en este teléfono','','<span class="pill ok">✓</span>')
+      +`<button class="cell" onclick="pushProbar()"><div class="main"><span class="t" style="color:var(--brand-text)">Enviar una prueba</span></div></button>`
+      +`<button class="cell" onclick="pushDesactivar()"><div class="main"><span class="t" style="color:var(--red)">Desactivar</span></div></button>`; return; }
+  if(Notification.permission==='denied'){ box.innerHTML=cel('Bloqueadas','Habilítelas en los ajustes del teléfono para esta app y vuelva a entrar.'); return; }
+  box.innerHTML=`<button class="cell" onclick="pushActivar()"><div class="main"><span class="t" style="color:var(--brand-text)">🔔 Activar notificaciones</span></div></button>`;
+}
+function b64uBytes(s){ const b=atob(s.replace(/-/g,'+').replace(/_/g,'/')+'==='.slice((s.length+3)%4)); return Uint8Array.from(b,c=>c.charCodeAt(0)); }
+async function pushActivar(){
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){ toast('No se dio permiso para notificaciones.'); pintarPush(); return; }
+    const reg=await swReg();
+    const sub=await reg.pushManager.getSubscription()||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uBytes(VAPID_PUBLIC)});
+    const j=sub.toJSON();
+    await supaFetch('/rpc/guardar_push',{method:'POST',body:{p_endpoint:j.endpoint,p_p256dh:j.keys.p256dh,p_auth:j.keys.auth,p_ua:navigator.userAgent}});
+    toast('Notificaciones activadas.');
+  }catch(e){ toast('No se pudieron activar: '+(e.message||e)); }
+  pintarPush();
+}
+async function pushDesactivar(){
+  try{ const sub=await pushSub(); if(sub){ await supaFetch('/rpc/quitar_push',{method:'POST',body:{p_endpoint:sub.endpoint}}).catch(()=>{}); await sub.unsubscribe(); } toast('Notificaciones desactivadas.'); }
+  catch(e){ toast('No se pudo: '+(e.message||e)); }
+  pintarPush();
+}
+async function pushProbar(){
+  try{
+    const res=await fetch(SUPA_URL+'/functions/v1/asistente',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+auth.access_token,'Content-Type':'application/json'},body:JSON.stringify({accion:'probar_push'})});
+    const d=await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(d.error||('HTTP '+res.status));
+    toast(d.enviadas?'Prueba enviada: debería llegar en unos segundos.':'No se envió: falta configurar las claves en el servidor o volver a activar.');
+  }catch(e){ toast('No se pudo enviar la prueba: '+e.message); }
 }
 
 /* ══ Sedes de usuarios ══

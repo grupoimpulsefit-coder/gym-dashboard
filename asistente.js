@@ -1,15 +1,17 @@
 /* ════════════════════════════════════════════════════════════════════════
-   Asistente — botón de ayuda flotante en todas las pantallas.
+   Chloe — asistente de ayuda, botón flotante en todas las pantallas.
 
    · Chat: responde con el Manual Operativo (Edge Function `asistente`). Si no
-     sabe algo o el trámite es de Administración, crea un ticket.
-   · Mis consultas: los tickets de quien está conectado y la respuesta de
-     Administración.
+     sabe algo o el trámite es de Administración, crea un ticket (o agrega los
+     datos nuevos a una consulta pendiente del mismo asunto).
+   · Mis consultas: los tickets de quien está conectado, la respuesta de
+     Administración y "Agregar detalle" mientras sigan pendientes.
    · Pendientes (solo admin, admin_sedes, admin_g): responder y cerrar tickets.
      "Enseñar al asistente" hace que use esa respuesta en las próximas dudas.
 
    Requiere sesion.js cargado antes (usa Sesion.token/url/key) y la tabla de
    asistente.sql. Se incluye con <script src="/asistente.js"></script>.
+   /movil?asistente=pend (desde una notificación push) abre el panel en esa pestaña.
    ════════════════════════════════════════════════════════════════════════ */
 (function () {
   if (window.__asistente || !window.Sesion) return;
@@ -19,8 +21,15 @@
   var TIPO = { duda: 'Duda', anular_venta: 'Anular venta', revisar_sinpe: 'Revisar SINPE',
                descuadre_caja: 'Descuadre de caja', error_app: 'Error de la app', otro: 'Otro' };
   var HKEY = 'asistenteChat', VISTO = 'asistenteVisto';
-  var yo = { token: null, uid: null, rol: null }, tab = 'chat', enviando = false;
+  var yo = { token: null, uid: null, rol: null }, tab = 'chat', enviando = false, abrirEn = null;
   var chat = leerChat();
+  try {
+    var qs = new URLSearchParams(location.search), q = qs.get('asistente');
+    if (q === 'pend' || q === 'mis' || q === 'chat') {
+      abrirEn = q; qs.delete('asistente');
+      history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs : '') + location.hash);
+    }
+  } catch (_) {}
 
   function leerChat() { try { return JSON.parse(sessionStorage.getItem(HKEY) || 'null') || { historial: [], burbujas: [] }; } catch (_) { return { historial: [], burbujas: [] }; } }
   function guardarChat() { try { sessionStorage.setItem(HKEY, JSON.stringify(chat)); } catch (_) {} }
@@ -65,6 +74,7 @@
     '#asis-c .t{border:.5px solid var(--sep,rgba(60,60,67,.29));border-radius:12px;padding:10px;font-size:14px}' +
     '#asis-c .t small{color:var(--sec,#666);display:block}' +
     '#asis-c .t .r{margin-top:6px;padding:8px;border-radius:8px;background:var(--brand-tint,rgba(14,159,142,.14))}' +
+    '#asis-c .ag{margin-top:6px;padding-left:8px;border-left:2px solid var(--sep,#ccc)}' +
     '#asis-c textarea{width:100%;box-sizing:border-box;margin-top:6px;min-height:60px;border-radius:8px;border:1px solid var(--sep,#ccc);padding:6px;font-size:14px;font-family:inherit;background:var(--card,#fff);color:var(--label,#000)}' +
     '#asis-f{display:flex;gap:6px;padding:10px 12px;border-top:.5px solid var(--sep,rgba(60,60,67,.29))}' +
     '#asis-f textarea{flex:1;resize:none;height:42px;max-height:120px;border-radius:12px;border:0;padding:10px 12px;font-size:16px;font-family:inherit;background:var(--fill,rgba(120,120,128,.12));color:var(--label,#000);outline:none}' +
@@ -74,15 +84,15 @@
 
   /* ── Botón y panel ── */
   var btn = document.createElement('button');
-  btn.id = 'asis-btn'; btn.type = 'button'; btn.title = 'Ayuda'; btn.setAttribute('aria-label', 'Abrir ayuda');
+  btn.id = 'asis-btn'; btn.type = 'button'; btn.title = 'Chloe · Ayuda'; btn.setAttribute('aria-label', 'Abrir ayuda de Chloe');
   btn.innerHTML = '💬<span class="n"></span>';
   var p = document.createElement('div');
-  p.id = 'asis-p'; p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'Asistente');
+  p.id = 'asis-p'; p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'Chloe');
   p.innerHTML =
-    '<header><b>Asistente</b><button class="chip" id="asis-nueva" type="button">Nueva</button><button class="chip" id="asis-x" type="button" aria-label="Cerrar">✕</button></header>' +
+    '<header><b>Chloe</b><button class="chip" id="asis-nueva" type="button">Nueva</button><button class="chip" id="asis-x" type="button" aria-label="Cerrar">✕</button></header>' +
     '<div class="asis-tabs"><button data-t="chat" class="on" type="button">Chat</button><button data-t="mis" type="button">Mis consultas</button><button data-t="pend" type="button" style="display:none">Pendientes</button></div>' +
     '<div id="asis-c"></div>' +
-    '<form id="asis-f"><textarea id="asis-i" rows="1" placeholder="Escriba su consulta…"></textarea><button type="submit" id="asis-s">Enviar</button></form>';
+    '<form id="asis-f"><textarea id="asis-i" rows="1" placeholder="Escríbale a Chloe…"></textarea><button type="submit" id="asis-s">Enviar</button></form>';
 
   function montar() {
     document.body.appendChild(btn); document.body.appendChild(p);
@@ -96,6 +106,15 @@
     $('asis-i').onkeydown = function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } };
     vigilar(); setInterval(vigilar, 3000);
     setInterval(contar, 120000);
+    // Notificación tocada con la app ya abierta (sw.js avisa por mensaje)
+    if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (e) {
+      if (e.data && e.data.tipo === 'abrir-asistente') { abrirEn = e.data.tab || 'chat'; if (yo.rol) abrirPendiente(); }
+    });
+  }
+  function abrirPendiente() {
+    if (!abrirEn) return;
+    tab = abrirEn === 'pend' && !esAdmin() ? 'mis' : abrirEn; abrirEn = null;
+    abrir(); contar();
   }
   function $(id) { return document.getElementById(id); }
   function abierto() { return p.style.display === 'flex'; }
@@ -114,7 +133,7 @@
       api('/rest/v1/user_roles?id=eq.' + uid + '&select=role').then(function (r) {
         yo.rol = r && r[0] && r[0].role;
         p.querySelector('[data-t=pend]').style.display = esAdmin() ? '' : 'none';
-        contar();
+        contar(); abrirPendiente();
       }).catch(function () {});
     }
   }
@@ -147,7 +166,7 @@
     var c = $('asis-c');
     c.innerHTML = chat.burbujas.length ? chat.burbujas.map(function (b) {
       return '<div class="m ' + b.r + '">' + (b.r === 'a' ? fmt(b.t) : esc(b.t)) + '</div>';
-    }).join('') : '<div class="vacio">Pregunte cómo hacer algo en la app o un procedimiento del manual: abrir o cerrar turno, SINPE, minita, mediciones, vacaciones…<br><br>Si no hay respuesta, o el trámite es de Administración, se crea una consulta y la respuesta aparece en <b>Mis consultas</b>.</div>';
+    }).join('') : '<div class="vacio">Hola, soy <b>Chloe</b>. Pregúnteme cómo hacer algo en la app o un procedimiento del manual: abrir o cerrar turno, SINPE, minita, mediciones, vacaciones…<br><br>Si no hay respuesta, o el trámite es de Administración, se crea una consulta y la respuesta aparece en <b>Mis consultas</b>. Si después tiene más datos, dígamelo y los agrego a esa misma consulta.</div>';
     if (enviando) c.insertAdjacentHTML('beforeend', '<div class="m a">Escribiendo…</div>');
     c.scrollTop = c.scrollHeight;
   }
@@ -171,22 +190,42 @@
   }
 
   /* ── Mis consultas ── */
-  function tarjeta(t, extra) {
+  // deAdmin: vista de Pendientes (muestra quién consultó y no el "⏳ Pendiente")
+  function tarjeta(t, extra, deAdmin) {
     return '<div class="t"><small>#' + t.id + ' · ' + esc(TIPO[t.tipo] || t.tipo) + ' · ' + fecha(t.created_at) +
-      (t.usuario && extra ? ' · ' + esc(t.usuario) + (t.sede ? ' (' + esc(t.sede) + ')' : '') : '') + '</small>' +
+      (t.usuario && deAdmin ? ' · ' + esc(t.usuario) + (t.sede ? ' (' + esc(t.sede) + ')' : '') : '') + '</small>' +
       '<div><b>' + esc(t.resumen) + '</b></div>' +
       (t.detalle ? '<div style="margin-top:4px">' + esc(t.detalle) + '</div>' : '') +
+      (t.agregados || []).map(function (a) { return '<div class="ag"><small>Agregado · ' + fecha(a.at) + '</small>' + esc(a.texto) + '</div>'; }).join('') +
       (t.respuesta ? '<div class="r"><small>Administración' + (t.resuelto_at ? ' · ' + fecha(t.resuelto_at) : '') + '</small>' + esc(t.respuesta) + '</div>'
-                   : (t.estado === 'pendiente' && !extra ? '<small style="margin-top:6px">⏳ Pendiente</small>' : '')) +
+                   : (t.estado === 'pendiente' && !deAdmin ? '<small style="margin-top:6px">⏳ Pendiente</small>' : '')) +
       (extra || '') + '</div>';
   }
   function pintarMis() {
     var c = $('asis-c'); c.innerHTML = '<div class="vacio">Cargando…</div>';
     api('/rest/v1/asistente_tickets?user_id=eq.' + yo.uid + '&order=created_at.desc&limit=30&select=*').then(function (r) {
-      c.innerHTML = (r && r.length) ? r.map(function (t) { return tarjeta(t); }).join('') : '<div class="vacio">Todavía no tiene consultas.</div>';
+      c.innerHTML = (r && r.length) ? r.map(function (t) {
+        return tarjeta(t, t.estado !== 'pendiente' ? '' :
+          '<div data-ag="' + t.id + '"><button class="chip" type="button" style="margin-top:8px">+ Agregar detalle</button></div>');
+      }).join('') : '<div class="vacio">Todavía no tiene consultas.</div>';
+      c.querySelectorAll('[data-ag] button').forEach(function (b) { b.onclick = function () { formAgregar(b.parentNode); }; });
       try { localStorage.setItem(VISTO + yo.uid, new Date().toISOString()); } catch (_) {}
       contar();
     }).catch(function (e) { c.innerHTML = '<div class="e">' + esc(e.message) + '</div>'; });
+  }
+  function formAgregar(box) {
+    var id = box.dataset.ag;
+    box.innerHTML = '<textarea id="asis-a' + id + '" maxlength="2000" placeholder="Lo que falta: fecha, monto, factura, referencia SINPE…"></textarea>' +
+      '<button class="chip" type="button" style="margin-top:6px;background:var(--brand,#0E9F8E);color:#fff">Agregar a la consulta #' + id + '</button>';
+    var ta = $('asis-a' + id), b = box.querySelector('button');
+    ta.focus();
+    b.onclick = function () {
+      var txt = ta.value.trim(); if (!txt) { ta.focus(); return; }
+      b.disabled = true; b.textContent = 'Guardando…';
+      api('/functions/v1/asistente', { method: 'POST', body: { accion: 'agregar', ticket: Number(id), texto: txt } })
+        .then(function () { pintarMis(); })
+        .catch(function (e) { b.disabled = false; b.textContent = 'Agregar a la consulta #' + id; alert(e.message); });
+    };
   }
 
   /* ── Pendientes (Administración) ── */
@@ -197,8 +236,8 @@
       c.innerHTML = r.map(function (t) {
         return tarjeta(t,
           '<textarea id="asis-r' + t.id + '" placeholder="Respuesta para ' + esc(t.usuario || 'la persona') + '"></textarea>' +
-          '<label style="display:flex;gap:6px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" id="asis-e' + t.id + '"' + (t.tipo === 'duda' ? ' checked' : '') + '> Enseñar al asistente (la usará en próximas dudas)</label>' +
-          '<button class="chip" type="button" data-id="' + t.id + '" style="margin-top:6px;background:var(--brand,#0E9F8E);color:#fff">Responder y cerrar</button>');
+          '<label style="display:flex;gap:6px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" id="asis-e' + t.id + '"' + (t.tipo === 'duda' ? ' checked' : '') + '> Enseñarle a Chloe (la usará en próximas dudas)</label>' +
+          '<button class="chip" type="button" data-id="' + t.id + '" style="margin-top:6px;background:var(--brand,#0E9F8E);color:#fff">Responder y cerrar</button>', true);
       }).join('');
       c.querySelectorAll('button[data-id]').forEach(function (b) { b.onclick = function () { resolver(b); }; });
     }).catch(function (e) { c.innerHTML = '<div class="e">' + esc(e.message) + '</div>'; });
