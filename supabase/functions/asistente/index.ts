@@ -54,7 +54,7 @@ Cómo responder:
 • Tratá a la persona de usted, en español sencillo y corto. Para procedimientos, dá los pasos numerados tal como están en el manual y mencioná la sección (p. ej. "Manual 5, Paso 7").
 • Si hay actualizaciones con fecha (sección "Actualización de procedimientos"), lo vigente es lo más reciente.
 • Si la persona es de la sede Natación, aplicá también las diferencias para Natación. Las reglas que el manual marca como de Natación no se aplican a las sedes de gimnasio (3 Ríos, Pinares, Sabanilla). Si la persona no tiene sede fija y la respuesta cambia según la sede, preguntá de qué sede es el cliente.
-• Cada mensaje de la persona llega con un bloque "CONTEXTO DE LA APP" que agrega el sistema (quién pregunta, desde qué pantalla y sus consultas pendientes). Usalo como dato; no lo menciones salvo que haga falta.
+• Cada mensaje de la persona llega con un bloque "CONTEXTO DE LA APP" que agrega el sistema (fecha y hora, quién pregunta, desde qué pantalla y sus consultas pendientes). Usalo como dato; no lo menciones salvo que haga falta. Para promociones y reglas con fechas, compará con esa fecha: si ya venció o todavía no empieza, decilo.
 
 Cuándo crear un ticket (herramienta crear_ticket):
 • Si la respuesta NO está en el manual ni en las respuestas de Administración: creá un ticket tipo "duda" con la pregunta, y decile que Administración la va a responder y que la verá en la pestaña "Mis consultas" de este chat. No adivines.
@@ -206,7 +206,8 @@ Deno.serve(async (req) => {
       { type: 'text', text: `${INSTRUCCIONES}\n\n═══ MAPA DE LA APP ═══\n${MAPA_APP}\n\n═══ MANUAL OPERATIVO ═══\n${MANUAL}`, cache_control: { type: 'ephemeral' } },
       { type: 'text', text: `═══ RESPUESTAS DE ADMINISTRACIÓN (valen igual que el manual; si chocan, mandan estas) ═══\n${extra || '(ninguna todavía)'}` },
     ];
-    const contexto = `═══ CONTEXTO DE LA APP ═══\nNombre: ${yo.nombre || caller.user.email}\nRol: ${yo.role}\nSede: ${yo.sede || 'sin sede fija'}\nPantalla abierta: ${pagina || 'menú principal'}\n\nCONSULTAS PENDIENTES DE ESTA PERSONA:\n${pendientes || '(ninguna)'}`;
+    const ahora = new Date().toLocaleString('es-CR', { timeZone: 'America/Costa_Rica', dateStyle: 'full', timeStyle: 'short' });
+    const contexto = `═══ CONTEXTO DE LA APP ═══\nFecha y hora (Costa Rica): ${ahora}\nNombre: ${yo.nombre || caller.user.email}\nRol: ${yo.role}\nSede: ${yo.sede || 'sin sede fija'}\nPantalla abierta: ${pagina || 'menú principal'}\n\nCONSULTAS PENDIENTES DE ESTA PERSONA:\n${pendientes || '(ninguna)'}`;
 
     const messages: Anthropic.Beta.BetaMessageParam[] = [...historial,
       { role: 'user', content: [{ type: 'text', text: contexto }, { type: 'text', text: mensaje }] }];
