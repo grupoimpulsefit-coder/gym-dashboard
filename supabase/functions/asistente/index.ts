@@ -40,7 +40,7 @@ const MAPA_APP = `Módulos de jykc.dev (cada uno es una pantalla; se entra desde
 • /caja — Cierre de Caja. Pestañas Cierre y Facturación. Abrir turno (denominaciones + inventario inicial), facturar productos/minita/eventos, cargar Informe de Ventas de WStudio, Reporte SINPE de Ridivi, foto del datáfono, conteo de inventario, opción de minita, recuadro verde «Para WStudio», cierre parcial y cierre final (definitivo; descargar el PDF antes).
 • /gastos — Registrar gastos (necesitan factura y aprobación de Administración) y pagos de clases grupales / instructores de planta.
 • /mediciones — Agenda semanal de mediciones en bloques de 15 minutos. Recepción agenda; el instructor marca la rutina completa o incompleta.
-• /inventario — Consulta de stock, precios y faltantes por sede (recepción solo lectura).
+• /inventario — Stock, precios y faltantes por sede. Solo Administración, coordinador (solo consulta) y admin_sucursal. Recepción NO tiene acceso a este módulo ni puede ver cantidades de stock en ninguna pantalla: el conteo de inventario de recepción (apertura y cierre en /caja) es a ciegas.
 • /conciliacion — Auditoría SINPE: qué facturas tienen su SINPE y cuáles no.
 • /rrhh — Mi Portal (para quien está en planilla): saldo y solicitud de vacaciones, día libre sin goce, incapacidades, citas médicas y comprobantes. Administración ve ahí Recursos Humanos.
 • /planilla, /sedes, /comparativa, /otros, /nat — módulos de Administración (planilla quincenal, reportes por sede, rentabilidad de productos, academia de natación).
@@ -64,7 +64,8 @@ Cuándo crear un ticket (herramienta crear_ticket):
 • Un ticket por asunto. Si es una simple duda que sí está en el manual, respondé sin ticket.
 • Si la persona trae más datos o una corrección sobre un asunto que ya tiene una consulta pendiente (lista "CONSULTAS PENDIENTES DE ESTA PERSONA"), usá agregar_a_ticket con ese número en vez de crear otro, y decile a qué número se agregó. Si no está claro que sea el mismo asunto, preguntale. Las consultas ya respondidas no se reabren: un asunto nuevo lleva ticket nuevo.
 • Emergencias médicas o accidentes: indicá de inmediato el procedimiento del manual (sección 11) y que avise a Administración; no esperes a un ticket.
-• No compartas datos personales de colaboradores, clientes ni dueños.`;
+• No compartas datos personales de colaboradores, clientes ni dueños.
+• No tenés acceso al stock. Si alguien de recepción pregunta cuántas unidades hay de un producto, respondé solo que esa cantidad no se puede consultar (el conteo de recepción es a ciegas); no le indiques módulos ni formas de verla.`;
 
 const TOOLS: Anthropic.Beta.BetaTool[] = [{
   name: 'crear_ticket',
