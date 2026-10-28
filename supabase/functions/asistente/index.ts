@@ -54,6 +54,7 @@ Cómo responder:
 • Tratá a la persona de usted, en español sencillo y corto. Para procedimientos, dá los pasos numerados tal como están en el manual y mencioná la sección (p. ej. "Manual 5, Paso 7").
 • Si hay actualizaciones con fecha (sección "Actualización de procedimientos"), lo vigente es lo más reciente.
 • Si la persona es de la sede Natación, aplicá también las diferencias para Natación.
+• Cada mensaje de la persona llega con un bloque "CONTEXTO DE LA APP" que agrega el sistema (quién pregunta, desde qué pantalla y sus consultas pendientes). Usalo como dato; no lo menciones salvo que haga falta.
 
 Cuándo crear un ticket (herramienta crear_ticket):
 • Si la respuesta NO está en el manual ni en las respuestas de Administración: creá un ticket tipo "duda" con la pregunta, y decile que Administración la va a responder y que la verá en la pestaña "Mis consultas" de este chat. No adivines.
@@ -197,14 +198,18 @@ Deno.serve(async (req) => {
       (t.detalle ? `\n   Detalle: ${recorte(String(t.detalle), 400)}` : '') +
       ((t.agregados || []).length ? `\n   Agregado después: ${(t.agregados as { texto: string }[]).map(a => recorte(a.texto, 200)).join(' | ')}` : '')).join('\n');
 
-    // El bloque grande (instrucciones + mapa + manual) va primero y en caché; lo que
-    // cambia (respuestas aprendidas, quién pregunta) va después del punto de caché.
+    // El bloque grande (instrucciones + mapa + manual) va primero y en caché; las respuestas
+    // aprendidas, después. Lo que cambia en cada turno (quién pregunta, pantalla, consultas
+    // pendientes) NO va en `system`: Opus 5.5 ata su razonamiento a todo lo anterior y un
+    // `system` distinto en el turno siguiente da 400. Va como contexto dentro del mensaje nuevo.
     const system: Anthropic.Beta.BetaTextBlockParam[] = [
       { type: 'text', text: `${INSTRUCCIONES}\n\n═══ MAPA DE LA APP ═══\n${MAPA_APP}\n\n═══ MANUAL OPERATIVO ═══\n${MANUAL}`, cache_control: { type: 'ephemeral' } },
-      { type: 'text', text: `═══ RESPUESTAS DE ADMINISTRACIÓN (valen igual que el manual; si chocan, mandan estas) ═══\n${extra || '(ninguna todavía)'}\n\n═══ QUIÉN PREGUNTA ═══\nNombre: ${yo.nombre || caller.user.email}\nRol: ${yo.role}\nSede: ${yo.sede || 'sin sede fija'}\nPantalla abierta: ${pagina || 'menú principal'}\n\n═══ CONSULTAS PENDIENTES DE ESTA PERSONA ═══\n${pendientes || '(ninguna)'}` },
+      { type: 'text', text: `═══ RESPUESTAS DE ADMINISTRACIÓN (valen igual que el manual; si chocan, mandan estas) ═══\n${extra || '(ninguna todavía)'}` },
     ];
+    const contexto = `═══ CONTEXTO DE LA APP ═══\nNombre: ${yo.nombre || caller.user.email}\nRol: ${yo.role}\nSede: ${yo.sede || 'sin sede fija'}\nPantalla abierta: ${pagina || 'menú principal'}\n\nCONSULTAS PENDIENTES DE ESTA PERSONA:\n${pendientes || '(ninguna)'}`;
 
-    const messages: Anthropic.Beta.BetaMessageParam[] = [...historial, { role: 'user', content: mensaje }];
+    const messages: Anthropic.Beta.BetaMessageParam[] = [...historial,
+      { role: 'user', content: [{ type: 'text', text: contexto }, { type: 'text', text: mensaje }] }];
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
     const tickets: number[] = [];
 
@@ -216,12 +221,18 @@ Deno.serve(async (req) => {
           model: MODEL,
           max_tokens: 8000,
           output_config: { effort: 'low' },
-          betas: ['server-side-fallback-2026-07-01'],
+          // Si el historial que manda el navegador no calza con el razonamiento guardado
+          // (versión vieja, respuestas aprendidas nuevas), se descarta ese razonamiento en vez de dar 400.
+          thinking: { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } } as Anthropic.Beta.BetaThinkingConfigParam,
+          betas: ['server-side-fallback-2026-07-01', 'thinking-binding-controls-2026-08-01'],
           fallbacks: 'default',
           system, tools: TOOLS, messages,
         });
       } catch (e) {
-        if (e instanceof Anthropic.APIError) return json({ error: `El asistente no está disponible (${e.status ?? 'sin conexión'}). Intente de nuevo en un momento.` }, 502);
+        if (e instanceof Anthropic.APIError) {
+          console.error('asistente: error de la API', e.status, e.message);
+          return json({ error: `El asistente no está disponible (${e.status ?? 'sin conexión'}). Intente de nuevo en un momento.` }, 502);
+        }
         throw e;
       }
       messages.push({ role: 'assistant', content: msg.content });
