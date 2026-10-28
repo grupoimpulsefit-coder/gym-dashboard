@@ -7,7 +7,6 @@ export const MANUAL = ` FIT AND TRAIN FITNESS CLUB
  de recepcionista, con el fin de garantizar un servicio de calidad, mantener la correcta
  operación del club y brindar una atención profesional a nuestros clientes.
  Sistema: jykc.dev — Sistema de Gestión Fit and Train
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  Actualización de procedimientos — octubre 2026
  • 3.2.1 Referencia SINPE en WStudio (vigente desde el 04/10/2026): toda venta por SINPE
  registrada en WStudio lleva la referencia en el campo Notas.
@@ -42,7 +41,6 @@ export const MANUAL = ` FIT AND TRAIN FITNESS CLUB
  • La colaboradora puede coordinar internamente con una compañera para cubrir el turno.
  • Todo cambio debe ser comunicado y aprobado por Administración antes de realizarse.
 1.3 Incapacidades y ausencias
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  Procedimiento
  • En caso de enfermedad, subir la boleta de incapacidad en Mi Portal (tipo Incapacidad).
  • Para citas médicas, registrar la cita en Mi Portal (tipo Cita médica) con al menos 3 días de
@@ -71,7 +69,6 @@ export const MANUAL = ` FIT AND TRAIN FITNESS CLUB
  (EBAIS, clínica u hospital).
  INS (riesgo del trabajo) Incapacidades o citas por un riesgo del trabajo atendido por el INS.
  Maternidad Incapacidad por maternidad.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  Mi Portal — sección Incapacidades y citas médicas: formulario y lista de documentos enviados.
  Campo Emitida por: CCSS, INS (riesgo del trabajo) o Maternidad.
 1.4 Vacaciones y días libres sin goce de salario — Mi Portal (jykc.dev)
@@ -79,7 +76,6 @@ Las vacaciones se solicitan en www.jykc.dev, en el módulo Mi Portal, que debe a
 colaboradora.
  ⚠ SOLICITAR CON MÍNIMO 15 DÍAS DE ANTICIPACIÓN ⚠
  Toda solicitud queda sujeta a aprobación. Enviarla no significa que los días ya estén aprobados.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  En Mi Portal también está la opción de solicitar un día libre sin goce de salario. Igual que las
  vacaciones, queda sujeto a aprobación.
  Cómo solicitar vacaciones
@@ -96,7 +92,6 @@ colaboradora.
 El proceso de apertura se realiza íntegramente en el sistema. No hay Excel. Seguir los pasos en
 orden.
  1. Ingresar a jykc.dev e iniciar sesión con las credenciales del turno.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  2. Seleccionar el módulo “Cierre de Caja” en la pantalla principal.
  3. Dar clic en el botón “Abrir turno”.
  4. En la pantalla que aparece, ingresar las denominaciones de efectivo que hay en la caja
@@ -133,7 +128,6 @@ orden.
  4. En las casillas de USD y Migración: lo mismo de siempre.
  Solo el primer turno del día abre en ₡0. Los demás turnos siempre copian los montos del
  recuadro «Para WStudio».
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  Recuadro «Para WStudio» (pestaña Cierre): al abrir el turno se usan los montos de «Al abrir este turno».
  No se puede operar el turno sin haberlo abierto correctamente en el sistema. Si hay diferencia en el
  efectivo inicial, anotarla en el campo correspondiente y reportarla a Administración.
@@ -147,7 +141,6 @@ orden.
  Gestión de pagos
  • Cobrar membresías según la tarifa correspondiente.
  • Emitir y registrar comprobantes de pago (SINPE, datáfono, efectivo).
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  • Enviar recordatorios de pago a clientes con mensualidad próxima a vencer.
  • Confirmar el tipo de pago antes de cerrar la transacción y entregar el comprobante.
 3.2.1 Ventas por SINPE Móvil — Referencia obligatoria en WStudio
@@ -170,14 +163,12 @@ mismo SINPE justifique dos ventas y encontrar rápido un pago ante dudas o recla
  5. Revisar y guardar: confirmar que el número esté completo (sin espacios ni dígitos
  faltantes) y que el monto coincida con el SINPE. Finalizar la venta.
  Ridivi — Listado de Operaciones: botón “Detalles”.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  Ridivi — Detalles de la Operación: la Referencia SINPE está marcada en rojo.
  Ojo: no confundir la Referencia SINPE con el ID ni con el número de Movimiento. La Referencia
  SINPE es el número largo (normalmente inicia con la fecha, p. ej. 20261004…).
  WStudio — Registrar Venta: campo Notas marcado en rojo.
  Las notas de este campo se muestran en la factura electrónica que recibe el cliente. Escribir
  únicamente la referencia en el formato indicado.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  Lista de verificación — antes de cerrar cada venta por SINPE
  ☐ El SINPE aparece como Aceptada / Operación confirmada en Ridivi.
  ☐ Nombre, cédula y monto coinciden con el cliente y la venta.
@@ -207,7 +198,6 @@ desglose de minita se actualizan automáticamente.
  5. El Cierre se actualiza solo y genera el Desglose de Otros (Minita) con lo vendido por
  categoría (ver Paso 7 del cierre).
  Opciones superiores de la caja: Cierre y Facturación.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  Pantalla de Facturación: productos (izquierda), ticket actual y cobros del día (derecha).
  Venta pagada por SINPE: se ingresan los últimos 6 dígitos de la referencia.
  Ventas de productos por SINPE en Facturación: últimos 6 dígitos. Ventas registradas en WStudio:
@@ -215,7 +205,6 @@ desglose de minita se actualizan automáticamente.
  Además
  • Informar cuando un producto esté por agotarse para solicitar reposición.
 3.4 Control de lockers
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  Manejo de llaves
  • Entregar la llave al cliente y registrar el número de locker y el nombre.
  • Al salir, el cliente devuelve la llave y se marca como disponible.
@@ -238,7 +227,6 @@ desglose de minita se actualizan automáticamente.
 3.6 Módulo de Mediciones — jykc.dev
  Desde el 07/10/2026 todas las citas de medición se agendan únicamente en jykc.dev. No se
  deben usar otros medios para agendarlas.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  Cómo agendar una cita de medición
  1. Ingresar a jykc.dev y seleccionar el módulo Mediciones (Agendar citas) en la pantalla
  principal de la sede.
@@ -255,10 +243,8 @@ desglose de minita se actualizan automáticamente.
  ⚠ LOS VIERNES NO HAY MEDICIONES EN LA TARDE ⚠
  La rutina (completa / incompleta) la marca el instructor, no la recepcionista.
  Pantalla principal: módulo Mediciones (agendar citas).
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
 Agenda semanal de mediciones — bloques de 15 minutos. Cada “+” es un espacio libre. Las mañanas inician a las 7:30 a. m.
  Formulario “Espacio libre”: solo el nombre es obligatorio.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  La cita queda registrada en el calendario en estado “Pendiente”.
 4. Proceso para Agendar Reposiciones
 Seguir los pasos en orden cada vez que un cliente solicite una reposición de clase.
@@ -275,7 +261,6 @@ Seguir los pasos en orden cada vez que un cliente solicite una reposición de cl
 El cierre se realiza en el sistema jykc.dev. Seguir los pasos en el orden indicado. Si es el último turno
 del día hacer Cierre Final; si no, hacer Cierre Parcial.
 Paso 1 — Descargar el Informe de Ventas del día desde wstudio
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  Informe requerido desde wstudio
  • Informe de Ventas: ventas generales del día.
  • Descargar el archivo antes de ingresar al sistema de cierre. El Informe de Ventas por
@@ -305,7 +290,6 @@ Paso 5 — Conteo de inventario de cierre
  • Usar el botón “Contar / verificar inventario”.
  • El sistema compara con lo registrado y detecta diferencias del turno (ventas no registradas
  o faltantes).
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  • Solo verifica: no modifica el stock real.
  • Sin este conteo no es posible cerrar el turno.
 Paso 6 — Opción de Minita (sobre)
@@ -327,7 +311,6 @@ Paso 7 — Verificar el Resumen del Cierre
  • El desglose muestra: Total Tarjeta, Total SINPE, Total Transferencia, Gastos, Ingresos
  extra, Caja inicial.
  • Si el mensaje es “Caja cuadra”, proceder al paso siguiente.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  Si la caja NO cuadra, revisar los datos ingresados antes de continuar. No hacer cierre final con
  diferencia sin reportar a Administración.
 Ventas facturadas en caja (Facturación)
@@ -347,7 +330,6 @@ WStudio así:
  (CRC), usando los botones Copiar.
  4. Cerrar la caja en WStudio.
  5. Volver a jykc.dev y hacer el Cierre parcial o Cierre final como siempre (Paso 8).
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  Recuadro «Para WStudio»: al cerrar el turno se copian los montos de «Al cerrar este turno».
  Cómo sale cada monto
  • Efectivo: ya viene sin el fondo de caja y sin lo cobrado en Facturación (minita y
@@ -364,7 +346,6 @@ WStudio así:
  − Efectivo cobrado en Facturación (minita y eventos) −₡3 600
  = Efectivo para WStudio ₡25 000
 El sistema hace esta cuenta solo. En WStudio se pone ₡25 000, que es el efectivo de membresías.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  Si WStudio marca una diferencia
  • Si la caja cuadra en jykc.dev, en WStudio también debe cuadrar con los montos del
  recuadro.
@@ -372,7 +353,6 @@ El sistema hace esta cuenta solo. En WStudio se pone ₡25 000, que es el efecti
  efectivo. Revisar el conteo, los gastos y el sobre en jykc.dev.
  • Si la caja cuadra en jykc.dev y aun así WStudio marca diferencia: tomar captura de las
  dos pantallas y reportarlo a Administración.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
 Paso 8 — Cierre Parcial o Cierre Final
  Tipo de cierre Cuándo usarlo Acción
  Cierre parcial No es el último turno del día. Dar clic en “Cierre parcial”. El
@@ -394,7 +374,6 @@ orden:
  El detalle se obtiene desde el desglose de Minita en el sistema → opción “Imprimir” →
  recortar por categoría.
  4 Facturas de gastos del turno (si las hubo).
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
 7. Entrega del Turno
 Antes de finalizar la jornada, comunicar a la recepcionista entrante:
  ☐ Clientes pendientes
@@ -411,7 +390,6 @@ Antes de finalizar la jornada, comunicar a la recepcionista entrante:
  Situaciones relevantes ocurridas durante el turno.
  ☐ Situaciones con seguimiento
  Casos que requieren atención en el próximo turno.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
 8. Preguntas Frecuentes (FAQ)
 Respuestas rápidas basadas en el reglamento del club.
 8.1 Reposiciones
@@ -442,7 +420,6 @@ Respuestas rápidas basadas en el reglamento del club.
  Presentar un comprobante válido (médico u otro documento justificante).
  El comprobante se envía a Administración y queda en validación.
  El tiempo mínimo de revisión es de 72 horas hábiles.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
 8.3 Enfermedad
  P ¿Qué ocurre si un cliente se ausenta por enfermedad varios días?
  R Presentar una epicrisis o documento médico oficial.
@@ -466,10 +443,8 @@ Respuestas rápidas basadas en el reglamento del club.
  Debe solicitar nuevamente espacio, sujeto a disponibilidad.
 8.7 Promociones
  P ¿Se pueden mantener promociones vencidas?
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  R No. El período máximo de gracia es de un (1) día.
  Pasado ese día no se puede aplicar la promoción bajo ninguna circunstancia.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
 9. Situaciones que Escalar a Administración
  Nunca resolver de forma unilateral
  • Reembolsos.
@@ -496,7 +471,6 @@ Respuestas rápidas basadas en el reglamento del club.
  Servicios disponibles Datos confidenciales del club
  Promociones vigentes
  Requisitos de inscripción
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
 11. Manejo de Emergencias
 11.1 Emergencias médicas
  1. Los profesores de natación y gimnasio atienden primero (capacitados en primeros
@@ -510,7 +484,6 @@ Respuestas rápidas basadas en el reglamento del club.
  inmediato.
  Ap agón localizado Informar a Administración de Esperar instrucciones.
  inmediato.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
 12. Normas Generales del Personal
  Puntualidad, uniforme y presentación
  • Presentarse puntualmente al inicio del turno.
@@ -539,7 +512,6 @@ Día 1
  • Conocimiento del equipo y máquinas disponibles en la sede.
 Día 2
  Contenidos
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
  • Apertura de turno en jykc.dev.
  • Uso del sistema de facturación (wstudio).
  • Atención presencial.
@@ -554,7 +526,6 @@ Día 2
 Beneficios del personal
  Cada colaborador tiene derecho a una (1) membresía gratuita del club, válida únicamente en la sede
  en la que trabaja. Este beneficio es personal e intransferible.
-Manual Operativo y de Capacitación de Recepcionista — Fit and Train Fitness Club
 
 ════ DIFERENCIAS PARA LA SEDE NATACIÓN (Academia de Natación) ════
 El manual de la Academia de Natación es igual al anterior, con estos cambios:
