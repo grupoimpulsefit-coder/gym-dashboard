@@ -195,7 +195,7 @@
 <script src="/asistente.js" defer></script>
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-10-18a';
+const APP_VER='2026-10-28a';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -212,10 +212,12 @@ const ICONS={
   envios:'<svg viewBox="0 0 24 24"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></svg>',
   proyecciones:'<svg viewBox="0 0 24 24"><path d="M4 18L10 11l4 4 6-8"/><path d="M15 7h5v5"/></svg>',
   arqueo:'<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8 13l3 3 5-6"/></svg>',
-  mediciones:'<svg viewBox="0 0 24 24"><path d="M2 9h20v6H2z"/><path d="M6 9v3M10 9v4M14 9v3M18 9v4"/></svg>'
+  mediciones:'<svg viewBox="0 0 24 24"><path d="M2 9h20v6H2z"/><path d="M6 9v3M10 9v4M14 9v3M18 9v4"/></svg>',
+  minita:'<svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>'
 };
 const MODS=[
   {id:'caja',label:'Caja',color:'var(--brand)'},
+  {id:'minita',label:'Minita',color:'var(--green)'},
   {id:'gastos',label:'Gastos',color:'var(--orange)'},
   {id:'inventario',label:'Inventario',color:'var(--amber)'},
   {id:'arqueo',label:'Arqueo',color:'#FF2D55',arqueo:true},
@@ -382,7 +384,7 @@ const labelActual=()=>view==='mod'?(MODS.find(x=>x.id===curMod)?.label||'Atrás'
 async function goHub(sede,push){ if(push) pushBack(view+':'+(detSede||''),push,labelActual()); view='hub'; detSede=sede; setTabs('sedes'); await renderHub(true); startPoll(); window.scrollTo(0,0); }
 async function goMod(mod,push){ if(push) pushBack(view+':'+(view==='mod'?curMod:detSede||''),push,labelActual()); view='mod'; curMod=mod; await renderMod(true); startPoll(); window.scrollTo(0,0); }
 function back(){ const e=navStack.pop(); if(e&&e.fn) e.fn(); else goSedes(); }
-function setFecha(f){ if(!f) return; selDate=f; if(view==='mod'&&curMod==='caja') renderCaja(true); else if(view==='hub') renderHub(true); else renderSedes(true); startPoll(); }
+function setFecha(f){ if(!f) return; selDate=f; if(view==='mod'&&curMod==='caja') renderCaja(true); else if(view==='mod'&&curMod==='minita') renderMinitaMod(); else if(view==='hub') renderHub(true); else renderSedes(true); startPoll(); }
 function abrirCierreFinal(id){ const c=ultimosFinales.find(x=>x.id===id); if(!c) return; selDate=c.fecha; detSede=c.sede; detTurnoId=c.id; goMod('caja',goCierresTab); }
 function abrirCierreHist(sede,fecha,id){ selDate=fecha; detSede=sede; detTurnoId=id; goMod('caja',()=>goMod('cierres')); }
 
@@ -447,6 +449,7 @@ function navMod(title,extraHtml,actHtml){
 }
 async function renderMod(showLoading){
   if(curMod==='caja') return renderCaja(showLoading);
+  if(curMod==='minita') return renderMinitaMod();
   if(curMod==='arqueo') return renderArqueoMod();
   if(curMod==='arqueoVer') return renderArqueoVer();
   if(curMod==='inventario') return renderInventarioMod();
@@ -919,6 +922,92 @@ async function cancelarEnvio(id){
     toast(out&&out.length?'Envío cancelado.':'No se canceló: recepción ya lo había aceptado.');
     renderEnviosMod();
   }catch(e){ if(b){ b.disabled=false; b.textContent='Cancelar envío'; } toast('No se pudo cancelar: '+e.message); }
+}
+
+// Minita: facturas de caja del día (productos y eventos). Ver facturacion.sql.
+// Anula un coordinador o un admin, y solo mientras el turno de la factura siga abierto (lo valida anular_factura_caja).
+let fxRows=[], fxTurnos={};
+const puedeAnular=()=>esAdmin()||me?.role==='coordinador';
+const FX_MET={efectivo:'Efectivo',tarjeta:'Tarjeta',sinpe:'SINPE'};
+const fxMonto=(f,m)=>Array.isArray(f.pagos)&&f.pagos.length?f.pagos.filter(p=>p.metodo===m).reduce((a,p)=>a+(Number(p.monto)||0),0):(f.metodo===m?Number(f.total)||0:0);
+const fxMetTxt=f=>Array.isArray(f.pagos)&&f.pagos.length>1?f.pagos.map(p=>(FX_MET[p.metodo]||p.metodo)+' '+fmt(p.monto)).join(' + '):(FX_MET[f.metodo]||f.metodo||'—');
+const fxDet=f=>f.tipo==='evento'?'Evento: '+((f.items&&f.items[0]&&f.items[0].producto)||'—')+(f.cliente_nombre?' · '+f.cliente_nombre:'')
+  :(f.items||[]).map(it=>it.producto+(Number(it.cantidad)>1?' ×'+it.cantidad:'')).join(', ');
+const errTxt=e=>{ try{ return JSON.parse(e.message).message||e.message; }catch(_){ return e.message; } };
+async function renderMinitaMod(){
+  navMod('Minita',`<div class="row"><span class="st">${esc(fechaLarga(selDate))}</span></div>${segFecha()}`);
+  const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
+  const sede=detSede, fecha=selDate;
+  let rows, turnos;
+  try{ [rows,turnos]=await Promise.all([
+      supaFetch(`/facturas_caja?sede=eq.${encodeURIComponent(sede)}&fecha=eq.${fecha}&order=numero.desc&select=*`),
+      supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(sede)}&fecha=eq.${fecha}&select=id,turno_num,estado`)]); }
+  catch(e){ v.innerHTML=`<div class="empty">No se pudieron cargar las facturas: ${esc(errTxt(e))}</div>`; return; }
+  if(view!=='mod'||curMod!=='minita'||detSede!==sede||selDate!==fecha) return;   // cambió de pantalla mientras llegaba
+  fxRows=rows||[]; fxTurnos={}; (turnos||[]).forEach(t=>{ fxTurnos[t.id]=t; });
+  const act=fxRows.filter(f=>f.estado!=='anulada'), nAnul=fxRows.length-act.length;
+  const suma=L=>L.reduce((s,f)=>s+(Number(f.total)||0),0);
+  const prods=act.filter(f=>f.tipo!=='evento'), evs=act.filter(f=>f.tipo==='evento');
+  const porProd={}; prods.forEach(f=>(f.items||[]).forEach(it=>{ const k=String(it.producto||'—'); const p=porProd[k]=porProd[k]||{qty:0,total:0}; p.qty+=Number(it.cantidad)||0; p.total+=Number(it.total)||0; }));
+  const top=Object.entries(porProd).sort((a,b)=>b[1].total-a[1].total);
+  const cell=(t,s,val)=>`<div class="cell"><div class="main"><span class="t">${t}</span>${s?`<span class="s">${s}</span>`:''}</div><span class="v num">${val}</span></div>`;
+  const fila=f=>{ const an=f.estado==='anulada'; const t=fxTurnos[f.cierre_id];
+    return `<button class="cell" onclick="verFactura('${f.id}')"><div class="main"><span class="t"${an?' style="text-decoration:line-through;color:var(--sec)"':''}>#${f.numero} · ${esc(fxDet(f))}</span><span class="s">${hora(f.created_at)}${t?' · T'+t.turno_num:''} · ${esc(fxMetTxt(f))}${f.created_by?' · '+esc(quien(f.created_by)):''}</span></div>${an?'<span class="pill bad">Anulada</span>':`<span class="v num">${fmt(f.total)}</span>`}<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`; };
+  v.innerHTML=`
+    <div class="tiles"><div class="tile"><span class="l">Minita</span><span class="n num">${fmt(suma(prods))}</span></div><div class="tile"><span class="l">Facturas</span><span class="n num">${act.length}${nAnul?` <small style="color:var(--red)">· ${nAnul} anulada${nAnul===1?'':'s'}</small>`:''}</span></div></div>
+    ${act.length?`<div class="sect"><div class="hdr">Por método de pago</div><div class="group">${['efectivo','tarjeta','sinpe'].map(m=>cell(FX_MET[m],'',fmt(act.reduce((s,f)=>s+fxMonto(f,m),0)))).join('')}${evs.length?cell('Incluye eventos',`${evs.length} cobro(s) · no van al sobre`,fmt(suma(evs))):''}</div></div>`:''}
+    ${top.length?`<div class="sect"><div class="hdr">Productos vendidos</div><div class="group">${top.map(([p,x])=>cell(esc(p),x.qty+' u',fmt(x.total))).join('')}</div></div>`:''}
+    <div class="sect"><div class="hdr">Facturas</div><div class="group">${fxRows.length?fxRows.map(fila).join(''):'<div class="cell"><span class="s">No hay facturas de caja este día.</span></div>'}</div>
+      <div class="ftr">Cobros hechos en la pestaña Facturación de caja. ${puedeAnular()?'Tocá una factura para ver el detalle o anularla.':'Tocá una factura para ver el detalle.'}</div></div>`;
+}
+function verFactura(id){
+  const f=fxRows.find(x=>x.id===id); if(!f) return;
+  const an=f.estado==='anulada', t=fxTurnos[f.cierre_id], abierto=t?.estado==='abierto';
+  const fila=(a,b)=>`<div class="cell"><div class="main"><span class="t">${a}</span></div><span class="v">${b}</span></div>`;
+  const items=Array.isArray(f.items)?f.items:[];
+  let pie;
+  if(an) pie='';
+  else if(!puedeAnular()) pie='<div class="ftr" style="padding:12px 0 0">Solo un coordinador o un administrador puede anular facturas.</div>';
+  else if(!abierto) pie='<div class="ftr" style="padding:12px 0 0">El turno de esta factura ya se cerró: no se puede anular, porque el cierre ya quedó guardado con ella.</div>';
+  else pie=`<div class="hdr" style="padding:16px 0 6px">Anular</div>
+      <div class="group" style="margin:0"><div class="cell"><div class="main"><span class="t">Motivo</span></div><input class="qty" id="fxMotivo" type="text" maxlength="200" placeholder="Obligatorio" style="width:62%;text-align:right;font-weight:400"></div></div>
+      <div style="padding-top:14px"><button class="btn danger" id="btnAnular" onclick="anularFactura('${f.id}')">Anular factura #${f.numero}</button></div>
+      <div class="ftr" style="padding:8px 0 0;text-align:center">${f.tipo==='evento'?'El cobro sale del cierre del turno.':'El cobro sale del cierre del turno y los productos vuelven al inventario.'} No se puede deshacer.</div>`;
+  const sh=document.getElementById('sheet');
+  sh.innerHTML=`<div class="sheet-bg" onclick="cerrarSheet()"></div>
+    <div class="sheet-panel" role="dialog" aria-label="Factura">
+      <div class="sheet-h"><button class="act" onclick="cerrarSheet()">Cerrar</button><span class="tt">Factura #${f.numero}</span><span class="act" style="visibility:hidden">Cerrar</span></div>
+      <div class="sheet-body">
+        <div class="group" style="margin:0">
+          ${fila('Estado',an?'<span class="pill bad">Anulada</span>':'<span class="pill ok">Activa</span>')}
+          ${fila('Hora',esc(fechaHora(f.created_at)))}
+          ${fila('Turno',t?`T${t.turno_num} · ${esc(t.estado)}`:'—')}
+          ${fila('Cobró',esc(f.created_by||'—'))}
+          ${fila('Pago',esc(fxMetTxt(f)))}
+          ${f.referencia?fila('Referencia SINPE','…'+esc(String(f.referencia).slice(-6))):''}
+          ${f.recibido?fila('Efectivo recibido',fmt(f.recibido)):''}
+          ${f.tipo==='evento'&&f.cliente_nombre?fila('Cliente',esc(f.cliente_nombre)+(f.tipo_precio==='miembro'?' · miembro':' · no miembro')):''}
+          ${an?fila('Motivo',esc(f.motivo_anulacion||'—'))+fila('Anuló',esc(f.anulada_por||'—'))+fila('Anulada',esc(fechaHora(f.anulada_at))):''}
+        </div>
+        <div class="hdr" style="padding:16px 0 6px">${f.tipo==='evento'?'Evento':'Productos'}</div>
+        <div class="group" style="margin:0">${items.map(it=>`<div class="cell"><div class="main"><span class="t">${esc(it.producto)}</span><span class="s num">${Number(it.cantidad)||1} × ${fmt(it.precio)}</span></div><span class="v num">${fmt(it.total)}</span></div>`).join('')||'<div class="cell"><span class="s">Sin detalle.</span></div>'}
+          <div class="cell"><div class="main"><span class="t"><b>Total</b></span></div><span class="v strong num">${fmt(f.total)}</span></div></div>
+        ${pie}
+      </div></div>`;
+  sh.hidden=false; document.body.style.overflow='hidden';
+}
+async function anularFactura(id){
+  if(!puedeAnular()) return;
+  const f=fxRows.find(x=>x.id===id); if(!f) return;
+  const inp=document.getElementById('fxMotivo'); const motivo=(inp?.value||'').trim();
+  if(!motivo){ toast('Escribí el motivo de la anulación.'); inp?.focus(); return; }
+  if(!confirm(`¿Anular la factura #${f.numero} de ${detSede} por ${fmt(f.total)}?\n\n${fxDet(f)}\n\nMotivo: ${motivo}\n\nNo se puede deshacer.`)) return;
+  const b=document.getElementById('btnAnular'); if(b){ b.disabled=true; b.textContent='Anulando…'; }
+  try{
+    await supaFetch('/rpc/anular_factura_caja',{method:'POST',prefer:'return=representation',body:{p_factura:id,p_motivo:motivo}});
+    invCache[detSede]=null;   // el stock volvió al inventario
+    cerrarSheet(); toast(`Factura #${f.numero} anulada.`); renderMinitaMod();
+  }catch(e){ if(b){ b.disabled=false; b.textContent=`Anular factura #${f.numero}`; } toast('No se pudo anular: '+errTxt(e)); }
 }
 
 // Proyecciones (solo admin): último snapshot de la sede
