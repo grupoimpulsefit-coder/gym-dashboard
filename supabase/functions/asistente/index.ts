@@ -29,7 +29,8 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
-const MODEL = 'claude-opus-5-5';
+// Haiku: responder sobre el manual no necesita más, y cuesta ~40 veces menos que Opus.
+const MODEL = 'claude-haiku-5-5';
 const MAX_MENSAJES = 40;          // historial que se acepta del navegador (unos 10 intercambios)
 const MAX_HISTORIAL_BYTES = 300_000;
 const TIPOS = ['duda', 'anular_venta', 'revisar_sinpe', 'descuadre_caja', 'error_app', 'otro'] as const;
@@ -200,7 +201,7 @@ Deno.serve(async (req) => {
 
     // El bloque grande (instrucciones + mapa + manual) va primero y en caché; las respuestas
     // aprendidas, después. Lo que cambia en cada turno (quién pregunta, pantalla, consultas
-    // pendientes) NO va en `system`: Opus 5.5 ata su razonamiento a todo lo anterior y un
+    // pendientes) NO va en `system`: el modelo ata su razonamiento a todo lo anterior y un
     // `system` distinto en el turno siguiente da 400. Va como contexto dentro del mensaje nuevo.
     const system: Anthropic.Beta.BetaTextBlockParam[] = [
       { type: 'text', text: `${INSTRUCCIONES}\n\n═══ MAPA DE LA APP ═══\n${MAPA_APP}\n\n═══ MANUAL OPERATIVO ═══\n${MANUAL}`, cache_control: { type: 'ephemeral' } },
@@ -225,8 +226,8 @@ Deno.serve(async (req) => {
           // Si el historial que manda el navegador no calza con el razonamiento guardado
           // (versión vieja, respuestas aprendidas nuevas), se descarta ese razonamiento en vez de dar 400.
           thinking: { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } } as Anthropic.Beta.BetaThinkingConfigParam,
-          betas: ['server-side-fallback-2026-07-01', 'thinking-binding-controls-2026-08-01'],
-          fallbacks: 'default',
+          // Haiku no tiene respaldo automático (fallbacks): un rechazo se maneja abajo (stop_reason 'refusal').
+          betas: ['thinking-binding-controls-2026-08-01'],
           system, tools: TOOLS, messages,
         });
       } catch (e) {
