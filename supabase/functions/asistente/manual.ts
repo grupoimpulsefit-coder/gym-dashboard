@@ -423,8 +423,7 @@ Respuestas rápidas basadas en el reglamento del club.
 8.3 Enfermedad
  P ¿Qué ocurre si un cliente se ausenta por enfermedad varios días?
  R Presentar una epicrisis o documento médico oficial.
- Si la ausencia supera los 22 días, el espacio queda liberado.
- Al regresar, se valida con Administración si hay disponibilidad.
+ El caso lo revisa Administración.
 8.4 Indumentaria para entrenar
  P ¿Qué indumentaria es obligatoria para entrenar?
  R Ropa deportiva cómoda y adecuada para el ejercicio.
@@ -535,6 +534,12 @@ El manual de la Academia de Natación es igual al anterior, con estos cambios:
  • Verificar que la bitácora esté completa (clases, instructores, incidentes).
  • Registrar novedades importantes del día.
  • Si hay datos faltantes, coordinarlos con el instructor antes del cierre.
+
+8.3 Enfermedad (se agrega en Natación; NO aplica a las sedes de gimnasio)
+ P ¿Qué ocurre si un cliente se ausenta por enfermedad varios días?
+ R Presentar una epicrisis o documento médico oficial.
+ Si la ausencia supera los 22 días, el espacio queda liberado.
+ Al regresar, se valida con Administración si hay disponibilidad.
 
 8.4 Indumentaria para nadar (reemplaza "Indumentaria para entrenar")
  P ¿Qué indumentaria es obligatoria?
