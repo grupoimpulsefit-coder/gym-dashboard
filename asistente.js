@@ -11,11 +11,14 @@
 
    Requiere sesion.js cargado antes (usa Sesion.token/url/key) y la tabla de
    asistente.sql. Se incluye con <script src="/asistente.js"></script>.
+   Una página con sesión propia (movil.html) define antes window.AsistenteSesion =
+   { token, url, key, renovar } y el panel usa esa en vez de Sesion.
    /movil?asistente=pend (desde una notificación push) abre el panel en esa pestaña.
    ════════════════════════════════════════════════════════════════════════ */
 (function () {
-  if (window.__asistente || !window.Sesion) return;
+  if (window.__asistente || !(window.AsistenteSesion || window.Sesion)) return;
   window.__asistente = true;
+  function S() { return window.AsistenteSesion || window.Sesion; }
 
   var ADMIN = ['admin', 'admin_sedes', 'admin_g'];
   var TIPO = { duda: 'Duda', anular_venta: 'Anular venta', revisar_sinpe: 'Revisar SINPE',
@@ -42,14 +45,26 @@
 
   function api(path, opt) {
     opt = opt || {};
-    var h = { apikey: Sesion.key(), Authorization: 'Bearer ' + Sesion.token(), 'Content-Type': 'application/json' };
+    var s = S();
+    var h = { apikey: s.key(), Authorization: 'Bearer ' + s.token(), 'Content-Type': 'application/json' };
     if (opt.method === 'PATCH') h.Prefer = 'return=minimal';
-    return fetch(Sesion.url() + path, { method: opt.method || 'GET', headers: h, body: opt.body ? JSON.stringify(opt.body) : undefined })
-      .then(function (r) { return r.text().then(function (t) {
+    return fetch(s.url() + path, { method: opt.method || 'GET', headers: h, body: opt.body ? JSON.stringify(opt.body) : undefined })
+      .then(function (r) {
+        // Sesión propia vencida (app móvil): se renueva y se reintenta una vez
+        if (r.status === 401 && !opt._re && window.AsistenteSesion && AsistenteSesion.renovar) {
+          return Promise.resolve(AsistenteSesion.renovar()).then(function (ok) {
+            return ok ? api(path, Object.assign({}, opt, { _re: true })) : leerResp(r);
+          });
+        }
+        return leerResp(r);
+      });
+  }
+  function leerResp(r) {
+    return r.text().then(function (t) {
         var j = null; try { j = t ? JSON.parse(t) : null; } catch (_) {}
         if (!r.ok) { var e = new Error((j && (j.error || j.message)) || ('Error ' + r.status)); e.data = j; throw e; }
         return j;
-      }); });
+      });
   }
 
   /* ── Estilos ── */
@@ -123,7 +138,7 @@
 
   // Mostrar el botón solo con sesión iniciada; detectar cambio de usuario
   function vigilar() {
-    var t = Sesion.token();
+    var t = S().token();
     if (!t) { btn.style.display = 'none'; cerrar(); yo = { token: null, uid: null, rol: null }; return; }
     btn.style.display = 'flex';
     var uid = uidDe(t);

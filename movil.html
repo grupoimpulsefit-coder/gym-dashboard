@@ -195,7 +195,7 @@
 <script src="/asistente.js" defer></script>
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-10-28b';
+const APP_VER='2026-10-28c';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -279,6 +279,8 @@ async function refreshSession(){
     saveAuth({access_token:d.access_token,refresh_token:d.refresh_token,expires_at:Date.now()+(d.expires_in||3600)*1000,user_id:d.user?.id||auth.user_id,email:d.user?.email||auth.email}); return true;
   }catch(_){return false;}
 }
+// Chloe (asistente.js) usa la sesión de esta app, no la de /sesion.js (que aquí no se inicia)
+window.AsistenteSesion={ token:()=>auth?.access_token||null, url:()=>SUPA_URL, key:()=>SUPA_KEY, renovar:()=>auth?.refresh_token?refreshSession():false };
 async function loadMe(){
   const rows=await supaFetch(`/user_roles?id=eq.${auth.user_id}&select=role,nombre,sede,sedes_extra`);
   me=rows?.[0]||null;
