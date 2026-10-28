@@ -438,8 +438,6 @@ Respuestas rápidas basadas en el reglamento del club.
 8.6 Vencimiento de membresía
  P ¿Qué ocurre si una mensualidad vence?
  R Existe un día de gracia después del vencimiento.
- Con más de 10 días de atraso el cliente es retirado del calendario sin excepción.
- Debe solicitar nuevamente espacio, sujeto a disponibilidad.
 8.7 Promociones
  P ¿Se pueden mantener promociones vencidas?
  R No. El período máximo de gracia es de un (1) día.
@@ -546,6 +544,12 @@ El manual de la Academia de Natación es igual al anterior, con estos cambios:
  R Traje de baño de competencia (no se permite ropa de calle ni pantaloneta tipo tela).
  Gorra de natación.
  Lentes de natación (recomendados).
+
+8.6 Vencimiento de membresía (se agrega en Natación; NO aplica a las sedes de gimnasio)
+ P ¿Qué ocurre si una mensualidad vence?
+ R Existe un día de gracia después del vencimiento.
+ Con más de 10 días de atraso el cliente es retirado del calendario sin excepción.
+ Debe solicitar nuevamente espacio, sujeto a disponibilidad.
 
 13. Capacitación del personal nuevo, Día 1: en lugar de "Conocimiento del equipo y máquinas disponibles en la sede" va "Metodología de natación".
 `;
