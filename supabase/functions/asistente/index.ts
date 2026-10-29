@@ -18,7 +18,7 @@
 //  Secretos: ANTHROPIC_API_KEY (el mismo de analizar-datafono) y, para las
 //  notificaciones push, VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY (la pública es la
 //  misma que VAPID_PUBLIC en movil.html). Sin las VAPID el chat funciona igual.
-//  Se publica con el nombre exacto: asistente  (incluye manual.ts)
+//  Se publica con el nombre exacto: asistente  (incluye manual.ts y terminos.ts)
 //    supabase functions deploy asistente
 //  (SUPABASE_URL, SUPABASE_ANON_KEY y SUPABASE_SERVICE_ROLE_KEY ya vienen inyectadas.)
 // ════════════════════════════════════════════════════════════════════════
@@ -26,6 +26,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import Anthropic from 'npm:@anthropic-ai/sdk';
 import webpush from 'npm:web-push@3.6.7';
 import { MANUAL } from './manual.ts';
+import { TERMINOS } from './terminos.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -42,7 +43,7 @@ const ADMIN_ROLES = ['admin', 'admin_sedes', 'admin_g'];
 const MAPA_APP = `Módulos de jykc.dev (cada uno es una pantalla; se entra desde el menú principal):
 • /caja — Cierre de Caja. Pestañas Cierre y Facturación. Abrir turno (denominaciones + inventario inicial), facturar productos/minita/eventos, cargar Informe de Ventas de WStudio, Reporte SINPE de Ridivi, foto del datáfono, conteo de inventario, opción de minita, recuadro verde «Para WStudio», cierre parcial y cierre final (definitivo; descargar el PDF antes).
 • /gastos — Registrar gastos (necesitan factura y aprobación de Administración) y pagos de clases grupales / instructores de planta.
-• /mediciones — Agenda semanal de mediciones en bloques de 15 minutos. Recepción agenda; el instructor marca la rutina completa o incompleta.
+• /mediciones — Agenda semanal de mediciones en bloques de 15 minutos. Recepción agenda; el instructor o el coordinador marca la rutina (completa, incompleta o solo medición). Administración también puede marcarla.
 • /inventario — Stock, precios y faltantes por sede. Solo Administración, coordinador (solo consulta) y admin_sucursal. Recepción NO tiene acceso a este módulo ni puede ver cantidades de stock en ninguna pantalla: el conteo de inventario de recepción (apertura y cierre en /caja) es a ciegas.
 • /conciliacion — Auditoría SINPE: qué facturas tienen su SINPE y cuáles no.
 • /rrhh — Mi Portal (para quien está en planilla): saldo y solicitud de vacaciones, día libre sin goce, incapacidades, citas médicas y comprobantes. Administración ve ahí Recursos Humanos.
@@ -54,9 +55,10 @@ Sistemas externos: WStudio (membresías y su caja), Ridivi (SINPE Móvil). La se
 const INSTRUCCIONES = `Te llamás Chloe y sos la asistente de ayuda de jykc.dev, el sistema de gestión de Fit and Train Fitness Club (Costa Rica). Te escribe el personal del club (recepcionistas, instructores, coordinadores) desde dentro de la app.
 
 Cómo responder:
-• Respondé solo con lo que dicen el Manual Operativo y el mapa de la app de abajo, más las respuestas de Administración que se te den. No inventes pasos, montos, botones, plazos ni políticas.
+• Respondé solo con lo que dicen el Manual Operativo, los Términos y Condiciones y el mapa de la app de abajo, más las respuestas de Administración que se te den. No inventes pasos, montos, botones, plazos ni políticas.
 • Tratá a la persona de usted, en español sencillo y corto. Para procedimientos, dá los pasos numerados tal como están en el manual y mencioná la sección (p. ej. "Manual 5, Paso 7").
 • Si hay actualizaciones con fecha (sección "Actualización de procedimientos"), lo vigente es lo más reciente.
+• Los Términos y Condiciones de abajo son el contrato y el reglamento que firma el cliente. Usalos para preguntas sobre las reglas del club (indumentaria, edad mínima, niños, casilleros, horario de las instalaciones, reposiciones, congelamientos, cambios de horario, conducta) y citá la cláusula o el número del reglamento. Las cláusulas del contrato hablan de la piscina y las clases de natación; no las apliques a las sedes de gimnasio salvo que el texto lo diga. Para los procedimientos internos del personal manda el Manual. Si el Manual y los Términos dicen cosas distintas sobre lo mismo, no elijas: explicá lo que dice cada uno y recomendá confirmarlo con Administración.
 • Si la persona es de la sede Natación, aplicá también las diferencias para Natación. Las reglas que el manual marca como de Natación no se aplican a las sedes de gimnasio (3 Ríos, Pinares, Sabanilla). Si la persona no tiene sede fija y la respuesta cambia según la sede, preguntá de qué sede es el cliente.
 • Cada mensaje de la persona llega con un bloque "CONTEXTO DE LA APP" que agrega el sistema (fecha y hora, quién pregunta, desde qué pantalla y sus consultas pendientes). Usalo como dato; no lo menciones salvo que haga falta. Para promociones y reglas con fechas, compará con esa fecha: si ya venció o todavía no empieza, decilo.
 
@@ -231,7 +233,7 @@ Deno.serve(async (req) => {
     // pendientes) NO va en `system`: el modelo ata su razonamiento a todo lo anterior y un
     // `system` distinto en el turno siguiente da 400. Va como contexto dentro del mensaje nuevo.
     const system: Anthropic.Beta.BetaTextBlockParam[] = [
-      { type: 'text', text: `${INSTRUCCIONES}\n\n═══ MAPA DE LA APP ═══\n${MAPA_APP}\n\n═══ MANUAL OPERATIVO ═══\n${MANUAL}`, cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: `${INSTRUCCIONES}\n\n═══ MAPA DE LA APP ═══\n${MAPA_APP}\n\n═══ MANUAL OPERATIVO ═══\n${MANUAL}\n\n═══ TÉRMINOS Y CONDICIONES Y REGLAMENTO (los firma el cliente) ═══\n${TERMINOS}`, cache_control: { type: 'ephemeral' } },
       { type: 'text', text: `═══ CONOCIMIENTO AGREGADO POR ADMINISTRACIÓN (vale igual que el manual; si choca, manda esto, y entre dos notas manda la más reciente) ═══\n${conocimiento || '(nada todavía)'}\n\n═══ RESPUESTAS DE ADMINISTRACIÓN (valen igual que el manual; si chocan, mandan estas) ═══\n${extra || '(ninguna todavía)'}` },
     ];
     const ahora = new Date().toLocaleString('es-CR', { timeZone: 'America/Costa_Rica', dateStyle: 'full', timeStyle: 'short' });
