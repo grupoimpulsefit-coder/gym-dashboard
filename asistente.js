@@ -8,6 +8,8 @@
      Administración y "Agregar detalle" mientras sigan pendientes.
    · Pendientes (solo admin, admin_sedes, admin_g): responder y cerrar tickets.
      "Enseñar al asistente" hace que use esa respuesta en las próximas dudas.
+   · Conocimiento (solo Administración): lo que le enseñaron desde el chat
+     ("Chloe, agregá a tu conocimiento que…"); se puede quitar si quedó viejo.
 
    Requiere sesion.js cargado antes (usa Sesion.token/url/key) y la tabla de
    asistente.sql. Se incluye con <script src="/asistente.js"></script>.
@@ -105,7 +107,7 @@
   p.id = 'asis-p'; p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'Chloe');
   p.innerHTML =
     '<header><b>Chloe</b><button class="chip" id="asis-nueva" type="button">Nueva</button><button class="chip" id="asis-x" type="button" aria-label="Cerrar">✕</button></header>' +
-    '<div class="asis-tabs"><button data-t="chat" class="on" type="button">Chat</button><button data-t="mis" type="button">Mis consultas</button><button data-t="pend" type="button" style="display:none">Pendientes</button></div>' +
+    '<div class="asis-tabs"><button data-t="chat" class="on" type="button">Chat</button><button data-t="mis" type="button">Mis consultas</button><button data-t="pend" type="button" style="display:none">Pendientes</button><button data-t="con" type="button" style="display:none">Conocimiento</button></div>' +
     '<div id="asis-c"></div>' +
     '<form id="asis-f"><textarea id="asis-i" rows="1" placeholder="Escríbale a Chloe…"></textarea><button type="submit" id="asis-s">Enviar</button></form>';
 
@@ -128,7 +130,7 @@
   }
   function abrirPendiente() {
     if (!abrirEn) return;
-    tab = abrirEn === 'pend' && !esAdmin() ? 'mis' : abrirEn; abrirEn = null;
+    tab = (abrirEn === 'pend' || abrirEn === 'con') && !esAdmin() ? 'mis' : abrirEn; abrirEn = null;
     abrir(); contar();
   }
   function $(id) { return document.getElementById(id); }
@@ -148,6 +150,7 @@
       api('/rest/v1/user_roles?id=eq.' + uid + '&select=role').then(function (r) {
         yo.rol = r && r[0] && r[0].role;
         p.querySelector('[data-t=pend]').style.display = esAdmin() ? '' : 'none';
+        p.querySelector('[data-t=con]').style.display = esAdmin() ? '' : 'none';
         contar(); abrirPendiente();
       }).catch(function () {});
     }
@@ -173,6 +176,7 @@
     $('asis-nueva').style.display = t === 'chat' ? '' : 'none';
     if (t === 'chat') pintarChat();
     else if (t === 'mis') pintarMis();
+    else if (t === 'con') pintarCon();
     else pintarPend();
   }
 
@@ -181,7 +185,8 @@
     var c = $('asis-c');
     c.innerHTML = chat.burbujas.length ? chat.burbujas.map(function (b) {
       return '<div class="m ' + b.r + '">' + (b.r === 'a' ? fmt(b.t) : esc(b.t)) + '</div>';
-    }).join('') : '<div class="vacio">Hola, soy <b>Chloe</b>. Pregúnteme cómo hacer algo en la app o un procedimiento del manual: abrir o cerrar turno, SINPE, minita, mediciones, vacaciones…<br><br>Si no hay respuesta, o el trámite es de Administración, se crea una consulta y la respuesta aparece en <b>Mis consultas</b>. Si después tiene más datos, dígamelo y los agrego a esa misma consulta.</div>';
+    }).join('') : '<div class="vacio">Hola, soy <b>Chloe</b>. Pregúnteme cómo hacer algo en la app o un procedimiento del manual: abrir o cerrar turno, SINPE, minita, mediciones, vacaciones…<br><br>Si no hay respuesta, o el trámite es de Administración, se crea una consulta y la respuesta aparece en <b>Mis consultas</b>. Si después tiene más datos, dígamelo y los agrego a esa misma consulta.' +
+      (esAdmin() ? '<br><br>Administración: para enseñarme algo nuevo escriba, por ejemplo, <b>«Agregá a tu conocimiento que…»</b>. Lo verá en la pestaña <b>Conocimiento</b>.' : '') + '</div>';
     if (enviando) c.insertAdjacentHTML('beforeend', '<div class="m a">Escribiendo…</div>');
     c.scrollTop = c.scrollHeight;
   }
@@ -266,6 +271,27 @@
       resuelto_por: yo.uid, resuelto_at: new Date().toISOString() } })
       .then(function () { pintarPend(); contar(); })
       .catch(function (e) { b.disabled = false; b.textContent = 'Responder y cerrar'; alert(e.message); });
+  }
+
+  /* ── Conocimiento (Administración) ── */
+  function pintarCon() {
+    var c = $('asis-c'); c.innerHTML = '<div class="vacio">Cargando…</div>';
+    api('/rest/v1/asistente_conocimiento?activo=eq.true&order=created_at.desc&limit=200&select=*').then(function (r) {
+      c.innerHTML = (r && r.length) ? r.map(function (n) {
+        return '<div class="t"><small>#' + n.id + ' · ' + fecha(n.created_at) + (n.autor ? ' · ' + esc(n.autor) : '') + '</small>' +
+          '<div><b>' + esc(n.tema) + '</b></div><div style="margin-top:4px;white-space:pre-wrap">' + esc(n.contenido) + '</div>' +
+          '<button class="chip" type="button" data-q="' + n.id + '" style="margin-top:8px">Quitar</button></div>';
+      }).join('') : '<div class="vacio">Chloe todavía no tiene conocimiento agregado.<br><br>En el Chat escríbale, por ejemplo: «Agregá a tu conocimiento que desde el 1 de noviembre la mensualidad en Pinares cuesta ₡25 000».</div>';
+      c.querySelectorAll('button[data-q]').forEach(function (b) { b.onclick = function () { quitarCon(b); }; });
+    }).catch(function (e) { c.innerHTML = '<div class="e">' + esc(e.message) + '</div>'; });
+  }
+  function quitarCon(b) {
+    if (!confirm('¿Quitar la nota #' + b.dataset.q + '? Chloe deja de usarla desde la próxima consulta.')) return;
+    b.disabled = true; b.textContent = 'Quitando…';
+    api('/rest/v1/asistente_conocimiento?id=eq.' + b.dataset.q, { method: 'PATCH', body: {
+      activo: false, quitado_por: yo.uid, quitado_at: new Date().toISOString() } })
+      .then(pintarCon)
+      .catch(function (e) { b.disabled = false; b.textContent = 'Quitar'; alert(e.message); });
   }
 
   if (document.body) montar(); else document.addEventListener('DOMContentLoaded', montar);
