@@ -195,7 +195,7 @@
 <script src="/asistente.js" defer></script>
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-10-28c';
+const APP_VER='2026-10-29a';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -256,7 +256,7 @@ const puedeArquear=()=>esAdmin()||me?.role==='admin_sucursal';
 const verInventarioReal=()=>esAdmin()||me?.role==='coordinador';
 // Mediciones: recepción/coordinación agenda, el instructor solo marca la rutina.
 const puedeAgendarMed=()=>esAdmin()||['recepcion','admin_sucursal','coordinador'].includes(me?.role);
-const puedeRutinaMed=()=>esAdmin()||me?.role==='instructor';
+const puedeRutinaMed=()=>esAdmin()||['instructor','coordinador'].includes(me?.role);
 const puedeVerMed=()=>puedeAgendarMed()||puedeRutinaMed();
 // Asistencia: presente lo marcan recepción o el instructor; ausente solo recepción (lo valida la base)
 const puedePresenteMed=()=>puedeAgendarMed()||me?.role==='instructor';
@@ -544,7 +544,7 @@ async function renderMedicionesMod(){
     ${fuera.length?`<div class="sect"><div class="hdr">⚠ Fuera del horario</div><div class="group">${fuera.map(r=>fila(medMin(r.hora))).join('')}</div><div class="ftr">Se agendaron antes del cambio de horario. Abrilas para eliminarlas y volver a agendarlas en un espacio válido.</div></div>`:''}
     <div class="sect"><div class="hdr">Mañana · 7:30 a 10:30</div><div class="group">${amHoy.map(fila).join('')}</div></div>
     <div class="sect"><div class="hdr">Tarde · 5:00 a 7:45 p. m.</div><div class="group">${pmHoy.length?pmHoy.map(fila).join(''):'<div class="cell"><span class="s">Viernes en la tarde no hay mediciones.</span></div>'}</div>
-      <div class="ftr">${puedeRutinaMed()&&!puedeAgendarMed()?'Como instructor podés marcar la rutina y si el cliente llegó (presente).':'La rutina la marca el instructor. Ausente solo lo marca recepción.'} Sábado y domingo no hay medición.</div></div>`;
+      <div class="ftr">${puedeRutinaMed()&&!puedeAgendarMed()?'Como instructor podés marcar la rutina y si el cliente llegó (presente).':puedeRutinaMed()?'Podés marcar la rutina y si el cliente llegó (presente o ausente) desde el día de la cita.':'La rutina la marca el instructor o el coordinador.'} Sábado y domingo no hay medición.</div></div>`;
 }
 
 // Hoja de una medición: crear, editar, marcar rutina o eliminar

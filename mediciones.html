@@ -393,7 +393,7 @@ const dowDe=f=>{const [y,m,d]=String(f).split('-').map(Number);return (new Date(
 const bloqueoDe=(f,h)=>bloqUnico[f+'|'+h] || bloqPerm[dowDe(f)+'|'+h] || null;
 const esAdmin=()=>['admin','admin_sedes','admin_g'].includes(currentRole);
 const puedeAgendar=()=>esAdmin()||['recepcion','admin_sucursal','coordinador'].includes(currentRole);
-const puedeRutina=()=>esAdmin()||currentRole==='instructor';
+const puedeRutina=()=>esAdmin()||['instructor','coordinador'].includes(currentRole);
 // Asistencia: presente lo marcan recepción o el instructor; ausente solo recepción (y admins).
 // La base lo hace cumplir (mediciones_asistencia.sql).
 const puedePresente=()=>puedeAgendar()||currentRole==='instructor';
@@ -471,7 +471,7 @@ function init(){
   document.getElementById('sedeTitle').textContent='· '+currentSede;
   document.getElementById('leyRol').textContent = puedeRutina()&&!puedeAgendar()
     ? 'Como instructor podés marcar la rutina (o solo medición) y si el cliente llegó (presente).'
-    : puedeAgendar()&&!puedeRutina() ? 'La rutina la marca el instructor.' : '';
+    : puedeAgendar()&&!puedeRutina() ? 'La rutina la marca el instructor o el coordinador.' : '';
   document.getElementById('app').hidden=false;
   cargar();
 }
@@ -737,7 +737,7 @@ function abrir(f,h){
         ${!puedeAusente()?'<div class="hint">Solo recepción puede marcar ausente.</div>':''}
       </div>
       <div class="sect" style="gap:7px">
-        <div class="hdr" style="padding:0 4px">Rutina${puedeRutina()?'':' · la marca el instructor'}</div>
+        <div class="hdr" style="padding:0 4px">Rutina${puedeRutina()?'':' · la marca el instructor o el coordinador'}</div>
         <div class="seg-rutina" id="segRutina" style="grid-template-columns:repeat(2,1fr)">
           <button data-v="" onclick="setRutina('')" ${puedeRutina()?'':'disabled'}>Pendiente</button>
           <button data-v="completa" onclick="setRutina('completa')" ${puedeRutina()?'':'disabled'}>✓ Completa</button>
