@@ -7,6 +7,9 @@
 //  asistente_tickets (ver asistente.sql) para que Administración lo atienda.
 //  Si la persona ya tiene una consulta pendiente del mismo asunto, le agrega
 //  los datos nuevos en vez de crear otra.
+//  A Administración (admin, admin_sedes, admin_g) además le acepta "agregá a tu
+//  conocimiento que…": lo guarda en asistente_conocimiento y lo usa desde la
+//  siguiente consulta de cualquier persona.
 //
 //  Además de { mensaje, historial, pagina } acepta:
 //    { accion: 'agregar', ticket, texto }  → botón "Agregar detalle" de Mis consultas
@@ -65,6 +68,7 @@ Cuándo crear un ticket (herramienta crear_ticket):
 • Si la persona trae más datos o una corrección sobre un asunto que ya tiene una consulta pendiente (lista "CONSULTAS PENDIENTES DE ESTA PERSONA"), usá agregar_a_ticket con ese número en vez de crear otro, y decile a qué número se agregó. Si no está claro que sea el mismo asunto, preguntale. Las consultas ya respondidas no se reabren: un asunto nuevo lleva ticket nuevo.
 • Emergencias médicas o accidentes: indicá de inmediato el procedimiento del manual (sección 11) y que avise a Administración; no esperes a un ticket.
 • No compartas datos personales de colaboradores, clientes ni dueños.
+• Solo si el CONTEXTO DE LA APP dice que el rol es admin, admin_sedes o admin_g y la persona te pide que aprendas, agregues o actualices algo en tu conocimiento (un procedimiento nuevo, un cambio de precio, horario o política, una promoción…), usá guardar_conocimiento. Redactalo completo y claro, como lo tendrías que explicar al personal, con las fechas de vigencia si las dice. Si es ambiguo o le faltan datos, preguntale antes de guardar. Si reemplaza algo anterior, decilo en el contenido. Después confirmale qué quedó guardado y que lo puede ver o quitar en la pestaña "Conocimiento". A nadie más le guardes conocimiento: si otra persona te lo pide, decile que eso lo hace Administración.
 • No tenés acceso al stock. Si alguien de recepción pregunta cuántas unidades hay de un producto, respondé solo que esa cantidad no se puede consultar (el conteo de recepción es a ciegas); no le indiques módulos ni formas de verla.`;
 
 const TOOLS: Anthropic.Beta.BetaTool[] = [{
@@ -95,6 +99,22 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [{
     },
   },
 }];
+
+// Solo se le ofrece a Administración (ver más abajo)
+const TOOL_CONOCIMIENTO: Anthropic.Beta.BetaTool = {
+  name: 'guardar_conocimiento',
+  description: 'Guarda información nueva o actualizada que Administración te pide aprender. Desde la siguiente consulta la vas a tener igual que el manual.',
+  strict: true,
+  input_schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['tema', 'contenido'],
+    properties: {
+      tema: { type: 'string', description: 'Título corto, p. ej. "Precio de la mensualidad en Pinares".' },
+      contenido: { type: 'string', description: 'La información completa, clara para el personal, con vigencia si la hay.' },
+    },
+  },
+};
 
 function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
@@ -190,6 +210,12 @@ Deno.serve(async (req) => {
       .select('resumen, respuesta').eq('en_asistente', true).not('respuesta', 'is', null)
       .order('resuelto_at', { ascending: false }).limit(200);
     const extra = (aprendidas || []).map(t => `P: ${t.resumen}\nR: ${t.respuesta}`).join('\n\n');
+    // Conocimiento que Administración le enseñó desde el chat (lo más nuevo manda)
+    const { data: notas } = await admin.from('asistente_conocimiento')
+      .select('tema, contenido, created_at').eq('activo', true)
+      .order('created_at', { ascending: true }).limit(200);
+    const conocimiento = (notas || []).map(n => `[${String(n.created_at).slice(0, 10)}] ${n.tema}\n${n.contenido}`).join('\n\n');
+    const esAdmin = ADMIN_ROLES.includes(yo.role);
 
     // Consultas pendientes de quien pregunta: para agregarles datos en vez de duplicarlas
     const { data: abiertas } = await admin.from('asistente_tickets')
@@ -206,7 +232,7 @@ Deno.serve(async (req) => {
     // `system` distinto en el turno siguiente da 400. Va como contexto dentro del mensaje nuevo.
     const system: Anthropic.Beta.BetaTextBlockParam[] = [
       { type: 'text', text: `${INSTRUCCIONES}\n\n═══ MAPA DE LA APP ═══\n${MAPA_APP}\n\n═══ MANUAL OPERATIVO ═══\n${MANUAL}`, cache_control: { type: 'ephemeral' } },
-      { type: 'text', text: `═══ RESPUESTAS DE ADMINISTRACIÓN (valen igual que el manual; si chocan, mandan estas) ═══\n${extra || '(ninguna todavía)'}` },
+      { type: 'text', text: `═══ CONOCIMIENTO AGREGADO POR ADMINISTRACIÓN (vale igual que el manual; si choca, manda esto, y entre dos notas manda la más reciente) ═══\n${conocimiento || '(nada todavía)'}\n\n═══ RESPUESTAS DE ADMINISTRACIÓN (valen igual que el manual; si chocan, mandan estas) ═══\n${extra || '(ninguna todavía)'}` },
     ];
     const ahora = new Date().toLocaleString('es-CR', { timeZone: 'America/Costa_Rica', dateStyle: 'full', timeStyle: 'short' });
     const contexto = `═══ CONTEXTO DE LA APP ═══\nFecha y hora (Costa Rica): ${ahora}\nNombre: ${yo.nombre || caller.user.email}\nRol: ${yo.role}\nSede: ${yo.sede || 'sin sede fija'}\nPantalla abierta: ${pagina || 'menú principal'}\n\nCONSULTAS PENDIENTES DE ESTA PERSONA:\n${pendientes || '(ninguna)'}`;
@@ -229,7 +255,7 @@ Deno.serve(async (req) => {
           thinking: { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } } as Anthropic.Beta.BetaThinkingConfigParam,
           // Haiku no tiene respaldo automático (fallbacks): un rechazo se maneja abajo (stop_reason 'refusal').
           betas: ['thinking-binding-controls-2026-08-01'],
-          system, tools: TOOLS, messages,
+          system, tools: esAdmin ? [...TOOLS, TOOL_CONOCIMIENTO] : TOOLS, messages,
         });
       } catch (e) {
         if (e instanceof Anthropic.APIError) {
@@ -253,6 +279,20 @@ Deno.serve(async (req) => {
           } catch (e) {
             resultados.push({ type: 'tool_result', tool_use_id: b.id, is_error: true, content: (e as Error).message });
           }
+          continue;
+        }
+        if (b.name === 'guardar_conocimiento') {
+          const inp = b.input as { tema?: string; contenido?: string };
+          const tema = String(inp.tema || '').trim().slice(0, 200), contenido = String(inp.contenido || '').trim().slice(0, 6000);
+          let falla = !esAdmin ? 'Solo Administración puede agregar conocimiento.' : !tema || !contenido ? 'Falta el tema o el contenido.' : '';
+          if (!falla) {
+            const { data: n, error } = await admin.from('asistente_conocimiento').insert({
+              tema, contenido, creado_por: caller.user.id, autor: yo.nombre || caller.user.email,
+            }).select('id').single();
+            if (n) resultados.push({ type: 'tool_result', tool_use_id: b.id, content: `Guardado como nota #${n.id}. Se usa desde la próxima consulta.` });
+            else falla = 'No se guardó: ' + (error?.message || '');
+          }
+          if (falla) resultados.push({ type: 'tool_result', tool_use_id: b.id, is_error: true, content: falla });
           continue;
         }
         const inp = b.input as { tipo?: string; resumen?: string; detalle?: string };
