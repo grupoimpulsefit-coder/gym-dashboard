@@ -702,7 +702,9 @@ function _sesionExpirada(motivo) {
 // Sedes donde el usuario (no admin) puede operar: su sede principal + sedes_extra, validadas y sin duplicar.
 function computeSedes(sede,extra){ const set=[]; [sede,...(Array.isArray(extra)?extra:[])].forEach(s=>{ if(s&&SEDES.includes(s)&&!set.includes(s))set.push(s); }); return set; }
 async function supaFetch(path,opts={}){
-  const token=currentToken||SUPA_KEY;
+  // Sin sesión (p. ej. se cerró en otra pestaña) no se manda como anónimo: la base respondería con un error de permisos confuso
+  if(!currentToken) throw new Error('Su sesión se cerró (quizá se cerró sesión o se entró con otra cuenta en otra pestaña). Vuelva a entrar e intente de nuevo.');
+  const token=currentToken;
   const res=await fetch(SUPA_URL+'/rest/v1'+path,{method:opts.method||'GET',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':opts.prefer||'return=minimal',...(opts.headers||{})},body:opts.body!=null?JSON.stringify(opts.body):undefined});
   if(res.status===401&&!opts._retry&&await Sesion.renovar())return supaFetch(path,{...opts,_retry:true});
   if(!res.ok){const t=await res.text();throw new Error(t);} const txt=await res.text(); return txt?JSON.parse(txt):null;
@@ -821,6 +823,7 @@ document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key
     document.getElementById('userNombre').textContent=auth.nombre||'—';document.getElementById('loginScreen').style.display='none';setTimeout(init,0);}}catch(_){}})();
 async function doLogout(silent){ Sesion.cerrar();stopLivePoll();try{await fetch(`${SUPA_URL}/auth/v1/logout`,{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}});}catch(_){}
   currentToken=null;currentRole=null;currentSede=null;currentEmail='';document.getElementById('app').style.display='none';
+  document.querySelectorAll('.modal-bg').forEach(m=>m.style.display='none');   // las ventanas quedaban encima del login
   if(!silent){document.getElementById('loginEmail').value='';document.getElementById('loginPassword').value='';}document.getElementById('loginScreen').style.display='flex';}
 
 // ── Init ──
