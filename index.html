@@ -1901,6 +1901,35 @@ async function processUsuariosFile(data, filename) {
     }
 }
 
+// Promos solo para una lista de clientes (tabla promo_clientes, ver promo_clientes.sql):
+// avisa si en el informe alguien fuera de la lista pagó con ese código "(Promo: X)".
+// Las promos que no tienen lista no se revisan.
+async function avisoPromos() {
+    const PROMO_RE = /\(\s*promo\s*:\s*([^)]*?)\s*\)/i;
+    const conPromo = [...renovacionesData, ...clasesSueltasData, ...sinClasificarData]
+        .map(r => ({ r, m: PROMO_RE.exec(r.Producto || '') })).filter(x => x.m);
+    if (!conPromo.length) return '';
+    const lista = [];
+    try {
+        for (let off = 0; ; off += 1000) {
+            const pag = await supaFetch(`/promo_clientes?sede=eq.${encodeURIComponent(currentSedeName)}&select=promo,cliente_norm&order=id&limit=1000&offset=${off}`) || [];
+            lista.push(...pag);
+            if (pag.length < 1000) break;
+        }
+    } catch(e) { console.warn('No se pudieron revisar las promos:', e.message); return ''; }
+    const autorizados = {};
+    lista.forEach(p => (autorizados[p.promo] = autorizados[p.promo] || new Set()).add(p.cliente_norm));
+    const revisadas = conPromo.filter(x => autorizados[normName(x.m[1])]);
+    if (!revisadas.length) return '';
+    const ajenos = revisadas.filter(x => !autorizados[normName(x.m[1])].has(normName(x.r.Cliente)));
+    if (!ajenos.length) return `<div style="color:var(--green);font-size:13px;margin-top:4px;">✅ Promos con lista: ${revisadas.length === 1 ? 'el pago es' : `los ${revisadas.length} pagos son`} de clientes autorizados</div>`;
+    const h = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+    return `<div style="margin-top:8px;text-align:left;border:1px solid var(--red);border-radius:10px;padding:10px 12px;font-size:13px;">
+        <div style="color:var(--red);font-weight:700;margin-bottom:4px;">⚠️ ${ajenos.length} ${ajenos.length === 1 ? 'pago' : 'pagos'} con promo de clientes que no están en la lista</div>
+        ${ajenos.map(({ r, m }) => `<div>• <b>${h(r.Cliente)}</b> · Promo: ${h(m[1])} · ${h(String(r.FechaStr).replace(/\s+/g, ' '))} · ₡${(r.Total || 0).toLocaleString()}</div>`).join('')}
+    </div>`;
+}
+
 // ── RENOVACIONES (Ventas_por_Producto.xlsx → "Page 1") ──
 async function processRenovacionesFile(data, filename) {
     try {
@@ -1996,8 +2025,9 @@ async function processRenovacionesFile(data, filename) {
         }
 
         renoLoaded = true; renoSubido = true;
+        const avisoPromo = await avisoPromos();
         document.getElementById('uploadStatusR').innerHTML =
-            `<span style="color:var(--green);font-weight:600;">✅ ${renovacionesData.length} transacciones de membresía cargadas</span>`;
+            `<span style="color:var(--green);font-weight:600;">✅ ${renovacionesData.length} transacciones de membresía cargadas</span>` + avisoPromo;
 
         rebuildDashboard();
     } catch(e) {
