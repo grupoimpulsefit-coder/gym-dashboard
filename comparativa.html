@@ -457,7 +457,7 @@ function render(snaps, desde, hasta) {
       return;
     }
 
-    // Cobros reales del rango (membresías + clases grupales; excluye sesiones sueltas y sin clasificar)
+    // Cobros reales del rango (membresías + clases grupales + PT; excluye sesiones sueltas y sin clasificar)
     const cobros = (snap.renov_data || []).filter(r => {
       if (!Metas.cuentaParaMeta(r)) return false;
       const d = parseDMY(r.FechaStr);

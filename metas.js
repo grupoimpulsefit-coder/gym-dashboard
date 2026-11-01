@@ -4,7 +4,8 @@
    falta se calculan EXACTAMENTE igual en las dos páginas.
 
    Criterio de "cobrado": el mismo de Comparativa — pagos de membresía del
-   informe de ventas (renov_data) más las clases grupales sueltas; sin
+   informe de ventas (renov_data) más las clases grupales sueltas y Personal
+   Trainer; sin
    sesiones sueltas ni productos sin clasificar (Metas.cuentaParaMeta). "Proyección": activos cuyo plan vence dentro del mes.
 
    Tabla: metas_sedes (sede, mes_orden 'YYYY-MM', monto). Ver metas_sedes.sql.
@@ -68,9 +69,12 @@
   }
 
   /* ── Cálculos ── */
-  // Las clases grupales sueltas cuentan para la meta; las sesiones sueltas no (pedido de Administración, 31/10/2026)
+  // Las clases grupales sueltas y Personal Trainer cuentan para la meta; las sesiones
+  // sueltas no (pedido de Administración, 31/10/2026). PT cuenta aunque quede sin clasificar.
   function esClaseGrupal(p) { return /clase\s*grupal/.test(norm(p)); }
+  function esPersonal(p) { return /\bpersonal\b/.test(norm(p)); }
   function cuentaParaMeta(r) {
+    if (esPersonal(r.Producto)) return true;
     if (r.EsSinClasificar) return false;
     return !r.EsClaseSuelta || esClaseGrupal(r.Producto);
   }
