@@ -311,22 +311,15 @@ const SEDES = ['3 Ríos','Natación','Pinares','Sabanilla'];
 
 const PT_KW = ['personal training','personal 2026'];
 
-// Bebidas, snacks y suplementos vendidos sueltos en recepción
-const MINITA_KW = [
-  'agua','gatorade','gatorage','powerade','rooster','be come strong',
-  'amino','creatina','pre-entreno','pre entreno','preentreno','bucked up','glu',
-  'gricket','gym bite','scoop de prote','proteina','proteína','become strong',
-  'snack','bebida','paño','pano'
-];
+// Bebidas, snacks y suplementos vendidos sueltos en recepción (la lista vive en
+// /metas.js porque la minita también cuenta para la meta)
+const MINITA_KW = Metas.MINITA_KW;
 
 // Ingresos que no son venta del gimnasio (p. ej. alquiler de la oficina de nutrición)
 const OTROS_KW = ['alquiler'];
 
-// Mercadería de natación (no es bebida/suplemento ni membresía)
-const ACCESORIOS_KW = [
-  'gorra','lente','goggle','tapon de nariz','tapon de oido',
-  'tapón de nariz','tapón de oido','bolso'
-];
+// Mercadería de natación (no es bebida/suplemento ni membresía; no cuenta para la meta)
+const ACCESORIOS_KW = Metas.ACCESORIOS_KW;
 
 // Todo lo que no caiga en PT/Minita/Accesorios se asume Membresía
 // (planes, clases, mensualidades, matrículas, etc. — son la mayoría de los productos reales)
@@ -452,7 +445,7 @@ function buildDashboard(latest) {
     Metas.recordar({ mesOrden: metaMes, mesTxt, calc: metaCalc, onGuardado: () => buildDashboard(latest) });
     document.getElementById('metaBox').innerHTML = Metas.htmlResumen(metaCalc);
     document.getElementById('metaNota').textContent = metaCalc.total.sedesConMeta
-      ? 'Pagos de membresía, mismo criterio que Comparativa' : '';
+      ? 'Membresías, clases grupales, PT y minita · mismo criterio que Comparativa' : '';
   } else {
     document.getElementById('metaBox').innerHTML = '';
     document.getElementById('metaNota').textContent = '';
@@ -513,7 +506,7 @@ function buildDashboard(latest) {
   document.getElementById('kpiMemb').textContent   = fmt(memb);
   document.getElementById('kpiMembPct').textContent= pct(memb,total) + ' del total';
   document.getElementById('kpiMinita').textContent = fmt(minita);
-  document.getElementById('kpiMinitaPct').textContent = pct(minita,total) + ' del total';
+  document.getElementById('kpiMinitaPct').textContent = pct(minita,total) + ' · cuenta para la meta';
   document.getElementById('kpiPT').textContent     = fmt(pt);
   document.getElementById('kpiPTPct').textContent  = pct(pt,total) + ' · cuenta para la meta';
   document.getElementById('kpiAcc').textContent    = fmt(accesorios);

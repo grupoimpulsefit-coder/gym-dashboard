@@ -435,7 +435,7 @@ function render(snaps, desde, hasta) {
   Metas.recordar({ mesOrden, mesTxt, calc: metaCalc, onGuardado: () => render(snaps, desde, hasta) });
   document.getElementById('metaBox').innerHTML = Metas.htmlResumen(metaCalc);
   document.getElementById('metaNota').textContent = metaCalc.total.sedesConMeta
-    ? `Cobrado del 1 al ${metaCalc.corteTxt}, sin importar la fecha "Desde"` : '';
+    ? `Cobrado del 1 al ${metaCalc.corteTxt} con la minita, sin importar la fecha "Desde"` : '';
   const tdMeta = sede => {
     const r = metaCalc.porSede[sede];
     if (!(r?.meta > 0)) return '<td class="num muted-i">—</td><td class="num muted-i">—</td>';

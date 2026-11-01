@@ -3,10 +3,11 @@
    Lo usan comparativa.html y sedes.html, así la meta, lo cobrado y lo que
    falta se calculan EXACTAMENTE igual en las dos páginas.
 
-   Criterio de "cobrado": el mismo de Comparativa — pagos de membresía del
-   informe de ventas (renov_data) más las clases grupales sueltas y Personal
-   Trainer; sin
-   sesiones sueltas ni productos sin clasificar (Metas.cuentaParaMeta). "Proyección": activos cuyo plan vence dentro del mes.
+   Criterio de "cobrado": pagos de membresía del informe de ventas (renov_data)
+   más las clases grupales sueltas y Personal Trainer (Metas.cuentaParaMeta,
+   también usado por la tabla de Comparativa), más la minita: la del archivo y
+   la facturada en caja (facturas_caja). Sin sesiones sueltas, accesorios ni
+   productos sin clasificar. "Proyección": activos cuyo plan vence dentro del mes.
 
    Tabla: metas_sedes (sede, mes_orden 'YYYY-MM', monto). Ver metas_sedes.sql.
    Usa la función global supaFetch() de la página que lo incluye.
@@ -20,6 +21,7 @@
 (function () {
   var SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
   var cache = {};            // mesOrden → { sede: monto }
+  var cajaCache = {};        // mesOrden → [{ sede, fecha, total }] minita facturada en caja
   var precios = null;        // sede → { planNormalizado: precio }
   var tablaFalta = false;    // true si metas_sedes todavía no existe
 
@@ -78,12 +80,60 @@
     if (r.EsSinClasificar) return false;
     return !r.EsClaseSuelta || esClaseGrupal(r.Producto);
   }
-  function cobrado(snap, desde, hasta) {
-    return (snap.renov_data || []).reduce(function (s, r) {
-      if (!cuentaParaMeta(r)) return s;
+
+  // La minita también cuenta para la meta (Administración, 01/11/2026). En el archivo de
+  // ventas viene sin clasificar; desde que se factura en caja sale de facturas_caja.
+  // Mismas listas que el desglose de sedes.html (que las toma de aquí).
+  var MINITA_KW = [
+    'agua', 'gatorade', 'gatorage', 'powerade', 'rooster', 'be come strong',
+    'amino', 'creatina', 'pre-entreno', 'pre entreno', 'preentreno', 'bucked up', 'glu',
+    'gricket', 'gym bite', 'scoop de prote', 'proteina', 'proteína', 'become strong',
+    'snack', 'bebida', 'paño', 'pano'
+  ];
+  // Mercadería de natación: se vende en caja pero no es minita
+  var ACCESORIOS_KW = [
+    'gorra', 'lente', 'goggle', 'tapon de nariz', 'tapon de oido',
+    'tapón de nariz', 'tapón de oido', 'bolso'
+  ];
+  var tiene = function (lista, p) { var pl = String(p || '').toLowerCase(); return lista.some(function (k) { return pl.indexOf(k) >= 0; }); };
+  function esMinita(p) { return tiene(MINITA_KW, p); }
+
+  function cobrado(snap, sede, desde, hasta, caja) {
+    var archivo = (snap ? snap.renov_data || [] : []).reduce(function (s, r) {
+      if (!cuentaParaMeta(r) && !esMinita(r.Producto)) return s;
       var d = parseDMY(r.FechaStr);
       return d && d >= desde && d <= hasta ? s + (Number(r.Total) || 0) : s;
     }, 0);
+    return (caja || []).reduce(function (s, v) {
+      return v.sede === sede && v.fecha >= desde && v.fecha <= hasta ? s + v.total : s;
+    }, archivo);
+  }
+
+  /* Minita facturada en caja del mes (por páginas: la base entrega máx. 1000 filas).
+     Eventos y anuladas no cuentan. Sin la tabla o sin permiso, queda vacía. */
+  async function cargarCaja(mesOrden) {
+    if (cajaCache[mesOrden]) return;
+    var p = mesOrden.split('-').map(Number);
+    var sig = p[1] === 12 ? (p[0] + 1) + '-01' : p[0] + '-' + String(p[1] + 1).padStart(2, '0');
+    var out = [];
+    try {
+      var path = '/facturas_caja?fecha=gte.' + mesOrden + '-01&fecha=lt.' + sig + '-01&estado=eq.activa&select=sede,fecha,tipo,items&order=id.asc&limit=1000';
+      for (;;) {
+        var filas = (await supaFetch(path + '&offset=' + out.length)) || [];
+        if (!filas.length) break;
+        out.push.apply(out, filas);
+      }
+    } catch (e) { console.warn('metas: no se pudo cargar la minita de caja:', e.message); }
+    cajaCache[mesOrden] = [];
+    out.forEach(function (f) {
+      if ((f.tipo || 'producto') !== 'producto') return;
+      var q = String(f.fecha).split('-').map(Number);
+      var fecha = new Date(q[0], q[1] - 1, q[2]);
+      (f.items || []).forEach(function (it) {
+        if (tiene(ACCESORIOS_KW, it.producto)) return;
+        cajaCache[mesOrden].push({ sede: f.sede, fecha: fecha, total: Number(it.total) || 0 });
+      });
+    });
   }
   function proyeccion(snap, sede, desde, hasta) {
     return (snap.users_data || []).reduce(function (s, u) {
@@ -98,7 +148,7 @@
      tabla todavía no se creó (para avisar que falta correr el SQL). */
   async function cargar(mesOrden, forzar) {
     if (!forzar && cache[mesOrden]) return cache[mesOrden];
-    await cargarPrecios();
+    await Promise.all([cargarPrecios(), cargarCaja(mesOrden)]);
     var out = {};
     try {
       var rows = await supaFetch('/metas_sedes?mes_orden=eq.' + encodeURIComponent(mesOrden) + '&select=sede,monto,updated_by,updated_at') || [];
@@ -128,7 +178,7 @@
       var snap = o.snaps[sede];
       var r = {
         meta: metas[sede] || 0,
-        cobrado: snap ? cobrado(snap, lim.ini, corte) : 0,
+        cobrado: cobrado(snap, sede, lim.ini, corte, cajaCache[o.mesOrden]),
         proy: snap ? proyeccion(snap, sede, lim.ini, lim.fin) : 0,
         conDatos: !!snap
       };
@@ -303,7 +353,7 @@
   window.Metas = {
     cargar: cargar, calcular: calcular, htmlResumen: htmlResumen, htmlSede: htmlSede,
     recordar: recordar, abrirEditor: abrirEditor, mesOrdenDe: mesOrdenDe, normalizarMes: normalizarMes,
-    cuentaParaMeta: cuentaParaMeta,
+    cuentaParaMeta: cuentaParaMeta, MINITA_KW: MINITA_KW, ACCESORIOS_KW: ACCESORIOS_KW,
     _editar: function () { abrirEditor(); }, _cerrar: cerrar, _guardar: guardar, _sugerir: sugerir
   };
 })();
