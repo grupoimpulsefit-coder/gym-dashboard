@@ -5,9 +5,10 @@
 --  Algunas promos (código "(Promo: X)" en el nombre del plan del informe de
 --  Ventas por Producto) son solo para una lista de clientes. Al subir el
 --  informe, index.html avisa si alguien que NO está en la lista pagó con ese
---  código. Promos sin lista aquí no se revisan.
+--  código. Promos sin lista aquí no se revisan. La lista se ve, se descarga y
+--  se edita en la pestaña "Promos" de index.html.
 --  promo y cliente_norm van en minúsculas, sin tildes ni espacios dobles
---  (igual que normName() de index.html).
+--  (igual que normName() de index.html); promo_nombre es como se muestra.
 -- ══════════════════════════════════════════════════════════════════════════
 
 create table if not exists promo_clientes (
@@ -20,6 +21,12 @@ create table if not exists promo_clientes (
   created_at    timestamptz not null default now(),
   unique (sede, promo, cliente_norm)
 );
+alter table promo_clientes
+  add column if not exists promo_nombre text,
+  add column if not exists pin          text,
+  add column if not exists telefono     text,
+  add column if not exists plan         text,
+  add column if not exists nota         text;
 
 alter table promo_clientes enable row level security;
 
@@ -49,15 +56,31 @@ language sql immutable set search_path = '' as $$
     '\s+', ' ', 'g'))
 $$;
 
--- Promo fin de año (Natación): los clientes que la compraron en octubre 2026
-insert into promo_clientes (sede, promo, cliente, cliente_norm, created_by)
-select distinct on (promo_norm(e->>'Cliente'))
-       'Natación', 'promo fin de ano', trim(regexp_replace(e->>'Cliente', '\s+', ' ', 'g')),
-       promo_norm(e->>'Cliente'), 'ventas octubre 2026'
-from gym_snapshots s, jsonb_array_elements(s.renov_data) e
-where s.sede = 'Natación' and s.mes_orden = '2026-10'
-  and e->>'Producto' ~* '\(\s*promo\s*:\s*promo fin de a'
+-- Promo fin de año (Natación): los clientes que la compraron en octubre 2026,
+-- con el último plan que pagaron y PIN/teléfono del Informe de Usuarios
+insert into promo_clientes (sede, promo, promo_nombre, cliente, cliente_norm, pin, telefono, plan, created_by)
+select v.sede, 'promo fin de ano', 'Promo fin de año', v.cliente, v.n, u.pin, u.tel, v.plan, 'ventas octubre 2026'
+from (
+  select distinct on (promo_norm(e->>'Cliente')) 'Natación'::text sede, promo_norm(e->>'Cliente') n,
+         trim(regexp_replace(e->>'Cliente', '\s+', ' ', 'g')) cliente,
+         trim(regexp_replace(regexp_replace(e->>'Producto', '\(\s*Promo:.*$', ''), '\s+', ' ', 'g')) plan
+  from gym_snapshots s, jsonb_array_elements(s.renov_data) e
+  where s.sede = 'Natación' and s.mes_orden = '2026-10'
+    and e->>'Producto' ~* '\(\s*promo\s*:\s*promo fin de a'
+  order by promo_norm(e->>'Cliente'), to_timestamp(e->>'FechaStr', 'DD/MM/YYYY HH12:MI:SS AM') desc
+) v
+left join (
+  select distinct on (promo_norm(u->>'Nombre')) promo_norm(u->>'Nombre') n, u->>'PIN' pin, u->>'Telefono' tel
+  from gym_snapshots s, jsonb_array_elements(s.users_data) u
+  where s.sede = 'Natación' and s.mes_orden = '2026-11'
+  order by promo_norm(u->>'Nombre'), u->>'PIN'
+) u on u.n = v.n
 on conflict (sede, promo, cliente_norm) do nothing;
 
+update promo_clientes set nota = 'Pagó la promo 2 veces (2/10 y 31/10)'
+  where promo = 'promo fin de ano' and pin = '2106' and nota is null;
+update promo_clientes set nota = 'Dos cobros iguales el 24/10 con 3 min de diferencia: revisar cobro doble'
+  where promo = 'promo fin de ano' and pin = '8609' and nota is null;
+
 -- Comprobación: 74 clientes
-select sede, promo, count(*) from promo_clientes group by 1, 2;
+select sede, promo_nombre, count(*) from promo_clientes group by 1, 2;

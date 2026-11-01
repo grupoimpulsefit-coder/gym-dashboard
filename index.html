@@ -399,6 +399,7 @@
             <button class="tab-btn" onclick="switchTab('tab-renovaciones', this)">🔄 Análisis de Renovaciones</button>
             <button class="tab-btn" onclick="switchTab('tab-validacion', this)">💳 Validación Descuentos</button>
             <button class="tab-btn" onclick="switchTab('tab-seguimiento', this)">📋 Seguimiento Vencidos</button>
+            <button class="tab-btn" onclick="switchTab('tab-promos', this)">🎟️ Promos</button>
             <button class="tab-btn" onclick="switchTab('tab-historial', this)">📅 Historial</button>
         </div>
 
@@ -680,6 +681,53 @@
                 <div id="segTableInfo" style="padding:12px 0;font-size:13px;color:var(--sec);"></div>
             </div>
         </div><!-- /tab-seguimiento -->
+
+        <!-- ── TAB PROMOS: CLIENTES AUTORIZADOS POR PROMO (promo_clientes) ── -->
+        <div id="tab-promos" class="tab-panel">
+            <div class="controls">
+                <div class="controls-title">🎟️ Promos con lista de clientes</div>
+                <div class="filter-group">
+                    <div class="filter-item"><label>Promo</label>
+                        <select id="promoSel" onchange="renderPromos()"></select></div>
+                    <div class="filter-item"><label>Buscar cliente</label>
+                        <input type="text" id="promoSearch" placeholder="Nombre, PIN o teléfono..." oninput="renderPromos()"></div>
+                    <div class="filter-item" style="justify-content:flex-end;">
+                        <button class="btn btn-green" onclick="descargarPromoExcel()" style="margin-top:auto;">⬇ Descargar Excel</button></div>
+                </div>
+                <div id="promoAgregar" style="display:none;margin-top:14px;">
+                    <div class="filter-group">
+                        <div class="filter-item"><label>Agregar cliente (nombre como sale en el sistema)</label>
+                            <input type="text" id="promoNuevoNombre" placeholder="Nombre completo"></div>
+                        <div class="filter-item"><label>PIN</label>
+                            <input type="text" id="promoNuevoPin" placeholder="Opcional"></div>
+                        <div class="filter-item"><label>Teléfono</label>
+                            <input type="text" id="promoNuevoTel" placeholder="Opcional"></div>
+                        <div class="filter-item"><label>Plan</label>
+                            <input type="text" id="promoNuevoPlan" placeholder="Opcional"></div>
+                        <div class="filter-item"><label>Nota</label>
+                            <input type="text" id="promoNuevoNota" placeholder="Opcional"></div>
+                        <div class="filter-item" style="justify-content:flex-end;">
+                            <button class="btn btn-purple" onclick="agregarPromoCliente()" style="margin-top:auto;">➕ Agregar</button></div>
+                    </div>
+                </div>
+                <p style="margin:12px 0 0;font-size:13px;color:var(--sec);">
+                    Al subir Ventas por Producto, quien pague con una de estas promos y no esté en la lista sale marcado.
+                    <b>Black November</b> no usa lista: se revisa por regla (nuevos y reingresos de más de 30 días, en planes mensuales o trimestres).
+                </p>
+            </div>
+            <div class="table-section">
+                <div class="section-title">Clientes autorizados</div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr>
+                            <th>#</th><th>Cliente</th><th>PIN</th><th>Teléfono</th><th>Plan</th><th>Nota</th><th>Agregado por</th><th></th>
+                        </tr></thead>
+                        <tbody id="promoBody"></tbody>
+                    </table>
+                </div>
+                <div id="promoInfo" style="padding:12px 0;font-size:13px;color:var(--sec);"></div>
+            </div>
+        </div><!-- /tab-promos -->
 
         <!-- ── TAB 4: HISTORIAL ── -->
         <div id="tab-historial" class="tab-panel">
@@ -1578,6 +1626,7 @@ function switchTab(id, btn) {
     if (id === 'tab-renovaciones' && renovacionesData.length) renderRenovaciones();
     if (id === 'tab-validacion' && allValidacion.length) renderValidacion();
     if (id === 'tab-seguimiento' && usersData.length) renderSeguimiento();
+    if (id === 'tab-promos') loadPromos();
     if (id === 'tab-historial') loadAndRenderHistorial();
 }
 
@@ -1940,11 +1989,109 @@ async function avisoPromos() {
     if (!revisadas.length) return '';
     const malos = revisadas.filter(x => x.motivo);
     if (!malos.length) return `<div style="color:var(--green);font-size:13px;margin-top:4px;">✅ Promos revisadas: ${revisadas.length === 1 ? 'el pago califica' : `los ${revisadas.length} pagos califican`}</div>`;
-    const h = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+    const h = escHtml;
     return `<div style="margin-top:8px;text-align:left;border:1px solid var(--red);border-radius:10px;padding:10px 12px;font-size:13px;">
         <div style="color:var(--red);font-weight:700;margin-bottom:4px;">⚠️ ${malos.length} ${malos.length === 1 ? 'pago' : 'pagos'} con promo que no ${malos.length === 1 ? 'califica' : 'califican'}</div>
         ${malos.map(({ r, m, motivo }) => `<div>• <b>${h(r.Cliente)}</b> · Promo: ${h(m[1])} · <span style="color:var(--red);">${h(motivo)}</span> · ${h(String(r.FechaStr).replace(/\s+/g, ' '))} · ₡${(r.Total || 0).toLocaleString()}</div>`).join('')}
     </div>`;
+}
+
+function escHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+// ── PESTAÑA PROMOS: ver, descargar y editar la lista de promo_clientes ──
+let promoClientes = [];
+const puedeEditarPromos = () => currentRole === 'admin' || currentRole === 'admin_sedes';   // igual que la RLS
+
+async function loadPromos() {
+    const body = document.getElementById('promoBody');
+    body.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--ter);">⏳ Cargando...</td></tr>`;
+    try {
+        const filas = [];
+        for (let off = 0; ; off += 1000) {
+            const pag = await supaFetch(`/promo_clientes?select=*&order=sede,promo,cliente,id&limit=1000&offset=${off}`) || [];
+            filas.push(...pag);
+            if (pag.length < 1000) break;
+        }
+        promoClientes = filas;
+    } catch(e) {
+        body.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--red);">❌ No se pudo cargar la lista: ${escHtml(e.message)}</td></tr>`;
+        return;
+    }
+    const sel = document.getElementById('promoSel'), antes = sel.value;
+    const promos = [...new Map(promoClientes.map(p => [p.sede + '|' + p.promo, p])).values()];
+    sel.innerHTML = promos.map(p => `<option value="${escHtml(p.sede + '|' + p.promo)}">${escHtml(p.sede)} · ${escHtml(p.promo_nombre || p.promo)}</option>`).join('');
+    if (promos.some(p => p.sede + '|' + p.promo === antes)) sel.value = antes;
+    document.getElementById('promoAgregar').style.display = puedeEditarPromos() && promos.length ? '' : 'none';
+    renderPromos();
+}
+
+function promoActual() {
+    const [sede, promo] = (document.getElementById('promoSel').value || '|').split('|');
+    return promoClientes.filter(p => p.sede === sede && p.promo === promo);
+}
+
+function renderPromos() {
+    const todas = promoActual();
+    const q = normName(document.getElementById('promoSearch').value);
+    const filas = q ? todas.filter(p => normName([p.cliente, p.pin, p.telefono].join(' ')).includes(q)) : todas;
+    const edita = puedeEditarPromos();
+    document.getElementById('promoBody').innerHTML = filas.length ? filas.map((p, i) => `<tr>
+        <td>${i + 1}</td><td><b>${escHtml(p.cliente)}</b></td><td>${escHtml(p.pin)}</td><td>${escHtml(p.telefono)}</td>
+        <td>${escHtml(p.plan)}</td>
+        <td>${p.nota ? `<span style="color:var(--orange);">⚠ ${escHtml(p.nota)}</span>` : ''}</td>
+        <td style="color:var(--sec);font-size:12px;">${escHtml(p.created_by)}</td>
+        <td>${edita ? `<button class="btn btn-red" style="min-height:28px;padding:0 10px;font-size:12px;" onclick="quitarPromoCliente(${p.id})">Quitar</button>` : ''}</td>
+    </tr>`).join('') : `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--ter);">${todas.length ? 'Ningún cliente coincide con la búsqueda' : 'No hay promos con lista de clientes'}</td></tr>`;
+    document.getElementById('promoInfo').textContent = todas.length ? (q ? `${filas.length} de ${todas.length} clientes` : `${todas.length} clientes`) : '';
+}
+
+async function agregarPromoCliente() {
+    const [sede, promo] = document.getElementById('promoSel').value.split('|');
+    const campo = id => document.getElementById(id).value.trim();
+    const cliente = campo('promoNuevoNombre').replace(/\s+/g, ' ');
+    if (!sede || !cliente) { alert('Escriba el nombre del cliente tal como sale en el sistema.'); return; }
+    const lista = promoActual();
+    if (lista.some(p => p.cliente_norm === normName(cliente))) { alert(`${cliente} ya está en la lista.`); return; }
+    const u = usersData.find(x => normName(x.Nombre) === normName(cliente));   // completa PIN/teléfono si el informe está cargado
+    try {
+        await supaFetch('/promo_clientes', { method: 'POST', body: {
+            sede, promo, promo_nombre: lista[0]?.promo_nombre || null,
+            cliente: u?.Nombre?.trim() || cliente, cliente_norm: normName(cliente),
+            pin: campo('promoNuevoPin') || u?.PIN || null, telefono: campo('promoNuevoTel') || u?.Telefono || null,
+            plan: campo('promoNuevoPlan') || null, nota: campo('promoNuevoNota') || null,
+            created_by: currentUserEmail || null
+        } });
+    } catch(e) { alert('No se pudo agregar: ' + e.message); return; }
+    ['promoNuevoNombre', 'promoNuevoPin', 'promoNuevoTel', 'promoNuevoPlan', 'promoNuevoNota'].forEach(id => document.getElementById(id).value = '');
+    await loadPromos();
+}
+
+async function quitarPromoCliente(id) {
+    const p = promoClientes.find(x => x.id === id);
+    if (!p || !confirm(`¿Quitar a ${p.cliente} de la lista de ${p.promo_nombre || p.promo}?\n\nSi vuelve a pagar con esa promo, saldrá marcado al subir el informe.`)) return;
+    try { await supaFetch(`/promo_clientes?id=eq.${id}`, { method: 'DELETE' }); }
+    catch(e) { alert('No se pudo quitar: ' + e.message); return; }
+    await loadPromos();
+}
+
+function descargarPromoExcel() {
+    const filas = promoActual();
+    if (!filas.length) { alert('No hay clientes para descargar.'); return; }
+    const nombre = filas[0].promo_nombre || filas[0].promo, sede = filas[0].sede;
+    const ws = XLSX.utils.aoa_to_sheet([
+        [`${nombre} — ${sede} — clientes autorizados`],
+        [`${filas.length} clientes · descargado ${new Date().toLocaleString('es-CR')}`],
+        [],
+        ['#', 'Cliente', 'PIN', 'Teléfono', 'Plan', 'Nota', 'Agregado por', 'Fecha'],
+        ...filas.map((p, i) => [i + 1, p.cliente, p.pin || '', p.telefono || '', p.plan || '', p.nota || '', p.created_by || '',
+            p.created_at ? new Date(p.created_at).toLocaleDateString('es-CR') : ''])
+    ]);
+    ws['!cols'] = [{ wch: 4 }, { wch: 32 }, { wch: 8 }, { wch: 12 }, { wch: 48 }, { wch: 50 }, { wch: 22 }, { wch: 12 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+    XLSX.writeFile(wb, `${nombre} - ${sede}.xlsx`.replace(/[\\/:*?"<>|]/g, ''));
 }
 
 // ── RENOVACIONES (Ventas_por_Producto.xlsx → "Page 1") ──
