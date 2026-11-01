@@ -82,5 +82,35 @@ update promo_clientes set nota = 'Pagó la promo 2 veces (2/10 y 31/10)'
 update promo_clientes set nota = 'Dos cobros iguales el 24/10 con 3 min de diferencia: revisar cobro doble'
   where promo = 'promo fin de ano' and pin = '8609' and nota is null;
 
--- Comprobación: 74 clientes
-select sede, promo_nombre, count(*) from promo_clientes group by 1, 2;
+-- Planes Estándar Halloween: en noviembre 2026 cuestan ₡5.000 solo para quien los pagó
+-- en octubre. Estas listas se revisan por el nombre del plan (promo = plan normalizado).
+-- Falta el de 3 Ríos.
+insert into promo_clientes (sede, promo, promo_nombre, cliente, cliente_norm, pin, telefono, plan, created_by)
+select v.sede, v.promo, v.plan, v.cliente, v.n, u.pin, u.tel, v.plan, 'ventas octubre 2026'
+from (
+  select distinct on (p.sede, promo_norm(e->>'Cliente')) p.sede, p.plan, promo_norm(p.plan) promo,
+         trim(regexp_replace(e->>'Cliente', '\s+', ' ', 'g')) cliente, promo_norm(e->>'Cliente') n
+  from (values ('Sabanilla', 'Plan Estandar halloween'), ('Pinares', 'ESTANDAR HALLOWEEN 2026'),
+               ('Natación', 'Plan Estandar Halloween 2026')) p(sede, plan)
+  join gym_snapshots s on s.sede = p.sede and s.mes_orden = '2026-10'
+  cross join jsonb_array_elements(s.renov_data) e
+  where promo_norm(regexp_replace(e->>'Producto', '\(\s*Promo:.*$', '')) = promo_norm(p.plan)
+    and e->>'Cliente' !~* '^\s*invitado\s*$'
+  order by p.sede, promo_norm(e->>'Cliente')
+) v
+left join (
+  select distinct on (s.sede, promo_norm(x->>'Nombre')) s.sede, promo_norm(x->>'Nombre') n, x->>'PIN' pin, x->>'Telefono' tel
+  from (select distinct on (sede) sede, users_data from gym_snapshots
+        where case when jsonb_typeof(users_data) = 'array' then jsonb_array_length(users_data) > 0 else false end
+        order by sede, mes_orden desc) s
+  cross join jsonb_array_elements(s.users_data) x
+  order by s.sede, promo_norm(x->>'Nombre'), x->>'PIN'
+) u on u.sede = v.sede and u.n = v.n
+on conflict (sede, promo, cliente_norm) do nothing;
+
+update promo_clientes set nota = 'En octubre pagó ₡28.250 (14/10) y ₡5.000 (18/10)'
+  where sede = 'Sabanilla' and promo = 'plan estandar halloween'
+    and cliente_norm = promo_norm('Laverne Otárola Urtecho') and nota is null;
+
+-- Comprobación: Promo fin de año 74 · Halloween Sabanilla 93, Pinares 68, Natación 22
+select sede, promo_nombre, count(*) from promo_clientes group by 1, 2 order by 1, 2;

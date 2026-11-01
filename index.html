@@ -685,7 +685,7 @@
         <!-- ── TAB PROMOS: CLIENTES AUTORIZADOS POR PROMO (promo_clientes) ── -->
         <div id="tab-promos" class="tab-panel">
             <div class="controls">
-                <div class="controls-title">🎟️ Promos con lista de clientes</div>
+                <div class="controls-title">🎟️ Promos y planes con lista de clientes</div>
                 <div class="filter-group">
                     <div class="filter-item"><label>Promo</label>
                         <select id="promoSel" onchange="renderPromos()"></select></div>
@@ -711,7 +711,7 @@
                     </div>
                 </div>
                 <p style="margin:12px 0 0;font-size:13px;color:var(--sec);">
-                    Al subir Ventas por Producto, quien pague con una de estas promos y no esté en la lista sale marcado.
+                    Al subir Ventas por Producto, quien pague una de estas promos o planes y no esté en la lista sale marcado.
                     <b>Black November</b> no usa lista: se revisa por regla (nuevos y reingresos de más de 30 días, en planes mensuales o trimestres).
                 </p>
             </div>
@@ -1962,29 +1962,37 @@ const REGLAS_PROMO = {
         : '',
 };
 
-// Revisa los pagos con código "(Promo: X)" del informe: contra REGLAS_PROMO, o contra la
-// lista de clientes autorizados de esa promo (tabla promo_clientes, ver promo_clientes.sql).
-// Las promos sin regla ni lista no se revisan.
+// Revisa los pagos del informe que traen código "(Promo: X)" o que son de un plan con lista
+// (ej. "Plan Estandar halloween": en noviembre solo para quien lo pagó en octubre): contra
+// REGLAS_PROMO, o contra la lista de clientes autorizados (tabla promo_clientes, ver
+// promo_clientes.sql; la clave es el código o el nombre del plan normalizado).
+// Lo que no tiene regla ni lista no se revisa.
 async function avisoPromos() {
     const PROMO_RE = /\(\s*promo\s*:\s*([^)]*?)\s*\)/i;
-    const conPromo = [...renovacionesData, ...clasesSueltasData, ...sinClasificarData]
-        .map(r => ({ r, m: PROMO_RE.exec(r.Producto || '') })).filter(x => x.m)
-        .map(x => ({ ...x, promo: normName(x.m[1]), plan: x.r.Producto.replace(PROMO_RE, '') }));
-    if (!conPromo.length) return '';
+    const pagos = [...renovacionesData, ...clasesSueltasData, ...sinClasificarData].map(r => {
+        const m = PROMO_RE.exec(r.Producto || '');
+        const plan = (r.Producto || '').replace(PROMO_RE, '');
+        return { r, plan, promo: m ? normName(m[1]) : null, nombre: m ? `Promo: ${m[1]}` : `Plan: ${plan.trim()}` };
+    });
+    if (!pagos.length) return '';
     const autorizados = {};
-    if (conPromo.some(x => !REGLAS_PROMO[x.promo])) {
-        try {
-            for (let off = 0; ; off += 1000) {
-                const pag = await supaFetch(`/promo_clientes?sede=eq.${encodeURIComponent(currentSedeName)}&select=promo,cliente_norm&order=id&limit=1000&offset=${off}`) || [];
-                pag.forEach(p => (autorizados[p.promo] = autorizados[p.promo] || new Set()).add(p.cliente_norm));
-                if (pag.length < 1000) break;
-            }
-        } catch(e) { console.warn('No se pudo leer la lista de promos:', e.message); }
-    }
-    const revisadas = conPromo
-        .map(x => ({ ...x, motivo: REGLAS_PROMO[x.promo] ? REGLAS_PROMO[x.promo](x.r, x.plan)
-            : autorizados[x.promo] ? (autorizados[x.promo].has(normName(x.r.Cliente)) ? '' : 'no está en la lista')
-            : null }))
+    try {
+        for (let off = 0; ; off += 1000) {
+            const pag = await supaFetch(`/promo_clientes?sede=eq.${encodeURIComponent(currentSedeName)}&select=promo,cliente_norm&order=id&limit=1000&offset=${off}`) || [];
+            pag.forEach(p => (autorizados[p.promo] = autorizados[p.promo] || new Set()).add(p.cliente_norm));
+            if (pag.length < 1000) break;
+        }
+    } catch(e) { console.warn('No se pudo leer la lista de promos:', e.message); }
+    const revisadas = pagos
+        .map(x => {
+            // un pago puede tener regla (por el código) y lista (por el código o por el plan): debe cumplir todas
+            const regla = x.promo && REGLAS_PROMO[x.promo];
+            const listas = [autorizados[x.promo], autorizados[normName(x.plan)]].filter(Boolean);
+            if (!regla && !listas.length) return { ...x, motivo: null };
+            const motivos = [regla ? regla(x.r, x.plan) : '',
+                ...listas.map(l => l.has(normName(x.r.Cliente)) ? '' : 'no está en la lista')];
+            return { ...x, motivo: [...new Set(motivos.filter(Boolean))].join(' · ') };
+        })
         .filter(x => x.motivo !== null);
     if (!revisadas.length) return '';
     const malos = revisadas.filter(x => x.motivo);
@@ -1992,7 +2000,7 @@ async function avisoPromos() {
     const h = escHtml;
     return `<div style="margin-top:8px;text-align:left;border:1px solid var(--red);border-radius:10px;padding:10px 12px;font-size:13px;">
         <div style="color:var(--red);font-weight:700;margin-bottom:4px;">⚠️ ${malos.length} ${malos.length === 1 ? 'pago' : 'pagos'} con promo que no ${malos.length === 1 ? 'califica' : 'califican'}</div>
-        ${malos.map(({ r, m, motivo }) => `<div>• <b>${h(r.Cliente)}</b> · Promo: ${h(m[1])} · <span style="color:var(--red);">${h(motivo)}</span> · ${h(String(r.FechaStr).replace(/\s+/g, ' '))} · ₡${(r.Total || 0).toLocaleString()}</div>`).join('')}
+        ${malos.map(({ r, nombre, motivo }) => `<div>• <b>${h(r.Cliente)}</b> · ${h(nombre)} · <span style="color:var(--red);">${h(motivo)}</span> · ${h(String(r.FechaStr).replace(/\s+/g, ' '))} · ₡${(r.Total || 0).toLocaleString()}</div>`).join('')}
     </div>`;
 }
 
