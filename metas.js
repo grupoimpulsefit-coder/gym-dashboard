@@ -69,9 +69,9 @@
   }
 
   /* ── Cálculos ── */
-  // Las clases grupales sueltas y Personal Trainer cuentan para la meta; las sesiones
+  // Las clases grupales sueltas (incluye clase de baile) y Personal Trainer cuentan para la meta; las sesiones
   // sueltas no (pedido de Administración, 31/10/2026). PT cuenta aunque quede sin clasificar.
-  function esClaseGrupal(p) { return /clase\s*grupal/.test(norm(p)); }
+  function esClaseGrupal(p) { return /clase\s*(grupal|(de\s*)?baile)/.test(norm(p)); }
   function esPersonal(p) { return /\bpersonal\b/.test(norm(p)); }
   function cuentaParaMeta(r) {
     if (esPersonal(r.Producto)) return true;
