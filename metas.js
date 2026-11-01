@@ -4,8 +4,8 @@
    falta se calculan EXACTAMENTE igual en las dos páginas.
 
    Criterio de "cobrado": el mismo de Comparativa — pagos de membresía del
-   informe de ventas (renov_data), sin clases sueltas ni productos sin
-   clasificar. "Proyección": activos cuyo plan vence dentro del mes.
+   informe de ventas (renov_data) más las clases grupales sueltas; sin
+   sesiones sueltas ni productos sin clasificar (Metas.cuentaParaMeta). "Proyección": activos cuyo plan vence dentro del mes.
 
    Tabla: metas_sedes (sede, mes_orden 'YYYY-MM', monto). Ver metas_sedes.sql.
    Usa la función global supaFetch() de la página que lo incluye.
@@ -68,9 +68,15 @@
   }
 
   /* ── Cálculos ── */
+  // Las clases grupales sueltas cuentan para la meta; las sesiones sueltas no (pedido de Administración, 31/10/2026)
+  function esClaseGrupal(p) { return /clase\s*grupal/.test(norm(p)); }
+  function cuentaParaMeta(r) {
+    if (r.EsSinClasificar) return false;
+    return !r.EsClaseSuelta || esClaseGrupal(r.Producto);
+  }
   function cobrado(snap, desde, hasta) {
     return (snap.renov_data || []).reduce(function (s, r) {
-      if (r.EsClaseSuelta || r.EsSinClasificar) return s;
+      if (!cuentaParaMeta(r)) return s;
       var d = parseDMY(r.FechaStr);
       return d && d >= desde && d <= hasta ? s + (Number(r.Total) || 0) : s;
     }, 0);
@@ -293,6 +299,7 @@
   window.Metas = {
     cargar: cargar, calcular: calcular, htmlResumen: htmlResumen, htmlSede: htmlSede,
     recordar: recordar, abrirEditor: abrirEditor, mesOrdenDe: mesOrdenDe, normalizarMes: normalizarMes,
+    cuentaParaMeta: cuentaParaMeta,
     _editar: function () { abrirEditor(); }, _cerrar: cerrar, _guardar: guardar, _sugerir: sugerir
   };
 })();

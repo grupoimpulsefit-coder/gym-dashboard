@@ -13,8 +13,8 @@
 <style>
 /* Colores de sede (los mismos de index.html) y de categoría de venta */
 :root { --s-3rios:var(--brand); --s-nat:var(--purple); --s-pin:var(--green); --s-sab:var(--blue);
-  --k-memb:var(--blue); --k-min:var(--orange); --k-pt:var(--purple); --k-acc:#A2845E; }
-@media (prefers-color-scheme: dark) { :root { --k-acc:#AC8E68; } }
+  --k-memb:var(--blue); --k-min:var(--orange); --k-pt:var(--purple); --k-acc:#A2845E; --k-otr:#8E8E93; }
+@media (prefers-color-scheme: dark) { :root { --k-acc:#AC8E68; --k-otr:#98989D; } }
 
 #dashboard { display:none; padding-bottom:32px; }
 .topbar-controls .btn-ghost { min-height:36px; }
@@ -28,7 +28,7 @@
 .stack { display:flex; height:12px; border-radius:6px; overflow:hidden; background:var(--fill2); gap:2px; }
 .stack i { display:block; height:100%; min-width:0; }
 .stack.sm { height:8px; border-radius:4px; }
-.cats { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; margin-top:14px; }
+.cats { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:10px; margin-top:14px; }
 .cat .l { font-size:13px; color:var(--sec); display:flex; align-items:center; gap:6px; white-space:nowrap; }
 .cat .l i { width:8px; height:8px; border-radius:50%; flex:none; }
 .cat .v { font-size:20px; font-weight:700; letter-spacing:-.015em; font-variant-numeric:tabular-nums; margin-top:1px; }
@@ -151,6 +151,7 @@
         <div class="cat"><div class="l"><i style="background:var(--k-min)"></i>Minita</div><div class="v" id="kpiMinita">—</div><div class="s" id="kpiMinitaPct">—</div></div>
         <div class="cat"><div class="l"><i style="background:var(--k-pt)"></i>Personal Trainer</div><div class="v" id="kpiPT">—</div><div class="s" id="kpiPTPct">—</div></div>
         <div class="cat"><div class="l"><i style="background:var(--k-acc)"></i>Accesorios</div><div class="v" id="kpiAcc">—</div><div class="s" id="kpiAccPct">—</div></div>
+        <div class="cat"><div class="l"><i style="background:var(--k-otr)"></i>Otros ingresos</div><div class="v" id="kpiOtr">—</div><div class="s" id="kpiOtrPct">—</div></div>
       </div>
     </div>
   </div>
@@ -289,6 +290,7 @@ const CATS = [
   { k: 'min', label: 'Minita',           color: 'var(--k-min)' },
   { k: 'pt',  label: 'Personal Trainer', color: 'var(--k-pt)' },
   { k: 'acc', label: 'Accesorios',       color: 'var(--k-acc)' },
+  { k: 'otr', label: 'Otros ingresos',   color: 'var(--k-otr)' },
 ];
 
 /* ── Gráficas en modo claro/oscuro (igual que index.html) ──
@@ -312,9 +314,13 @@ const PT_KW = ['personal training','personal 2026'];
 // Bebidas, snacks y suplementos vendidos sueltos en recepción
 const MINITA_KW = [
   'agua','gatorade','gatorage','powerade','rooster','be come strong',
-  'aminos','creatina','pre-entreno','pre entreno','bucked up','glu',
-  'gricket','gym bite','scoop de prote','snack','bebida','paño','pano'
+  'amino','creatina','pre-entreno','pre entreno','preentreno','bucked up','glu',
+  'gricket','gym bite','scoop de prote','proteina','proteína','become strong',
+  'snack','bebida','paño','pano'
 ];
+
+// Ingresos que no son venta del gimnasio (p. ej. alquiler de la oficina de nutrición)
+const OTROS_KW = ['alquiler'];
 
 // Mercadería de natación (no es bebida/suplemento ni membresía)
 const ACCESORIOS_KW = [
@@ -329,6 +335,7 @@ function classify(p) {
   if (PT_KW.some(k => pl.includes(k))) return 'pt';
   if (MINITA_KW.some(k => pl.includes(k))) return 'minita';
   if (ACCESORIOS_KW.some(k => pl.includes(k))) return 'accesorios';
+  if (OTROS_KW.some(k => pl.includes(k))) return 'otros';
   return 'memb';
 }
 
@@ -458,7 +465,7 @@ function buildDashboard(latest) {
     });
   });
 
-  let total = 0, memb = 0, minita = 0, pt = 0, accesorios = 0;
+  let total = 0, memb = 0, minita = 0, pt = 0, accesorios = 0, otros = 0;
   const sedeSummary = {};
   SEDES.forEach(s => {
     const snap = latest[s];
@@ -473,18 +480,19 @@ function buildDashboard(latest) {
     const min  = rows.filter(r=>r.cat==='minita').reduce((a,r)=>a+r.total,0);
     const pt_  = rows.filter(r=>r.cat==='pt').reduce((a,r)=>a+r.total,0);
     const acc  = rows.filter(r=>r.cat==='accesorios').reduce((a,r)=>a+r.total,0);
+    const otr  = rows.filter(r=>r.cat==='otros').reduce((a,r)=>a+r.total,0);
 
     const vMap = {};
     rows.forEach(r => { vMap[r.vendedor] = (vMap[r.vendedor]||0) + r.total; });
     const vRank = Object.entries(vMap).sort((a,b)=>b[1]-a[1]);
 
-    sedeSummary[s] = { tot, mem, min, pt: pt_, acc, vRank, hasDetalle: rows.length > 0, mes: snap?.mes || mesTxt, updated_at: snap?.updated_at || null, fe: snap?.fe_total || 0, feCount: snap?.fe_count || 0 };
-    total += tot; memb += mem; minita += min; pt += pt_; accesorios += acc;
+    sedeSummary[s] = { tot, mem, min, pt: pt_, acc, otr, vRank, hasDetalle: rows.length > 0, mes: snap?.mes || mesTxt, updated_at: snap?.updated_at || null, fe: snap?.fe_total || 0, feCount: snap?.fe_count || 0 };
+    total += tot; memb += mem; minita += min; pt += pt_; accesorios += acc; otros += otr;
   });
 
   _ultimoLatest = latest;
   aplicarTemaGraficas();
-  const totales = { mem: memb, min: minita, pt, acc: accesorios };
+  const totales = { mem: memb, min: minita, pt, acc: accesorios, otr: otros };
   // Barra apilada por categoría (resumen y tarjetas)
   const pila = (d, tot) => CATS.map(c => d[c.k] > 0
       ? `<i style="flex:${d[c.k]};background:${c.color}" title="${c.label}: ${fmt(d[c.k])}"></i>` : '').join('');
@@ -499,6 +507,8 @@ function buildDashboard(latest) {
   document.getElementById('kpiPTPct').textContent  = pct(pt,total) + ' · aparte de membresías';
   document.getElementById('kpiAcc').textContent    = fmt(accesorios);
   document.getElementById('kpiAccPct').textContent = pct(accesorios,total) + ' del total';
+  document.getElementById('kpiOtr').textContent    = fmt(otros);
+  document.getElementById('kpiOtrPct').textContent = pct(otros,total) + ' · alquileres, fuera de la meta';
 
   // Tarjetas por sede
   const cabeza = (s, m, extra = '') => `<div class="sc-head">
@@ -512,7 +522,7 @@ function buildDashboard(latest) {
     const m = SEDE_META[s];
     if (!d) return `<div class="sede-card no-data">${cabeza(s, m)}<div class="sc-mes">Sin datos cargados aún</div></div>`;
     const top = d.vRank[0];
-    const cats = { mem: d.mem, min: d.min, pt: d.pt, acc: d.acc };
+    const cats = { mem: d.mem, min: d.min, pt: d.pt, acc: d.acc, otr: d.otr };
     const filasCat = CATS.filter(c => c.k === 'mem' || c.k === 'min' || cats[c.k] > 0)
       .map(c => li(c.label, fmt(cats[c.k]), pct(cats[c.k], d.tot), '', c.color)).join('');
     const filasFE = d.fe > 0
@@ -536,7 +546,7 @@ function buildDashboard(latest) {
 
   // Gráfica de barras: una barra por sede, apilada por categoría
   const activeSedes = SEDES.filter(s => sedeSummary[s]);
-  const catKey = { mem: 'mem', min: 'min', pt: 'pt', acc: 'acc' };
+  const catKey = { mem: 'mem', min: 'min', pt: 'pt', acc: 'acc', otr: 'otr' };
   if (chartBar) chartBar.destroy();
   chartBar = new Chart(document.getElementById('chartBar'), {
     type: 'bar',
@@ -557,7 +567,7 @@ function buildDashboard(latest) {
   chartPie = new Chart(document.getElementById('chartPie'), {
     type: 'doughnut',
     data: { labels: CATS.map(c => c.label),
-      datasets: [{ data: [memb, minita, pt, accesorios], backgroundColor: CATS.map(c => colorReal(c.color)),
+      datasets: [{ data: [memb, minita, pt, accesorios, otros], backgroundColor: CATS.map(c => colorReal(c.color)),
         borderColor: colorReal('var(--card)'), borderWidth: 3, hoverOffset: 6 }] },
     options: { responsive: true, maintainAspectRatio: false, cutout: '66%',
       plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, font: { size: 12 } } },
