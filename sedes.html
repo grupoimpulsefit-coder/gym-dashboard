@@ -339,6 +339,17 @@ function classify(p) {
   return 'memb';
 }
 
+// La base entrega como máximo 1000 filas por consulta: se pide por páginas hasta traer todo
+// (en octubre 2026 las facturas de caja de las 4 sedes ya pasaban de 1000 y se perdían).
+async function supaFetchTodo(path) {
+  const out = [];
+  for (;;) {
+    const filas = (await supaFetch(`${path}&order=id.asc&limit=1000&offset=${out.length}`)) || [];
+    if (!filas.length) return out;
+    out.push(...filas);
+  }
+}
+
 // ── Ventas de productos cobradas en la caja (facturas_caja, ver facturacion.sql) ──
 // Desde que la minita se factura en caja ya no viene en el archivo de ventas del
 // sistema anterior, así que el reporte suma las dos fuentes. Eventos y anuladas no cuentan.
@@ -347,7 +358,7 @@ async function ventasCajaMes(mesOrden) {
   const [y, m] = mesOrden.split('-').map(Number);
   const sig = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
   try {
-    const fs = (await supaFetch(`/facturas_caja?fecha=gte.${mesOrden}-01&fecha=lt.${sig}-01&estado=eq.activa&select=sede,tipo,items,created_by`)) || [];
+    const fs = await supaFetchTodo(`/facturas_caja?fecha=gte.${mesOrden}-01&fecha=lt.${sig}-01&estado=eq.activa&select=sede,tipo,items,created_by`);
     return fs.filter(f => (f.tipo || 'producto') === 'producto')
       .flatMap(f => (f.items || []).map(it => ({ sede: f.sede, producto: it.producto, cantidad: Number(it.cantidad) || 0,
                                                 total: Number(it.total) || 0, vendedor: f.created_by })));

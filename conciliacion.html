@@ -309,18 +309,24 @@ function rango(){
   const ds=[...(A.informe?.F||[]).map(x=>x.ymd),...(A.sinpe?.S||[]).map(x=>x.ymd)].filter(Boolean).sort();
   return ds.length?{desde:ds[0],hasta:ds[ds.length-1]}:null;
 }
+// La base entrega como máximo 1000 filas por consulta: se pide por páginas hasta traer todo
+async function supaFetchTodo(path){
+  const out=[];
+  for(;;){ const filas=(await supaFetch(`${path}&order=id.asc&limit=1000&offset=${out.length}`))||[];
+    if(!filas.length) return out; out.push(...filas); }
+}
 // Facturas SINPE de esta caja (minita y eventos) y decisiones guardadas
 async function cargarBase(){
   const r=rango(); A.caja=[]; A.errCaja=null; A.decisiones=[]; A.errDec=null; if(!r) return;
   try{
-    const fs=(await supaFetch(`/facturas_caja?sede=eq.${encodeURIComponent(currentSede)}&fecha=gte.${r.desde}&fecha=lte.${r.hasta}&estado=eq.activa&select=numero,fecha,metodo,pagos,total,referencia,tipo,cliente_nombre,items`))||[];
+    const fs=await supaFetchTodo(`/facturas_caja?sede=eq.${encodeURIComponent(currentSede)}&fecha=gte.${r.desde}&fecha=lte.${r.hasta}&estado=eq.activa&select=numero,fecha,metodo,pagos,total,referencia,tipo,cliente_nombre,items`);
     fs.forEach(f=>{ const P=Array.isArray(f.pagos)&&f.pagos.length?f.pagos:[{metodo:f.metodo,monto:f.total,referencia:f.referencia}];
       const p=P.filter(x=>x.metodo==='sinpe'); if(!p.length) return;
       const det=f.tipo==='evento'?`🎟️ ${(f.items&&f.items[0]&&f.items[0].producto)||'Evento'} · ${f.cliente_nombre||''}`:(f.items||[]).map(it=>it.producto+(Number(it.cantidad)>1?' ×'+it.cantidad:'')).join(', ');
       A.caja.push({ origen:'caja', key:`fac:caja:${f.fecha}:${f.numero}`, numero:`Caja #${f.numero}`, ymd:f.fecha, cliente:det, ced:'',
         ref:digitos(p[0].referencia||f.referencia), monto:Math.round(p.reduce((a,x)=>a+(Number(x.monto)||0),0)) }); });
   }catch(e){ A.errCaja=mensajeError(e); }
-  try{ A.decisiones=(await supaFetch(`/sinpe_conciliacion?sede=eq.${encodeURIComponent(currentSede)}&select=*`))||[]; }
+  try{ A.decisiones=await supaFetchTodo(`/sinpe_conciliacion?sede=eq.${encodeURIComponent(currentSede)}&select=*`); }
   catch(e){ A.errDec=mensajeError(e); }
 }
 
