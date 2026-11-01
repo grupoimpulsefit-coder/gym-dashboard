@@ -1962,6 +1962,21 @@ const REGLAS_PROMO = {
         : '',
 };
 
+// Precio que deben pagar los clientes de una lista en un mes dado (clave = la de promo_clientes)
+const PRECIO_PROMO = {
+    // Planes Estándar Halloween: en noviembre 2026 cuestan ₡5.000 para quien los pagó en octubre
+    'plan estandar halloween':      { precio: 5000, mes: '2026-11' },   // Sabanilla
+    'estandar halloween 2026':      { precio: 5000, mes: '2026-11' },   // Pinares
+    'plan estandar halloween 2026': { precio: 5000, mes: '2026-11' },   // Natación
+};
+
+// Tipos de aviso, en orden de gravedad, cada uno con su color
+const AVISO_PROMO = {
+    lista: { color: 'var(--red)',    icono: '🔴', txt: 'Fuera de la lista' },
+    regla: { color: 'var(--purple)', icono: '🟣', txt: 'No cumple la regla' },
+    monto: { color: 'var(--orange)', icono: '🟠', txt: 'Monto distinto' },
+};
+
 // Revisa los pagos del informe que traen código "(Promo: X)" o que son de un plan con lista
 // (ej. "Plan Estandar halloween": en noviembre solo para quien lo pagó en octubre): contra
 // REGLAS_PROMO, o contra la lista de clientes autorizados (tabla promo_clientes, ver
@@ -1983,24 +1998,41 @@ async function avisoPromos() {
             if (pag.length < 1000) break;
         }
     } catch(e) { console.warn('No se pudo leer la lista de promos:', e.message); }
+    const mesDe = d => d instanceof Date && !isNaN(d) ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : '';
     const revisadas = pagos
         .map(x => {
             // un pago puede tener regla (por el código) y lista (por el código o por el plan): debe cumplir todas
             const regla = x.promo && REGLAS_PROMO[x.promo];
-            const listas = [autorizados[x.promo], autorizados[normName(x.plan)]].filter(Boolean);
-            if (!regla && !listas.length) return { ...x, motivo: null };
-            const motivos = [regla ? regla(x.r, x.plan) : '',
-                ...listas.map(l => l.has(normName(x.r.Cliente)) ? '' : 'no está en la lista')];
-            return { ...x, motivo: [...new Set(motivos.filter(Boolean))].join(' · ') };
+            const claves = [...new Set([x.promo, normName(x.plan)])].filter(k => k && autorizados[k]);
+            if (!regla && !claves.length) return { ...x, motivos: null };
+            const motivos = [];
+            const fallo = regla ? regla(x.r, x.plan) : '';
+            if (fallo) motivos.push({ tipo: 'regla', txt: fallo });
+            claves.forEach(k => {
+                const p = PRECIO_PROMO[k];
+                if (!autorizados[k].has(normName(x.r.Cliente))) motivos.push({ tipo: 'lista', txt: 'no está en la lista' });
+                else if (p && mesDe(x.r.TxDate) === p.mes && Math.abs((x.r.Total || 0) - p.precio) > 1)
+                    motivos.push({ tipo: 'monto', txt: `pagó ₡${(x.r.Total || 0).toLocaleString()} y debía pagar ₡${p.precio.toLocaleString()}` });
+            });
+            const tipos = Object.keys(AVISO_PROMO);
+            motivos.sort((a, b) => tipos.indexOf(a.tipo) - tipos.indexOf(b.tipo));
+            return { ...x, motivos };
         })
-        .filter(x => x.motivo !== null);
+        .filter(x => x.motivos !== null);
     if (!revisadas.length) return '';
-    const malos = revisadas.filter(x => x.motivo);
+    const malos = revisadas.filter(x => x.motivos.length);
     if (!malos.length) return `<div style="color:var(--green);font-size:13px;margin-top:4px;">✅ Promos revisadas: ${revisadas.length === 1 ? 'el pago califica' : `los ${revisadas.length} pagos califican`}</div>`;
+    // el tipo más grave de cada pago define su color; primero los más graves
+    const tipos = Object.keys(AVISO_PROMO);
+    malos.sort((a, b) => tipos.indexOf(a.motivos[0].tipo) - tipos.indexOf(b.motivos[0].tipo));
+    const cuenta = tipos.map(t => [t, malos.filter(x => x.motivos[0].tipo === t).length]).filter(([, n]) => n);
     const h = escHtml;
-    return `<div style="margin-top:8px;text-align:left;border:1px solid var(--red);border-radius:10px;padding:10px 12px;font-size:13px;">
-        <div style="color:var(--red);font-weight:700;margin-bottom:4px;">⚠️ ${malos.length} ${malos.length === 1 ? 'pago' : 'pagos'} con promo que no ${malos.length === 1 ? 'califica' : 'califican'}</div>
-        ${malos.map(({ r, nombre, motivo }) => `<div>• <b>${h(r.Cliente)}</b> · ${h(nombre)} · <span style="color:var(--red);">${h(motivo)}</span> · ${h(String(r.FechaStr).replace(/\s+/g, ' '))} · ₡${(r.Total || 0).toLocaleString()}</div>`).join('')}
+    return `<div style="margin-top:8px;text-align:left;border:1px solid ${AVISO_PROMO[malos[0].motivos[0].tipo].color};border-radius:10px;padding:10px 12px;font-size:13px;">
+        <div style="font-weight:700;margin-bottom:2px;">⚠️ ${malos.length} ${malos.length === 1 ? 'pago' : 'pagos'} con promo para revisar</div>
+        <div style="color:var(--sec);margin-bottom:6px;">${cuenta.map(([t, n]) => `${AVISO_PROMO[t].icono} ${AVISO_PROMO[t].txt}: ${n}`).join(' · ')}</div>
+        ${malos.map(({ r, nombre, motivos }) => `<div style="border-left:3px solid ${AVISO_PROMO[motivos[0].tipo].color};padding:2px 0 2px 8px;margin:3px 0;">
+            <b>${h(r.Cliente)}</b> · ${h(nombre)} · ${motivos.map(m => `<span style="color:${AVISO_PROMO[m.tipo].color};font-weight:600;">${h(m.txt)}</span>`).join(' · ')}
+            · ${h(String(r.FechaStr).replace(/\s+/g, ' '))} · ₡${(r.Total || 0).toLocaleString()}</div>`).join('')}
     </div>`;
 }
 
