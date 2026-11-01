@@ -14,6 +14,9 @@
 //  Además de { mensaje, historial, pagina } acepta:
 //    { accion: 'agregar', ticket, texto }  → botón "Agregar detalle" de Mis consultas
 //    { accion: 'probar_push' }             → notificación de prueba a los teléfonos de quien llama
+//    { accion: 'solicitar_anulacion', factura, motivo } → pide anular una factura de caja y avisa a
+//        Administración y al coordinador de la sede (ver anulaciones.sql)
+//    { accion: 'resolver_anulacion', solicitud, aprobar, nota } → aprueba (anula) o rechaza y avisa a quien la pidió
 //
 //  Secretos: ANTHROPIC_API_KEY (el mismo de analizar-datafono) y, para las
 //  notificaciones push, VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY (la pública es la
@@ -69,6 +72,7 @@ Cuándo crear un ticket (herramienta crear_ticket):
 • Si pide algo que solo Administración puede hacer o autorizar (anular o corregir una venta o un cierre, revisar un SINPE que no aparece o no cuadra, un descuadre de caja, reembolsos, descuentos fuera de tarifa, excepciones al reglamento, un error de la app): creá el ticket con el tipo que corresponda. Nunca digas que la acción ya se hizo: decí que quedó solicitada.
 • Antes de crear un ticket de trámite, pedí los datos que falten si son necesarios para que Administración actúe (fecha, sede, monto, número de factura o los últimos 6 dígitos de la referencia SINPE, nombre del cliente). Si ya los tiene, no los vuelvas a pedir.
 • Un ticket por asunto. Si es una simple duda que sí está en el manual, respondé sin ticket.
+• Anular una factura de la caja de jykc.dev (productos, minita o eventos de la pestaña Facturación): no crees ticket. Explicale que en /caja → Facturación, en "Cobros del día", toque "Solicitar anulación" en esa factura y escriba el motivo; Administración y el coordinador de la sede reciben el aviso y la aprueban con un botón. Que no cierre el turno hasta que la aprueben, porque con el turno cerrado ya no se puede anular. Si el turno ya se cerró, o la venta es de WStudio (membresías), sí va como ticket (anular_venta o descuadre_caja).
 • Si la persona trae más datos o una corrección sobre un asunto que ya tiene una consulta pendiente (lista "CONSULTAS PENDIENTES DE ESTA PERSONA"), usá agregar_a_ticket con ese número en vez de crear otro, y decile a qué número se agregó. Si no está claro que sea el mismo asunto, preguntale. Las consultas ya respondidas no se reabren: un asunto nuevo lleva ticket nuevo.
 • Emergencias médicas o accidentes: indicá de inmediato el procedimiento del manual (sección 11) y que avise a Administración; no esperes a un ticket.
 • No compartas datos personales de colaboradores, clientes ni dueños. Excepción: al revisar la caja podés mencionar el nombre del cliente y el monto de un cobro de esa caja para ubicarlo (nunca cédula ni teléfono).
@@ -173,6 +177,16 @@ async function avisarAdmins(admin: SupabaseClient, salvo: string, aviso: Aviso) 
     await enviarPush(admin, (data || []).map(a => a.id).filter(id => id !== salvo), aviso);
   } catch (_) { /* sin aviso */ }
 }
+// Quienes aprueban anulaciones de una sede: Administración y los coordinadores de esa sede
+async function avisarAprobadores(admin: SupabaseClient, sede: string, salvo: string, aviso: Aviso) {
+  try {
+    const { data } = await admin.from('user_roles').select('id, role, sede, sedes_extra').in('role', [...ADMIN_ROLES, 'coordinador']);
+    const ids = (data || []).filter(u => ADMIN_ROLES.includes(u.role) || u.sede === sede || (u.sedes_extra || []).includes(sede))
+      .map(u => u.id).filter(id => id !== salvo);
+    return await enviarPush(admin, ids, aviso);
+  } catch (_) { return 0; }
+}
+const METODO_TXT: Record<string, string> = { efectivo: 'efectivo', tarjeta: 'tarjeta', sinpe: 'SINPE', mixto: 'pago mixto' };
 const recorte = (s: string, n = 140) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 
 // ── Revisar la caja (herramienta revisar_caja) ────────────────────────────
@@ -358,6 +372,33 @@ Deno.serve(async (req) => {
     if (body.accion === 'probar_push') {
       const n = await enviarPush(admin, [caller.user.id], { title: 'Chloe', body: 'Las notificaciones de consultas están activas en este teléfono.', tag: 'prueba', url: '/movil' });
       return json({ enviadas: n });
+    }
+
+    // Anulación de facturas de caja: los permisos y las reglas los valida la base (anulaciones.sql)
+    if (body.accion === 'solicitar_anulacion') {
+      const { data, error } = await asCaller.rpc('solicitar_anulacion_factura', { p_factura: String(body.factura || ''), p_motivo: String(body.motivo || '') });
+      if (error) return json({ error: error.message }, 400);
+      const s = data as { id: number; sede: string; numero: number; total: number; metodo: string; tipo: string; motivo: string; solicitante: string };
+      const avisados = await avisarAprobadores(admin, s.sede, caller.user.id, {
+        title: `Anular factura #${s.numero} · ${s.sede}`,
+        body: recorte(`${s.solicitante}: ₡${Math.round(Number(s.total)).toLocaleString('es-CR')} (${METODO_TXT[s.metodo] || s.metodo}${s.tipo === 'evento' ? ', evento' : ''}). Motivo: ${s.motivo}`, 180),
+        tag: 'anul-' + s.id, url: '/movil?anular=' + s.id,
+      });
+      return json({ ok: true, id: s.id, avisados });
+    }
+    if (body.accion === 'resolver_anulacion') {
+      const { data, error } = await asCaller.rpc('resolver_anulacion_factura', {
+        p_solicitud: Number(body.solicitud), p_aprobar: body.aprobar === true, p_nota: body.nota ? String(body.nota) : null });
+      if (error) return json({ error: error.message }, 400);
+      const r = data as { id: number; estado: string; nota: string | null; sede: string; numero: number; solicitado_por: string | null };
+      const txt = r.estado === 'aprobada' ? 'quedó anulada' : r.estado === 'rechazada' ? 'no se anuló: la solicitud fue rechazada' : 'no se pudo anular: el turno ya se había cerrado';
+      if (r.solicitado_por && r.solicitado_por !== caller.user.id) {
+        await enviarPush(admin, [r.solicitado_por], {
+          title: `Factura #${r.numero} · ${r.sede}`, body: recorte(`La factura ${txt}.${r.nota ? ' ' + r.nota : ''} (${yo.nombre || caller.user.email})`, 180),
+          tag: 'anul-' + r.id, url: '/movil',
+        }).catch(() => 0);
+      }
+      return json({ ok: true, estado: r.estado, nota: r.nota });
     }
 
     if (!ANTHROPIC_API_KEY) return json({ error: 'Falta configurar ANTHROPIC_API_KEY en los secretos de la función.' }, 500);
