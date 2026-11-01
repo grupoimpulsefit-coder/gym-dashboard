@@ -242,6 +242,18 @@ async function supaFetch(path, opts = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// La base entrega como máximo 1000 filas por consulta: se pide por páginas hasta traer todo
+// (los gastos de una sede se cargan completos y crecen ~100 por mes).
+// El path debe traer un order que termine en id para que las páginas no se crucen.
+async function supaFetchTodo(path) {
+  const out = [];
+  for (;;) {
+    const filas = (await supaFetch(`${path}&limit=1000&offset=${out.length}`)) || [];
+    if (!filas.length) return out;
+    out.push(...filas);
+  }
+}
+
 // ── Config ──────────────────────────────────────────────────────────────
 const ROLES_PERMITIDOS = ['recepcion', 'admin_sucursal', 'coordinador', 'admin_sedes', 'admin_g'];
 const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
@@ -392,7 +404,7 @@ async function loadGastos() {
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('loading').style.display = 'block';
   try {
-    gastos = (await supaFetch(`/gastos?sede=eq.${encodeURIComponent(currentSede)}&order=fecha_clase.desc&select=*`)) || [];
+    gastos = await supaFetchTodo(`/gastos?sede=eq.${encodeURIComponent(currentSede)}&order=fecha_clase.desc,id.desc&select=*`);
     document.getElementById('loading').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
     poblarMeses();
