@@ -312,7 +312,10 @@ async function boot(){
   }
   document.getElementById('login').hidden=false;
 }
-function enterApp(){ document.getElementById('login').hidden=true; document.getElementById('app').hidden=false; goSedes(); revisarClave(); }
+function enterApp(){ document.getElementById('login').hidden=true; document.getElementById('app').hidden=false; goSedes().then(()=>{ if(anularEn){ const id=anularEn; anularEn=null; abrirSolicitudAnulacion(id); } }); revisarClave(); }
+// /movil?anular=<id> (notificación de una solicitud de anulación): se abre al entrar
+let anularEn=null;
+try{ const qs=new URLSearchParams(location.search); anularEn=qs.get('anular'); if(anularEn){ qs.delete('anular'); history.replaceState(null,'',location.pathname+(qs.toString()?'?'+qs:'')+location.hash); } }catch(_){}
 // Contraseña: la app maneja su propia sesión; el cambio usa la ventana compartida de /sesion.js
 function clavePara(forzado){ if(!window.Sesion) return;
   Sesion.cambiarClave({ forzado, url:SUPA_URL, key:SUPA_KEY, token:auth?.access_token, email:auth?.email,
@@ -928,8 +931,11 @@ async function cancelarEnvio(id){
 
 // Minita: facturas de caja del día (productos y eventos). Ver facturacion.sql.
 // Anula un coordinador o un admin, y solo mientras el turno de la factura siga abierto (lo valida anular_factura_caja).
-let fxRows=[], fxTurnos={};
+// Quien no puede anular la pide (anulaciones.sql); la Edge Function `asistente` avisa por push y
+// la notificación abre /movil?anular=<id> con los botones Aprobar y anular / Rechazar.
+let fxRows=[], fxTurnos={}, fxSol=[];
 const puedeAnular=()=>esAdmin()||me?.role==='coordinador';
+const solPend=fid=>fxSol.find(s=>s.factura_id===fid&&s.estado==='pendiente');
 const FX_MET={efectivo:'Efectivo',tarjeta:'Tarjeta',sinpe:'SINPE'};
 const fxMonto=(f,m)=>Array.isArray(f.pagos)&&f.pagos.length?f.pagos.filter(p=>p.metodo===m).reduce((a,p)=>a+(Number(p.monto)||0),0):(f.metodo===m?Number(f.total)||0:0);
 const fxMetTxt=f=>Array.isArray(f.pagos)&&f.pagos.length>1?f.pagos.map(p=>(FX_MET[p.metodo]||p.metodo)+' '+fmt(p.monto)).join(' + '):(FX_MET[f.metodo]||f.metodo||'—');
@@ -941,12 +947,14 @@ async function renderMinitaMod(){
   const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
   const sede=detSede, fecha=selDate;
   let rows, turnos;
-  try{ [rows,turnos]=await Promise.all([
+  let sols;
+  try{ [rows,turnos,sols]=await Promise.all([
       supaFetch(`/facturas_caja?sede=eq.${encodeURIComponent(sede)}&fecha=eq.${fecha}&order=numero.desc&select=*`),
-      supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(sede)}&fecha=eq.${fecha}&select=id,turno_num,estado`)]); }
+      supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(sede)}&fecha=eq.${fecha}&select=id,turno_num,estado`),
+      supaFetch(`/anulaciones_caja?sede=eq.${encodeURIComponent(sede)}&fecha=eq.${fecha}&order=created_at.desc&select=*`).catch(()=>[])]); }
   catch(e){ v.innerHTML=`<div class="empty">No se pudieron cargar las facturas: ${esc(errTxt(e))}</div>`; return; }
   if(view!=='mod'||curMod!=='minita'||detSede!==sede||selDate!==fecha) return;   // cambió de pantalla mientras llegaba
-  fxRows=rows||[]; fxTurnos={}; (turnos||[]).forEach(t=>{ fxTurnos[t.id]=t; });
+  fxRows=rows||[]; fxSol=sols||[]; fxTurnos={}; (turnos||[]).forEach(t=>{ fxTurnos[t.id]=t; });
   const act=fxRows.filter(f=>f.estado!=='anulada'), nAnul=fxRows.length-act.length;
   const suma=L=>L.reduce((s,f)=>s+(Number(f.total)||0),0);
   const prods=act.filter(f=>f.tipo!=='evento'), evs=act.filter(f=>f.tipo==='evento');
@@ -954,23 +962,34 @@ async function renderMinitaMod(){
   const top=Object.entries(porProd).sort((a,b)=>b[1].total-a[1].total);
   const cell=(t,s,val)=>`<div class="cell"><div class="main"><span class="t">${t}</span>${s?`<span class="s">${s}</span>`:''}</div><span class="v num">${val}</span></div>`;
   const fila=f=>{ const an=f.estado==='anulada'; const t=fxTurnos[f.cierre_id];
-    return `<button class="cell" onclick="verFactura('${f.id}')"><div class="main"><span class="t"${an?' style="text-decoration:line-through;color:var(--sec)"':''}>#${f.numero} · ${esc(fxDet(f))}</span><span class="s">${hora(f.created_at)}${t?' · T'+t.turno_num:''} · ${esc(fxMetTxt(f))}${f.created_by?' · '+esc(quien(f.created_by)):''}</span></div>${an?'<span class="pill bad">Anulada</span>':`<span class="v num">${fmt(f.total)}</span>`}<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`; };
+    return `<button class="cell" onclick="verFactura('${f.id}')"><div class="main"><span class="t"${an?' style="text-decoration:line-through;color:var(--sec)"':''}>#${f.numero} · ${esc(fxDet(f))}</span><span class="s">${hora(f.created_at)}${t?' · T'+t.turno_num:''} · ${esc(fxMetTxt(f))}${f.created_by?' · '+esc(quien(f.created_by)):''}</span></div>${an?'<span class="pill bad">Anulada</span>':solPend(f.id)?'<span class="pill warn">Por anular</span>':`<span class="v num">${fmt(f.total)}</span>`}<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`; };
   v.innerHTML=`
     <div class="tiles"><div class="tile"><span class="l">Minita</span><span class="n num">${fmt(suma(prods))}</span></div><div class="tile"><span class="l">Facturas</span><span class="n num">${act.length}${nAnul?` <small style="color:var(--red)">· ${nAnul} anulada${nAnul===1?'':'s'}</small>`:''}</span></div></div>
     ${act.length?`<div class="sect"><div class="hdr">Por método de pago</div><div class="group">${['efectivo','tarjeta','sinpe'].map(m=>cell(FX_MET[m],'',fmt(act.reduce((s,f)=>s+fxMonto(f,m),0)))).join('')}${evs.length?cell('Incluye eventos',`${evs.length} cobro(s) · no van al sobre`,fmt(suma(evs))):''}</div></div>`:''}
     ${top.length?`<div class="sect"><div class="hdr">Productos vendidos</div><div class="group">${top.map(([p,x])=>cell(esc(p),x.qty+' u',fmt(x.total))).join('')}</div></div>`:''}
     <div class="sect"><div class="hdr">Facturas</div><div class="group">${fxRows.length?fxRows.map(fila).join(''):'<div class="cell"><span class="s">No hay facturas de caja este día.</span></div>'}</div>
-      <div class="ftr">Cobros hechos en la pestaña Facturación de caja. ${puedeAnular()?'Tocá una factura para ver el detalle o anularla.':'Tocá una factura para ver el detalle.'}</div></div>`;
+      <div class="ftr">Cobros hechos en la pestaña Facturación de caja. ${puedeAnular()?'Tocá una factura para ver el detalle o anularla.':'Tocá una factura para ver el detalle o pedir que la anulen.'}</div></div>`;
 }
 function verFactura(id){
   const f=fxRows.find(x=>x.id===id); if(!f) return;
   const an=f.estado==='anulada', t=fxTurnos[f.cierre_id], abierto=t?.estado==='abierto';
   const fila=(a,b)=>`<div class="cell"><div class="main"><span class="t">${a}</span></div><span class="v">${b}</span></div>`;
   const items=Array.isArray(f.items)?f.items:[];
+  const sol=solPend(f.id);
   let pie;
   if(an) pie='';
-  else if(!puedeAnular()) pie='<div class="ftr" style="padding:12px 0 0">Solo un coordinador o un administrador puede anular facturas.</div>';
   else if(!abierto) pie='<div class="ftr" style="padding:12px 0 0">El turno de esta factura ya se cerró: no se puede anular, porque el cierre ya quedó guardado con ella.</div>';
+  else if(sol) pie=`<div class="hdr" style="padding:16px 0 6px">Anulación solicitada</div>
+      <div class="group" style="margin:0">${fila('Pidió',esc(sol.solicitante||'—'))}${fila('Hora',esc(fechaHora(sol.created_at)))}
+        <div class="cell"><div class="main"><span class="t">Motivo</span><span class="s">${esc(sol.motivo)}</span></div></div></div>
+      ${puedeAnular()?`<div style="padding-top:14px"><button class="btn danger" id="btnAprobar" onclick="resolverAnulacion(${sol.id},true)">Aprobar y anular factura #${f.numero}</button></div>
+      <div style="padding-top:8px"><button class="btn" id="btnRechazar" onclick="resolverAnulacion(${sol.id},false)">Rechazar</button></div>
+      <div class="ftr" style="padding:8px 0 0;text-align:center">${f.tipo==='evento'?'El cobro sale del cierre del turno.':'El cobro sale del cierre del turno y los productos vuelven al inventario.'} No se puede deshacer.</div>`
+      :'<div class="ftr" style="padding:12px 0 0">Esperando que Administración o el coordinador la aprueben. No cierre el turno mientras tanto.</div>'}`;
+  else if(!puedeAnular()) pie=`<div class="hdr" style="padding:16px 0 6px">Pedir anulación</div>
+      <div class="group" style="margin:0"><div class="cell"><div class="main"><span class="t">Motivo</span></div><input class="qty" id="fxMotivo" type="text" maxlength="200" placeholder="Obligatorio" style="width:62%;text-align:right;font-weight:400"></div></div>
+      <div style="padding-top:14px"><button class="btn danger" id="btnSolicitar" onclick="solicitarAnulacion('${f.id}')">Solicitar anulación de la #${f.numero}</button></div>
+      <div class="ftr" style="padding:8px 0 0;text-align:center">Administración y el coordinador reciben el aviso y la aprueban. No cierre el turno mientras tanto.</div>`;
   else pie=`<div class="hdr" style="padding:16px 0 6px">Anular</div>
       <div class="group" style="margin:0"><div class="cell"><div class="main"><span class="t">Motivo</span></div><input class="qty" id="fxMotivo" type="text" maxlength="200" placeholder="Obligatorio" style="width:62%;text-align:right;font-weight:400"></div></div>
       <div style="padding-top:14px"><button class="btn danger" id="btnAnular" onclick="anularFactura('${f.id}')">Anular factura #${f.numero}</button></div>
@@ -1010,6 +1029,43 @@ async function anularFactura(id){
     invCache[detSede]=null;   // el stock volvió al inventario
     cerrarSheet(); toast(`Factura #${f.numero} anulada.`); renderMinitaMod();
   }catch(e){ if(b){ b.disabled=false; b.textContent=`Anular factura #${f.numero}`; } toast('No se pudo anular: '+errTxt(e)); }
+}
+
+async function fnAsistente(body){
+  const call=()=>fetch(SUPA_URL+'/functions/v1/asistente',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+(auth?.access_token||''),'Content-Type':'application/json'},body:JSON.stringify(body)});
+  let res=await call(); if(res.status===401&&auth?.refresh_token&&await refreshSession()) res=await call();
+  const d=await res.json().catch(()=>({})); if(!res.ok) throw new Error(d.error||('Error '+res.status)); return d;
+}
+async function solicitarAnulacion(id){
+  const f=fxRows.find(x=>x.id===id); if(!f) return;
+  const inp=document.getElementById('fxMotivo'); const motivo=(inp?.value||'').trim();
+  if(!motivo){ toast('Escribí el motivo de la anulación.'); inp?.focus(); return; }
+  const b=document.getElementById('btnSolicitar'); if(b){ b.disabled=true; b.textContent='Enviando…'; }
+  try{ await fnAsistente({accion:'solicitar_anulacion',factura:id,motivo}); cerrarSheet(); toast(`Solicitud enviada para la factura #${f.numero}.`); renderMinitaMod(); }
+  catch(e){ if(b){ b.disabled=false; b.textContent=`Solicitar anulación de la #${f.numero}`; } toast('No se pudo enviar: '+e.message); }
+}
+async function resolverAnulacion(sid,aprobar){
+  if(!puedeAnular()) return;
+  const s=fxSol.find(x=>x.id===sid); if(!s) return;
+  let nota=null;
+  if(!aprobar){ nota=prompt(`¿Por qué se rechaza la anulación de la factura #${s.numero}? (opcional)`); if(nota==null) return; }
+  const b=document.getElementById(aprobar?'btnAprobar':'btnRechazar'); if(b){ b.disabled=true; b.textContent=aprobar?'Anulando…':'Rechazando…'; }
+  try{
+    const r=await fnAsistente({accion:'resolver_anulacion',solicitud:sid,aprobar,nota:nota||null});
+    if(r.estado==='aprobada') invCache[detSede]=null;   // el stock volvió al inventario
+    cerrarSheet(); toast(r.estado==='aprobada'?`Factura #${s.numero} anulada.`:r.estado==='rechazada'?'Solicitud rechazada.':(r.nota||'La solicitud venció.')); renderMinitaMod();
+  }catch(e){ if(b){ b.disabled=false; b.textContent=aprobar?`Aprobar y anular factura #${s.numero}`:'Rechazar'; } toast('No se pudo: '+e.message); }
+}
+// Desde la notificación: /movil?anular=<id> → Minita de esa sede y día con la factura abierta
+async function abrirSolicitudAnulacion(id){
+  try{
+    const s=(await supaFetch(`/anulaciones_caja?id=eq.${encodeURIComponent(id)}&select=*`))?.[0];
+    if(!s){ toast('No se encontró la solicitud de anulación.'); return; }
+    selDate=s.fecha; detSede=s.sede;
+    await goMod('minita',goSedes);
+    if(fxRows.some(f=>f.id===s.factura_id)) verFactura(s.factura_id);
+    if(s.estado!=='pendiente') toast(`Esta solicitud ya fue resuelta (${s.estado}${s.resuelto_por?' por '+s.resuelto_por:''}).`);
+  }catch(e){ toast('No se pudo abrir la solicitud: '+errTxt(e)); }
 }
 
 // Proyecciones (solo admin): último snapshot de la sede
@@ -1427,7 +1483,9 @@ async function suGuardar(){
 }
 
 // ── Service worker (solo la carcasa; nunca datos de Supabase) ──
-if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); }); }
+if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); });
+  // App ya abierta y se toca la notificación de una anulación (sw.js)
+  navigator.serviceWorker.addEventListener('message',e=>{ if(e.data?.tipo==='abrir-anulacion'&&me) abrirSolicitudAnulacion(e.data.id); }); }
 boot();
 </script>
 </body>

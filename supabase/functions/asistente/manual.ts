@@ -1,4 +1,4 @@
-// Manual Operativo y de Capacitación de Recepcionista (gimnasio v8 + natación v13).
+// Manual Operativo y de Capacitación de Recepcionista (gimnasio v10 + consolidado natación v15).
 // Al salir una versión nueva del manual, reemplazar este texto y volver a publicar la función.
 export const MANUAL = ` FIT AND TRAIN FITNESS CLUB
  MANUAL OPERATIVO Y DE CAPACITACIÓN
@@ -28,6 +28,9 @@ export const MANUAL = ` FIT AND TRAIN FITNESS CLUB
  • 1.3 Incapacidades y citas médicas (vigente desde el 14/10/2026): las boletas, citas y
  comprobantes se adjuntan en Mi Portal, indicando el tipo y quién lo emitió. 1.4: también se
  puede solicitar un día libre sin goce de salario.
+ • 5. Cierre, Paso 1 (01/11/2026): paso a paso para sacar el Informe de Ventas en WStudio y
+ descargarlo en Excel.
+ • 2.2 Abrir la caja en WStudio (01/11/2026): paso a paso (Menú → Registrar Venta → Abrir Turno).
  • 8.1 y 8.2 (aclarado por Administración el 29/10/2026): las clases perdidas por feriado no se
  reponen, salvo con la reposición del mes; el congelamiento en gimnasio es solo para Platinum o
  Anualidad no pagados con promoción, y en Natación es por razón médica.
@@ -132,6 +135,18 @@ orden.
  Solo el primer turno del día abre en ₡0. Los demás turnos siempre copian los montos del
  recuadro «Para WStudio».
  Recuadro «Para WStudio» (pestaña Cierre): al abrir el turno se usan los montos de «Al abrir este turno».
+2.2 Cómo abrir la caja en WStudio (paso a paso)
+ Abrir turno en WStudio
+ 1. Abrir el menú de WStudio (botón ☰ en la esquina superior izquierda).
+ 2. En la sección Ventas, seleccionar Registrar Venta. Se abre la pantalla Abrir Turno.
+ 3. Verificar el Cajero y la Caja, y llenar los montos:
+ – Primer turno del día: todo en ₡0.
+ – Segundo o tercer turno: copiar los montos de jykc.dev/caja → pestaña Cierre →
+ recuadro «Para WStudio» → «Al abrir este turno» (Efectivo, SINPE, Tarjeta y
+ Transferencia en CRC).
+ 4. Al final de la pantalla, dar clic en Abrir Turno.
+ WStudio: botón del menú (esquina superior izquierda). Menú → Ventas → Registrar Venta.
+ Pantalla “Abrir Turno” en WStudio: efectivo y otras formas de pago; botón “Abrir Turno” al final.
  No se puede operar el turno sin haberlo abierto correctamente en el sistema. Si hay diferencia en el
  efectivo inicial, anotarla en el campo correspondiente y reportarla a Administración.
 3. Funciones Durante el Turno
@@ -268,6 +283,17 @@ Paso 1 — Descargar el Informe de Ventas del día desde wstudio
  • Informe de Ventas: ventas generales del día.
  • Descargar el archivo antes de ingresar al sistema de cierre. El Informe de Ventas por
  Producto ya no es requerido.
+ Cómo sacar el Informe de Ventas en WStudio
+ 1. Abrir el menú de WStudio (botón ☰ en la esquina superior izquierda).
+ 2. Seleccionar Informes.
+ 3. En la sección Ventas, seleccionar Informe de Ventas.
+ 4. En Rango de tiempo, usar el filtro Ventas de hoy o elegir Rango personalizado… e
+ indicar Fecha Desde y Fecha Hasta.
+ 5. Con la fecha lista, dar clic en el botón Ver.
+ 6. Cuando cargue el informe, dar clic en Descargar (esquina superior derecha) y elegir Excel.
+ Este archivo es el que se carga en el sistema de caja (Paso 2).
+ Descargar siempre en Excel, no en PDF: ese es el formato que se carga en el sistema de caja de
+ jykc.dev.
 Paso 2 — Cargar el Informe de Ventas en jykc.dev
  Cómo cargar el informe
  • Ingresar a jykc.dev → módulo Cierre de Caja.
@@ -406,9 +432,8 @@ Respuestas rápidas basadas en el reglamento del club.
  Realizar dos clases seguidas puede generar efectos secundarios a la salud.
  P ¿Se pueden reponer clases en feriados?
  R El club permanece cerrado los días feriados.
- Las clases que caen en feriado no se reponen.
- Si el cliente quiere, puede usar su reposición del mes para recuperar esa clase.
- Si ya la utilizó, no se puede hacer nada más, incluso en casos especiales.
+ Si el cliente dispone de su reposición mensual, puede utilizarla para recuperar esa clase.
+ Si ya la utilizó, no puede reponer la clase del feriado, incluso en casos especiales.
  P ¿Qué se registra como gasto y qué como ingreso?
  R GASTO: cualquier efectivo que salió de la caja, siempre que tenga factura de gasto Y
  aprobación de Administración o los dueños. Sin ambas condiciones no se puede registrar
@@ -427,7 +452,8 @@ Respuestas rápidas basadas en el reglamento del club.
 8.3 Enfermedad
  P ¿Qué ocurre si un cliente se ausenta por enfermedad varios días?
  R Presentar una epicrisis o documento médico oficial.
- El caso lo revisa Administración.
+ Si la ausencia supera los 22 días, el espacio queda liberado.
+ Al regresar, se valida con Administración si hay disponibilidad.
 8.4 Indumentaria para entrenar
  P ¿Qué indumentaria es obligatoria para entrenar?
  R Ropa deportiva cómoda y adecuada para el ejercicio.
@@ -442,6 +468,8 @@ Respuestas rápidas basadas en el reglamento del club.
 8.6 Vencimiento de membresía
  P ¿Qué ocurre si una mensualidad vence?
  R Existe un día de gracia después del vencimiento.
+ Con más de 10 días de atraso el cliente es retirado del calendario sin excepción.
+ Debe solicitar nuevamente espacio, sujeto a disponibilidad.
 8.7 Promociones
  P ¿Se pueden mantener promociones vencidas?
  R No. El período máximo de gracia es de un (1) día.
@@ -527,6 +555,10 @@ Día 2
 Beneficios del personal
  Cada colaborador tiene derecho a una (1) membresía gratuita del club, válida únicamente en la sede
  en la que trabaja. Este beneficio es personal e intransferible.
+15. Acuse de Recibido
+ Declaración del colaborador: "Declaro haber leído y comprendido el presente Manual Operativo y de
+ Capacitación de Recepcionista de Fit and Train Fitness Club, y me comprometo a cumplir las políticas y
+ procedimientos aquí establecidos." Se firma con nombre del colaborador, firma y fecha.
 
 ════ DIFERENCIAS PARA LA SEDE NATACIÓN (Academia de Natación) ════
 El manual de la Academia de Natación es igual al anterior, con estos cambios:
@@ -537,29 +569,17 @@ El manual de la Academia de Natación es igual al anterior, con estos cambios:
  • Registrar novedades importantes del día.
  • Si hay datos faltantes, coordinarlos con el instructor antes del cierre.
 
-8.2 Congelamiento de membresía (reemplaza el 8.2 de gimnasio)
+8.2 Congelamiento de membresía (reemplaza el 8.2 de gimnasio; aclarado por Administración el 29/10/2026)
  P ¿Cómo se solicita un congelamiento?
  R En Natación el congelamiento aplica por razón médica (cualquier plan).
  Se solicita por escrito, adjuntando la constancia médica respectiva.
  El tiempo máximo de congelamiento es de 30 días (Términos y Condiciones, cláusula 13.ª).
-
-8.3 Enfermedad (se agrega en Natación; NO aplica a las sedes de gimnasio)
- P ¿Qué ocurre si un cliente se ausenta por enfermedad varios días?
- R Presentar una epicrisis o documento médico oficial.
- Si la ausencia supera los 22 días, el espacio queda liberado.
- Al regresar, se valida con Administración si hay disponibilidad.
 
 8.4 Indumentaria para nadar (reemplaza "Indumentaria para entrenar")
  P ¿Qué indumentaria es obligatoria?
  R Traje de baño de competencia (no se permite ropa de calle ni pantaloneta tipo tela).
  Gorra de natación.
  Lentes de natación (recomendados).
-
-8.6 Vencimiento de membresía (se agrega en Natación; NO aplica a las sedes de gimnasio)
- P ¿Qué ocurre si una mensualidad vence?
- R Existe un día de gracia después del vencimiento.
- Con más de 10 días de atraso el cliente es retirado del calendario sin excepción.
- Debe solicitar nuevamente espacio, sujeto a disponibilidad.
 
 Duración de las clases de natación: depende del nivel (ver la Metodología de natación). Estimulación
 temprana 45 min; niños Principiante y Transición 50 min; niños Intermedio y Avanzado 1 hora; adultos
