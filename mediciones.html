@@ -203,6 +203,11 @@ td.pasado .cell{opacity:.55}
 .f-row input{flex:1;min-width:0;border:0;background:transparent;color:var(--label);outline:none;min-height:44px;font-size:16px;text-align:right}
 .f-row input::placeholder{color:var(--ter)}
 .f-row .v{flex:1;text-align:right;font-size:16px;color:var(--sec);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.f-area{display:flex;flex-direction:column;gap:2px;padding:10px 16px;position:relative}
+.f-area + .f-area::before{content:"";position:absolute;left:16px;right:0;top:0;height:.5px;background:var(--sep)}
+.f-area label{font-size:13px;color:var(--sec)}
+.f-area textarea{border:0;background:transparent;color:var(--label);outline:none;font-size:16px;min-height:44px;resize:vertical;padding:2px 0;font-family:inherit}
+.f-area textarea::placeholder{color:var(--ter)}
 .seg-rutina{display:grid;grid-template-columns:repeat(3,1fr);background:var(--fill);border-radius:10px;padding:2px;gap:2px}
 .seg-rutina button{min-height:42px;border-radius:8px;font-size:14px;font-weight:600;color:var(--label);text-align:center}
 .seg-rutina button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.14)}
@@ -470,7 +475,7 @@ function init(){
   }else ctrl.innerHTML=`<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
   document.getElementById('sedeTitle').textContent='· '+currentSede;
   document.getElementById('leyRol').textContent = puedeRutina()&&!puedeAgendar()
-    ? 'Como instructor podés marcar la rutina (o solo medición) y si el cliente llegó (presente).'
+    ? 'Como instructor podés marcar la rutina (o solo medición), si el cliente llegó (presente) y llenar la ficha (objetivos, días, condición médica).'
     : puedeAgendar()&&!puedeRutina() ? 'La rutina la marca el instructor o el coordinador.' : '';
   document.getElementById('app').hidden=false;
   cargar();
@@ -534,6 +539,18 @@ function estadoCita(c){
   return {cls:'pend',lbl:'Pendiente',pill:'<span class="pill status">Pendiente</span>'};
 }
 
+// Quién hizo la medición (marcó la rutina): nombre, o el correo en las viejas
+const midioDe=c=>c.rutina?(c.rutina_por_nombre||c.rutina_por||''):'';
+// Ficha opcional del cliente: objetivos, días que puede entrenar, condición médica
+const FICHA=[['objetivos','fObj','Objetivos','Ej. bajar de peso, ganar masa muscular'],
+             ['dias_entreno','fDias','Días que puede entrenar','Ej. lunes, miércoles y viernes en la tarde'],
+             ['condicion_medica','fCond','Condición médica','Ej. hipertensión, lesión de rodilla…']];
+const htmlFicha=c=>`<div class="sect" style="gap:7px">
+    <div class="hdr" style="padding:0 4px">Ficha del cliente · opcional</div>
+    <div class="f-group">${FICHA.map(([k,id,lbl,ph])=>`<div class="f-area"><label for="${id}">${lbl}</label><textarea id="${id}" rows="2" maxlength="1000" placeholder="${esc(ph)}">${esc(c?.[k]||'')}</textarea></div>`).join('')}</div>
+  </div>`;
+const leerFicha=()=>Object.fromEntries(FICHA.map(([k,id])=>[k,document.getElementById(id).value.trim()||null]));
+
 function render(){
   pintarSegDias();
   document.getElementById('contenido').innerHTML = vistaSemana ? htmlSemana() : htmlDia();
@@ -570,7 +587,7 @@ function htmlDia(){
   const f=ymd(diaDe(diaSel)), hoy=todayStr(), pasado=f<hoy?' pasado':'';
   const filaCita=(h,c)=>`<button class="row${pasado}" onclick="abrir('${f}','${h}')">
         <span class="hr">${h}</span>
-        <span class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}</span></span>
+        <span class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}${midioDe(c)?' · Midió '+esc(midioDe(c)):''}${c.condicion_medica?' · ⚕️':''}</span></span>
         ${estadoCita(c).pill}${chev}</button>`;
   const bloque=(titulo,slots)=>{
     if(!slots.length) return `<div class="sect"><div class="hdr">${titulo}</div><div class="group"><div class="row ro"><span class="main"><span class="t" style="color:var(--sec)">Viernes en la tarde no hay mediciones.</span></span></div></div></div>`;
@@ -614,8 +631,8 @@ function htmlSemana(){
       if(!c && !haySlot(i,m)){ tr+=`<td class="slot${pasado}"><div class="cell na" title="Viernes en la tarde no hay mediciones">—</div></td>`; continue; }
       if(c){
         const {cls:est,lbl}=estadoCita(c);
-        tr+=`<td class="slot${pasado}"><div class="cell taken ${est}" onclick="abrir('${f}','${h}')" title="${esc(c.nombre)}">
-              <div class="nm">${esc(c.nombre)}</div><div class="st">${lbl}</div></div></td>`;
+        tr+=`<td class="slot${pasado}"><div class="cell taken ${est}" onclick="abrir('${f}','${h}')" title="${esc(c.nombre)}${midioDe(c)?' — midió '+esc(midioDe(c)):''}${c.condicion_medica?' — ⚕️ '+esc(c.condicion_medica):''}">
+              <div class="nm">${c.condicion_medica?'⚕️ ':''}${esc(c.nombre)}</div><div class="st">${lbl}</div></div></td>`;
       }else{
         const b=bloqueoDe(f,h);
         if(b){
@@ -696,6 +713,7 @@ function abrir(f,h){
           <div class="f-row"><label>Agendó</label><span class="v">${esc(currentNombre||currentEmail)}</span></div>
         </div>
         <div class="hint" style="margin-top:8px;">La rutina (completa / incompleta) la marca el instructor.</div>
+        <div style="margin-top:18px">${htmlFicha(null)}</div>
       </div>
       <div id="modoBloqueo" hidden>
         <div class="seg-rutina" id="segTipoBloq" style="grid-template-columns:repeat(2,1fr);">
@@ -744,8 +762,9 @@ function abrir(f,h){
           <button data-v="incompleta" onclick="setRutina('incompleta')" ${puedeRutina()?'':'disabled'}>✗ Incompleta</button>
           <button data-v="sin_rutina" onclick="setRutina('sin_rutina')" ${puedeRutina()?'':'disabled'} title="Se le hizo la medición, pero sin rutina">📏 Solo medición</button>
         </div>
-        ${c.rutina_por?`<div class="hint">Marcada por ${esc(c.rutina_por)}${c.rutina_at?' · '+new Date(c.rutina_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</div>`:''}
-      </div>`;
+        ${midioDe(c)?`<div class="hint">Medición hecha por <b>${esc(midioDe(c))}</b>${c.rutina_at?' · '+new Date(c.rutina_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</div>`:''}
+      </div>
+      ${htmlFicha(c)}`;
     pintarSeg();
     document.getElementById('mFoot').innerHTML = puedeAgendar()
       ? `<button class="btn-destroy" onclick="borrar('${c.id}')">Eliminar medición</button>` : '';
@@ -826,19 +845,20 @@ async function guardarNueva(){
       sede:currentSede,fecha:mFecha,hora:mHora,nombre,
       telefono:document.getElementById('fTel').value.trim()||null,
       pin:document.getElementById('fPin').value.trim()||null,
+      ...leerFicha(),
       agendado_por:currentEmail||null, agendado_por_nombre:currentNombre||currentEmail||null}});
     cerrar(); aviso(`Medición agendada: ${nombre} · ${mHora}`,true); cargar();
   }catch(e){
     btn.disabled=false;btn.textContent='Agendar';
     err.textContent = /bloqueado/i.test(e.message) ? 'Ese espacio acaba de ser bloqueado. Recargue la agenda.'
                     : /duplicate|unique/i.test(e.message) ? 'Ese espacio ya fue tomado por otra persona. Recargue.'
-                    : e.message;
+                    : mensajeError(e);
   }
 }
 
 async function guardarEdicion(id){
   const err=document.getElementById('mErr'), btn=document.getElementById('mSave');
-  const body={rutina:mRutina||null};
+  const body={rutina:mRutina||null, ...leerFicha()};
   if(mAsist!==mAsistOrig) body.asistencia=mAsist||null;   // solo si cambió (la base valida quién puede)
   if(puedeAgendar()){
     const nombre=document.getElementById('fNombre').value.trim();
@@ -854,7 +874,9 @@ async function guardarEdicion(id){
   }catch(e){btn.disabled=false;btn.textContent='Guardar';err.textContent=mensajeError(e);}
 }
 // Los errores de Supabase llegan como JSON en el texto: mostrar solo el mensaje
-function mensajeError(e){ try{ const j=JSON.parse(e.message); return j.message||e.message; }catch(_){ return e.message; } }
+function mensajeError(e){
+  if(/objetivos|dias_entreno|condicion_medica|rutina_por_nombre/.test(e.message)) return 'Falta correr mediciones_ficha.sql en Supabase.';
+  try{ const j=JSON.parse(e.message); return j.message||e.message; }catch(_){ return e.message; } }
 
 async function borrar(id){
   if(!confirm('¿Eliminar esta medición? El espacio queda libre.'))return;
@@ -872,7 +894,7 @@ function imprimirSemana(){
   const fila=m=>{let tr=`<tr><td class="h">${hhmm(m)}</td>`;
     for(let i=0;i<NDIAS;i++){const f=ymd(diaDe(i)),h=hhmm(m),c=citas[f+'|'+h];
       if(!c&&!haySlot(i,m)){ tr+='<td class="na"></td>'; continue; }
-      if(c){ tr+=`<td class="${c.rutina==='sin_rutina'?'solomed':c.rutina||(c.asistencia==='ausente'?'ausente':'pend')}"><b>${esc(c.nombre)}</b>${c.telefono?'<br><span class="tel">'+esc(c.telefono)+'</span>':''}${c.pin?'<br><span class="tel">PIN '+esc(c.pin)+'</span>':''}<br><span class="rt">${c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':c.rutina==='sin_rutina'?'Solo medición':c.asistencia==='ausente'?'Ausente':c.asistencia==='presente'?'Presente · ☐ rutina':'☐ Pendiente'}</span></td>`; continue; }
+      if(c){ tr+=`<td class="${c.rutina==='sin_rutina'?'solomed':c.rutina||(c.asistencia==='ausente'?'ausente':'pend')}"><b>${esc(c.nombre)}</b>${c.telefono?'<br><span class="tel">'+esc(c.telefono)+'</span>':''}${c.pin?'<br><span class="tel">PIN '+esc(c.pin)+'</span>':''}${c.condicion_medica?'<br><span class="tel">⚕️ '+esc(c.condicion_medica)+'</span>':''}<br><span class="rt">${c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':c.rutina==='sin_rutina'?'Solo medición':c.asistencia==='ausente'?'Ausente':c.asistencia==='presente'?'Presente · ☐ rutina':'☐ Pendiente'}${midioDe(c)?' · '+esc(midioDe(c)):''}</span></td>`; continue; }
       const b=bloqueoDe(f,h);
       tr+= b ? `<td class="bloq">🔒 ${esc(b.motivo||'Bloqueado')}</td>` : '<td></td>';}
     return tr+'</tr>';};
