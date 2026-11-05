@@ -720,12 +720,13 @@
                 <div class="table-container">
                     <table>
                         <thead><tr>
-                            <th>#</th><th>Cliente</th><th>PIN</th><th>Teléfono</th><th>Plan</th><th>Nota</th><th>Agregado por</th><th></th>
+                            <th>#</th><th>Cliente</th><th>PIN</th><th>Teléfono</th><th>Plan</th><th id="promoPagoTh">Pago</th><th>Nota</th><th>Agregado por</th><th></th>
                         </tr></thead>
                         <tbody id="promoBody"></tbody>
                     </table>
                 </div>
                 <div id="promoInfo" style="padding:12px 0;font-size:13px;color:var(--sec);"></div>
+                <div id="promoAjenos"></div>
             </div>
         </div><!-- /tab-promos -->
 
@@ -2044,9 +2045,11 @@ function escHtml(s) {
 let promoClientes = [];
 const puedeEditarPromos = () => currentRole === 'admin' || currentRole === 'admin_sedes';   // igual que la RLS
 
-async function loadPromos() {
+async function loadPromos(opts = {}) {
     const body = document.getElementById('promoBody');
-    body.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--ter);">⏳ Cargando...</td></tr>`;
+    body.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--ter);">⏳ Cargando...</td></tr>`;
+    // al abrir la pestaña se vuelven a leer los pagos (pudo haberse subido un informe nuevo)
+    if (!opts.mismosPagos) Object.keys(promoPagosCache).forEach(k => delete promoPagosCache[k]);
     try {
         const filas = [];
         for (let off = 0; ; off += 1000) {
@@ -2056,7 +2059,7 @@ async function loadPromos() {
         }
         promoClientes = filas;
     } catch(e) {
-        body.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--red);">❌ No se pudo cargar la lista: ${escHtml(e.message)}</td></tr>`;
+        body.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--red);">❌ No se pudo cargar la lista: ${escHtml(e.message)}</td></tr>`;
         return;
     }
     const sel = document.getElementById('promoSel'), antes = sel.value;
@@ -2072,19 +2075,82 @@ function promoActual() {
     return promoClientes.filter(p => p.sede === sede && p.promo === promo);
 }
 
+// Pagos de la promo en su mes de precio (PRECIO_PROMO), sacados del informe de ventas guardado
+// de ese mes (gym_snapshots). Así la lista muestra quién ya pagó sin tener que subir nada.
+const promoPagosCache = {};   // 'sede|mes' → { filas, updated_at } | 'cargando' | { error }
+async function cargarPagosPromo(sede, mes) {
+    const k = sede + '|' + mes;
+    if (promoPagosCache[k]) return;
+    promoPagosCache[k] = 'cargando';
+    try {
+        const s = (await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(sede)}&mes_orden=eq.${mes}&select=renov_data,updated_at&order=updated_at.desc&limit=1`) || [])[0];
+        promoPagosCache[k] = { filas: s?.renov_data || [], updated_at: s?.updated_at || null };
+    } catch(e) { promoPagosCache[k] = { error: e.message }; }
+    renderPromos();
+}
+// Pagos de la promo/plan (por código "(Promo: X)" o por nombre del plan) en el mes, por cliente
+function pagosPromoDelMes(filas, promo, mes) {
+    const PROMO_RE = /\(\s*promo\s*:\s*([^)]*?)\s*\)/i, porCliente = new Map();
+    filas.forEach(r => {
+        const m = PROMO_RE.exec(r.Producto || '');
+        if (normName((r.Producto || '').replace(PROMO_RE, '')) !== promo && !(m && normName(m[1]) === promo)) return;
+        const d = parseRenoDateTime(r.FechaStr);
+        if (!d || `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` !== mes) return;
+        const k = normName(r.Cliente);
+        if (!porCliente.has(k)) porCliente.set(k, []);
+        porCliente.get(k).push({ cliente: r.Cliente, total: Number(r.Total) || 0, fecha: d });
+    });
+    return porCliente;
+}
+
 function renderPromos() {
     const todas = promoActual();
     const q = normName(document.getElementById('promoSearch').value);
     const filas = q ? todas.filter(p => normName([p.cliente, p.pin, p.telefono].join(' ')).includes(q)) : todas;
     const edita = puedeEditarPromos();
+    // Estado del pago en el mes de la promo (solo las que tienen precio por mes)
+    const precio = todas.length && PRECIO_PROMO[todas[0].promo];
+    const mesTxt = precio ? new Date(precio.mes + '-15').toLocaleDateString('es-CR', { month: 'long' }) : '';
+    document.getElementById('promoPagoTh').textContent = precio ? `Pago de ${mesTxt}` : 'Pago';
+    let cache = null, pagos = null;
+    if (precio) {
+        cache = promoPagosCache[todas[0].sede + '|' + precio.mes];
+        if (!cache) cargarPagosPromo(todas[0].sede, precio.mes);
+        else if (cache !== 'cargando' && !cache.error) pagos = pagosPromoDelMes(cache.filas, todas[0].promo, precio.mes);
+    }
+    const dia = d => d.toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit' });
+    const celdaPago = p => {
+        if (!precio) return '<span style="color:var(--ter);">—</span>';
+        if (!pagos) return `<span style="color:var(--ter);">${cache?.error ? 'sin datos' : '…'}</span>`;
+        const ps = pagos.get(p.cliente_norm);
+        if (!ps) return '<span style="color:var(--ter);">Pendiente</span>';
+        return ps.map(x => Math.abs(x.total - precio.precio) <= 1
+            ? `<span style="color:var(--green);font-weight:600;">✓ ₡${x.total.toLocaleString('es-CR')} · ${dia(x.fecha)}</span>`
+            : `<span style="color:var(--orange);font-weight:600;">⚠ ₡${x.total.toLocaleString('es-CR')} · ${dia(x.fecha)} (debía ₡${precio.precio.toLocaleString('es-CR')})</span>`).join('<br>');
+    };
     document.getElementById('promoBody').innerHTML = filas.length ? filas.map((p, i) => `<tr>
         <td>${i + 1}</td><td><b>${escHtml(p.cliente)}</b></td><td>${escHtml(p.pin)}</td><td>${escHtml(p.telefono)}</td>
         <td>${escHtml(p.plan)}</td>
+        <td style="white-space:nowrap;">${celdaPago(p)}</td>
         <td>${p.nota ? `<span style="color:var(--orange);">⚠ ${escHtml(p.nota)}</span>` : ''}</td>
         <td style="color:var(--sec);font-size:12px;">${escHtml(p.created_by)}</td>
         <td>${edita ? `<button class="btn btn-red" style="min-height:28px;padding:0 10px;font-size:12px;" onclick="quitarPromoCliente(${p.id})">Quitar</button>` : ''}</td>
-    </tr>`).join('') : `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--ter);">${todas.length ? 'Ningún cliente coincide con la búsqueda' : 'No hay promos con lista de clientes'}</td></tr>`;
-    document.getElementById('promoInfo').textContent = todas.length ? (q ? `${filas.length} de ${todas.length} clientes` : `${todas.length} clientes`) : '';
+    </tr>`).join('') : `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--ter);">${todas.length ? 'Ningún cliente coincide con la búsqueda' : 'No hay promos con lista de clientes'}</td></tr>`;
+    let info = todas.length ? (q ? `${filas.length} de ${todas.length} clientes` : `${todas.length} clientes`) : '';
+    let ajenos = '';
+    if (pagos) {
+        const enLista = new Set(todas.map(p => p.cliente_norm));
+        const pagaron = todas.filter(p => pagos.has(p.cliente_norm)).length;
+        info += ` · ${pagaron} ya pagaron en ${mesTxt} · ${todas.length - pagaron} pendientes` +
+            (cache.updated_at ? ` · según el informe de ventas cargado el ${new Date(cache.updated_at).toLocaleString('es-CR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ' · todavía no hay informe de ventas de ese mes');
+        const fuera = [...pagos.entries()].filter(([k]) => !enLista.has(k));
+        if (fuera.length) ajenos = `<div style="padding:10px 12px;border:1px solid var(--red);border-radius:10px;font-size:13px;">
+            <b style="color:var(--red);">🔴 Pagaron en ${mesTxt} sin estar en la lista (${fuera.length})</b>
+            ${fuera.map(([, ps]) => `<div>${escHtml(ps[0].cliente)} · ${ps.map(x => `₡${x.total.toLocaleString('es-CR')} el ${dia(x.fecha)}`).join(', ')}</div>`).join('')}
+            <div style="color:var(--sec);margin-top:4px;">Si es la misma persona con el nombre escrito distinto, agréguela a la lista con el nombre como sale en el sistema.</div></div>`;
+    }
+    document.getElementById('promoInfo').textContent = info;
+    document.getElementById('promoAjenos').innerHTML = ajenos;
 }
 
 async function agregarPromoCliente() {
@@ -2105,7 +2171,7 @@ async function agregarPromoCliente() {
         } });
     } catch(e) { alert('No se pudo agregar: ' + e.message); return; }
     ['promoNuevoNombre', 'promoNuevoPin', 'promoNuevoTel', 'promoNuevoPlan', 'promoNuevoNota'].forEach(id => document.getElementById(id).value = '');
-    await loadPromos();
+    await loadPromos({ mismosPagos: true });
 }
 
 async function quitarPromoCliente(id) {
@@ -2113,22 +2179,27 @@ async function quitarPromoCliente(id) {
     if (!p || !confirm(`¿Quitar a ${p.cliente} de la lista de ${p.promo_nombre || p.promo}?\n\nSi vuelve a pagar con esa promo, saldrá marcado al subir el informe.`)) return;
     try { await supaFetch(`/promo_clientes?id=eq.${id}`, { method: 'DELETE' }); }
     catch(e) { alert('No se pudo quitar: ' + e.message); return; }
-    await loadPromos();
+    await loadPromos({ mismosPagos: true });
 }
 
 function descargarPromoExcel() {
     const filas = promoActual();
     if (!filas.length) { alert('No hay clientes para descargar.'); return; }
     const nombre = filas[0].promo_nombre || filas[0].promo, sede = filas[0].sede;
+    // Estado del pago del mes de la promo, igual que en la tabla (si ya se leyó)
+    const precio = PRECIO_PROMO[filas[0].promo], cache = precio && promoPagosCache[sede + '|' + precio.mes];
+    const pagos = cache && cache !== 'cargando' && !cache.error ? pagosPromoDelMes(cache.filas, filas[0].promo, precio.mes) : null;
+    const pagoTxt = p => !pagos ? '' : !pagos.has(p.cliente_norm) ? 'Pendiente'
+        : pagos.get(p.cliente_norm).map(x => `₡${x.total.toLocaleString('es-CR')} el ${x.fecha.toLocaleDateString('es-CR')}${Math.abs(x.total - precio.precio) > 1 ? ' (monto distinto)' : ''}`).join('; ');
     const ws = XLSX.utils.aoa_to_sheet([
         [`${nombre} — ${sede} — clientes autorizados`],
         [`${filas.length} clientes · descargado ${new Date().toLocaleString('es-CR')}`],
         [],
-        ['#', 'Cliente', 'PIN', 'Teléfono', 'Plan', 'Nota', 'Agregado por', 'Fecha'],
-        ...filas.map((p, i) => [i + 1, p.cliente, p.pin || '', p.telefono || '', p.plan || '', p.nota || '', p.created_by || '',
+        ['#', 'Cliente', 'PIN', 'Teléfono', 'Plan', 'Pago', 'Nota', 'Agregado por', 'Fecha'],
+        ...filas.map((p, i) => [i + 1, p.cliente, p.pin || '', p.telefono || '', p.plan || '', pagoTxt(p), p.nota || '', p.created_by || '',
             p.created_at ? new Date(p.created_at).toLocaleDateString('es-CR') : ''])
     ]);
-    ws['!cols'] = [{ wch: 4 }, { wch: 32 }, { wch: 8 }, { wch: 12 }, { wch: 48 }, { wch: 50 }, { wch: 22 }, { wch: 12 }];
+    ws['!cols'] = [{ wch: 4 }, { wch: 32 }, { wch: 8 }, { wch: 12 }, { wch: 48 }, { wch: 26 }, { wch: 50 }, { wch: 22 }, { wch: 12 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
     XLSX.writeFile(wb, `${nombre} - ${sede}.xlsx`.replace(/[\\/:*?"<>|]/g, ''));
