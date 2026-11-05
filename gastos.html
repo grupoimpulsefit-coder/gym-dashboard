@@ -33,6 +33,8 @@
 #dashboard { display: none; }
 .kpi.blue   .kpi-value { color: var(--cat-grupales); }
 .kpi.teal   .kpi-value { color: var(--cat-planta); }
+/* Pestañas de Gastos / facturas XML: en el celular, 2 × 2 para que no se salgan de la pantalla */
+@media (max-width: 700px) { #piTabs { grid-auto-flow: row; grid-template-columns: 1fr 1fr; } #piTabs .tab { padding: 4px 8px; font-size: 13px; white-space: normal; text-align: center; } }
 </style>
 </head>
 <body>
@@ -90,6 +92,18 @@
     </div>
   </div>
 
+  <div class="tabs" role="tablist" id="piTabs">
+    <button class="tab active" data-tab="gastos" onclick="piMostrar('gastos')">🧾 Gastos del mes</button>
+    <button class="tab" data-tab="xml" onclick="piMostrar('xml')">📥 Cargar factura XML</button>
+    <button class="tab" data-tab="pagos" onclick="piMostrar('pagos')">💸 Pago de la semana</button>
+    <button class="tab" data-tab="config" id="piTabConfig" onclick="piMostrar('config')" style="display:none;">⚙️ Configuración</button>
+  </div>
+
+  <div id="vista_xml" style="display:none;"></div>
+  <div id="vista_pagos" style="display:none;"></div>
+  <div id="vista_config" style="display:none;"></div>
+
+  <div id="vistaGastos">
   <div class="kpi-row">
     <div class="kpi orange">
       <div class="kpi-label">Total gasto del mes</div>
@@ -182,8 +196,15 @@
   </div>
 
   <!-- Tablas por categoría -->
-  <div class="section"><div class="section-title">📋 Gastos registrados</div></div>
+  <div class="section"><div class="section-title">📋 Gastos registrados
+    <span style="margin-left:auto;display:flex;gap:6px;align-items:center;text-transform:none;letter-spacing:0;font-weight:400;">Forma de pago:
+      <select id="filtroPago" class="ui" onchange="renderGastos()">
+        <option value="">Todas</option>
+        <option value="transferencia">Transferencia / banco</option>
+        <option value="caja">Caja (fin de semana)</option>
+      </select></span></div></div>
   <div id="gastosContainer"></div>
+  </div>
 
 </div>
 
@@ -193,6 +214,7 @@
     <div class="modal-head" id="instructorModalTitle">➕ Nuevo instructor</div>
     <div class="modal-body">
       <div class="f-field"><label>Nombre <span class="req">*</span></label><input type="text" id="iNombre" placeholder="Nombre completo"></div>
+      <div class="f-field"><label>Cédula</label><input type="text" id="iCedula" placeholder="Para reconocerlo en el XML de la factura" inputmode="numeric"></div>
       <div class="f-field"><label>Número de cuenta BAC</label><input type="text" id="iCuentaBac" placeholder="Cuenta / IBAN BAC"></div>
       <div class="f-field"><label>Otro banco (si no usa BAC)</label><input type="text" id="iOtroBanco" placeholder="Nombre del banco"></div>
       <div class="f-field"><label>Número de cuenta del otro banco</label><input type="text" id="iCuentaOtro" placeholder="Cuenta / IBAN"></div>
@@ -209,6 +231,7 @@
 
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
+<script src="/pagos_instructores.js"></script>
 <script>
 // ── Supabase ──────────────────────────────────────────────────────────────
 const SUPA_URL = '__SUPA_URL__';
@@ -374,7 +397,7 @@ async function initGastos() {
     ctrl.innerHTML = `<label>🏢 Sede:</label> <select id="sedeSelector"></select>`;
     const sel = document.getElementById('sedeSelector');
     sel.innerHTML = opciones.map(s => `<option value="${esc(s)}"${s===currentSede?' selected':''}>${SEDE_META[s]?.icon||''} ${esc(s)}</option>`).join('');
-    sel.onchange = () => { currentSede = sel.value; loadGastos(); };
+    sel.onchange = () => { currentSede = sel.value; loadGastos(); piRefrescar(); };
   } else {
     ctrl.innerHTML = `<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
   }
@@ -386,6 +409,7 @@ async function initGastos() {
   document.getElementById('fFecha').value = new Date().toLocaleDateString('en-CA');
   await cargarInstructores();
   await loadGastos();
+  piInit();
 }
 
 async function cargarInstructores() {
@@ -429,10 +453,22 @@ function poblarMeses() {
   sel.innerHTML = ordenados.map(([ord, et]) => `<option value="${ord}"${ord===actual?' selected':''}>${esc(et)}</option>`).join('');
 }
 
+// Pagado de caja (efectivo, clases de fin de semana) vs transferencia / banco
+const esPagoCaja = g => g.pago_tipo === 'caja' || g.metodo_pago === 'caja' || g.banco_pago === 'Pago de caja';
+// Texto extra de las facturas cargadas por XML: día de pago y si ya se pagó
+function infoPagoXml(g) {
+  if (g.origen !== 'xml') return '';
+  const xml = ' <span class="pill info" title="Cargada desde el XML de la factura electrónica">XML</span>';
+  if (esPagoCaja(g)) return xml;
+  const dia = g.dia_pago ? parseFecha(g.dia_pago).toLocaleDateString('es-CR', { weekday:'short', day:'2-digit', month:'2-digit' }) : '';
+  return xml + `<br><span style="font-size:11px;color:var(--muted);">Pago ${esc(dia)}${g.pagado_at ? ' · ✓ pagado' : ' · pendiente'}</span>`;
+}
+
 function renderGastos() {
   const mesSel = document.getElementById('mesSelector').value;
-  const delMes = gastos.filter(g => g.mes_orden === mesSel);
-  const etiqueta = delMes[0]?.mes || document.getElementById('mesSelector').selectedOptions[0]?.textContent || '';
+  const filtroPago = document.getElementById('filtroPago')?.value || '';
+  const delMes = gastos.filter(g => g.mes_orden === mesSel && (!filtroPago || (esPagoCaja(g) ? 'caja' : 'transferencia') === filtroPago));
+  const etiqueta = gastos.find(g => g.mes_orden === mesSel)?.mes || document.getElementById('mesSelector').selectedOptions[0]?.textContent || '';
   document.getElementById('sedeTitle').textContent = '· ' + currentSede;
   document.getElementById('dashPeriod').textContent = `${currentSede} · ${etiqueta}`;
 
@@ -462,7 +498,7 @@ function renderGastos() {
         <td>${esc(new Date(g.fecha_clase+'T00:00:00').toLocaleDateString('es-CR'))}</td>
         <td>${esc(g.emisor)}</td>
         <td>${g.documento_cobro ? esc(g.documento_cobro) : '<span class="pill">—</span>'}</td>
-        <td>${g.numero_factura ? esc(g.numero_factura) : '—'}</td>
+        <td>${g.numero_factura ? esc(g.numero_factura) : '—'}${infoPagoXml(g)}</td>
         <td>${g.banco_pago ? esc(g.banco_pago) : '—'}${g.cuenta_pago ? '<br><span style="font-size:11px;color:var(--muted);">'+esc(g.cuenta_pago)+'</span>' : ''}</td>
         <td class="num">${fmtCRC(g.monto)}</td>
         ${acc ? `<td class="num" style="white-space:nowrap;">${edit ? `<button class="btn-edit" title="Editar factura" onclick="editarGasto('${g.id}')">✏️</button>` : ''}${adm ? ` <button class="btn-del" title="Eliminar gasto" onclick="deleteGasto('${g.id}')">🗑</button>` : ''}</td>` : ''}
@@ -730,6 +766,7 @@ let editandoInstructorId = null;   // null = crear; id = editar (solo admin)
 
 function setInstructorModalFields(inst) {
   document.getElementById('iNombre').value     = inst?.nombre || '';
+  document.getElementById('iCedula').value     = inst?.cedula || '';
   document.getElementById('iCuentaBac').value  = inst?.cuenta_bac || '';
   document.getElementById('iOtroBanco').value  = inst?.otro_banco || '';
   document.getElementById('iCuentaOtro').value = inst?.cuenta_otro || '';
@@ -787,6 +824,7 @@ async function guardarInstructor() {
   if (editar && !esAdmin()) { err.textContent = 'Solo un administrador puede editar instructores.'; return; }
   const payload = {
     nombre,
+    cedula:      document.getElementById('iCedula').value.replace(/\D/g, '') || null,
     cuenta_bac:  document.getElementById('iCuentaBac').value.trim() || null,
     otro_banco:  document.getElementById('iOtroBanco').value.trim() || null,
     cuenta_otro: document.getElementById('iCuentaOtro').value.trim() || null,
@@ -807,7 +845,7 @@ async function guardarInstructor() {
     if (id) { document.getElementById('fInstructor').value = id; onInstructorChange(); }
     closeInstructorModal();
   } catch(e) {
-    err.textContent = /duplicate|unique/i.test(e.message) ? 'Ya existe un instructor con ese nombre.' : e.message;
+    err.textContent = /cedula/i.test(e.message) ? 'Ya existe un instructor con esa cédula.' : /duplicate|unique/i.test(e.message) ? 'Ya existe un instructor con ese nombre.' : e.message;
   } finally {
     btn.disabled = false; btn.textContent = editar ? 'Guardar cambios' : 'Guardar instructor';
   }
