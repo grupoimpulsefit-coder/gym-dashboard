@@ -218,6 +218,9 @@ td.pasado .cell{opacity:.55}
 .seg-rutina button.on[data-v="ausente"]{color:var(--orange)}
 .seg-rutina button:disabled{opacity:.45}
 .hint{font-size:13px;color:var(--sec);padding:0 4px}
+.f-row select{flex:1;min-width:0;border:0;background:transparent;color:var(--label);outline:none;min-height:44px;font-size:16px;text-align:right;text-align-last:right;font-family:inherit}
+.f-row .need{color:var(--red)}
+.btn-tomar{min-height:36px;padding:0 12px;border-radius:9px;background:var(--brand);color:#fff;font-size:14px;font-weight:600;flex:none}
 .err{color:var(--red);font-size:14px;min-height:20px;padding:0 4px}
 .btn-destroy{background:var(--card);border-radius:12px;min-height:50px;width:100%;display:flex;
   align-items:center;justify-content:center;color:var(--red);font-size:17px;font-weight:500;box-shadow:var(--shadow)}
@@ -305,7 +308,7 @@ td.pasado .cell{opacity:.55}
 
     <div class="leyenda">
       <span><span class="dot" style="background:var(--ter)"></span>Pendiente</span>
-      <span><span class="dot" style="background:var(--blue)"></span>Presente, sin rutina</span>
+      <span><span class="dot" style="background:var(--blue)"></span>En proceso (llegó, sin rutina)</span>
       <span><span class="dot" style="background:var(--orange)"></span>Ausente / sin marcar</span>
       <span><span class="dot" style="background:var(--green)"></span>Rutina completa</span>
       <span><span class="dot" style="background:var(--red)"></span>Rutina incompleta</span>
@@ -362,6 +365,9 @@ const minDe=h=>{const [a,b]=String(h||'').split(':').map(Number);return a*60+(b|
 // Citas agendadas antes del cambio de horario que ya no caen en un espacio válido
 const fueraDeHorario=c=>{const m=minDe(c.hora);return !SLOTS.includes(m)||!haySlot(dowDe(c.fecha),m);};
 
+let instructores=[];   // [{id,nombre,role}] de la sede actual
+// id de la cuenta actual (sale del token de sesión)
+function miId(){ try{ return JSON.parse(atob(currentToken.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub||''; }catch(_){ return ''; } }
 let currentToken=null,currentRole=null,currentSede=null,currentEmail='',currentNombre='',currentSedes=[];
 
 /* ── Sesión: renovación silenciosa + cierre por inactividad (ver sesion.js) ── */
@@ -475,7 +481,7 @@ function init(){
   }else ctrl.innerHTML=`<span class="sede-lock">${SEDE_META[currentSede]?.icon||'🏢'} ${esc(currentSede)}</span>`;
   document.getElementById('sedeTitle').textContent='· '+currentSede;
   document.getElementById('leyRol').textContent = puedeRutina()&&!puedeAgendar()
-    ? 'Como instructor podés marcar la rutina (o solo medición), si el cliente llegó (presente) y llenar la ficha (objetivos, días, condición médica).'
+    ? 'Como instructor podés tomar una medición (Yo la atiendo), marcar la rutina (o solo medición), si el cliente llegó (presente) y llenar la ficha.'
     : puedeAgendar()&&!puedeRutina() ? 'La rutina la marca el instructor o el coordinador.' : '';
   document.getElementById('app').hidden=false;
   cargar();
@@ -494,10 +500,13 @@ async function cargar(){
   const sede=encodeURIComponent(currentSede);
   try{
     // Los bloqueos permanentes se traen siempre; los de una sola fecha, solo los de la semana visible.
-    const [rows,blos]=await Promise.all([
+    const [rows,blos,ins]=await Promise.all([
       supaFetch(`/mediciones?sede=eq.${sede}&fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.asc,hora.asc&select=*`),
-      supaFetch(`/mediciones_bloqueos?sede=eq.${sede}&or=(tipo.eq.permanente,and(fecha.gte.${desde},fecha.lte.${hasta}))&select=*`).catch(()=>[])
+      supaFetch(`/mediciones_bloqueos?sede=eq.${sede}&or=(tipo.eq.permanente,and(fecha.gte.${desde},fecha.lte.${hasta}))&select=*`).catch(()=>[]),
+      // Instructores de la sede (para asignar quién atiende); si falta el SQL, lista vacía
+      supaFetch('/rpc/mediciones_instructores',{method:'POST',body:{p_sede:currentSede}}).catch(()=>[])
     ]);
+    instructores=ins||[];
     if(seq!==reqSeq)return;
     citas={}; (rows||[]).forEach(r=>{citas[r.fecha+'|'+normHora(r.hora)]=r;});
     cargarBloqueos(blos);
@@ -534,7 +543,7 @@ function estadoCita(c){
   if(c.rutina==='incompleta') return {cls:'incompleta',lbl:'✗ Incompleta',pill:'<span class="pill bad">✗ Incompleta</span>'};
   if(c.rutina==='sin_rutina') return {cls:'solomed',  lbl:'📏 Solo medición',pill:'<span class="pill solomed">📏 Solo medición</span>'};
   if(c.asistencia==='ausente')  return {cls:'ausente', lbl:'Ausente',             pill:'<span class="pill warn">Ausente</span>'};
-  if(c.asistencia==='presente') return {cls:'presente',lbl:'Presente · sin rutina',pill:'<span class="pill info">Presente</span>'};
+  if(c.asistencia==='presente') return {cls:'presente',lbl:'⏳ En proceso'+(c.instructor_nombre?' · '+esc(c.instructor_nombre):''),pill:'<span class="pill info">⏳ En proceso</span>'};
   if(citaPasada(c))             return {cls:'pend sinmarcar',lbl:'Sin marcar',   pill:'<span class="pill warn">Sin marcar</span>'};
   return {cls:'pend',lbl:'Pendiente',pill:'<span class="pill status">Pendiente</span>'};
 }
@@ -587,7 +596,7 @@ function htmlDia(){
   const f=ymd(diaDe(diaSel)), hoy=todayStr(), pasado=f<hoy?' pasado':'';
   const filaCita=(h,c)=>`<button class="row${pasado}" onclick="abrir('${f}','${h}')">
         <span class="hr">${h}</span>
-        <span class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}${midioDe(c)?' · Midió '+esc(midioDe(c)):''}${c.condicion_medica?' · ⚕️':''}</span></span>
+        <span class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}${midioDe(c)?' · Midió '+esc(midioDe(c)):(c.asistencia==='presente'&&c.instructor_nombre?' · Con '+esc(c.instructor_nombre):'')}${c.condicion_medica?' · ⚕️':''}</span></span>
         ${estadoCita(c).pill}${chev}</button>`;
   const bloque=(titulo,slots)=>{
     if(!slots.length) return `<div class="sect"><div class="hdr">${titulo}</div><div class="group"><div class="row ro"><span class="main"><span class="t" style="color:var(--sec)">Viernes en la tarde no hay mediciones.</span></span></div></div></div>`;
@@ -731,6 +740,7 @@ function abrir(f,h){
     setTimeout(()=>document.getElementById('fNombre').focus(),120);
   }else{
     mId=c.id; mRutina=c.rutina||''; mAsist=c.asistencia||''; mAsistOrig=mAsist; mFutura=c.fecha>todayStr();
+    mInstr=c.instructor_id||''; mInstrOrig=mInstr; mInstrNom=c.instructor_nombre||'';
     document.getElementById('mTitulo').textContent=c.nombre;
     const editable=puedeAgendar();
     document.getElementById('mBody').innerHTML=`
@@ -753,6 +763,7 @@ function abrir(f,h){
         </div>
         ${c.asistencia_por?`<div class="hint">Marcado por ${esc(c.asistencia_por)}${c.asistencia_at?' · '+new Date(c.asistencia_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</div>`:''}
         ${!puedeAusente()?'<div class="hint">Solo recepción puede marcar ausente.</div>':''}
+        <div id="instrBox"></div>
       </div>
       <div class="sect" style="gap:7px">
         <div class="hdr" style="padding:0 4px">Rutina${puedeRutina()?'':' · la marca el instructor o el coordinador'}</div>
@@ -784,7 +795,31 @@ function pintarSeg(){
   document.querySelectorAll('#segAsist button').forEach(b=>{ const v=b.dataset.v; b.classList.toggle('on',v===mAsist);
     // Fecha futura: nada. Instructor: solo "presente" (o dejar lo que ya estaba).
     b.disabled = mFutura || (v==='presente' ? !puedePresente() : (!puedeAusente() && v!==mAsistOrig)); });
+  pintarInstr();
 }
+// Instructor que atiende: obligatorio al marcar presente. Recepción lo escoge;
+// el instructor solo puede tomarla él mismo (la base lo hace cumplir).
+function pintarInstr(){
+  const box=document.getElementById('instrBox'); if(!box) return;
+  if(mAsist!=='presente'){ box.innerHTML=''; return; }
+  const yo=miId();
+  if(currentRole==='instructor'){
+    const nom = mInstr===yo ? 'Vos' : mInstr ? (mInstrNom||'Otro instructor') : 'Vos (al guardar)';
+    box.innerHTML=`<div class="f-group" style="margin-top:8px"><div class="f-row"><label>Lo atiende</label><span class="v">${esc(nom)}</span>
+      ${mInstr&&mInstr!==yo?`<button class="btn-tomar" onclick="tomarMedicion()">Yo la atiendo</button>`:''}</div></div>`;
+    return;
+  }
+  const lista=[...instructores];
+  if(mInstr&&!lista.some(i=>i.id===mInstr)) lista.unshift({id:mInstr,nombre:mInstrNom||'(otro)'});
+  box.innerHTML=`<div class="f-group" style="margin-top:8px"><div class="f-row"><label>Lo atiende <span class="need">*</span></label>
+    <select id="fInstr" onchange="mInstr=this.value;mInstrNom=this.options[this.selectedIndex].text">
+      <option value="">Escoger instructor…</option>
+      ${lista.map(i=>`<option value="${esc(i.id)}"${i.id===mInstr?' selected':''}>${esc(i.nombre)}</option>`).join('')}
+    </select></div></div>
+    ${!instructores.length?'<div class="hint" style="margin-top:6px">No se pudo cargar la lista de instructores (¿falta correr mediciones_instructor.sql?).</div>':''}`;
+}
+function tomarMedicion(){ mInstr=miId(); mInstrNom=currentNombre; pintarInstr(); }
+let mInstr='', mInstrOrig='', mInstrNom='';
 
 /* Espacio libre: se agenda una medición o se bloquea el espacio */
 let mAsist='', mAsistOrig='', mFutura=false;
@@ -860,6 +895,11 @@ async function guardarEdicion(id){
   const err=document.getElementById('mErr'), btn=document.getElementById('mSave');
   const body={rutina:mRutina||null, ...leerFicha()};
   if(mAsist!==mAsistOrig) body.asistencia=mAsist||null;   // solo si cambió (la base valida quién puede)
+  if(mAsist==='presente'){
+    if(!mInstr && currentRole!=='instructor' && (mAsist!==mAsistOrig || mInstrOrig)){
+      err.textContent='Escoja el instructor que atiende al cliente.'; return; }
+    if(mInstr!==mInstrOrig) body.instructor_id=mInstr||null;
+  }
   if(puedeAgendar()){
     const nombre=document.getElementById('fNombre').value.trim();
     if(!nombre){err.textContent='El nombre es obligatorio.';return;}
@@ -876,6 +916,7 @@ async function guardarEdicion(id){
 // Los errores de Supabase llegan como JSON en el texto: mostrar solo el mensaje
 function mensajeError(e){
   if(/objetivos|dias_entreno|condicion_medica|rutina_por_nombre/.test(e.message)) return 'Falta correr mediciones_ficha.sql en Supabase.';
+  if(/instructor_id/.test(e.message)) return 'Falta correr mediciones_instructor.sql en Supabase.';
   try{ const j=JSON.parse(e.message); return j.message||e.message; }catch(_){ return e.message; } }
 
 async function borrar(id){
@@ -894,7 +935,7 @@ function imprimirSemana(){
   const fila=m=>{let tr=`<tr><td class="h">${hhmm(m)}</td>`;
     for(let i=0;i<NDIAS;i++){const f=ymd(diaDe(i)),h=hhmm(m),c=citas[f+'|'+h];
       if(!c&&!haySlot(i,m)){ tr+='<td class="na"></td>'; continue; }
-      if(c){ tr+=`<td class="${c.rutina==='sin_rutina'?'solomed':c.rutina||(c.asistencia==='ausente'?'ausente':'pend')}"><b>${esc(c.nombre)}</b>${c.telefono?'<br><span class="tel">'+esc(c.telefono)+'</span>':''}${c.pin?'<br><span class="tel">PIN '+esc(c.pin)+'</span>':''}${c.condicion_medica?'<br><span class="tel">⚕️ '+esc(c.condicion_medica)+'</span>':''}<br><span class="rt">${c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':c.rutina==='sin_rutina'?'Solo medición':c.asistencia==='ausente'?'Ausente':c.asistencia==='presente'?'Presente · ☐ rutina':'☐ Pendiente'}${midioDe(c)?' · '+esc(midioDe(c)):''}</span></td>`; continue; }
+      if(c){ tr+=`<td class="${c.rutina==='sin_rutina'?'solomed':c.rutina||(c.asistencia==='ausente'?'ausente':'pend')}"><b>${esc(c.nombre)}</b>${c.telefono?'<br><span class="tel">'+esc(c.telefono)+'</span>':''}${c.pin?'<br><span class="tel">PIN '+esc(c.pin)+'</span>':''}${c.condicion_medica?'<br><span class="tel">⚕️ '+esc(c.condicion_medica)+'</span>':''}<br><span class="rt">${c.rutina==='completa'?'✓ Completa':c.rutina==='incompleta'?'✗ Incompleta':c.rutina==='sin_rutina'?'Solo medición':c.asistencia==='ausente'?'Ausente':c.asistencia==='presente'?'En proceso · ☐ rutina':'☐ Pendiente'}${midioDe(c)?' · '+esc(midioDe(c)):c.asistencia==='presente'&&c.instructor_nombre?' · con '+esc(c.instructor_nombre):''}</span></td>`; continue; }
       const b=bloqueoDe(f,h);
       tr+= b ? `<td class="bloq">🔒 ${esc(b.motivo||'Bloqueado')}</td>` : '<td></td>';}
     return tr+'</tr>';};

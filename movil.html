@@ -158,6 +158,10 @@
   .btn.plain svg{stroke:var(--label)}
   .btn.danger{background:var(--red-tint);color:var(--red)}
   .btn.danger svg{stroke:var(--red)}
+  .sheet-body .farea{flex-direction:column;align-items:stretch;gap:2px}
+  .sheet-body .farea label{font-size:13px;color:var(--sec)}
+  .sheet-body .farea textarea{border:0;background:transparent;color:var(--label);outline:none;font:inherit;font-size:17px;min-height:44px;resize:vertical;padding:2px 0}
+  .sheet-body .farea textarea::placeholder{color:var(--ter)}
   .sheet-body select.qty{width:58%;text-align:right;font-weight:400;-webkit-appearance:none;appearance:none}
   .sheet-body .search{margin:0 0 10px}
   .sheet-body .search input{background:var(--fill)}
@@ -488,7 +492,7 @@ const medPill=c=>c.rutina==='completa'?'<span class="pill ok">✓ Completa</span
                :c.rutina==='incompleta'?'<span class="pill bad">✗ Incompleta</span>'
                :c.rutina==='sin_rutina'?'<span class="pill solomed">📏 Solo medición</span>'
                :c.asistencia==='ausente'?'<span class="pill warn">Ausente</span>'
-               :c.asistencia==='presente'?'<span class="pill info">Presente</span>'
+               :c.asistencia==='presente'?'<span class="pill info">⏳ En proceso</span>'
                :medPasada(c)?'<span class="pill warn">Sin marcar</span>'
                :'<span class="pill status">Pendiente</span>';
 
@@ -503,11 +507,14 @@ async function renderMedicionesMod(){
   v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
   const seq=++medSeq, sedeQ=encodeURIComponent(detSede), dow=medDow(medFecha);
   try{
-    const [rows,blos]=await Promise.all([
+    const [rows,blos,ins]=await Promise.all([
       supaFetch(`/mediciones?sede=eq.${sedeQ}&fecha=eq.${medFecha}&order=hora.asc&select=*`),
       // Bloqueos que aplican a este día: el permanente de su día de la semana, o el de esta fecha
-      supaFetch(`/mediciones_bloqueos?sede=eq.${sedeQ}&or=(and(tipo.eq.permanente,dia_semana.eq.${dow}),and(tipo.eq.unico,fecha.eq.${medFecha}))&select=*`).catch(()=>[])
+      supaFetch(`/mediciones_bloqueos?sede=eq.${sedeQ}&or=(and(tipo.eq.permanente,dia_semana.eq.${dow}),and(tipo.eq.unico,fecha.eq.${medFecha}))&select=*`).catch(()=>[]),
+      // Instructores de la sede, para asignar quién atiende (si falta el SQL, lista vacía)
+      supaFetch('/rpc/mediciones_instructores',{method:'POST',body:{p_sede:detSede}}).catch(()=>[])
     ]);
+    medInstructores=ins||[];
     medRows=rows||[];
     medBloq={}; (blos||[]).forEach(b=>{ medBloq[String(b.hora||'').slice(0,5)]=b; });
   }
@@ -525,7 +532,7 @@ async function renderMedicionesMod(){
   const fuera=medRows.filter(r=>!validos.includes(String(r.hora||'').slice(0,5)));   // agendadas antes del cambio de horario
   const chevSvg='<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg>';
   const fila=m=>{ const h=medHH(m), c=by[h];
-    if(c) return `<button class="cell" onclick="medAbrir('${h}')"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}</span></div>${medPill(c)}${chevSvg}</button>`;
+    if(c) return `<button class="cell" onclick="medAbrir('${h}')"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}${medMidio(c)?' · Midió '+esc(medMidio(c)):(c.asistencia==='presente'&&c.instructor_nombre?' · Con '+esc(c.instructor_nombre):'')}${c.condicion_medica?' · ⚕️':''}</span></div>${medPill(c)}${chevSvg}</button>`;
     const b=medBloq[h];
     if(b){ const det=(b.tipo==='permanente'?'Todos los '+MED_DIAS[b.dia_semana]:'Solo este día')+(b.motivo?' · '+esc(b.motivo):'');
       return puedeAgendarMed()
@@ -547,8 +554,18 @@ async function renderMedicionesMod(){
     ${fuera.length?`<div class="sect"><div class="hdr">⚠ Fuera del horario</div><div class="group">${fuera.map(r=>fila(medMin(r.hora))).join('')}</div><div class="ftr">Se agendaron antes del cambio de horario. Abrilas para eliminarlas y volver a agendarlas en un espacio válido.</div></div>`:''}
     <div class="sect"><div class="hdr">Mañana · 7:30 a 10:30</div><div class="group">${amHoy.map(fila).join('')}</div></div>
     <div class="sect"><div class="hdr">Tarde · 5:00 a 7:45 p. m.</div><div class="group">${pmHoy.length?pmHoy.map(fila).join(''):'<div class="cell"><span class="s">Viernes en la tarde no hay mediciones.</span></div>'}</div>
-      <div class="ftr">${puedeRutinaMed()&&!puedeAgendarMed()?'Como instructor podés marcar la rutina y si el cliente llegó (presente).':puedeRutinaMed()?'Podés marcar la rutina y si el cliente llegó (presente o ausente) desde el día de la cita.':'La rutina la marca el instructor o el coordinador.'} Sábado y domingo no hay medición.</div></div>`;
+      <div class="ftr">${puedeRutinaMed()&&!puedeAgendarMed()?'Como instructor podés tomar una medición (Yo la atiendo), marcar la rutina, si el cliente llegó (presente) y llenar la ficha.':puedeRutinaMed()?'Podés marcar la rutina y si el cliente llegó (presente o ausente) desde el día de la cita.':'La rutina la marca el instructor o el coordinador.'} Sábado y domingo no hay medición.</div></div>`;
 }
+
+// Quién hizo la medición (marcó la rutina): nombre, o el correo en las viejas
+const medMidio=c=>c&&c.rutina?(c.rutina_por_nombre||c.rutina_por||''):'';
+// Ficha opcional del cliente: la llenan recepción al agendar o el instructor en la medición
+const MED_FICHA=[['objetivos','medObj','Objetivos','Ej. bajar de peso, ganar masa muscular'],
+                 ['dias_entreno','medDias','Días que puede entrenar','Ej. lunes, miércoles y viernes en la tarde'],
+                 ['condicion_medica','medCond','Condición médica','Ej. hipertensión, lesión de rodilla…']];
+const medHtmlFicha=c=>`<div class="hdr" style="padding:16px 0 6px">Ficha del cliente · opcional</div>
+  <div class="group" style="margin:0">${MED_FICHA.map(([k,id,lbl,ph])=>`<div class="cell farea"><label for="${id}">${lbl}</label><textarea id="${id}" rows="2" maxlength="1000" placeholder="${esc(ph)}">${esc(c?.[k]||'')}</textarea></div>`).join('')}</div>`;
+const medLeerFicha=()=>Object.fromEntries(MED_FICHA.map(([k,id])=>[k,document.getElementById(id)?.value.trim()||null]));
 
 // Hoja de una medición: crear, editar, marcar rutina o eliminar
 let medHora=null, medRutina='', medAsist='', medAsistOrig='', medFutura=false;
@@ -558,6 +575,7 @@ function medAbrir(h){
   const b=!c && medBloq[h];
   if(b){ medHojaBloqueo(h,b); return; }
   medHora=h; medRutina=c?.rutina||''; medAsist=c?.asistencia||''; medAsistOrig=medAsist; medFutura=medFecha>todayStr();
+  medInstr=c?.instructor_id||''; medInstrOrig=medInstr; medInstrNom=c?.instructor_nombre||'';
   const editable=puedeAgendarMed();
   const campo=(lab,id,val,ph,tipo)=>editable
     ? `<div class="cell"><div class="main"><span class="t">${lab}</span></div><input class="qty" id="${id}" type="${tipo||'text'}" value="${esc(val||'')}" placeholder="${ph}" style="width:58%;text-align:right;font-weight:400"></div>`
@@ -584,6 +602,7 @@ function medAbrir(h){
           </div>
           ${c.asistencia_por?`<div class="ftr" style="padding:8px 0 0">Marcado por ${esc(c.asistencia_por)}</div>`:''}
           ${!puedeAusenteMed()?'<div class="ftr" style="padding:6px 0 0">Solo recepción puede marcar ausente.</div>':''}
+          <div id="medInstrBox"></div>
           <div class="hdr" style="padding:16px 0 6px">Rutina</div>
           <div class="seg" id="medSeg" style="grid-auto-flow:row;grid-template-columns:1fr 1fr">
             <button data-v="" onclick="medSetRutina('')" ${puedeRutinaMed()?'':'disabled'}>Pendiente</button>
@@ -591,7 +610,8 @@ function medAbrir(h){
             <button data-v="incompleta" onclick="medSetRutina('incompleta')" ${puedeRutinaMed()?'':'disabled'}>✗ Incompleta</button>
             <button data-v="sin_rutina" onclick="medSetRutina('sin_rutina')" ${puedeRutinaMed()?'':'disabled'}>📏 Solo medición</button>
           </div>
-          ${c.rutina_por?`<div class="ftr" style="padding:8px 0 0">Marcada por ${esc(c.rutina_por)}</div>`:''}`:''}
+          ${medMidio(c)?`<div class="ftr" style="padding:8px 0 0">Medición hecha por <b>${esc(medMidio(c))}</b>${c.rutina_at?' · '+new Date(c.rutina_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</div>`:''}`:''}
+        ${medHtmlFicha(c)}
         <div class="err" id="medErr" style="text-align:left"></div>
         ${c&&editable?`<button class="btn plain" style="margin-top:14px;color:var(--red)" onclick="medBorrar('${c.id}')">Eliminar medición</button>`:''}
         ${!c&&editable?`<button class="btn plain" style="margin-top:14px" onclick="medBloquearHoja('${h}')">🔒 Bloquear este espacio</button>`:''}
@@ -681,12 +701,41 @@ function medPintarSeg(){
     b.disabled=!puedeRutinaMed()||(medAsist==='ausente'&&b.dataset.v!==''); });
   document.querySelectorAll('#medSegAsist button').forEach(b=>{ const v=b.dataset.v; b.classList.toggle('on',v===medAsist);
     b.disabled = medFutura || (v==='presente' ? !puedePresenteMed() : (!puedeAusenteMed() && v!==medAsistOrig)); });
+  medPintarInstr();
 }
+// Instructor que atiende: obligatorio al marcar presente. Recepción lo escoge;
+// el instructor solo puede tomarla él mismo (la base lo hace cumplir).
+let medInstructores=[], medInstr='', medInstrOrig='', medInstrNom='';
+function medPintarInstr(){
+  const box=document.getElementById('medInstrBox'); if(!box) return;
+  if(medAsist!=='presente'){ box.innerHTML=''; return; }
+  const yo=auth?.user_id||'';
+  if(me?.role==='instructor'){
+    const nom = medInstr===yo ? 'Vos' : medInstr ? (medInstrNom||'Otro instructor') : 'Vos (al guardar)';
+    box.innerHTML=`<div class="group" style="margin:10px 0 0"><div class="cell"><div class="main"><span class="t">Lo atiende</span></div><span class="v">${esc(nom)}</span>
+      ${medInstr&&medInstr!==yo?`<button class="btn" style="width:auto;min-height:36px;padding:0 12px;font-size:14px;flex:none;background:var(--brand);color:#fff" onclick="medTomar()">Yo la atiendo</button>`:''}</div></div>`;
+    return;
+  }
+  const lista=[...medInstructores];
+  if(medInstr&&!lista.some(i=>i.id===medInstr)) lista.unshift({id:medInstr,nombre:medInstrNom||'(otro)'});
+  box.innerHTML=`<div class="group" style="margin:10px 0 0"><div class="cell"><div class="main"><span class="t">Lo atiende <span style="color:var(--red)">*</span></span></div>
+    <select class="qty" id="medInstr" onchange="medInstr=this.value;medInstrNom=this.options[this.selectedIndex].text">
+      <option value="">Escoger…</option>
+      ${lista.map(i=>`<option value="${esc(i.id)}"${i.id===medInstr?' selected':''}>${esc(i.nombre)}</option>`).join('')}
+    </select></div></div>
+    ${!medInstructores.length?'<div class="ftr" style="padding:6px 0 0">No se pudo cargar la lista de instructores (¿falta correr mediciones_instructor.sql?).</div>':''}`;
+}
+function medTomar(){ medInstr=auth?.user_id||''; medInstrNom=me?.nombre||''; medPintarInstr(); }
 async function medGuardar(id){
   const err=document.getElementById('medErr'), btn=document.getElementById('medSave');
   const inp=i=>document.getElementById(i)?.value.trim()||'';
-  const body = id ? {rutina:medRutina||null} : {};
+  const body = id ? {rutina:medRutina||null, ...medLeerFicha()} : medLeerFicha();
   if(id && medAsist!==medAsistOrig) body.asistencia=medAsist||null;   // solo si cambió (la base valida quién puede)
+  if(id && medAsist==='presente'){
+    if(!medInstr && me?.role!=='instructor' && (medAsist!==medAsistOrig || medInstrOrig)){
+      err.textContent='Escoja el instructor que atiende al cliente.'; return; }
+    if(medInstr!==medInstrOrig) body.instructor_id=medInstr||null;
+  }
   if(puedeAgendarMed()){
     const nombre=inp('medNombre');
     if(!nombre){ err.textContent='El nombre es obligatorio.'; return; }
@@ -701,6 +750,8 @@ async function medGuardar(id){
   }catch(e){ btn.disabled=false; btn.textContent=id?'Guardar':'Agendar';
     err.textContent = /bloqueado/i.test(e.message) ? 'Ese espacio acaba de ser bloqueado. Recargá la agenda.'
                     : /duplicate|unique/i.test(e.message) ? 'Ese espacio ya fue tomado. Recargá.'
+                    : /objetivos|dias_entreno|condicion_medica/.test(e.message) ? 'Falta correr mediciones_ficha.sql en Supabase.'
+                    : /instructor_id/.test(e.message) ? 'Falta correr mediciones_instructor.sql en Supabase.'
                     : (()=>{ try{ return JSON.parse(e.message).message||e.message; }catch(_){ return e.message; } })(); }
 }
 async function medBorrar(id){
