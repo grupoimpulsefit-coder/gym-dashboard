@@ -33,7 +33,8 @@ create index if not exists empleados_sede_idx on empleados (sede);
 create index if not exists empleados_user_idx on empleados (user_id);
 -- Para tablas ya creadas antes de agregar las columnas:
 alter table empleados add column if not exists asegurado_ccss boolean default true;
--- Puesto del colaborador (texto libre: 'Instructor', 'Recepcionista', ...). Sale en la boleta de pago.
+-- Puesto del colaborador: 'Recepción' | 'Entrenador' | 'Misceláneo' | 'Seguridad' | 'Mantenimiento'
+-- (lista en PUESTOS de rrhh.html). Sale en la boleta de pago.
 alter table empleados add column if not exists puesto text;
 
 -- ── Pago semanal por horas (servicios profesionales) ──

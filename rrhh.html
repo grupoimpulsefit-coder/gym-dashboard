@@ -203,7 +203,7 @@
       <div class="form-grid">
         <div class="f-field"><label>Nombre completo <span class="req">*</span></label><input type="text" id="eNombre"></div>
         <div class="f-field"><label>Cédula / ID</label><input type="text" id="eCedula"></div>
-        <div class="f-field"><label>Puesto</label><input type="text" id="ePuesto" list="puestosList" placeholder="Ej. Instructor, Recepcionista" maxlength="80"><datalist id="puestosList"></datalist></div>
+        <div class="f-field"><label>Puesto</label><select id="ePuesto"></select></div>
         <div class="f-field"><label>Correo</label><input type="email" id="eCorreo" placeholder="para el acceso al portal"></div>
         <div class="f-field"><label>Teléfono</label><input type="text" id="eTelefono"></div>
         <div class="f-field full"><label>Dirección</label><input type="text" id="eDireccion"></div>
@@ -469,6 +469,8 @@ function renderKpis(){
 // conserva su historial (vacaciones, planillas cerradas, liquidación).
 const esBaja = e => e.activo === false;
 
+const PUESTOS = ['Recepción', 'Entrenador', 'Misceláneo', 'Seguridad', 'Mantenimiento'];
+
 function renderEmpleados(){
   const tb = document.getElementById('empBody'); tb.innerHTML='';
   const bajas = empleados.filter(esBaja).length;
@@ -552,10 +554,10 @@ function openEmpleadoModal(id){
   document.getElementById('empModalTitle').textContent = e ? '✏️ Editar empleado' : '＋ Nuevo empleado';
   document.getElementById('eNombre').value = e?.nombre || '';
   document.getElementById('eCedula').value = e?.cedula || '';
+  // Un puesto guardado que no esté en la lista se conserva como opción para no perderlo.
+  const puestos = e?.puesto && !PUESTOS.includes(e.puesto) ? [...PUESTOS, e.puesto] : PUESTOS;
+  document.getElementById('ePuesto').innerHTML = '<option value="">— Sin asignar —</option>' + puestos.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
   document.getElementById('ePuesto').value = e?.puesto || '';
-  // Sugerencias con los puestos ya usados, para escribirlos siempre igual
-  document.getElementById('puestosList').innerHTML = [...new Set(empleados.map(x=>(x.puesto||'').trim()).filter(Boolean))].sort()
-    .map(p=>`<option value="${esc(p)}">`).join('');
   document.getElementById('eCorreo').value = e?.correo || '';
   document.getElementById('eTelefono').value = e?.telefono || '';
   document.getElementById('eDireccion').value = e?.direccion || '';
@@ -663,7 +665,7 @@ async function guardarEmpleado(){
   const payload = {
     nombre,
     cedula: document.getElementById('eCedula').value.trim() || null,
-    puesto: document.getElementById('ePuesto').value.trim() || null,
+    puesto: document.getElementById('ePuesto').value || null,
     correo: document.getElementById('eCorreo').value.trim().toLowerCase() || null,
     telefono: document.getElementById('eTelefono').value.trim() || null,
     direccion: document.getElementById('eDireccion').value.trim() || null,
