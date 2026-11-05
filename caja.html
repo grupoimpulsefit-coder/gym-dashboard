@@ -702,7 +702,9 @@ function _sesionExpirada(motivo) {
 // Sedes donde el usuario (no admin) puede operar: su sede principal + sedes_extra, validadas y sin duplicar.
 function computeSedes(sede,extra){ const set=[]; [sede,...(Array.isArray(extra)?extra:[])].forEach(s=>{ if(s&&SEDES.includes(s)&&!set.includes(s))set.push(s); }); return set; }
 async function supaFetch(path,opts={}){
-  const token=currentToken||SUPA_KEY;
+  // Sin sesión (p. ej. se cerró en otra pestaña) no se manda como anónimo: la base respondería con un error de permisos confuso
+  if(!currentToken) throw new Error('Su sesión se cerró (quizá se cerró sesión o se entró con otra cuenta en otra pestaña). Vuelva a entrar e intente de nuevo.');
+  const token=currentToken;
   const res=await fetch(SUPA_URL+'/rest/v1'+path,{method:opts.method||'GET',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':opts.prefer||'return=minimal',...(opts.headers||{})},body:opts.body!=null?JSON.stringify(opts.body):undefined});
   if(res.status===401&&!opts._retry&&await Sesion.renovar())return supaFetch(path,{...opts,_retry:true});
   if(!res.ok){const t=await res.text();throw new Error(t);} const txt=await res.text(); return txt?JSON.parse(txt):null;
@@ -821,6 +823,7 @@ document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key
     document.getElementById('userNombre').textContent=auth.nombre||'—';document.getElementById('loginScreen').style.display='none';setTimeout(init,0);}}catch(_){}})();
 async function doLogout(silent){ Sesion.cerrar();stopLivePoll();try{await fetch(`${SUPA_URL}/auth/v1/logout`,{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}});}catch(_){}
   currentToken=null;currentRole=null;currentSede=null;currentEmail='';document.getElementById('app').style.display='none';
+  document.querySelectorAll('.modal-bg').forEach(m=>m.style.display='none');   // las ventanas quedaban encima del login
   if(!silent){document.getElementById('loginEmail').value='';document.getElementById('loginPassword').value='';}document.getElementById('loginScreen').style.display='flex';}
 
 // ── Init ──
@@ -2056,6 +2059,8 @@ async function cerrarTurno(estado){
   const fecha=document.getElementById('cFecha').value;
   if(document.getElementById('cTarjeta').value===''||document.getElementById('cSinpe').value===''){ msg.className='msg err'; msg.textContent='Cargue el 📤 Informe de Ventas (llena Tarjeta y SINPE automáticamente).'; return; }
   if(estado==='final'&&!window._sinpeReporte){ msg.className='msg err'; msg.textContent='Para el cierre final debe cargar el 🔷 Reporte SINPE del día.'; return; }
+  const solPend=(fxState.solicitudes||[]).filter(s=>s.estado==='pendiente'&&(fxState.facturas||[]).some(f=>f.id===s.factura_id&&f.cierre_id===turnoActual.id));
+  if(solPend.length&&!confirm(`Hay ${solPend.length} solicitud(es) de anulación sin aprobar (factura ${solPend.map(s=>'#'+s.numero).join(', ')}).\n\nSi cierra el turno, esas facturas ya no se podrán anular y quedarán como descuadre.\n\n¿Cerrar igual?`)) return;
   if(!fotoDatafono){ msg.className='msg err'; msg.textContent=`Suba la foto del datáfono (${estado==='final'?'cierre de lote':'auditoría'}) — es obligatoria para el cierre.`; return; }
   // Conteo de inventario obligatorio en cada cierre (parcial y final) para detectar diferencias entre turnos. No modifica el stock.
   const _invE = inventarioCierre ? Object.values(inventarioCierre) : null;
@@ -2233,7 +2238,7 @@ const FX_VACIO={efectivo:0,tarjeta:0,sinpe:0,total:0,productos:0,eventos:0,n:0,d
 // Parte que va al sobre (productos). Los cierres guardados antes de los eventos solo traen `total`.
 const fxProductos=f=>f.productos!=null?(Number(f.productos)||0):(Number(f.total)||0);
 let tabActual='cierre';
-const fxState={prods:[],cart:{},pago:'efectivo',cat:'todos',facturas:[],errFacturas:null,busy:false,
+const fxState={prods:[],cart:{},pago:'efectivo',cat:'todos',facturas:[],solicitudes:[],errFacturas:null,busy:false,
   eventos:[], evento:null,
   split:false, sel:['efectivo'], montos:{}};   // pago dividido: métodos elegidos y monto de cada uno   // evento: { id, tipo:'miembro'|'no_miembro', pin, nombre, tel, cliente } — uno por cobro
 const puedeAnular=()=>esAdmin()||currentRole==='coordinador';
@@ -2314,6 +2319,10 @@ async function loadFacturasDia(){
   catch(e){ if(turnoActual&&turnoActual.id===t.id){ fxState.errFacturas=mensajeError(e); renderFxHist(); } return; }
   if(!turnoActual||turnoActual.id!==t.id) return;   // cambió de sede o de turno mientras llegaba
   fxState.facturas=lista; fxState.errFacturas=null;
+  // Solicitudes de anulación (anulaciones.sql). Sin la tabla, la caja funciona igual.
+  try{ fxState.solicitudes=(await supaFetch(`/anulaciones_caja?sede=eq.${encodeURIComponent(t.sede)}&fecha=eq.${t.fecha}&order=created_at.desc&select=*`))||[]; }
+  catch(_){ fxState.solicitudes=[]; }
+  if(!turnoActual||turnoActual.id!==t.id) return;
   renderFxHist();
   // El cierre en pantalla es el del turno abierto → actualizar sus totales si cambió lo facturado
   if(window._formCierreId===t.id){
@@ -2507,14 +2516,57 @@ function renderFxHist(){
       ? `🎟️ ${esc((f.items&&f.items[0]&&f.items[0].producto)||'Evento')}<div class="hint" style="font-size:12px;">${esc(f.cliente_nombre||'')} ${f.tipo_precio==='miembro'?'<span class="fx-tag m">Miembro</span>':'<span class="fx-tag nm">No miembro</span>'}</div>`
       : (f.items||[]).map(it=>esc(it.producto)+(Number(it.cantidad)>1?' ×'+it.cantidad:'')).join(', ');
     const ref=fxMontoMetodo(f,'sinpe')>0&&f.referencia?`<div class="hint" style="font-size:11px;">ref …${esc(String(f.referencia).slice(-6))}</div>`:'';
-    const acc=anulada?`<span class="pill dif" title="${esc(f.motivo_anulacion||'')}">Anulada</span>`
-      :(puedeAnular()&&turnoActual&&f.cierre_id===turnoActual.id?`<button class="btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="fxAnular('${f.id}')">Anular</button>`:'');
+    const acc=anulada?`<span class="pill dif" title="${esc(f.motivo_anulacion||'')}">Anulada</span>`:fxAccionesAnular(f);
     return `<tr class="${anulada?'anulada':''}"><td class="num">${f.numero}</td><td>${new Date(f.created_at).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'})}</td>
       <td>${det}</td><td>${fxMetodoTxt(f)}${ref}</td><td class="num">${fmt(f.total)}</td><td>${acc}</td></tr>`;
   }).join(''):'<tr><td colspan="6" class="hint" style="text-align:center;padding:14px;">Aún no hay facturas hoy.</td></tr>';
   const r=resumirFacturas(L);
   document.getElementById('fxN').textContent=r.n?`${r.n} · ${fmt(r.total)}`:'';
   document.getElementById('fxPorMetodo').innerHTML=['efectivo','tarjeta','sinpe'].map(m=>`<div class="tile"><div class="tl">${FX_METODOS[m]}</div><div class="tv">${fmt(r[m])}</div></div>`).join('');
+}
+// ── Anulación: coordinador y Administración anulan directo; los demás la piden (anulaciones.sql).
+// La solicitud pasa por la Edge Function `asistente`, que avisa por push a quienes aprueban.
+const fxSolPend=fid=>fxState.solicitudes.find(s=>s.factura_id===fid&&s.estado==='pendiente');
+function fxAccionesAnular(f){
+  if(!turnoActual||f.cierre_id!==turnoActual.id) return '';   // turno cerrado: ya no se anula
+  const b=(txt,fn,extra='')=>`<button class="btn-ghost" style="font-size:12px;padding:4px 10px;${extra}" onclick="${fn}">${txt}</button>`;
+  const sol=fxSolPend(f.id);
+  if(sol){
+    const info=`<span class="pill" style="background:var(--orange-tint);color:var(--orange);" title="${esc((sol.solicitante||'')+': '+sol.motivo)}">⏳ Anulación solicitada</span>`;
+    return puedeAnular()?`${info}<div style="display:flex;gap:4px;margin-top:4px;">${b('Aprobar',`fxResolverAnulacion(${sol.id},true)`)}${b('Rechazar',`fxResolverAnulacion(${sol.id},false)`)}</div>`:info;
+  }
+  if(puedeAnular()) return b('Anular',`fxAnular('${f.id}')`);
+  const rech=fxState.solicitudes.find(s=>s.factura_id===f.id&&s.estado==='rechazada');
+  return (rech?`<div class="hint" style="font-size:11px;color:var(--red);" title="${esc(rech.nota||'')}">Anulación rechazada${rech.nota?': '+esc(rech.nota):''}</div>`:'')
+    +b('Solicitar anulación',`fxSolicitarAnulacion('${f.id}')`);
+}
+async function fxAsistente(body){
+  const res=await fetch(`${SUPA_URL}/functions/v1/asistente`,{ method:'POST',
+    headers:{'Authorization':'Bearer '+currentToken,'apikey':SUPA_KEY,'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  const d=await res.json().catch(()=>({})); if(!res.ok) throw new Error(d.error||('Error '+res.status)); return d;
+}
+async function fxSolicitarAnulacion(id){
+  const f=fxState.facturas.find(x=>x.id===id); if(!f) return;
+  const motivo=prompt(`Motivo para anular la factura #${f.numero} (${fmt(f.total)}).\nAdministración y el coordinador reciben el aviso y la aprueban.`);
+  if(motivo==null) return;
+  const msg=document.getElementById('fxMsg');
+  if(!motivo.trim()){ msg.className='msg err'; msg.textContent='Indique el motivo de la anulación.'; return; }
+  try{ await fxAsistente({accion:'solicitar_anulacion',factura:id,motivo:motivo.trim()});
+    msg.className='msg ok'; msg.textContent=`Solicitud enviada para la factura #${f.numero}. No cierre el turno hasta que la aprueben: con el turno cerrado ya no se puede anular.`; }
+  catch(e){ msg.className='msg err'; msg.textContent='⚠ '+mensajeError(e); }
+  await loadFacturasDia();
+}
+async function fxResolverAnulacion(sid,aprobar){
+  const s=fxState.solicitudes.find(x=>x.id===sid); if(!s) return;
+  let nota=null;
+  if(aprobar){ if(!confirm(`¿Aprobar y anular la factura #${s.numero} por ${fmt(s.total)}?\n\nPidió: ${s.solicitante||'—'}\nMotivo: ${s.motivo}\n\nEl stock vuelve al inventario. No se puede deshacer.`)) return; }
+  else { nota=prompt(`¿Por qué se rechaza la anulación de la factura #${s.numero}? (opcional)`); if(nota==null) return; }
+  const msg=document.getElementById('fxMsg');
+  try{ const r=await fxAsistente({accion:'resolver_anulacion',solicitud:sid,aprobar,nota:nota||null});
+    msg.className=r.estado==='vencida'?'msg err':'msg ok';
+    msg.textContent=r.estado==='aprobada'?`Factura #${s.numero} anulada. El stock se devolvió al inventario.`:r.estado==='rechazada'?`Solicitud de la factura #${s.numero} rechazada.`:(r.nota||'La solicitud venció.'); }
+  catch(e){ msg.className='msg err'; msg.textContent='⚠ '+mensajeError(e); }
+  await Promise.all([loadFxProds(), loadFacturasDia()]);
 }
 async function fxAnular(id){
   const f=fxState.facturas.find(x=>x.id===id); if(!f) return;
