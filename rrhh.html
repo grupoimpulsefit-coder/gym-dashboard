@@ -203,6 +203,7 @@
       <div class="form-grid">
         <div class="f-field"><label>Nombre completo <span class="req">*</span></label><input type="text" id="eNombre"></div>
         <div class="f-field"><label>Cédula / ID</label><input type="text" id="eCedula"></div>
+        <div class="f-field"><label>Puesto</label><input type="text" id="ePuesto" list="puestosList" placeholder="Ej. Instructor, Recepcionista" maxlength="80"><datalist id="puestosList"></datalist></div>
         <div class="f-field"><label>Correo</label><input type="email" id="eCorreo" placeholder="para el acceso al portal"></div>
         <div class="f-field"><label>Teléfono</label><input type="text" id="eTelefono"></div>
         <div class="f-field full"><label>Dirección</label><input type="text" id="eDireccion"></div>
@@ -482,7 +483,7 @@ function renderEmpleados(){
     const tr = tb.insertRow();
     if (esBaja(e)) tr.className = 'baja';
     tr.innerHTML = `
-      <td><strong>${esc(e.nombre)}</strong></td>
+      <td><strong>${esc(e.nombre)}</strong>${e.puesto ? `<div class="s-sub">${esc(e.puesto)}</div>` : ''}</td>
       <td>${esc(e.cedula)||'—'}</td>
       <td style="color:var(--blue);font-size:13px;">${esc(e.correo)||'—'}</td>
       <td>${esc(e.telefono)||'—'}</td>
@@ -551,6 +552,10 @@ function openEmpleadoModal(id){
   document.getElementById('empModalTitle').textContent = e ? '✏️ Editar empleado' : '＋ Nuevo empleado';
   document.getElementById('eNombre').value = e?.nombre || '';
   document.getElementById('eCedula').value = e?.cedula || '';
+  document.getElementById('ePuesto').value = e?.puesto || '';
+  // Sugerencias con los puestos ya usados, para escribirlos siempre igual
+  document.getElementById('puestosList').innerHTML = [...new Set(empleados.map(x=>(x.puesto||'').trim()).filter(Boolean))].sort()
+    .map(p=>`<option value="${esc(p)}">`).join('');
   document.getElementById('eCorreo').value = e?.correo || '';
   document.getElementById('eTelefono').value = e?.telefono || '';
   document.getElementById('eDireccion').value = e?.direccion || '';
@@ -658,6 +663,7 @@ async function guardarEmpleado(){
   const payload = {
     nombre,
     cedula: document.getElementById('eCedula').value.trim() || null,
+    puesto: document.getElementById('ePuesto').value.trim() || null,
     correo: document.getElementById('eCorreo').value.trim().toLowerCase() || null,
     telefono: document.getElementById('eTelefono').value.trim() || null,
     direccion: document.getElementById('eDireccion').value.trim() || null,
