@@ -22,50 +22,40 @@ let piDia = null;          // 'mie' | 'vie' | 'caja'
 let piPagos = [];          // gastos XML de la semana
 let piAtrasados = [];      // pendientes de semanas anteriores
 let piGrupos = [];         // instructores agrupados (pestaña actual)
+let piPorAprobar = [];     // facturas enviadas por instructores, esperando aprobación
 const piAbiertos = new Set();
 
 const PI_ROLES_PAGAR = ['admin', 'admin_sedes', 'admin_g', 'coordinador', 'admin_sucursal'];
 const piPuedePagar = () => PI_ROLES_PAGAR.includes(currentRole);
-const piDig = s => String(s ?? '').replace(/\D/g, '');
-const piNorm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
-const piYMD = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-function piSumarDias(d, n) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() + n); return x; }
 function piLunes(d) { return piSumarDias(d, -((d.getDay() + 6) % 7)); }
-const piFechaLarga = d => d.toLocaleDateString('es-CR', { weekday: 'long', day: 'numeric', month: 'long' });
 const piFechaCorta = s => s ? parseFecha(s).toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit' }) : '—';
 const piHora = s => s ? new Date(s).toLocaleString('es-CR', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' }) : '';
 
-// Hora actual en Costa Rica (para el ESTIMADO del día de pago; el definitivo lo pone la base)
-function piAhoraCR() {
-  const p = {};
-  new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Costa_Rica', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
-    .formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
-  return new Date(+p.year, +p.month - 1, +p.day, (+p.hour) % 24, +p.minute);
-}
-// Misma regla que dia_pago_instructor() en la base
-function piDiaPagoEstimado() {
-  const ahora = piAhoraCR();
-  for (let i = 0; i <= 7; i++) {
-    const d = piSumarDias(ahora, i);
-    if ((d.getDay() === 3 || d.getDay() === 5) && ahora < new Date(d.getFullYear(), d.getMonth(), d.getDate(), 10, 0)) return d;
-  }
-  return null;
-}
 
 // ── Pestañas ──────────────────────────────────────────────────────────────
 function piMostrar(tab) {
   piTab = tab;
   document.querySelectorAll('#piTabs .tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.getElementById('vistaGastos').style.display = tab === 'gastos' ? '' : 'none';
-  ['xml', 'pagos', 'config'].forEach(t => { document.getElementById('vista_' + t).style.display = tab === t ? '' : 'none'; });
+  ['xml', 'aprobar', 'pagos', 'config'].forEach(t => { document.getElementById('vista_' + t).style.display = tab === t ? '' : 'none'; });
   if (tab === 'xml') { piRenderCarga(); if (piF) piValidar(); }
+  if (tab === 'aprobar') piCargarPendientes();
   if (tab === 'pagos') piCargarPagos();
   if (tab === 'config') piCargarConfig();
 }
 
 async function piInit() {
   document.getElementById('piTabConfig').style.display = esAdmin() ? '' : 'none';
+  document.getElementById('piTabAprobar').style.display = esAdmin() ? '' : 'none';
   await piCargarCatalogos();
+  if (esAdmin()) piContarPendientes();
+}
+
+async function piContarPendientes() {
+  try {
+    const r = (await supaFetch('/facturas_pendientes?estado=eq.pendiente&select=id')) || [];
+    document.getElementById('piPendCount').innerHTML = r.length ? `<span class="pill pend" style="height:20px;padding:0 7px;">${r.length}</span>` : '';
+  } catch (_) {}
 }
 
 async function piCargarCatalogos() {
@@ -91,45 +81,8 @@ async function piRecargarGastos() {
   } catch (_) {}
 }
 
-// ══ 1) Lectura del XML (factura electrónica de Hacienda, v4.3 / v4.4) ══════
-function piHijo(el, nombre) { return el ? (el.getElementsByTagNameNS('*', nombre)[0] || null) : null; }
-function piTexto(el, nombre) { const h = piHijo(el, nombre); return h ? h.textContent.trim() : ''; }
 
-function piParseXML(texto) {
-  const doc = new DOMParser().parseFromString(texto, 'application/xml');
-  if (doc.getElementsByTagName('parsererror').length) throw new Error('El archivo no es un XML válido.');
-  const raiz = doc.documentElement, tipo = raiz.localName;
-  if (tipo === 'MensajeHacienda') throw new Error('Este XML es la respuesta de Hacienda (la aceptación), no la factura. Suba el XML de la factura electrónica.');
-  if (tipo === 'MensajeReceptor') throw new Error('Este XML es un mensaje de receptor, no la factura. Suba el XML de la factura electrónica.');
-  const NOMBRES = { TiqueteElectronico: 'tiquete electrónico', NotaCreditoElectronica: 'nota de crédito', NotaDebitoElectronica: 'nota de débito', FacturaElectronicaCompra: 'factura electrónica de compra', FacturaElectronicaExportacion: 'factura de exportación' };
-  if (tipo !== 'FacturaElectronica') {
-    throw new Error(NOMBRES[tipo]
-      ? `Este documento es un(a) ${NOMBRES[tipo]}. Se necesita una factura electrónica a nombre de la sede.`
-      : `No se reconoce el documento (${tipo}). Suba el XML de una factura electrónica.`);
-  }
-  const emisor = piHijo(raiz, 'Emisor'), receptor = piHijo(raiz, 'Receptor'), resumen = piHijo(raiz, 'ResumenFactura');
-  const lineas = [...raiz.getElementsByTagNameNS('*', 'LineaDetalle')].map(l => ({
-    cantidad: Number(piTexto(l, 'Cantidad')) || 0,
-    detalle: piTexto(l, 'Detalle'),
-    total: Number(piTexto(l, 'MontoTotalLinea')) || 0,
-  }));
-  const x = {
-    clave: piDig(piTexto(raiz, 'Clave')),
-    consecutivo: piDig(piTexto(raiz, 'NumeroConsecutivo')),
-    fecha: piTexto(raiz, 'FechaEmision'),
-    emisorNombre: piTexto(emisor, 'Nombre'),
-    emisorCedula: piDig(piTexto(piHijo(emisor, 'Identificacion'), 'Numero')),
-    receptorNombre: piTexto(receptor, 'Nombre'),
-    receptorCedula: piDig(piTexto(piHijo(receptor, 'Identificacion'), 'Numero')),
-    moneda: piTexto(resumen, 'CodigoMoneda') || 'CRC',
-    total: Number(piTexto(resumen, 'TotalComprobante')) || 0,
-    lineas,
-    firmado: raiz.getElementsByTagNameNS('http://www.w3.org/2000/09/xmldsig#', 'Signature').length > 0,
-  };
-  if (!x.clave) throw new Error('El XML no trae la clave de Hacienda: no parece una factura electrónica.');
-  if (!(x.total > 0)) throw new Error('No se encontró el total de la factura en el XML.');
-  return x;
-}
+// Lectura del XML y día de pago: factura_xml.js
 
 // ══ 2) Cargar factura ═════════════════════════════════════════════════════
 async function piLeerArchivo(file) {
@@ -206,15 +159,15 @@ async function piValidar() {
   c.hacienda = { e: 'wait', t: 'Consultando al emisor en Hacienda…' };
   f.checks = c;
   piRenderChecks();
-  const [dup, hac] = await Promise.all([piRevisarDuplicado(x.clave), piConsultarHacienda(x.emisorCedula)]);
+  const [dup, hac] = await Promise.all([piRevisarDuplicado(x.clave, f.pend?.id), piConsultarHacienda(x.emisorCedula)]);
   if (piF !== f) return;   // se cargó otra factura mientras tanto
   c.duplicado = dup; c.hacienda = hac;
   piRenderChecks();
 }
 
-async function piRevisarDuplicado(clave) {
+async function piRevisarDuplicado(clave, excluir) {
   try {
-    const r = await supaFetch('/rpc/factura_ya_cargada', { method: 'POST', body: { p_clave: clave }, prefer: 'return=representation' });
+    const r = await supaFetch('/rpc/factura_ya_cargada', { method: 'POST', body: { p_clave: clave, p_excluir: excluir || null }, prefer: 'return=representation' });
     const d = Array.isArray(r) ? r[0] : null;
     if (!d) return { e: 'ok', t: 'No se ha cargado antes', d: 'La clave de Hacienda es única.' };
     return { e: 'bad', t: 'Esta factura ya se cargó', d: `En ${d.sede}${d.cargado_at ? ' el ' + new Date(d.cargado_at).toLocaleString('es-CR') : ''}${d.created_by ? ' por ' + d.created_by : ''}.` };
@@ -287,18 +240,31 @@ function piRenderCarga(aviso) {
     drop.ondrop = e => { e.preventDefault(); drop.style.background = ''; const fl = e.dataTransfer.files[0]; if (fl) piLeerArchivo(fl); };
     return;
   }
-  const x = piF.x;
+  const x = piF.x, pend = piF.pend;
+  const PAGO_TXT = { sinpe: 'SINPE Móvil', bac: 'BAC', otro_banco: 'Otro banco' };
+  const tel = pend?.telefono ? piDig(pend.telefono) : '';
+  const bannerPend = pend ? `
+    <div class="form-card" style="border:1.5px solid var(--blue);display:flex;flex-direction:column;gap:6px;">
+      <div style="font-weight:700;font-size:16px;">📨 Enviada por el instructor el ${esc(piHora(pend.created_at))} · ${esc(pend.sede)}</div>
+      <div class="hint">Revise los datos y las clases que indicó. Al aprobarla entra a Gastos y al pago que le corresponde según la hora en que la envió.</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;">
+        ${pend.pago_numero ? `<span>Cuenta indicada: <b>${esc(PAGO_TXT[pend.pago_forma] || '')}${pend.pago_banco ? ' ' + esc(pend.pago_banco) : ''} · ${esc(pend.pago_numero)}</b></span>` : ''}
+        ${tel ? `<span>Teléfono: <a href="https://wa.me/${tel.length === 8 ? '506' + tel : tel}" target="_blank" rel="noopener">${esc(pend.telefono)}</a></span>` : ''}
+        ${pend.nota ? `<span>Nota: <i>${esc(pend.nota)}</i></span>` : ''}
+      </div>
+    </div>` : '';
   const dato = (k, val) => `<div><div class="kpi-label">${k}</div><div style="font-weight:600;font-size:15px;overflow-wrap:anywhere;">${val}</div></div>`;
   const lineas = x.lineas.slice(0, 6).map(l => `<li>${esc(l.detalle || '—')} · ${l.cantidad} · ${fmtCRC(l.total)}</li>`).join('')
     + (x.lineas.length > 6 ? `<li>… y ${x.lineas.length - 6} línea(s) más</li>` : '');
   v.innerHTML = `
-    <div class="section"><div class="section-title">📥 Cargar factura de instructor <span class="section-note">— ${esc(currentSede)}</span></div></div>
+    <div class="section"><div class="section-title">${pend ? '📨 Revisar factura enviada por el instructor' : '📥 Cargar factura de instructor'} <span class="section-note">— ${esc(currentSede)}</span></div></div>
     ${avisoHtml}
+    ${bannerPend}
     <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;padding:0 var(--gut);">
       <div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:12px;">
         <div class="form-card" style="margin:0;display:flex;align-items:center;gap:12px;">
           <div style="flex:1;min-width:0;"><div style="font-weight:600;overflow-wrap:anywhere;">${esc(piF.archivo)}</div><div class="hint">XML leído correctamente</div></div>
-          <button class="btn-ghost" onclick="piCancelar()">Cargar otra</button>
+          <button class="btn-ghost" onclick="piCancelar()">${pend ? '← Volver a la lista' : 'Cargar otra'}</button>
         </div>
         <div class="form-card" style="margin:0;">
           <div class="section-title" style="margin-bottom:12px;">Validaciones automáticas</div>
@@ -340,8 +306,8 @@ function piRenderCarga(aviso) {
         </div>
         <div class="form-actions" style="padding:0;">
           <div class="form-msg" id="piMsg"></div>
-          <button class="btn-ghost" onclick="piCancelar()">Cancelar</button>
-          <button class="btn-primary" id="piGuardar" onclick="piGuardar()">💾 Guardar y enviar a Gastos</button>
+          ${pend ? '<button class="btn-del" onclick="piRechazar()">✕ Rechazar</button>' : '<button class="btn-ghost" onclick="piCancelar()">Cancelar</button>'}
+          <button class="btn-primary" id="piGuardar" onclick="piGuardar()">${pend ? '✓ Aprobar y enviar a Gastos' : '💾 Guardar y enviar a Gastos'}</button>
         </div>
       </div>
     </div>`;
@@ -383,6 +349,7 @@ function piRenderInstructor() {
       </div>`;
     return;
   }
+  const pp = piF.pend || {};
   el.innerHTML = `
     <div class="section-title" style="margin-bottom:4px;">Instructor nuevo</div>
     <div class="hint" style="margin-bottom:12px;">La cédula ${esc(piF.x.emisorCedula || '—')} no está en el directorio. Agréguelo para saber a dónde pagarle.</div>
@@ -390,10 +357,10 @@ function piRenderInstructor() {
       <div class="f-field"><label for="piNNombre">Nombre <span class="req">*</span></label><input id="piNNombre" value="${esc(piF.x.emisorNombre)}"></div>
       <div class="f-field"><label for="piNForma">Forma de pago <span class="req">*</span></label>
         <select id="piNForma" onchange="document.getElementById('piNBancoWrap').style.display=this.value==='otro_banco'?'':'none'">
-          <option value="sinpe">SINPE Móvil</option><option value="bac">Cuenta BAC</option><option value="otro_banco">Otro banco</option>
+          ${[['sinpe', 'SINPE Móvil'], ['bac', 'Cuenta BAC'], ['otro_banco', 'Otro banco']].map(([v, t]) => `<option value="${v}"${pp.pago_forma === v ? ' selected' : ''}>${t}</option>`).join('')}
         </select></div>
-      <div class="f-field" id="piNBancoWrap" style="display:none;"><label for="piNBanco">Banco</label><input id="piNBanco" placeholder="Ej. BN, BCR, Popular"></div>
-      <div class="f-field"><label for="piNNumero">Número de cuenta o teléfono <span class="req">*</span></label><input id="piNNumero"></div>
+      <div class="f-field" id="piNBancoWrap" style="display:${pp.pago_forma === 'otro_banco' ? '' : 'none'};"><label for="piNBanco">Banco</label><input id="piNBanco" placeholder="Ej. BN, BCR, Popular" value="${esc(pp.pago_banco || '')}"></div>
+      <div class="f-field"><label for="piNNumero">Número de cuenta o teléfono <span class="req">*</span></label><input id="piNNumero" value="${esc(pp.pago_numero || '')}"></div>
     </div>
     <div class="form-actions" style="padding:12px 0 0;">
       <div class="form-msg" id="piNMsg"></div>
@@ -489,11 +456,13 @@ function piActualizar() {
   }
   const info = document.getElementById('piPagoInfo');
   if (info) {
-    const d = piDiaPagoEstimado();
+    const d = piF.pend ? piDiaPagoPara(piF.pend.created_at) : piDiaPagoEstimado();
     info.innerHTML = piF.caja
       ? '<div style="font-size:20px;font-weight:700;">Pago de caja</div><div class="hint">Clase de fin de semana: no entra al pago del miércoles ni del viernes.</div>'
       : `<div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;"><span style="font-size:20px;font-weight:700;">${d ? piFechaLarga(d) : '—'}</span><span class="pill info">Transferencia</span></div>
-         <div class="hint" style="margin-top:4px;">Si se guarda ahora. El día exacto lo fija el sistema con la hora del servidor (corte: miércoles y viernes a las 10:00 a. m.).</div>`;
+         <div class="hint" style="margin-top:4px;">${piF.pend
+           ? `Según la hora en que el instructor la envió (${esc(piHora(piF.pend.created_at))}).${d && d < piSumarDias(piAhoraCR(), 0) ? ' <b style="color:var(--orange);">Ese día ya pasó: quedará como atrasada.</b>' : ''}`
+           : 'Si se guarda ahora. El día exacto lo fija el sistema con la hora del servidor (corte: miércoles y viernes a las 10:00 a. m.).'}</div>`;
   }
   const pend = piPendientes();
   const btn = document.getElementById('piGuardar');
@@ -502,7 +471,11 @@ function piActualizar() {
   if (msg && !piF.guardando) { msg.className = 'form-msg'; msg.textContent = pend[0] || ''; }
 }
 
-function piCancelar() { piF = null; piRenderCarga(); }
+function piCancelar() {
+  const eraPend = !!piF?.pend;
+  piF = null;
+  if (eraPend) piMostrar('aprobar'); else piRenderCarga();
+}
 
 async function piGuardar() {
   const f = piF;
@@ -535,6 +508,7 @@ async function piGuardar() {
     monto_esperado: esperado,
     nota_diferencia: dif !== 0 ? f.nota.trim() : null,
     pago_tipo: f.caja ? 'caja' : 'transferencia',
+    factura_pendiente_id: f.pend ? f.pend.id : null,
   };
   const btn = document.getElementById('piGuardar');
   f.guardando = true; btn.disabled = true; btn.textContent = 'Guardando…';
@@ -550,15 +524,117 @@ async function piGuardar() {
     catch (_) { extra = ' (No se pudo guardar una copia del XML.)'; }
     const cuando = g.pago_tipo === 'caja' ? 'Se paga de caja.' : g.dia_pago ? `Se paga el ${piFechaLarga(parseFecha(g.dia_pago))}.` : '';
     piF = null;
-    piRenderCarga({ tipo: 'ok', texto: `✅ Factura de ${payload.emisor} por ${fmtCRC(payload.monto)} guardada en Gastos. ${cuando}${extra}` });
+    const texto = `✅ Factura de ${payload.emisor} por ${fmtCRC(payload.monto)} ${f.pend ? 'aprobada y enviada a' : 'guardada en'} Gastos. ${cuando}${extra}`;
+    if (f.pend) { piAvisoAprobar = { tipo: 'ok', texto }; piMostrar('aprobar'); }
+    else piRenderCarga({ tipo: 'ok', texto });
     piRecargarGastos();
   } catch (e) {
-    f.guardando = false; btn.disabled = false; btn.textContent = '💾 Guardar y enviar a Gastos';
+    f.guardando = false; btn.disabled = false; btn.textContent = f.pend ? '✓ Aprobar y enviar a Gastos' : '💾 Guardar y enviar a Gastos';
     msg.className = 'form-msg err';
     msg.textContent = /clave_hacienda|duplicate|unique/i.test(e.message) ? 'Esta factura ya se cargó antes.'
       : /column|origen|pago_tipo/i.test(e.message) ? 'Falta correr pagos_instructores.sql en Supabase.'
       : 'No se pudo guardar: ' + e.message;
   }
+}
+
+// ══ 2b) Por aprobar: facturas que envió el instructor desde /factura (solo admin) ══
+let piAvisoAprobar = null;
+
+async function piCargarPendientes() {
+  const v = document.getElementById('vista_aprobar');
+  v.innerHTML = '<div class="loading" style="display:block;"><div class="spinner"></div><div>Cargando facturas por aprobar…</div></div>';
+  try {
+    piPorAprobar = (await supaFetch('/facturas_pendientes?estado=eq.pendiente&order=created_at.asc'
+      + '&select=id,sede,numero_factura,emisor_nombre,emisor_cedula,monto,clases,pago_forma,pago_numero,telefono,nota,created_at')) || [];
+  } catch (e) {
+    v.innerHTML = `<div class="empty-state" style="display:block;">⚠️ No se pudieron cargar: ${esc(e.message)}`
+      + (/facturas_pendientes|relation|schema/i.test(e.message) ? '<br>¿Ya se corrió pagos_instructores.sql en Supabase?' : '') + '</div>';
+    return;
+  }
+  piContarPendientes();
+  const aviso = piAvisoAprobar; piAvisoAprobar = null;
+  const enlace = location.origin + '/factura';
+  const hoy = piSumarDias(piAhoraCR(), 0);
+  const filas = piPorAprobar.map((p, i) => {
+    const dia = piDiaPagoPara(p.created_at);
+    const clases = (Array.isArray(p.clases) ? p.clases : []).map(c => `${c.cantidad} ${c.tipo} (${piFechaCorta(c.fecha)})`).join(' · ');
+    return `<tr>
+      <td>${esc(piHora(p.created_at))}</td>
+      <td>${esc(p.sede)}</td>
+      <td><b>${esc(p.emisor_nombre || '—')}</b><br><span class="hint">${esc(p.emisor_cedula || '')}</span></td>
+      <td>…${esc(String(p.numero_factura || '').slice(-6))}</td>
+      <td>${esc(clases || '—')}${p.nota ? `<br><span class="hint">Nota: ${esc(p.nota)}</span>` : ''}</td>
+      <td class="num"><b>${fmtCRC(p.monto)}</b></td>
+      <td>${dia ? esc(piFechaLarga(dia)) : '—'}${dia && dia < hoy ? '<br><span class="pill pend">Ya pasó</span>' : ''}</td>
+      <td class="num"><button class="btn-primary" onclick="piRevisarPendiente(${i})">Revisar</button></td>
+    </tr>`;
+  }).join('');
+  v.innerHTML = `
+    <div class="section"><div class="section-title">📨 Facturas por aprobar <span class="section-note">— enviadas por los instructores desde la página pública · todas las sedes</span></div></div>
+    ${aviso ? `<div class="section" style="padding-top:0;"><div class="form-msg ${aviso.tipo}" style="font-size:15px;">${esc(aviso.texto)}</div></div>` : ''}
+    <div class="form-card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div style="flex:1 1 280px;"><b>Enlace para los instructores</b><div class="hint">Mándelo por WhatsApp: ahí suben el XML de su factura, sin usuario ni contraseña.</div></div>
+      <code style="font-size:14px;padding:8px 12px;border-radius:8px;background:var(--fill);overflow-wrap:anywhere;">${esc(enlace)}</code>
+      <button class="btn-ghost" onclick="piCopiarEnlace(this)">Copiar</button>
+    </div>
+    <div class="section"><div class="g-wrap" style="margin:0;">
+      <table class="g-table">
+        <thead><tr><th>Recibida</th><th>Sede</th><th>Instructor</th><th>Factura</th><th>Clases que indicó</th><th class="num">Monto</th><th>Se pagaría</th><th></th></tr></thead>
+        <tbody>${filas || '<tr><td colspan="8" class="g-empty">No hay facturas esperando aprobación.</td></tr>'}</tbody>
+      </table>
+    </div></div>`;
+}
+
+function piCopiarEnlace(btn) {
+  const enlace = location.origin + '/factura';
+  (navigator.clipboard ? navigator.clipboard.writeText(enlace) : Promise.reject())
+    .then(() => { btn.textContent = '✓ Copiado'; }, () => { prompt('Copie el enlace:', enlace); });
+}
+
+// Abre la factura en la pantalla de revisión (la misma de «Cargar factura XML»)
+async function piRevisarPendiente(i) {
+  const resumen = piPorAprobar[i]; if (!resumen) return;
+  let p;
+  try { p = ((await supaFetch(`/facturas_pendientes?id=eq.${encodeURIComponent(resumen.id)}&select=*`)) || [])[0]; }
+  catch (e) { alert('No se pudo abrir: ' + e.message); return; }
+  if (!p || p.estado !== 'pendiente') { alert('Esta factura ya fue revisada.'); piCargarPendientes(); return; }
+  let x;
+  try { x = piParseXML(p.xml); } catch (e) { alert('El XML guardado no se pudo leer: ' + e.message); return; }
+  // La factura se revisa en su sede
+  if (p.sede !== currentSede && SEDES.includes(p.sede)) {
+    currentSede = p.sede;
+    const sel = document.getElementById('sedeSelector'); if (sel) sel.value = p.sede;
+    piRecargarGastos();
+  }
+  if (!piTarifas.length) await piCargarCatalogos();
+  piF = { x, texto: p.xml, archivo: p.nombre_archivo || `factura_${p.numero_factura || ''}.xml`, pend: p,
+          checks: {}, inst: null, porNombre: false, clases: [], caja: false, cajaTocado: false, metodo: '', nota: '' };
+  const clases = (Array.isArray(p.clases) ? p.clases : []).map(c => ({
+    fecha: c.fecha, cantidad: c.cantidad, tarifaId: piTarifas.find(t => piNorm(t.tipo) === piNorm(c.tipo))?.id || '' }));
+  piF.clases = clases.length ? clases : piClasesIniciales(x);
+  piF.caja = piTodasFinde();
+  piBuscarInstructor();
+  piTab = 'xml';
+  document.querySelectorAll('#piTabs .tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'xml'));
+  ['xml', 'aprobar', 'pagos', 'config'].forEach(t => { document.getElementById('vista_' + t).style.display = t === 'xml' ? '' : 'none'; });
+  document.getElementById('vistaGastos').style.display = 'none';
+  piRenderCarga();
+  piValidar();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function piRechazar() {
+  const p = piF?.pend; if (!p) return;
+  const motivo = prompt(`¿Por qué se rechaza la factura de ${p.emisor_nombre || 'este instructor'}?\n(Avísele al instructor: puede corregirla y volver a enviarla.)`);
+  if (motivo === null) return;
+  if (!motivo.trim()) { alert('Escriba el motivo del rechazo.'); return; }
+  try {
+    await supaFetch(`/facturas_pendientes?id=eq.${encodeURIComponent(p.id)}&estado=eq.pendiente`, { method: 'PATCH',
+      body: { estado: 'rechazada', motivo_rechazo: motivo.trim(), revisado_por: currentEmail || null, revisado_at: new Date().toISOString() } });
+    piF = null;
+    piAvisoAprobar = { tipo: 'ok', texto: `Factura de ${p.emisor_nombre || 'el instructor'} rechazada.` };
+    piMostrar('aprobar');
+  } catch (e) { alert('No se pudo rechazar: ' + e.message); }
 }
 
 // ══ 3) Pago de la semana ══════════════════════════════════════════════════

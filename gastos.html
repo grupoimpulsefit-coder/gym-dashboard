@@ -34,7 +34,8 @@
 .kpi.blue   .kpi-value { color: var(--cat-grupales); }
 .kpi.teal   .kpi-value { color: var(--cat-planta); }
 /* Pestañas de Gastos / facturas XML: en el celular, 2 × 2 para que no se salgan de la pantalla */
-@media (max-width: 700px) { #piTabs { grid-auto-flow: row; grid-template-columns: 1fr 1fr; } #piTabs .tab { padding: 4px 8px; font-size: 13px; white-space: normal; text-align: center; } }
+#piTabs { max-width: calc(100% - 2 * var(--gut)); }
+@media (max-width: 900px) { #piTabs { grid-auto-flow: row; grid-template-columns: 1fr 1fr; } #piTabs .tab { padding: 4px 8px; font-size: 13px; white-space: normal; text-align: center; } }
 </style>
 </head>
 <body>
@@ -95,11 +96,13 @@
   <div class="tabs" role="tablist" id="piTabs">
     <button class="tab active" data-tab="gastos" onclick="piMostrar('gastos')">🧾 Gastos del mes</button>
     <button class="tab" data-tab="xml" onclick="piMostrar('xml')">📥 Cargar factura XML</button>
+    <button class="tab" data-tab="aprobar" id="piTabAprobar" onclick="piMostrar('aprobar')" style="display:none;">📨 Por aprobar <span id="piPendCount"></span></button>
     <button class="tab" data-tab="pagos" onclick="piMostrar('pagos')">💸 Pago de la semana</button>
     <button class="tab" data-tab="config" id="piTabConfig" onclick="piMostrar('config')" style="display:none;">⚙️ Configuración</button>
   </div>
 
   <div id="vista_xml" style="display:none;"></div>
+  <div id="vista_aprobar" style="display:none;"></div>
   <div id="vista_pagos" style="display:none;"></div>
   <div id="vista_config" style="display:none;"></div>
 
@@ -231,6 +234,7 @@
 
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
+<script src="/factura_xml.js"></script>
 <script src="/pagos_instructores.js"></script>
 <script>
 // ── Supabase ──────────────────────────────────────────────────────────────
