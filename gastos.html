@@ -9,6 +9,7 @@
 <link rel="icon" type="image/png" href="/icons/favicon-64.png">
 <title>Gastos por Sede</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <link rel="stylesheet" href="/ui.css">
 <style>
 /* Propio de Gastos (el resto del diseño vive en /ui.css) */
@@ -35,7 +36,14 @@
 .kpi.teal   .kpi-value { color: var(--cat-planta); }
 /* Pestañas de Gastos / facturas XML: en el celular, 2 × 2 para que no se salgan de la pantalla */
 #piTabs { max-width: calc(100% - 2 * var(--gut)); }
-@media (max-width: 900px) { #piTabs { grid-auto-flow: row; grid-template-columns: 1fr 1fr; } #piTabs .tab { padding: 4px 8px; font-size: 13px; white-space: normal; text-align: center; } }
+/* Planilla por horas: casillas de horas por día y nombre fijo al desplazar en el celular */
+.ph-tabla input.ph-dia { width: 46px; padding: 0 6px; text-align: center; }
+.ph-tabla .ph-nombre { position: sticky; left: 0; background: var(--card); z-index: 1; min-width: 170px; }
+.ph-tabla select.ph-tarifa { font-size: 12px; min-height: 30px; padding: 0 26px 0 8px; max-width: 230px; }
+@media (max-width: 520px) { .ph-tabla .ph-nombre { min-width: 130px; max-width: 150px; } .ph-tabla select.ph-tarifa { max-width: 130px; } }
+@media (max-width: 900px) { #piTabs { grid-template-columns: 1fr 1fr 1fr !important; } }
+@media (max-width: 520px) { #piTabs { grid-template-columns: 1fr 1fr !important; } }
+@media (max-width: 900px) { #piTabs { grid-auto-flow: row; } #piTabs .tab { padding: 4px 8px; font-size: 13px; white-space: normal; text-align: center; } }
 </style>
 </head>
 <body>
@@ -97,12 +105,14 @@
     <button class="tab active" data-tab="gastos" onclick="piMostrar('gastos')">🧾 Gastos del mes</button>
     <button class="tab" data-tab="xml" onclick="piMostrar('xml')">📥 Cargar factura XML</button>
     <button class="tab" data-tab="aprobar" id="piTabAprobar" onclick="piMostrar('aprobar')" style="display:none;">📨 Por aprobar <span id="piPendCount"></span></button>
+    <button class="tab" data-tab="horas" onclick="piMostrar('horas')">🕐 Horas <span id="phCount"></span></button>
     <button class="tab" data-tab="pagos" onclick="piMostrar('pagos')">💸 Pago de la semana</button>
     <button class="tab" data-tab="config" id="piTabConfig" onclick="piMostrar('config')" style="display:none;">⚙️ Configuración</button>
   </div>
 
   <div id="vista_xml" style="display:none;"></div>
   <div id="vista_aprobar" style="display:none;"></div>
+  <div id="vista_horas" style="display:none;"></div>
   <div id="vista_pagos" style="display:none;"></div>
   <div id="vista_config" style="display:none;"></div>
 
@@ -236,6 +246,7 @@
 <script src="/asistente.js" defer></script>
 <script src="/factura_xml.js"></script>
 <script src="/pagos_instructores.js"></script>
+<script src="/horas_instructores.js"></script>
 <script>
 // ── Supabase ──────────────────────────────────────────────────────────────
 const SUPA_URL = '__SUPA_URL__';
@@ -461,8 +472,10 @@ function poblarMeses() {
 const esPagoCaja = g => g.pago_tipo === 'caja' || g.metodo_pago === 'caja' || g.banco_pago === 'Pago de caja';
 // Texto extra de las facturas cargadas por XML: día de pago y si ya se pagó
 function infoPagoXml(g) {
-  if (g.origen !== 'xml') return '';
-  const xml = ' <span class="pill info" title="Cargada desde el XML de la factura electrónica">XML</span>';
+  if (g.origen !== 'xml' && g.origen !== 'horas') return '';
+  const xml = g.origen === 'horas'
+    ? ' <span class="pill info" title="Planilla por horas (sin factura)">Por horas</span>'
+    : ' <span class="pill info" title="Cargada desde el XML de la factura electrónica">XML</span>';
   if (esPagoCaja(g)) return xml;
   const dia = g.dia_pago ? parseFecha(g.dia_pago).toLocaleDateString('es-CR', { weekday:'short', day:'2-digit', month:'2-digit' }) : '';
   return xml + `<br><span style="font-size:11px;color:var(--muted);">Pago ${esc(dia)}${g.pagado_at ? ' · ✓ pagado' : ' · pendiente'}</span>`;
@@ -847,6 +860,7 @@ async function guardarInstructor() {
     }
     await cargarInstructores();
     if (id) { document.getElementById('fInstructor').value = id; onInstructorChange(); }
+    if (!editar && id && typeof phTrasNuevoInstructor === 'function') phTrasNuevoInstructor(id);
     closeInstructorModal();
   } catch(e) {
     err.textContent = /cedula/i.test(e.message) ? 'Ya existe un instructor con esa cédula.' : /duplicate|unique/i.test(e.message) ? 'Ya existe un instructor con ese nombre.' : e.message;

@@ -15,6 +15,9 @@
 let piTab = 'gastos';
 let piTarifas = [];        // tarifas activas
 let piTarifasTodas = [];   // incluye desactivadas (configuración)
+let piHoraTarifas = [];      // tarifas por hora (planilla por horas)
+let piHoraTarifasTodas = [];
+const PI_VISTAS = ['xml', 'aprobar', 'horas', 'pagos', 'config'];
 let piFiscal = {};         // sede → { razon_social, cedula_juridica }
 let piF = null;            // factura en carga
 let piSemana = null;       // lunes de la semana que se muestra en «Pago de la semana»
@@ -37,9 +40,10 @@ function piMostrar(tab) {
   piTab = tab;
   document.querySelectorAll('#piTabs .tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.getElementById('vistaGastos').style.display = tab === 'gastos' ? '' : 'none';
-  ['xml', 'aprobar', 'pagos', 'config'].forEach(t => { document.getElementById('vista_' + t).style.display = tab === t ? '' : 'none'; });
+  PI_VISTAS.forEach(t => { document.getElementById('vista_' + t).style.display = tab === t ? '' : 'none'; });
   if (tab === 'xml') { piRenderCarga(); if (piF) piValidar(); }
   if (tab === 'aprobar') piCargarPendientes();
+  if (tab === 'horas') phCargar();
   if (tab === 'pagos') piCargarPagos();
   if (tab === 'config') piCargarConfig();
 }
@@ -48,7 +52,7 @@ async function piInit() {
   document.getElementById('piTabConfig').style.display = esAdmin() ? '' : 'none';
   document.getElementById('piTabAprobar').style.display = esAdmin() ? '' : 'none';
   await piCargarCatalogos();
-  if (esAdmin()) piContarPendientes();
+  if (esAdmin()) { piContarPendientes(); phContar(); }
 }
 
 async function piContarPendientes() {
@@ -61,6 +65,8 @@ async function piContarPendientes() {
 async function piCargarCatalogos() {
   try { piTarifasTodas = (await supaFetch('/clase_tarifas?order=tipo.asc&select=*')) || []; } catch (_) { piTarifasTodas = []; }
   piTarifas = piTarifasTodas.filter(t => t.activo);
+  try { piHoraTarifasTodas = (await supaFetch('/hora_tarifas?order=tipo.asc&select=*')) || []; } catch (_) { piHoraTarifasTodas = []; }
+  piHoraTarifas = piHoraTarifasTodas.filter(t => t.activo);
   try {
     const f = (await supaFetch('/sedes_fiscal?select=*')) || [];
     piFiscal = Object.fromEntries(f.map(x => [x.sede, x]));
@@ -71,6 +77,7 @@ async function piCargarCatalogos() {
 function piRefrescar() {
   if (piTab === 'xml') { piRenderCarga(); if (piF) piValidar(); }
   if (piTab === 'pagos') piCargarPagos();
+  if (piTab === 'horas') { phCambios = false; phCargar(); }
 }
 
 // Recarga la lista de Gastos sin ocultar la pantalla actual
@@ -616,7 +623,7 @@ async function piRevisarPendiente(i) {
   piBuscarInstructor();
   piTab = 'xml';
   document.querySelectorAll('#piTabs .tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'xml'));
-  ['xml', 'aprobar', 'pagos', 'config'].forEach(t => { document.getElementById('vista_' + t).style.display = t === 'xml' ? '' : 'none'; });
+  PI_VISTAS.forEach(t => { document.getElementById('vista_' + t).style.display = t === 'xml' ? '' : 'none'; });
   document.getElementById('vistaGastos').style.display = 'none';
   piRenderCarga();
   piValidar();
@@ -638,7 +645,7 @@ async function piRechazar() {
 }
 
 // ══ 3) Pago de la semana ══════════════════════════════════════════════════
-const PI_COLS = 'id,sede,fecha_clase,emisor,emisor_cedula,instructor_id,numero_factura,monto,monto_esperado,nota_diferencia,banco_pago,cuenta_pago,metodo_pago,pago_tipo,dia_pago,cargado_at,pagado_at,pagado_por,detalle_clases';
+const PI_COLS = 'id,origen,sede,fecha_clase,emisor,emisor_cedula,instructor_id,numero_factura,monto,monto_esperado,nota_diferencia,banco_pago,cuenta_pago,metodo_pago,pago_tipo,dia_pago,cargado_at,pagado_at,pagado_por,detalle_clases';
 
 function piSemanaInicial() {
   const hoy = piAhoraCR();
@@ -654,7 +661,7 @@ async function piTraerPagos(sedes, lun, dom) {
   const filtroSede = sedes.length === 1
     ? `sede=eq.${encodeURIComponent(sedes[0])}`
     : `sede=in.(${sedes.map(s => encodeURIComponent('"' + s + '"')).join(',')})`;
-  return supaFetchTodo(`/gastos?origen=eq.xml&${filtroSede}`
+  return supaFetchTodo(`/gastos?origen=in.(xml,horas)&${filtroSede}`
     + `&or=(and(dia_pago.gte.${lun},dia_pago.lte.${dom}),and(pago_tipo.eq.caja,fecha_clase.gte.${lun},fecha_clase.lte.${dom}))`
     + `&select=${PI_COLS}&order=emisor.asc,id.asc`);
 }
@@ -666,7 +673,7 @@ async function piCargarPagos() {
   const lun = piYMD(piSemana), dom = piYMD(piSumarDias(piSemana, 6));
   try {
     piPagos = await piTraerPagos([currentSede], lun, dom);
-    piAtrasados = (await supaFetch(`/gastos?origen=eq.xml&sede=eq.${encodeURIComponent(currentSede)}&pagado_at=is.null&dia_pago=lt.${lun}&select=id,monto,dia_pago`)) || [];
+    piAtrasados = (await supaFetch(`/gastos?origen=in.(xml,horas)&sede=eq.${encodeURIComponent(currentSede)}&pagado_at=is.null&dia_pago=lt.${lun}&select=id,monto,dia_pago`)) || [];
     piRenderPagos();
   } catch (e) {
     v.innerHTML = `<div class="empty-state" style="display:block;">⚠️ No se pudieron cargar los pagos: ${esc(e.message)}`
@@ -695,7 +702,10 @@ function piAgrupar(rows) {
 }
 function piResumenClases(rows) {
   const t = {};
-  rows.forEach(g => (Array.isArray(g.detalle_clases) ? g.detalle_clases : []).forEach(c => { t[c.tipo] = (t[c.tipo] || 0) + (Number(c.cantidad) || 0); }));
+  rows.forEach(g => (Array.isArray(g.detalle_clases) ? g.detalle_clases : []).forEach(c => {
+    const k = (c.unidad === 'h' ? 'h ' : '') + c.tipo;   // por horas: «12 h Profesor de natación»
+    t[k] = (t[k] || 0) + (Number(c.cantidad) || 0);
+  }));
   return Object.entries(t).map(([k, n]) => `${n} ${k}`).join(' · ') || '—';
 }
 function piEstado(gr, caja) {
@@ -738,7 +748,14 @@ function piRenderPagos() {
     const nota = gr.rows.some(r => r.nota_diferencia) ? ` <span class="pill pend" title="${esc(gr.rows.filter(r => r.nota_diferencia).map(r => r.nota_diferencia).join(' · '))}">Con nota</span>` : '';
     const abierto = piAbiertos.has(i);
     const detalle = abierto ? `<tr><td colspan="${acciones ? 7 : 6}" style="background:var(--fill);font-size:13px;">
-        ${gr.rows.map(r => `<div style="display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:4px 0;">
+        ${gr.rows.map(r => r.origen === 'horas' ? `<div style="display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:4px 0;">
+          <span class="pill info">Por horas</span>
+          <span>Semana del ${esc(phRango(parseFecha(r.detalle_clases?.[0]?.semana || r.fecha_clase)))}</span>
+          <span>${esc(piResumenClases([r]))} × ${fmtCRC(r.detalle_clases?.[0]?.tarifa)}</span>
+          <b>${fmtCRC(r.monto)}</b>
+          <span class="hint">${r.pagado_at ? `Pagada ${esc(piHora(r.pagado_at))}${r.pagado_por ? ' por ' + esc(r.pagado_por) : ''}` : 'Pendiente'}</span>
+          <button class="btn-edit" onclick="phReciboGasto(piGrupos[${i}].rows.find(x => x.id === '${r.id}'))">📄 Recibo</button>
+        </div>` : `<div style="display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:4px 0;">
           <span>Factura …${esc(String(r.numero_factura || '').slice(-6))}</span>
           <span>Clase ${esc(piFechaCorta(r.fecha_clase))}</span>
           <span>${esc(piResumenClases([r]))}</span>
@@ -847,17 +864,17 @@ async function piExcel() {
       [fis?.razon_social ? `${fis.razon_social}${fis.cedula_juridica ? ' · ' + fis.cedula_juridica : ''}` : ''],
       [`Generado: ${new Date().toLocaleString('es-CR')}`],
       [],
-      ['Instructor', 'Cédula', 'Forma de pago', 'Cuenta / SINPE', 'Facturas', 'Monto', 'Estado'],
+      ['Instructor', 'Cédula', 'Forma de pago', 'Cuenta / SINPE', 'Detalle', 'Monto', 'Estado'],
     ];
     const filasMonto = [];
     grupos.forEach(gr => {
-      aoa.push([gr.nombre, gr.cedula, gr.banco, gr.cuenta, gr.rows.length, Math.round(gr.total), piEstado(gr, caja).txt]);
+      aoa.push([gr.nombre, gr.cedula, gr.banco, gr.cuenta, piResumenClases(gr.rows), Math.round(gr.total), piEstado(gr, caja).txt]);
       filasMonto.push(aoa.length - 1);
     });
-    aoa.push(['TOTAL', '', '', '', rs.length, Math.round(grupos.reduce((s, g) => s + g.total, 0)), '']);
+    aoa.push(['TOTAL', '', '', '', '', Math.round(grupos.reduce((s, g) => s + g.total, 0)), '']);
     filasMonto.push(aoa.length - 1);
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 30 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 9 }, { wch: 14 }, { wch: 20 }];
+    ws['!cols'] = [{ wch: 30 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 30 }, { wch: 14 }, { wch: 20 }];
     filasMonto.forEach(r => { const ref = XLSX.utils.encode_cell({ r, c: 5 }); if (ws[ref]) ws[ref].z = '#,##0'; });
     XLSX.utils.book_append_sheet(wb, ws, sede.replace(/[\\/?*[\]:]/g, '').slice(0, 31));
   });
@@ -905,15 +922,18 @@ function piRenderConfig(aviso) {
             <td class="num"><button class="btn-ok" onclick="piAgregarTarifa()">＋ Agregar</button></td></tr>
         </tbody></table></div>
     </div>
+    ${phConfigHtml()}
     <div class="form-card">
-      <div class="section-title" style="margin-bottom:4px;">Cédula de los instructores</div>
-      <div class="hint" style="margin-bottom:12px;">Con la cédula se reconoce al instructor en el XML. Si falta, se busca por nombre y se completa sola la primera vez que un admin carga su factura.</div>
+      <div class="section-title" style="margin-bottom:4px;">Instructores: cédula y pago por horas</div>
+      <div class="hint" style="margin-bottom:12px;">Con la cédula se reconoce al instructor en el XML. Si cobra por horas (no factura), elija su tarifa y su sede: aparecerá solo en la planilla semanal de esa sede.</div>
       <div class="g-wrap" style="margin:0;"><table class="g-table">
-        <thead><tr><th>Instructor</th><th>Cédula</th><th></th></tr></thead>
+        <thead><tr><th>Instructor</th><th>Cédula</th><th>Cobra por horas</th><th>Sede</th><th></th></tr></thead>
         <tbody>${instructores.map((ins, i) => `<tr><td>${esc(ins.nombre)}</td>
           <td><input id="piIC${i}" value="${esc(ins.cedula || '')}" inputmode="numeric" aria-label="Cédula de ${esc(ins.nombre)}" style="width:150px;text-align:left;"></td>
+          <td><select id="piIHT${i}" class="ui" aria-label="Tarifa por hora de ${esc(ins.nombre)}"><option value="">No (factura)</option>${piHoraTarifas.map(t => `<option value="${t.id}"${t.id === ins.hora_tarifa_id ? ' selected' : ''}>${esc(t.tipo)}</option>`).join('')}</select></td>
+          <td><select id="piIHS${i}" class="ui" aria-label="Sede de ${esc(ins.nombre)}"><option value="">—</option>${SEDES.map(s => `<option${s === ins.hora_sede ? ' selected' : ''}>${esc(s)}</option>`).join('')}</select></td>
           <td class="num"><button class="btn-edit" onclick="piGuardarCedula('${ins.id}', ${i})">💾 Guardar</button></td></tr>`).join('')
-          || '<tr><td colspan="3" class="g-empty">No hay instructores en el directorio.</td></tr>'}
+          || '<tr><td colspan="5" class="g-empty">No hay instructores en el directorio.</td></tr>'}
         </tbody></table></div>
     </div>
     <div class="section"><div class="hint">Cortes de pago (fijos): miércoles y viernes a las 10:00 a. m., hora de Costa Rica. Sábado y domingo se pagan de caja.</div></div>`;
@@ -966,8 +986,11 @@ async function piAgregarTarifa() {
 
 async function piGuardarCedula(id, i) {
   const cedula = piDig(document.getElementById('piIC' + i).value) || null;
+  const hora_tarifa_id = document.getElementById('piIHT' + i).value || null;
+  const hora_sede = hora_tarifa_id ? (document.getElementById('piIHS' + i).value || null) : null;
+  if (hora_tarifa_id && !hora_sede) { piRenderConfig({ tipo: 'err', texto: 'Elija la sede donde trabaja por horas.' }); return; }
   try {
-    await supaFetch(`/instructores?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: { cedula } });
-    await cargarInstructores(); piRenderConfig({ tipo: 'ok', texto: '✅ Cédula guardada.' });
+    await supaFetch(`/instructores?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: { cedula, hora_tarifa_id, hora_sede } });
+    await cargarInstructores(); piRenderConfig({ tipo: 'ok', texto: '✅ Datos del instructor guardados.' });
   } catch (e) { piRenderConfig({ tipo: 'err', texto: /duplicate|unique/i.test(e.message) ? 'Otro instructor ya tiene esa cédula.' : 'No se pudo guardar: ' + e.message }); }
 }

@@ -207,7 +207,7 @@ begin
      set pagado_at  = case when p_pagado then now() end,
          pagado_por = case when p_pagado then quien end
    where g.id = any(p_ids)
-     and g.origen = 'xml'
+     and g.origen in ('xml', 'horas')
      and (r.role in ('admin','admin_sedes','admin_g')
           or g.sede = r.sede or g.sede = any(coalesce(r.sedes_extra, '{}')));
   get diagnostics n = row_count;
