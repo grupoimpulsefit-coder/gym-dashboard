@@ -2252,9 +2252,14 @@ const puedeAnular=()=>esAdmin()||currentRole==='coordinador';
 function factCierre(){ return window._factCierre||FX_VACIO; }
 // Las columnas del cierre guardan Informe + facturado; el formulario muestra solo lo del Informe.
 function sinFacturado(row,col,key){ const v=row[col]; if(v==null) return ''; const f=row.facturado||{};
-  return Math.round((Number(v)||0)-(key==='productos'?fxProductos(f):(Number(f[key])||0))); }
+  // "Otros vendidos" nunca es negativo: si da negativo es porque `facturado` quedó desfasado de la columna
+  // (un guardado sin facturas cargadas). Antes ese negativo restaba del sobre y daba un faltante falso.
+  if(key==='productos') return Math.max(0,Math.round((Number(v)||0)-fxProductos(f)));
+  return Math.round((Number(v)||0)-(Number(f[key])||0)); }
 // Solo se guarda la columna `facturado` si la tabla de facturas respondió (facturacion.sql ya corrió).
-function facturadoPayload(){ return window._factCierre?{facturado:window._factCierre}:{}; }
+// Siempre se guarda junto con los totales: si no, `facturado` queda con lo de otro guardado y al recargar
+// los totales (que se guardan informe + facturado) se descuentan mal.
+function facturadoPayload(){ return {facturado:window._factCierre||FX_VACIO}; }
 function resumirFacturas(list){
   const r={efectivo:0,tarjeta:0,sinpe:0,total:0,productos:0,eventos:0,n:0,desglose:{}};
   list.filter(f=>f.estado!=='anulada').forEach(f=>{ const t=Math.round(Number(f.total)||0);
