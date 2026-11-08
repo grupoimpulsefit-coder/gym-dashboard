@@ -163,16 +163,15 @@ async function piValidar() {
         + (otra ? 'Cambie la sede arriba o pida' : 'Pida') + ` al instructor que la emita a nombre de ${(fis.razon_social || currentSede).replace(/\.+$/, '')}.` };
   }
   c.duplicado = { e: 'wait', t: 'Revisando si ya se cargó…' };
-  c.hacienda = { e: 'wait', t: 'Consultando al emisor en Hacienda…' };
   // Estado de la factura en Hacienda: solo si viene a nombre de una sede (con sus credenciales de API)
   const receptorSede = Object.values(piFiscal).some(s => piDig(s.cedula_juridica) && piDig(s.cedula_juridica) === x.receptorCedula);
   if (receptorSede && claveOk) c.estadoFE = { e: 'wait', t: 'Consultando el estado de la factura en Hacienda…' };
   f.checks = c;
   piRenderChecks();
-  const [dup, hac, est] = await Promise.all([piRevisarDuplicado(x.clave, f.pend?.id), piConsultarHacienda(x.emisorCedula),
+  const [dup, est] = await Promise.all([piRevisarDuplicado(x.clave, f.pend?.id),
     c.estadoFE ? piEstadoFactura(x.clave, x.receptorCedula) : null]);
   if (piF !== f) return;   // se cargó otra factura mientras tanto
-  c.duplicado = dup; c.hacienda = hac;
+  c.duplicado = dup;
   if (c.estadoFE) { if (est) c.estadoFE = est; else delete c.estadoFE; }
   piRenderChecks();
 }
@@ -216,24 +215,6 @@ async function piRevisarDuplicado(clave, excluir) {
   } catch (_) {
     return { e: 'warn', t: 'No se pudo revisar si ya se cargó', d: 'Al guardar, la base igual rechaza una factura repetida.' };
   }
-}
-
-// Consulta pública de Hacienda (sin credenciales): situación tributaria del emisor
-async function piConsultarHacienda(ced) {
-  if (!ced) return { e: 'warn', t: 'El XML no trae la cédula del emisor' };
-  const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 8000);
-  try {
-    const r = await fetch('https://api.hacienda.go.cr/fe/ae?identificacion=' + encodeURIComponent(ced), { signal: ctl.signal });
-    if (r.status === 404) return { e: 'warn', t: 'El emisor no aparece en Hacienda', d: `Cédula ${ced}. Revise los datos con el instructor.` };
-    if (!r.ok) throw new Error(String(r.status));
-    const j = await r.json();
-    const estado = j?.situacion?.estado || '';
-    const moroso = j?.situacion?.moroso === 'SI', omiso = j?.situacion?.omiso === 'SI';
-    if (/^inscrito/i.test(estado) && !moroso && !omiso) return { e: 'ok', t: 'Emisor activo en Hacienda', d: `${j.nombre || ''} · ${estado}` };
-    return { e: 'warn', t: 'Revisar al emisor en Hacienda', d: `${j.nombre || ced} · ${estado || 'sin estado'}${moroso ? ' · moroso' : ''}${omiso ? ' · omiso' : ''}` };
-  } catch (_) {
-    return { e: 'warn', t: 'No se pudo consultar Hacienda', d: 'El servicio no respondió. Se puede guardar igual.' };
-  } finally { clearTimeout(to); }
 }
 
 // ── Cálculos ──
