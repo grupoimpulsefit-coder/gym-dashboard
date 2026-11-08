@@ -23,6 +23,7 @@
 .pill-s{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;background:var(--fill);color:var(--label)}
 .pill-s.ok{background:var(--green-tint);color:var(--green)} .pill-s.warn{background:var(--orange-tint);color:var(--orange)}
 .pill-s.bad{background:var(--red-tint);color:var(--red)} .pill-s.info{background:var(--blue-tint);color:var(--blue)}
+.pill-s.menos{background:var(--orange);color:#fff}
 .sub{font-size:12px;color:var(--sec)}
 .mini{font-size:12px;padding:4px 10px;min-height:28px}
 .pos{color:var(--blue)} .neg{color:var(--red)}
@@ -34,8 +35,8 @@
 .seg-f button{border:0;background:var(--fill);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--label)}
 .seg-f button[aria-pressed="true"]{background:var(--brand-tint);color:var(--brand-text)}
 /* Lado a lado: color de cada fila según cómo calzó */
-:root{--c-azul:rgba(0,122,255,.13);--c-morado:rgba(175,82,222,.16);--c-amarillo:rgba(255,204,0,.26);--c-rojo:rgba(255,59,48,.14);--c-gris:rgba(120,120,128,.14)}
-@media (prefers-color-scheme: dark){:root{--c-azul:rgba(10,132,255,.24);--c-morado:rgba(191,90,242,.26);--c-amarillo:rgba(255,214,10,.22);--c-rojo:rgba(255,69,58,.24);--c-gris:rgba(120,120,128,.26)}}
+:root{--c-azul:rgba(0,122,255,.13);--c-morado:rgba(175,82,222,.16);--c-amarillo:rgba(255,204,0,.26);--c-naranja:rgba(255,149,0,.30);--c-rojo:rgba(255,59,48,.14);--c-gris:rgba(120,120,128,.14)}
+@media (prefers-color-scheme: dark){:root{--c-azul:rgba(10,132,255,.24);--c-morado:rgba(191,90,242,.26);--c-amarillo:rgba(255,214,10,.22);--c-naranja:rgba(255,159,10,.34);--c-rojo:rgba(255,69,58,.24);--c-gris:rgba(120,120,128,.26)}}
 .tabs-a{display:flex;justify-content:center;margin:16px 0 4px}
 .lado{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
 @media (max-width:1100px){.lado{grid-template-columns:1fr}}
@@ -47,7 +48,7 @@ table.lad td{padding:6px 8px;border-bottom:1px solid var(--card);vertical-align:
 table.lad td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 table.lad tr{cursor:pointer}
 table.lad tr.c-azul td{background:var(--c-azul)} table.lad tr.c-morado td{background:var(--c-morado)}
-table.lad tr.c-amarillo td{background:var(--c-amarillo)} table.lad tr.c-rojo td{background:var(--c-rojo)} table.lad tr.c-gris td{background:var(--c-gris)}
+table.lad tr.c-amarillo td{background:var(--c-amarillo)} table.lad tr.c-naranja td{background:var(--c-naranja)} table.lad tr.c-rojo td{background:var(--c-rojo)} table.lad tr.c-gris td{background:var(--c-gris)}
 table.lad tr.foco td{outline:2px solid var(--brand);outline-offset:-2px}
 .ref{font-family:ui-monospace,Menlo,monospace;font-size:11px;word-break:break-all}
 .leyenda{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 12px}
@@ -56,6 +57,10 @@ table.lad tr.foco td{outline:2px solid var(--brand);outline-offset:-2px}
 .lad-bar{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
   border-top:.5px solid var(--sep);padding:10px var(--gut) calc(env(safe-area-inset-bottom,0px) + 10px);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .lad-bar .t{flex:1 1 260px;min-width:0;font-size:13px}
+.buscar-a{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px var(--gut) 0}
+.buscar-a input{flex:1 1 320px;max-width:560px;min-height:40px;border:1.5px solid transparent;border-radius:10px;background:var(--fill);padding:0 12px;font-size:15px;color:var(--label);outline:none}
+.buscar-a input:focus{border-color:var(--brand)}
+mark.hl{background:var(--c-amarillo);color:inherit;border-radius:3px;padding:0 1px}
 </style>
 </head>
 <body>
@@ -116,6 +121,10 @@ table.lad tr.foco td{outline:2px solid var(--brand);outline-offset:-2px}
     <button role="tab" class="tab active" id="tabRes" aria-selected="true" onclick="verTab('res')">Resumen</button>
     <button role="tab" class="tab" id="tabLado" aria-selected="false" onclick="verTab('lado')">Lado a lado</button>
   </div></div>
+  <div class="buscar-a">
+    <input type="search" id="qBuscar" placeholder="🔎 Buscar referencia SINPE (o nombre, # de factura, monto)…" oninput="buscar(this.value)" autocomplete="off" inputmode="search">
+    <span class="hint" id="qInfo"></span>
+  </div>
 
   <div class="wrap-a" id="paneLado" hidden>
     <div class="leyenda" id="leyenda"></div>
@@ -249,7 +258,7 @@ function init(){
 }
 
 // ══ Lectura de archivos ══════════════════════════════════════════════════════
-const A={ informe:null, sinpe:null, caja:[], decisiones:[], errCaja:null, errDec:null, dia:'todos', fuera:{S:[],F:[]} };
+const A={ informe:null, sinpe:null, caja:[], decisiones:[], errCaja:null, errDec:null, dia:'todos', fuera:{S:[],F:[]}, q:'' };
 // Excluir lo que queda sin pareja fuera de las fechas del Informe (preferencia de este navegador)
 A.excluir=(()=>{ try{ return localStorage.getItem('concil_excluir')!=='0'; }catch(e){ return true; } })();
 const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/_/g,' ').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
@@ -439,8 +448,26 @@ function cambiarRango(v){ A.excluir=v; try{ localStorage.setItem('concil_excluir
 
 // ══ Pintar ════════════════════════════════════════════════════════════════════
 const sum=(a,k='monto')=>a.reduce((s,x)=>s+(Number(x[k])||0),0);
-const sinpeTxt=s=>`${esc(s.nombre||'—')}<div class="sub">${diaTxt(s.ymd)} ${esc(s.hora)} · ref …${esc(s.ref.slice(-6))}${s.detalle?` · “${esc(s.detalle)}”`:''}</div>`;
-const factTxt=f=>`${esc(f.numero)} · ${esc(f.cliente||'—')}<div class="sub">${diaTxt(f.ymd)} · ${f.origen==='caja'?'Facturación de caja':'wstudio'}${f.ref?` · notas …${esc(f.ref.slice(-6))}`:''}${f.refNoEsta?' · <span class="neg">la referencia de Notas no está en el reporte</span>':''}</div>`;
+// Cruce automático donde la factura pasa lo transferido (ej. facturan ₡40 000 y el SINPE es de ₡28 250):
+// es un error y queda por confirmar. Si una persona lo confirma, ya no se marca.
+const faltante=g=>sum(g.facts)-sum(g.sinpes);
+const pagoMenos=g=>g.por!=='manual'&&g.por!=='monto (verificar)'&&g.sinpes.length>0&&faltante(g)>TOPE_VINCULO;
+// ── Buscador: referencia SINPE (completa o una parte), nombre, # de factura o monto.
+// Con algo escrito busca en todos los días; una pareja sale completa si cualquiera de sus partes calza.
+const soloDig=s=>String(s||'').replace(/\D/g,'');
+const qDig=()=>{ const d=soloDig(A.q); return d.length>=3?d:''; };
+function calzaS(s){ if(!A.q) return true; const d=qDig();
+  return !!d&&(soloDig(s.ref).includes(d)||String(Math.round(s.monto))===d) || norm(s.nombre+' '+s.detalle).includes(norm(A.q)); }
+function calzaF(f){ if(!A.q) return true; const d=qDig();
+  return !!d&&(soloDig(f.ref).includes(d)||soloDig(f.numero)===d||String(Math.round(f.monto))===d) || norm(f.numero+' '+f.cliente).includes(norm(A.q)); }
+const calzaG=g=>g.sinpes.some(calzaS)||g.facts.some(calzaF);
+function buscar(v){ A.q=norm(v)?v.trim():''; if(A.r) pintar(); }
+// Referencia: completa y resaltada si calza con la búsqueda; si no, los últimos 6 dígitos
+function refHtml(ref,completa){ ref=String(ref||''); const d=qDig(), i=d?ref.indexOf(d):-1;
+  if(i<0) return completa?esc(ref):'…'+esc(ref.slice(-6));
+  return esc(ref.slice(0,i))+'<mark class="hl">'+esc(d)+'</mark>'+esc(ref.slice(i+d.length)); }
+const sinpeTxt=s=>`${esc(s.nombre||'—')}<div class="sub">${diaTxt(s.ymd)} ${esc(s.hora)} · ref ${refHtml(s.ref)}${s.detalle?` · “${esc(s.detalle)}”`:''}</div>`;
+const factTxt=f=>`${esc(f.numero)} · ${esc(f.cliente||'—')}<div class="sub">${diaTxt(f.ymd)} · ${f.origen==='caja'?'Facturación de caja':'wstudio'}${f.ref?` · notas ${refHtml(f.ref)}`:''}${f.refNoEsta?' · <span class="neg">la referencia de Notas no está en el reporte</span>':''}</div>`;
 function pintar(){
   document.getElementById('vacio').style.display='none'; document.getElementById('res').style.display='';
   const {grupos,sinpesLibres,factsLibres,sinFactura,sinSinpe}=A.r;
@@ -448,8 +475,8 @@ function pintar(){
   document.getElementById('kRec').textContent=fmt(rec); document.getElementById('kRecN').textContent=`${A.S.length} transferencias`;
   document.getElementById('kFac').textContent=fmt(fac); document.getElementById('kFacN').textContent=`${A.F.length} facturas (${A.F.filter(f=>f.origen==='caja').length} de la caja)`;
   document.getElementById('kDif').textContent=fmtS(dif); document.getElementById('kDifS').textContent=dif>0?'a favor: recibido sin facturar':dif<0?'en contra: facturado sin recibir':'cuadra';
-  const verif=grupos.filter(g=>g.por==='monto (verificar)');
-  document.getElementById('kPend').textContent=sinpesLibres.length+factsLibres.length+verif.length;
+  const verif=grupos.filter(g=>g.por==='monto (verificar)'), menos=grupos.filter(pagoMenos);
+  document.getElementById('kPend').textContent=sinpesLibres.length+factsLibres.length+verif.length+menos.length;
 
   // De dónde sale el saldo: cada SINPE y cada factura cae en un solo grupo
   const difPagos=grupos.reduce((a,g)=>a+sum(g.sinpes)-sum(g.facts),0);
@@ -473,29 +500,35 @@ function pintar(){
     const ss=A.S.filter(s=>diaS.get(s)===d), otro=ss.filter(s=>s.ymd!==d);
     const r=sum(ss), f=sum(A.F.filter(x=>x.ymd===d)); acum+=r-f;
     const nota=otro.length?`<div class="sub">incluye ${fmt(sum(otro))} que entró ${[...new Set(otro.map(s=>diaTxt(s.ymd)))].join(', ')}</div>`:'';
-    const p=sinpesLibres.filter(s=>s.ymd===d).length+factsLibres.filter(x=>x.ymd===d).length+verif.filter(g=>(g.facts[0]||{}).ymd===d).length;
+    const p=sinpesLibres.filter(s=>s.ymd===d).length+factsLibres.filter(x=>x.ymd===d).length+[...verif,...menos].filter(g=>(g.facts[0]||{}).ymd===d).length;
     return `<tr><td>${diaTxt(d)}</td><td class="num">${fmt(r)}${nota}</td><td class="num">${fmt(f)}</td><td class="num ${r-f<0?'neg':r-f>0?'pos':''}">${fmtS(r-f)}</td><td class="num"><b>${fmtS(acum)}</b></td><td class="num">${p?`<span class="pill-s warn">${p}</span>`:'<span class="pill-s ok">0</span>'}</td></tr>`;
   }).join('');
 
   // Filtro por día de los pendientes
   if(A.dia!=='todos'&&!dias.includes(A.dia)) A.dia='todos';
   document.getElementById('fDia').innerHTML=['todos',...dias].map(d=>`<button type="button" aria-pressed="${A.dia===d}" onclick="A.dia='${d}';pintar()">${d==='todos'?'Todos':diaTxt(d)}</button>`).join('');
-  const enDia=ymd=>A.dia==='todos'||ymd===A.dia;
+  const enDia=ymd=>!!A.q||A.dia==='todos'||ymd===A.dia;   // la búsqueda mira todos los días
+  const nS=A.S.filter(calzaS).length, nF=A.F.filter(calzaF).length;
+  document.getElementById('qInfo').innerHTML=!A.q?'':nS+nF?`${nS} SINPE y ${nF} factura(s) coinciden · en todos los días`
+    :'<span class="neg">Nada coincide en estos archivos.</span> Si la referencia es de otras fechas, suba el reporte de ese rango.';
 
   // Por confirmar
   const filas=[];
-  sinpesLibres.filter(s=>enDia(s.ymd)).forEach(s=>filas.push({ymd:s.ymd,html:`<tr><td><span class="pill-s bad">SINPE sin factura</span></td><td>${diaTxt(s.ymd)}</td><td>${sinpeTxt(s)}</td><td class="num">${fmt(s.monto)}</td>
+  sinpesLibres.filter(s=>enDia(s.ymd)&&calzaS(s)).forEach(s=>filas.push({ymd:s.ymd,html:`<tr><td><span class="pill-s bad">SINPE sin factura</span></td><td>${diaTxt(s.ymd)}</td><td>${sinpeTxt(s)}</td><td class="num">${fmt(s.monto)}</td>
     <td style="white-space:nowrap;"><button class="btn-ghost mini" onclick="abrirVinculo('s','${esc(s.ref)}')">Vincular a factura</button> <button class="btn-ghost mini" onclick="marcar('sin_factura','${esc(s.ref)}')">No es de una factura</button>${A.decisiones.some(d=>d.clave==='sep:'+s.ref)?` <button class="btn-ghost mini" onclick="deshacer(['sep:${esc(s.ref)}'])">Quitar separación</button>`:''}</td></tr>`}));
-  factsLibres.filter(f=>enDia(f.ymd)).forEach(f=>filas.push({ymd:f.ymd,html:`<tr><td><span class="pill-s bad">Factura sin SINPE</span></td><td>${diaTxt(f.ymd)}</td><td>${factTxt(f)}</td><td class="num">${fmt(f.monto)}</td>
+  factsLibres.filter(f=>enDia(f.ymd)&&calzaF(f)).forEach(f=>filas.push({ymd:f.ymd,html:`<tr><td><span class="pill-s bad">Factura sin SINPE</span></td><td>${diaTxt(f.ymd)}</td><td>${factTxt(f)}</td><td class="num">${fmt(f.monto)}</td>
     <td style="white-space:nowrap;"><button class="btn-ghost mini" onclick="abrirVinculo('f','${esc(f.key)}')">Vincular a SINPE</button> <button class="btn-ghost mini" onclick="marcar('sin_sinpe','${esc(f.key)}')">Se pagó por otro medio</button></td></tr>`}));
-  verif.filter(g=>enDia(g.facts[0].ymd)).forEach(g=>{ const i=A.r.grupos.indexOf(g); filas.push({ymd:g.facts[0].ymd,html:`<tr><td><span class="pill-s warn">Verificar</span></td><td>${diaTxt(g.facts[0].ymd)}</td>
+  verif.filter(g=>enDia(g.facts[0].ymd)&&calzaG(g)).forEach(g=>{ const i=A.r.grupos.indexOf(g); filas.push({ymd:g.facts[0].ymd,html:`<tr><td><span class="pill-s warn">Verificar</span></td><td>${diaTxt(g.facts[0].ymd)}</td>
     <td>${g.sinpes.map(sinpeTxt).join('')}<div class="sub" style="margin-top:4px;">↔ ${g.facts.map(f=>esc(f.numero)+' · '+esc(f.cliente)).join(', ')}</div><div class="sub">Calza solo por monto y día: confirme que sea esta persona.</div></td>
     <td class="num">${fmt(sum(g.sinpes))}</td><td style="white-space:nowrap;"><button class="btn-ghost mini" onclick="confirmarGrupo(${i})">Confirmar</button></td></tr>`}); });
+  menos.filter(g=>enDia(g.facts[0].ymd)&&calzaG(g)).forEach(g=>{ const i=A.r.grupos.indexOf(g); filas.push({ymd:g.facts[0].ymd,html:`<tr><td><span class="pill-s menos">Pagó de menos</span></td><td>${diaTxt(g.facts[0].ymd)}</td>
+    <td>${g.sinpes.map(sinpeTxt).join('')}<div class="sub" style="margin-top:4px;">↔ ${g.facts.map(f=>esc(f.numero)+' · '+esc(f.cliente)+' '+fmt(f.monto)).join(', ')}</div><div class="sub" style="color:var(--orange);font-weight:600;">Se facturó ${fmt(sum(g.facts))} y el SINPE es de ${fmt(sum(g.sinpes))}: faltan ${fmt(faltante(g))}.</div></td>
+    <td class="num neg">${fmtS(-faltante(g))}</td><td style="white-space:nowrap;"><button class="btn-ghost mini" onclick="confirmarGrupo(${i})">Confirmar así</button> <button class="btn-ghost mini" onclick="separar(${i})">Separar</button></td></tr>`}); });
   filas.sort((a,b)=>a.ymd.localeCompare(b.ymd));
-  document.getElementById('tPend').innerHTML=filas.length?filas.map(x=>x.html).join(''):'<tr><td colspan="5" class="hint" style="text-align:center;padding:14px;">Nada por confirmar 🎉</td></tr>';
+  document.getElementById('tPend').innerHTML=filas.length?filas.map(x=>x.html).join(''):`<tr><td colspan="5" class="hint" style="text-align:center;padding:14px;">${A.q?'Nada por confirmar con esa búsqueda':'Nada por confirmar 🎉'}</td></tr>`;
 
   // Conciliados (y lo marcado a mano sin pareja)
-  const ok=grupos.filter(g=>g.por!=='monto (verificar)').filter(g=>enDia((g.sinpes[0]||g.facts[0]).ymd))
+  const ok=grupos.filter(g=>g.por!=='monto (verificar)'&&!pagoMenos(g)).filter(g=>enDia((g.sinpes[0]||g.facts[0]).ymd)&&calzaG(g))
     .sort((a,b)=>(a.sinpes[0]||{}).ymd>(b.sinpes[0]||{}).ymd?1:-1);
   const como={referencia:'<span class="pill-s ok">referencia</span>','cédula':'<span class="pill-s ok">cédula</span>',nombre:'<span class="pill-s info">nombre</span>','dos SINPE':'<span class="pill-s info">dos SINPE</span>',manual:'<span class="pill-s info">a mano</span>'};
   let h=ok.map(g=>{ const d=sum(g.sinpes)-sum(g.facts); const man=g.por==='manual';
@@ -504,21 +537,21 @@ function pintar(){
       <td class="num ${d<0?'neg':d>0?'pos':''}">${d?fmtS(d):'—'}</td><td>${como[g.por]||esc(g.por)}</td>
       <td>${man?`<button class="btn-ghost mini" onclick="deshacer(${JSON.stringify(g.sinpes.map(s=>'ref:'+s.ref)).replace(/"/g,'&quot;')})">Deshacer</button>`
         :`<button class="btn-ghost mini" onclick="separar(${A.r.grupos.indexOf(g)})">Separar</button>`}</td></tr>`; }).join('');
-  sf.filter(s=>enDia(s.ymd)).forEach(s=>{ const d=sinFactura.get(s.ref); h+=`<tr><td>${sinpeTxt(s)}</td><td class="num">${fmt(s.monto)}</td><td><span class="pill-s">No es de una factura</span><div class="sub">${esc(d.nota||'')} · ${esc(d.creado_por||'')}</div></td><td class="num">—</td><td class="num pos">${fmtS(s.monto)}</td><td>${como.manual}</td>
+  sf.filter(s=>enDia(s.ymd)&&calzaS(s)).forEach(s=>{ const d=sinFactura.get(s.ref); h+=`<tr><td>${sinpeTxt(s)}</td><td class="num">${fmt(s.monto)}</td><td><span class="pill-s">No es de una factura</span><div class="sub">${esc(d.nota||'')} · ${esc(d.creado_por||'')}</div></td><td class="num">—</td><td class="num pos">${fmtS(s.monto)}</td><td>${como.manual}</td>
     <td><button class="btn-ghost mini" onclick="deshacer(['ref:${esc(s.ref)}'])">Deshacer</button></td></tr>`; });
-  ss.filter(f=>enDia(f.ymd)).forEach(f=>{ const d=sinSinpe.get(f.key); h+=`<tr><td><span class="pill-s">Se pagó por otro medio</span><div class="sub">${esc(d.nota||'')} · ${esc(d.creado_por||'')}</div></td><td class="num">—</td><td>${factTxt(f)}</td><td class="num">${fmt(f.monto)}</td><td class="num neg">${fmtS(-f.monto)}</td><td>${como.manual}</td>
+  ss.filter(f=>enDia(f.ymd)&&calzaF(f)).forEach(f=>{ const d=sinSinpe.get(f.key); h+=`<tr><td><span class="pill-s">Se pagó por otro medio</span><div class="sub">${esc(d.nota||'')} · ${esc(d.creado_por||'')}</div></td><td class="num">—</td><td>${factTxt(f)}</td><td class="num">${fmt(f.monto)}</td><td class="num neg">${fmtS(-f.monto)}</td><td>${como.manual}</td>
     <td><button class="btn-ghost mini" onclick="deshacer(['${esc(f.key)}'])">Deshacer</button></td></tr>`; });
   pintarLado();
-  document.getElementById('tOk').innerHTML=h||'<tr><td colspan="7" class="hint" style="text-align:center;padding:14px;">Todavía no hay nada conciliado.</td></tr>';
+  document.getElementById('tOk').innerHTML=h||`<tr><td colspan="7" class="hint" style="text-align:center;padding:14px;">${A.q?'Nada conciliado con esa búsqueda.':'Todavía no hay nada conciliado.'}</td></tr>`;
 }
 
 // ══ Lado a lado ═══════════════════════════════════════════════════════════════
 // Azul: referencia y monto exacto (o confirmado a mano uno a uno) · Morado: un SINPE con varias facturas
 // (o varias transferencias para una factura) y el total cuadra · Amarillo: por cédula o nombre
-// y monto exacto · Rojo: sin pareja, el monto no cuadra o calzó solo por monto · Gris: marcado a
+// y monto exacto · Naranja: se facturó más de lo transferido · Rojo: sin pareja, el monto no cuadra o calzó solo por monto · Gris: marcado a
 // mano como "no es de una factura" / "se pagó por otro medio".
 const COLORES={azul:['var(--c-azul)','Referencia y monto'],morado:['var(--c-morado)','Varias facturas o SINPE, total cuadra'],
-  amarillo:['var(--c-amarillo)','Nombre o cédula y monto'],rojo:['var(--c-rojo)','Revisar'],gris:['var(--c-gris)','Confirmado sin pareja']};
+  amarillo:['var(--c-amarillo)','Nombre o cédula y monto'],naranja:['var(--c-naranja)','Pagó de menos'],rojo:['var(--c-rojo)','Revisar'],gris:['var(--c-gris)','Confirmado sin pareja']};
 let tabA='res';
 function verTab(t){ tabA=t; document.getElementById('paneRes').hidden=t!=='res'; document.getElementById('paneLado').hidden=t!=='lado';
   if(t!=='lado') document.getElementById('ladBar').hidden=true;
@@ -526,23 +559,26 @@ function verTab(t){ tabA=t; document.getElementById('paneRes').hidden=t!=='res';
 function colorGrupo(g){
   // Ya lo revisó una persona, aunque haya diferencia de monto: morado si son varias, azul si es uno a uno
   if(g.por==='manual') return g.sinpes.length>1||g.facts.length>1?'morado':'azul';
+  if(pagoMenos(g)) return 'naranja';
   if(g.por==='monto (verificar)'||sum(g.sinpes)!==sum(g.facts)) return 'rojo';
   if(g.sinpes.length>1||g.facts.length>1) return 'morado';
   return g.por==='referencia'?'azul':'amarillo';
 }
 function pintarLado(){
-  const {grupos,sinFactura,sinSinpe}=A.r, enDia=ymd=>A.dia==='todos'||ymd===A.dia;
+  const {grupos,sinFactura,sinSinpe}=A.r, enDia=ymd=>!!A.q||A.dia==='todos'||ymd===A.dia;
   const info=new Map();   // ref|key → { color, g }
+  const gCalza=new Set(grupos.map((g,i)=>calzaG(g)?i:-1).filter(i=>i>=0));   // la pareja sale completa
   grupos.forEach((g,i)=>{ const c=colorGrupo(g); g.sinpes.forEach(s=>info.set('s:'+s.ref,{c,i})); g.facts.forEach(f=>info.set('f:'+f.key,{c,i})); });
+  const visible=(id,calza)=>calza||gCalza.has((info.get(id)||{}).i);
   sinFactura.forEach((_,ref)=>info.set('s:'+ref,{c:'gris'})); sinSinpe.forEach((_,k)=>info.set('f:'+k,{c:'gris'}));
-  const cuenta={azul:0,morado:0,amarillo:0,rojo:0,gris:0};
+  const cuenta={azul:0,morado:0,amarillo:0,naranja:0,rojo:0,gris:0};
   const fila=(id,cells)=>{ const x=info.get(id)||{c:'rojo'}; cuenta[x.c]++;
     return `<tr class="c-${x.c}" data-c="${x.c}" data-g="${x.i??''}" data-id="${esc(id)}" onclick="enfocar(this)">${cells}</tr>`; };
   const S=[...A.S].sort((a,b)=>(a.ymd+a.hora).localeCompare(b.ymd+b.hora)), F=[...A.F].sort((a,b)=>a.ymd.localeCompare(b.ymd));
-  document.getElementById('ladS').innerHTML=S.filter(s=>enDia(s.ymd)).map(s=>fila('s:'+s.ref,
-    `<td style="white-space:nowrap;">${diaTxt(s.ymd)}<div class="sub">${esc(s.hora)}</div></td><td>${esc(s.detalle)}</td><td class="ref">${esc(s.ref)}</td><td>${esc(s.nombre)}</td><td class="num">${fmt(s.monto)}</td>`)).join('');
-  document.getElementById('ladF').innerHTML=F.filter(f=>enDia(f.ymd)).map(f=>fila('f:'+f.key,
-    `<td style="white-space:nowrap;">${diaTxt(f.ymd)}</td><td class="ref">${esc(f.numero)}</td><td>${esc(f.cliente)}${f.origen==='caja'?'<div class="sub">Facturación de caja</div>':''}</td><td class="ref">${esc(f.ref)}</td><td class="num">${fmt(f.monto)}</td>`)).join('');
+  document.getElementById('ladS').innerHTML=S.filter(s=>enDia(s.ymd)&&visible('s:'+s.ref,calzaS(s))).map(s=>fila('s:'+s.ref,
+    `<td style="white-space:nowrap;">${diaTxt(s.ymd)}<div class="sub">${esc(s.hora)}</div></td><td>${esc(s.detalle)}</td><td class="ref">${refHtml(s.ref,true)}</td><td>${esc(s.nombre)}</td><td class="num">${fmt(s.monto)}</td>`)).join('');
+  document.getElementById('ladF').innerHTML=F.filter(f=>enDia(f.ymd)&&visible('f:'+f.key,calzaF(f))).map(f=>fila('f:'+f.key,
+    `<td style="white-space:nowrap;">${diaTxt(f.ymd)}</td><td class="ref">${esc(f.numero)}</td><td>${esc(f.cliente)}${f.origen==='caja'?'<div class="sub">Facturación de caja</div>':''}</td><td class="ref">${refHtml(f.ref,true)}</td><td class="num">${fmt(f.monto)}</td>`)).join('');
   document.getElementById('leyenda').innerHTML=Object.entries(COLORES).map(([k,[c,l]])=>`<span style="background:${c};">${l} · ${cuenta[k]}</span>`).join('');
   document.getElementById('fDia2').innerHTML=document.getElementById('fDia').innerHTML;
   document.getElementById('ladBar').hidden=true;
