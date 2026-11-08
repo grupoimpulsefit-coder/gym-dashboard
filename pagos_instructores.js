@@ -164,12 +164,47 @@ async function piValidar() {
   }
   c.duplicado = { e: 'wait', t: 'Revisando si ya se cargó…' };
   c.hacienda = { e: 'wait', t: 'Consultando al emisor en Hacienda…' };
+  // Estado de la factura en Hacienda: solo si viene a nombre de una sede (con sus credenciales de API)
+  const receptorSede = Object.values(piFiscal).some(s => piDig(s.cedula_juridica) && piDig(s.cedula_juridica) === x.receptorCedula);
+  if (receptorSede && claveOk) c.estadoFE = { e: 'wait', t: 'Consultando el estado de la factura en Hacienda…' };
   f.checks = c;
   piRenderChecks();
-  const [dup, hac] = await Promise.all([piRevisarDuplicado(x.clave, f.pend?.id), piConsultarHacienda(x.emisorCedula)]);
+  const [dup, hac, est] = await Promise.all([piRevisarDuplicado(x.clave, f.pend?.id), piConsultarHacienda(x.emisorCedula),
+    c.estadoFE ? piEstadoFactura(x.clave, x.receptorCedula) : null]);
   if (piF !== f) return;   // se cargó otra factura mientras tanto
   c.duplicado = dup; c.hacienda = hac;
+  if (c.estadoFE) { if (est) c.estadoFE = est; else delete c.estadoFE; }
   piRenderChecks();
+}
+
+// Llama a una Edge Function con la sesión (renueva el token si venció)
+async function piFuncion(nombre, body, reintento) {
+  const res = await fetch(`${SUPA_URL}/functions/v1/${nombre}`, { method: 'POST',
+    headers: { Authorization: 'Bearer ' + currentToken, apikey: SUPA_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (res.status === 401 && !reintento && await Sesion.renovar()) return piFuncion(nombre, body, true);
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(d.error || ('Error ' + res.status));
+  return d;
+}
+
+// Estado de la factura en Hacienda (Edge Function hacienda-estado): aceptada, rechazada o en proceso
+async function piEstadoFactura(clave, receptor) {
+  let r;
+  try { r = await piFuncion('hacienda-estado', { accion: 'estado', clave, receptor }); }
+  catch (_) { return { e: 'info', t: 'Estado en Hacienda: no disponible', d: 'No se pudo hacer la consulta. Se puede guardar igual.' }; }
+  const det = r.detalle || '';
+  switch (r.estado) {
+    case 'aceptado':  return { e: 'ok', t: 'Aceptada por Hacienda', d: 'Hacienda confirmó que la factura es válida.' };
+    case 'rechazado': return { e: 'bad', t: 'Hacienda RECHAZÓ esta factura', d: (det ? det + ' ' : '') + 'Pida al instructor que emita una factura nueva.' };
+    case 'procesando': case 'recibido':
+      return { e: 'warn', t: 'Hacienda todavía la está procesando', d: 'Suele tardar unos minutos. Se puede guardar; si quiere, vuelva a cargarla más tarde para confirmar.' };
+    case 'no_encontrado': return { e: 'warn', t: 'Hacienda no encuentra esta factura', d: 'Puede que el instructor no la haya enviado a Hacienda. Pregúntele antes de pagarla.' };
+    case 'sin_permiso': return { e: 'info', t: 'Hacienda no permite consultar esta factura', d: det || 'Las credenciales de la sede no tienen acceso a facturas recibidas.' };
+    case 'sin_credenciales': return { e: 'info', t: 'Estado en Hacienda: sin configurar', d: `Faltan las credenciales de API de ${r.sede || 'esta sede'} en Supabase.` };
+    case 'credenciales_invalidas': return { e: 'warn', t: 'Las credenciales de Hacienda no funcionan', d: det };
+    case 'sin_sede': return null;
+    default: return { e: 'info', t: 'Estado en Hacienda: no se pudo confirmar', d: det || `Respuesta: ${r.estado || 'desconocida'}.` };
+  }
 }
 
 async function piRevisarDuplicado(clave, excluir) {
@@ -276,7 +311,6 @@ function piRenderCarga(aviso) {
         <div class="form-card" style="margin:0;">
           <div class="section-title" style="margin-bottom:12px;">Validaciones automáticas</div>
           <div id="piChecks"></div>
-          <div class="hint" style="margin-top:12px;">El estado «Aceptada» en Hacienda se agregará en una segunda etapa (requiere las credenciales ATV de cada razón social).</div>
         </div>
       </div>
       <div style="flex:1.5 1 520px;min-width:0;display:flex;flex-direction:column;gap:12px;">
@@ -326,8 +360,8 @@ function piRenderCarga(aviso) {
 function piRenderChecks() {
   const el = document.getElementById('piChecks');
   if (!el || !piF) return;
-  const ICON = { ok: '✅', warn: '⚠️', bad: '⛔', wait: '⏳' };
-  const COLOR = { ok: 'var(--label)', warn: 'var(--orange)', bad: 'var(--red)', wait: 'var(--sec)' };
+  const ICON = { ok: '✅', warn: '⚠️', bad: '⛔', wait: '⏳', info: 'ℹ️' };
+  const COLOR = { ok: 'var(--label)', warn: 'var(--orange)', bad: 'var(--red)', wait: 'var(--sec)', info: 'var(--sec)' };
   el.innerHTML = Object.values(piF.checks).map(c => `
     <div style="display:flex;gap:10px;margin-bottom:10px;font-size:14px;">
       <span aria-hidden="true">${ICON[c.e]}</span>
@@ -907,8 +941,14 @@ function piRenderConfig(aviso) {
           <b>${esc(s)}</b>
           <div class="f-field"><label for="piRS${i}">Razón social</label><input id="piRS${i}" value="${esc(piFiscal[s]?.razon_social || '')}"></div>
           <div class="f-field"><label for="piCJ${i}">Cédula jurídica</label><input id="piCJ${i}" value="${esc(piFiscal[s]?.cedula_juridica || '')}" placeholder="3-101-XXXXXX" inputmode="numeric"></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+            <button class="btn-ghost" style="padding:6px 12px;font-size:13px;" onclick="piProbarHacienda(${i})" ${piDig(piFiscal[s]?.cedula_juridica) ? '' : 'disabled title="Guarde primero la cédula jurídica"'}>🔌 Probar Hacienda</button>
+            <span id="piHac${i}" class="hint"></span>
+          </div>
         </div>`).join('')}
       </div>
+      <div class="hint" style="margin-top:12px;">Para consultar si cada factura está <b>aceptada por Hacienda</b>, cada razón social necesita su usuario y contraseña de API (los generados en Tribu-CR, no la llave criptográfica) guardados en Supabase → Edge Functions → Secrets como
+        <code>HACIENDA_USUARIO_&lt;cédula&gt;</code> y <code>HACIENDA_CLAVE_&lt;cédula&gt;</code> (cédula solo con números). «Probar Hacienda» confirma que entran.</div>
       <div class="form-actions" style="padding:12px 0 0;"><button class="btn-primary" onclick="piGuardarFiscal()">💾 Guardar razones sociales</button></div>
     </div>
     <div class="form-card">
@@ -937,6 +977,19 @@ function piRenderConfig(aviso) {
         </tbody></table></div>
     </div>
     <div class="section"><div class="hint">Cortes de pago (fijos): miércoles y viernes a las 10:00 a. m., hora de Costa Rica. Sábado y domingo se pagan de caja.</div></div>`;
+}
+
+async function piProbarHacienda(i) {
+  const s = SEDES[i], el = document.getElementById('piHac' + i);
+  el.style.color = ''; el.textContent = 'Probando…';
+  try {
+    const r = await piFuncion('hacienda-estado', { accion: 'probar', receptor: piFiscal[s]?.cedula_juridica });
+    el.style.color = r.estado === 'conectado' ? 'var(--green)' : 'var(--orange)';
+    el.textContent = (r.estado === 'conectado' ? '✓ ' : '⚠ ') + (r.detalle || r.estado);
+  } catch (e) {
+    el.style.color = 'var(--red)';
+    el.textContent = /404|Failed to fetch/i.test(e.message) ? 'La función hacienda-estado no está publicada.' : e.message;
+  }
 }
 
 async function piGuardarFiscal() {
