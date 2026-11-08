@@ -15,6 +15,7 @@
     { "source": "/mediciones", "destination": "/mediciones.html" },
     { "source": "/planilla", "destination": "/planilla.html" },
     { "source": "/conciliacion", "destination": "/conciliacion.html" },
-    { "source": "/horarios", "destination": "/horarios.html" }
+    { "source": "/horarios", "destination": "/horarios.html" },
+    { "source": "/factura", "destination": "/factura.html" }
   ]
 }

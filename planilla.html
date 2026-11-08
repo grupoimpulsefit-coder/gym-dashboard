@@ -398,7 +398,7 @@ function calcLinea(e){
   const ccss = aseguradoCCSS(e) ? bruto * CCSS_TRABAJADOR : 0;
   const patrono = aseguradoCCSS(e) ? bruto * CCSS_PATRONO : 0;
   const neto = bruto - ccss + t.subsidio - t.deduccion;
-  return { empleado_id: e.id, nombre: e.nombre, cedula: e.cedula || '', cuenta_bac: e.cuenta_bac || '',
+  return { empleado_id: e.id, nombre: e.nombre, cedula: e.cedula || '', puesto: e.puesto || '', cuenta_bac: e.cuenta_bac || '',
     salario_mensual: Number(e.salario_mensual) || 0, diario, asegurado: aseguradoCCSS(e),
     base, notaBase, ...t, bruto, ccss, patrono, neto };
 }
@@ -762,8 +762,11 @@ function dibujarBoleta(doc, l){
   doc.setTextColor(30);
   const dato = (k, v, x) => { doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(120); doc.text(k, x, y);
                               doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(30); doc.text(String(v || '—'), x, y + 15); };
+  // Quincenas cerradas antes de existir el puesto no lo traen en el snapshot: se toma el actual.
+  const puesto = l.puesto || empleados.find(e => e.id === l.empleado_id)?.puesto || '';
   dato('Colaborador', l.nombre, X); dato('Cédula', l.cedula, X + 250); y += 36;
-  dato('Cuenta BAC', l.cuenta_bac, X); dato('Salario mensual', money(l.salario_mensual), X + 250); dato('Salario diario', money(l.diario), X + 380); y += 44;
+  dato('Puesto', puesto, X); dato('Cuenta BAC', l.cuenta_bac, X + 250); y += 36;
+  dato('Salario mensual', money(l.salario_mensual), X); dato('Salario diario', money(l.diario), X + 250); y += 44;
 
   // Ingresos y deducciones
   const tabla = (titulo, filas, total, rgb) => {

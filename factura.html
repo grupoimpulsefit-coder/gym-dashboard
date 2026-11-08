@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F2F2F7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+<meta name="robots" content="noindex">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icons/favicon-64.png">
+<title>Enviar factura de clases</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+/* Página pública para instructores externos (sin usuario). El resto del diseño vive en /ui.css */
+main { max-width: 680px; margin: 0 auto; padding: 8px 0 40px; }
+.drop { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; cursor: pointer;
+  border: 2px dashed var(--brand); box-shadow: none; padding: 32px 20px; }
+.drop.over { background: var(--brand-tint); }
+.datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.datos .v { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+.clase { display: grid; grid-template-columns: 1.2fr 1.2fr .7fr auto; gap: 8px; align-items: end; margin-bottom: 10px; }
+@media (max-width: 520px) { .clase { grid-template-columns: 1fr 1fr; } }
+.confirma { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; background: var(--fill); cursor: pointer; font-size: 14px; }
+.confirma input { width: 22px; height: 22px; margin: 0; flex: none; }
+.err-box { border: 1.5px solid var(--red); color: var(--red); font-weight: 600; }
+.ok-big { font-size: 22px; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">🧾</div>
+  <div>
+    <h1>Impulse Fit</h1>
+    <p>Envío de facturas de clases · instructores</p>
+  </div>
+</div>
+
+<main id="app"></main>
+
+<script src="/factura_xml.js"></script>
+<script>
+const SUPA_URL = '__SUPA_URL__';
+const SUPA_KEY = '__SUPA_KEY__';
+const fmtCRC = n => '₡' + Math.round(n || 0).toLocaleString('es-CR');
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function parseFecha(s) { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); }
+
+// Solo funciones públicas: esta página no puede leer ni escribir tablas
+async function rpc(fn, body) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+  const txt = await res.text();
+  let data = null; try { data = txt ? JSON.parse(txt) : null; } catch (_) {}
+  if (!res.ok) throw new Error((data && data.message) || 'No se pudo conectar. Intente de nuevo.');
+  return data;
+}
+
+let tipos = [];   // tipos de clase (sin tarifas)
+let F = null;     // factura en revisión
+let enviada = null;
+
+async function cargarTipos() {
+  try { tipos = (await rpc('tipos_clase_publicos')) || []; } catch (_) { tipos = []; }
+}
+
+function render(aviso) {
+  const app = document.getElementById('app');
+  const avisoHtml = aviso ? `<div class="form-card err-box">⚠️ ${esc(aviso)}</div>` : '';
+
+  if (enviada) {
+    const e = enviada;
+    app.innerHTML = `
+      <div class="section"><div class="section-title">Factura enviada</div></div>
+      <div class="form-card" style="display:flex;flex-direction:column;gap:10px;">
+        <div class="ok-big">✅ ¡Listo! Recibimos su factura</div>
+        <div>Factura de <b>${esc(e.emisor)}</b> por <b>${fmtCRC(e.monto)}</b> · sede <b>${esc(e.sede)}</b>.</div>
+        <div>${e.caja
+          ? 'Como son clases de fin de semana, se paga <b>de caja</b>.'
+          : e.dia ? `Si administración la aprueba, se le paga el <b>${esc(piFechaLarga(e.dia))}</b>.` : ''}</div>
+        <div class="hint">Administración revisa los datos. Si algo no calza, le contactarán${e.telefono ? ' al ' + esc(e.telefono) : ''}.</div>
+      </div>
+      <div class="form-actions" style="padding:0 var(--gut);">
+        <button class="btn-primary" onclick="enviada=null; F=null; render();">Enviar otra factura</button>
+      </div>`;
+    return;
+  }
+
+  if (!F) {
+    app.innerHTML = `
+      <div class="section"><div class="section-title">Enviar factura de clases</div></div>
+      ${avisoHtml}
+      <div class="form-card" style="display:flex;flex-direction:column;gap:6px;font-size:15px;">
+        <div>Suba el <b>XML</b> de su factura electrónica de las clases que dio. Administración la revisa y se le paga:</div>
+        <ul style="margin:4px 0 0;padding-left:20px;">
+          <li>Enviada antes del <b>miércoles 10:00 a. m.</b> → se paga el miércoles.</li>
+          <li>Enviada antes del <b>viernes 10:00 a. m.</b> → se paga el viernes.</li>
+          <li>Clases de <b>sábado y domingo</b> → se pagan de caja.</li>
+        </ul>
+        <div class="hint" style="margin-top:6px;">La factura debe venir a nombre de la razón social de la sede donde dio la clase.</div>
+      </div>
+      <label class="form-card drop" id="drop">
+        <div style="font-size:34px;" aria-hidden="true">📄</div>
+        <div style="font-weight:600;font-size:16px;">Toque aquí para elegir el XML</div>
+        <div class="hint">Es el archivo que termina en <b>.xml</b> (no el PDF). Lo genera su sistema de facturación o le llega por correo junto con el PDF.</div>
+        <input type="file" accept=".xml,text/xml,application/xml" style="display:none;" onchange="leerArchivo(this.files[0]); this.value='';">
+        <span class="btn-primary" style="margin-top:6px;">Elegir XML</span>
+      </label>`;
+    const drop = document.getElementById('drop');
+    drop.ondragover = ev => { ev.preventDefault(); drop.classList.add('over'); };
+    drop.ondragleave = () => drop.classList.remove('over');
+    drop.ondrop = ev => { ev.preventDefault(); drop.classList.remove('over'); const f = ev.dataTransfer.files[0]; if (f) leerArchivo(f); };
+    return;
+  }
+
+  const x = F.x;
+  const opcionesTipo = sel => '<option value="">— Tipo de clase —</option>' + tipos.map(t => `<option${t === sel ? ' selected' : ''}>${esc(t)}</option>`).join('');
+  app.innerHTML = `
+    <div class="section"><div class="section-title">Revise y envíe</div></div>
+    ${avisoHtml}
+    <div class="form-card">
+      <div class="section-title" style="margin-bottom:12px;">Datos de su factura</div>
+      <div class="datos">
+        <div><div class="kpi-label">Emisor</div><div class="v">${esc(x.emisorNombre || '—')}</div><div class="hint">Cédula ${esc(x.emisorCedula || '—')}</div></div>
+        <div><div class="kpi-label">N.º de factura</div><div class="v">${esc(x.consecutivo || '—')}</div></div>
+        <div><div class="kpi-label">Fecha</div><div class="v">${esc(x.fecha ? new Date(x.fecha).toLocaleString('es-CR') : '—')}</div></div>
+        <div><div class="kpi-label">Monto</div><div class="v" style="font-size:20px;">${x.moneda === 'CRC' ? fmtCRC(x.total) : esc(x.moneda) + ' ' + x.total}</div></div>
+        <div><div class="kpi-label">Sede</div><div class="v">${F.sede ? esc(F.sede) : '<span style="color:var(--red);">No reconocida</span>'}</div><div class="hint">${esc(x.receptorNombre || '')}</div></div>
+      </div>
+      <div class="hint" style="margin-top:10px;">${esc(F.archivo)} · <a href="#" onclick="F=null; render(); return false;">elegir otro archivo</a></div>
+    </div>
+
+    <div class="form-card">
+      <div class="section-title" style="margin-bottom:4px;">¿Qué clases cubre esta factura?</div>
+      <div class="hint" style="margin-bottom:12px;">Si dio varias clases (por ejemplo 3 el mismo día), indíquelas todas.</div>
+      ${F.clases.map((c, i) => `
+        <div class="clase">
+          <div class="f-field"><label for="cF${i}">Fecha de la clase</label><input type="date" id="cF${i}" value="${esc(c.fecha)}" onchange="F.clases[${i}].fecha=this.value"></div>
+          <div class="f-field"><label for="cT${i}">Tipo</label><select id="cT${i}" onchange="F.clases[${i}].tipo=this.value">${opcionesTipo(c.tipo)}</select></div>
+          <div class="f-field"><label for="cC${i}">Cantidad</label><input type="number" id="cC${i}" min="1" max="30" step="1" value="${esc(c.cantidad)}" oninput="F.clases[${i}].cantidad=this.value"></div>
+          ${F.clases.length > 1 ? `<button class="btn-del" style="margin-bottom:2px;justify-self:start;" aria-label="Quitar clase" onclick="F.clases.splice(${i},1); render();">✕</button>` : '<span></span>'}
+        </div>`).join('')}
+      <button class="btn-ghost" onclick="agregarClase()">＋ Agregar otro tipo de clase</button>
+    </div>
+
+    <div class="form-card">
+      <div class="section-title" style="margin-bottom:4px;">¿A dónde le pagamos? <span class="section-note">(opcional)</span></div>
+      <div class="hint" style="margin-bottom:12px;">Llénelo si es su primera factura o si cambió de cuenta.</div>
+      <div class="form-grid">
+        <div class="f-field"><label for="pForma">Forma de pago</label>
+          <select id="pForma" onchange="F.pago_forma=this.value; render();">
+            ${[['', '— Ya la tienen —'], ['sinpe', 'SINPE Móvil'], ['bac', 'Cuenta BAC'], ['otro_banco', 'Otro banco']].map(([v, t]) => `<option value="${v}"${F.pago_forma === v ? ' selected' : ''}>${t}</option>`).join('')}
+          </select></div>
+        ${F.pago_forma === 'otro_banco' ? `<div class="f-field"><label for="pBanco">Banco</label><input id="pBanco" value="${esc(F.pago_banco)}" placeholder="Ej. BN, BCR, Popular" oninput="F.pago_banco=this.value"></div>` : ''}
+        ${F.pago_forma ? `<div class="f-field"><label for="pNum">${F.pago_forma === 'sinpe' ? 'Teléfono de SINPE' : 'Número de cuenta (IBAN)'}</label><input id="pNum" value="${esc(F.pago_numero)}" oninput="F.pago_numero=this.value"></div>` : ''}
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-grid">
+        <div class="f-field"><label for="pTel">Teléfono / WhatsApp <span class="section-note">(opcional)</span></label><input id="pTel" inputmode="tel" value="${esc(F.telefono)}" placeholder="Para avisarle si algo no calza" oninput="F.telefono=this.value"></div>
+        <div class="f-field full"><label for="pNota">Nota <span class="section-note">(opcional)</span></label><textarea id="pNota" rows="2" oninput="F.nota=this.value">${esc(F.nota)}</textarea></div>
+      </div>
+      <label class="confirma" style="margin-top:14px;">
+        <input type="checkbox" id="pOk" ${F.confirmo ? 'checked' : ''} onchange="F.confirmo=this.checked; document.getElementById('msg').textContent='';">
+        <span><b>Confirmo que los datos son correctos</b><br><span class="hint">La factura corresponde a clases que di en ${esc(F.sede || 'la sede')}.</span></span>
+      </label>
+    </div>
+
+    <div class="form-actions" style="padding:0 var(--gut);">
+      <div class="form-msg err" id="msg"></div>
+      <button class="btn-ghost" onclick="F=null; render();">Cancelar</button>
+      <button class="btn-primary" id="btnEnviar" onclick="enviar()">Enviar factura</button>
+    </div>`;
+}
+
+function agregarClase() {
+  const ult = F.clases[F.clases.length - 1];
+  F.clases.push({ fecha: ult ? ult.fecha : '', tipo: '', cantidad: 1 });
+  render();
+}
+
+async function leerArchivo(file) {
+  if (!file) return;
+  if (file.size > 300000) { render('El archivo es demasiado grande para ser el XML de una factura.'); return; }
+  let texto, x;
+  try { texto = (await file.text()).replace(/^﻿/, ''); } catch (_) { render('No se pudo leer el archivo.'); return; }
+  try { x = piParseXML(texto); } catch (e) { render(e.message); return; }
+  if (x.moneda !== 'CRC') { render(`La factura está en ${x.moneda}. Debe ser en colones.`); return; }
+  let sede = null;
+  try { sede = await rpc('sede_por_receptor', { p_cedula: x.receptorCedula }); } catch (_) {}
+  if (!sede) {
+    render(`La factura viene a nombre de ${x.receptorNombre || 'otra empresa'} (${x.receptorCedula || 'sin receptor'}), que no es ninguna de nuestras sedes. Emítala a nombre de la razón social de la sede donde dio la clase.`);
+    return;
+  }
+  if (!tipos.length) await cargarTipos();
+  // Propone el tipo según el detalle de la factura (el instructor lo confirma)
+  const fecha = (x.fecha || '').slice(0, 10);
+  const clases = [];
+  tipos.forEach(t => {
+    const n = x.lineas.filter(l => piNorm(l.detalle).includes(piNorm(t))).reduce((s, l) => s + (l.cantidad || 0), 0);
+    if (n > 0) clases.push({ fecha, tipo: t, cantidad: Math.round(n) || 1 });
+  });
+  F = { x, texto, archivo: file.name, sede, clases: clases.length ? clases : [{ fecha, tipo: '', cantidad: 1 }],
+        pago_forma: '', pago_banco: '', pago_numero: '', telefono: '', nota: '', confirmo: false };
+  render();
+}
+
+async function enviar() {
+  const msg = document.getElementById('msg');
+  const malas = F.clases.some(c => !c.fecha || !c.tipo || !(Number(c.cantidad) >= 1));
+  if (malas) { msg.textContent = 'Complete la fecha, el tipo y la cantidad de cada clase.'; return; }
+  if (F.pago_forma && !String(F.pago_numero).trim()) { msg.textContent = 'Indique el número de cuenta o de SINPE, o elija «Ya la tienen».'; return; }
+  if (!F.confirmo) { msg.textContent = 'Marque la casilla para confirmar los datos.'; return; }
+  const btn = document.getElementById('btnEnviar');
+  btn.disabled = true; btn.textContent = 'Enviando…'; msg.textContent = '';
+  try {
+    const r = await rpc('enviar_factura_instructor', {
+      p_xml: F.texto, p_nombre_archivo: F.archivo,
+      p_clases: F.clases.map(c => ({ fecha: c.fecha, tipo: c.tipo, cantidad: Number(c.cantidad) })),
+      p_pago_forma: F.pago_forma || null, p_pago_banco: F.pago_banco || null, p_pago_numero: F.pago_numero || null,
+      p_telefono: F.telefono || null, p_nota: F.nota || null,
+    });
+    const fila = Array.isArray(r) ? r[0] : r;
+    enviada = {
+      emisor: F.x.emisorNombre, monto: fila?.monto ?? F.x.total, sede: fila?.sede || F.sede, telefono: F.telefono,
+      caja: F.clases.every(c => [0, 6].includes(parseFecha(c.fecha).getDay())),
+      dia: piDiaPagoPara(fila?.recibida),
+    };
+    F = null;
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Enviar factura';
+    msg.textContent = e.message;
+  }
+}
+
+cargarTipos();
+render();
+</script>
+</body>
+</html>

@@ -203,6 +203,7 @@
       <div class="form-grid">
         <div class="f-field"><label>Nombre completo <span class="req">*</span></label><input type="text" id="eNombre"></div>
         <div class="f-field"><label>Cédula / ID</label><input type="text" id="eCedula"></div>
+        <div class="f-field"><label>Puesto</label><select id="ePuesto"></select></div>
         <div class="f-field"><label>Correo</label><input type="email" id="eCorreo" placeholder="para el acceso al portal"></div>
         <div class="f-field"><label>Teléfono</label><input type="text" id="eTelefono"></div>
         <div class="f-field full"><label>Dirección</label><input type="text" id="eDireccion"></div>
@@ -468,6 +469,8 @@ function renderKpis(){
 // conserva su historial (vacaciones, planillas cerradas, liquidación).
 const esBaja = e => e.activo === false;
 
+const PUESTOS = ['Recepción', 'Entrenador', 'Misceláneo', 'Seguridad', 'Mantenimiento'];
+
 function renderEmpleados(){
   const tb = document.getElementById('empBody'); tb.innerHTML='';
   const bajas = empleados.filter(esBaja).length;
@@ -482,7 +485,7 @@ function renderEmpleados(){
     const tr = tb.insertRow();
     if (esBaja(e)) tr.className = 'baja';
     tr.innerHTML = `
-      <td><strong>${esc(e.nombre)}</strong></td>
+      <td><strong>${esc(e.nombre)}</strong>${e.puesto ? `<div class="s-sub">${esc(e.puesto)}</div>` : ''}</td>
       <td>${esc(e.cedula)||'—'}</td>
       <td style="color:var(--blue);font-size:13px;">${esc(e.correo)||'—'}</td>
       <td>${esc(e.telefono)||'—'}</td>
@@ -551,6 +554,10 @@ function openEmpleadoModal(id){
   document.getElementById('empModalTitle').textContent = e ? '✏️ Editar empleado' : '＋ Nuevo empleado';
   document.getElementById('eNombre').value = e?.nombre || '';
   document.getElementById('eCedula').value = e?.cedula || '';
+  // Un puesto guardado que no esté en la lista se conserva como opción para no perderlo.
+  const puestos = e?.puesto && !PUESTOS.includes(e.puesto) ? [...PUESTOS, e.puesto] : PUESTOS;
+  document.getElementById('ePuesto').innerHTML = '<option value="">— Sin asignar —</option>' + puestos.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  document.getElementById('ePuesto').value = e?.puesto || '';
   document.getElementById('eCorreo').value = e?.correo || '';
   document.getElementById('eTelefono').value = e?.telefono || '';
   document.getElementById('eDireccion').value = e?.direccion || '';
@@ -658,6 +665,7 @@ async function guardarEmpleado(){
   const payload = {
     nombre,
     cedula: document.getElementById('eCedula').value.trim() || null,
+    puesto: document.getElementById('ePuesto').value || null,
     correo: document.getElementById('eCorreo').value.trim().toLowerCase() || null,
     telefono: document.getElementById('eTelefono').value.trim() || null,
     direccion: document.getElementById('eDireccion').value.trim() || null,
