@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F2F2F7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/icons/favicon-64.png">
+<title>Mis Finanzas</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+/* Página aparte del gimnasio: sesión propia (finSesion), no usa user_roles ni sesion.js */
+#app { display: none; padding-bottom: 40px; }
+.semana-nav { display: flex; align-items: center; gap: 8px; padding: 14px var(--gut) 0; flex-wrap: wrap; }
+.semana-nav .lbl { font-weight: 700; font-size: 17px; margin: 0 6px; }
+.bar { height: 8px; border-radius: 4px; background: var(--fill2); overflow: hidden; margin-top: 4px; }
+.bar i { display: block; height: 100%; border-radius: 4px; background: var(--brand); }
+.lista { background: var(--card); border-radius: 12px; box-shadow: var(--shadow); margin: 0 var(--gut) 12px; }
+.fila { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-bottom: .5px solid var(--hair); font-size: 14px; }
+.fila:last-child { border-bottom: 0; }
+.fila .grow { flex: 1; min-width: 0; }
+.fila .sub { color: var(--sec); font-size: 12px; }
+.fila .m { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fila .m.in { color: var(--green); }
+.fila select { background: var(--fill); border: 0; border-radius: 8px; padding: 4px 6px; font-size: 12px; color: var(--label); }
+.fila button.x { border: 0; background: none; color: var(--red); font-size: 16px; cursor: pointer; padding: 4px; }
+.reparto { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 14px; }
+.reparto b { text-align: right; font-variant-numeric: tabular-nums; }
+.codigo { font: 700 22px ui-monospace, Menlo, monospace; letter-spacing: .08em; background: var(--fill); padding: 8px 14px; border-radius: 10px; display: inline-block; user-select: all; }
+.tabs { max-width: calc(100% - 2 * var(--gut)); }
+@media (max-width: 520px) { .tabs { grid-auto-flow: row; grid-template-columns: 1fr 1fr; } .tab { padding: 0 8px; } }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">💰</div>
+    <h2>Mis Finanzas</h2>
+    <p class="login-sub">Privado · solo su cuenta personal</p>
+    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" autocomplete="username"></div>
+    <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" autocomplete="current-password"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="header">
+    <div class="header-icon">💰</div>
+    <div><h1>Mis Finanzas</h1><p>Ingresos semanales, diezmo y gastos</p></div>
+    <div class="header-right">
+      <span id="userEmail"></span>
+      <button class="logout-btn" onclick="salir()">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-t="semana" onclick="tab('semana')">📅 Semana</button>
+    <button class="tab" data-t="registrar" onclick="tab('registrar')">➕ Registrar</button>
+    <button class="tab" data-t="rubros" onclick="tab('rubros')">📦 2º diezmo</button>
+    <button class="tab" data-t="ajustes" onclick="tab('ajustes')">⚙️ Ajustes</button>
+  </div>
+
+  <!-- ── SEMANA ── -->
+  <div class="tab-panel active" id="p_semana">
+    <div class="semana-nav">
+      <button class="btn-ghost" onclick="moverSemana(-1)">‹</button>
+      <span class="lbl" id="semLbl"></span>
+      <button class="btn-ghost" onclick="moverSemana(1)">›</button>
+      <button class="btn-ghost" onclick="semana = lunes(hoy()); render()">Hoy</button>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">Ingresos</div><div class="kpi-value" id="kIng">—</div></div>
+      <div class="kpi teal"><div class="kpi-label">Disponible (75%)</div><div class="kpi-value" id="kDisp">—</div></div>
+      <div class="kpi orange"><div class="kpi-label">Gastado</div><div class="kpi-value" id="kGas">—</div></div>
+      <div class="kpi green"><div class="kpi-label">Le queda</div><div class="kpi-value" id="kQueda">—</div><div class="kpi-sub" id="kSaldo"></div></div>
+    </div>
+    <div class="section"><div class="section-title">Reparto de la semana</div></div>
+    <div class="form-card"><div class="reparto" id="repSem"></div></div>
+    <div class="section"><div class="section-title">Gastos por categoría</div></div>
+    <div class="lista" id="catSem"></div>
+    <div class="section"><div class="section-title">Movimientos de la semana</div></div>
+    <div class="lista" id="movSem"></div>
+    <div class="section"><div class="section-title">Diezmo y primicia por entregar <span class="section-note" id="pendTot"></span></div></div>
+    <div class="lista" id="pendList"></div>
+  </div>
+
+  <!-- ── REGISTRAR ── -->
+  <div class="tab-panel" id="p_registrar">
+    <div class="section"><div class="section-title">Gasto</div></div>
+    <div class="form-card">
+      <div class="form-grid">
+        <div class="f-field"><label>Monto ₡</label><input id="gMonto" type="number" inputmode="decimal" min="0" step="any"></div>
+        <div class="f-field"><label>Descripción</label><input id="gDesc" placeholder="Ej. almuerzo, gasolina, Netflix"></div>
+        <div class="f-field"><label>Fecha</label><input id="gFecha" type="date"></div>
+        <div class="f-field"><label>Categoría</label><select id="gCat"></select></div>
+        <div class="f-field"><label>Sale de</label><select id="gRubro"></select></div>
+      </div>
+      <div class="form-actions"><span class="form-msg" id="gMsg"></span><button class="btn-primary" onclick="guardarGasto()">Guardar gasto</button></div>
+    </div>
+
+    <div class="section"><div class="section-title">Ingreso</div></div>
+    <div class="form-card">
+      <div class="form-grid">
+        <div class="f-field"><label>Monto ₡</label><input id="iMonto" type="number" inputmode="decimal" min="0" step="any" oninput="previewIngreso()"></div>
+        <div class="f-field"><label>Descripción</label><input id="iDesc" placeholder="Ej. salario semana"></div>
+        <div class="f-field"><label>Fecha</label><input id="iFecha" type="date"></div>
+      </div>
+      <div class="reparto" id="iPrev" style="margin-top:14px"></div>
+      <div class="form-actions"><span class="form-msg" id="iMsg"></span><button class="btn-primary" onclick="guardarIngreso()">Guardar ingreso</button></div>
+    </div>
+  </div>
+
+  <!-- ── SEGUNDO DIEZMO ── -->
+  <div class="tab-panel" id="p_rubros">
+    <div class="section"><div class="section-title">Segundo diezmo · saldo por rubro <span class="section-note">acumulado de todos los ingresos menos lo gastado de cada rubro</span></div></div>
+    <div class="lista" id="rubrosList"></div>
+  </div>
+
+  <!-- ── AJUSTES ── -->
+  <div class="tab-panel" id="p_ajustes">
+    <div class="section"><div class="section-title">Nombres de los 7 rubros</div></div>
+    <div class="form-card">
+      <div class="form-grid" id="rubrosForm"></div>
+      <div class="form-actions"><span class="form-msg" id="rMsg"></span><button class="btn-primary" onclick="guardarRubros()">Guardar nombres</button></div>
+    </div>
+
+    <div class="section"><div class="section-title">Palabras para categorizar <span class="section-note">si la descripción trae esta palabra, va a esa categoría (además de las que ya trae: super, gasolina, Netflix, alquiler…)</span></div></div>
+    <div class="form-card">
+      <div class="form-grid">
+        <div class="f-field"><label>Palabra</label><input id="rgPal" placeholder="Ej. pricesmart"></div>
+        <div class="f-field"><label>Categoría</label><input id="rgCat" list="catsList" placeholder="comida"></div>
+      </div>
+      <datalist id="catsList"></datalist>
+      <div class="form-actions"><span class="form-msg" id="rgMsg"></span><button class="btn-primary" onclick="guardarRegla()">Agregar</button></div>
+    </div>
+    <div class="lista" id="reglasList"></div>
+
+    <div class="section"><div class="section-title">Telegram</div></div>
+    <div class="form-card" id="tgBox"></div>
+  </div>
+</div>
+
+<script>
+const SUPA_URL = '__SUPA_URL__';
+const SUPA_KEY = '__SUPA_KEY__';
+const KEY = 'finSesion';           // sesión propia: no se mezcla con la del gimnasio
+const IDLE_MIN = 20;
+const CATS = ['comida', 'alquiler', 'aplicaciones', 'carro', 'otros'];
+
+let ses = null, ingresos = [], gastos = [], reglas = [], cfg = null, semana = null, ultimaAct = Date.now();
+
+/* ── utilidades ── */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const crc = n => '₡' + Math.round(+n || 0).toLocaleString('es-CR');
+const r2 = n => Math.round(n * 100) / 100;
+const hoy = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Costa_Rica' }).format(new Date());
+function lunes(f) { const d = new Date(f + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); }
+function sumarDias(f, n) { const d = new Date(f + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function fCorta(f) { return new Date(f + 'T12:00:00Z').toLocaleDateString('es-CR', { day: 'numeric', month: 'short', timeZone: 'UTC' }); }
+function reparto(m) { const d = r2(m * .10), p = r2(m * .05), s = r2(m * .10); return { diezmo: d, primicia: p, segundo: s, disponible: r2(m - d - p - s) }; }
+const rubroNombre = i => (cfg?.rubros || [])[i - 1] || ('Rubro ' + i);
+
+/* ── sesión ── */
+function guardarSes(d) {
+  ses = { access_token: d.access_token, refresh_token: d.refresh_token, exp: Date.now() + (d.expires_in || 3600) * 1000 };
+  try { localStorage.setItem(KEY, JSON.stringify(ses)); } catch (_) {}
+}
+async function renovar() {
+  if (!ses?.refresh_token) return false;
+  const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', {
+    method: 'POST', headers: { apikey: SUPA_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: ses.refresh_token }) });
+  const d = await r.json().catch(() => ({}));
+  if (!d.access_token) return false;
+  guardarSes(d); return true;
+}
+async function api(path, opt = {}) {
+  if (ses && ses.exp - Date.now() < 120000) await renovar();
+  const go = () => fetch(SUPA_URL + '/rest/v1/' + path, {
+    method: opt.method || 'GET',
+    headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + ses.access_token, 'Content-Type': 'application/json',
+               Prefer: opt.prefer || 'return=representation' },
+    body: opt.body ? JSON.stringify(opt.body) : undefined });
+  let r = await go();
+  if (r.status === 401 && await renovar()) r = await go();
+  if (r.status === 401) { salir(); throw new Error('Sesión vencida'); }
+  const txt = await r.text();
+  const data = txt ? JSON.parse(txt) : null;
+  if (!r.ok) throw new Error(data?.message || 'Error ' + r.status);
+  return data;
+}
+async function doLogin() {
+  const b = $('loginBtn'); b.disabled = true; $('loginError').textContent = '';
+  try {
+    const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=password', {
+      method: 'POST', headers: { apikey: SUPA_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: $('loginEmail').value.trim(), password: $('loginPassword').value }) });
+    const d = await r.json();
+    if (!d.access_token) throw new Error('Correo o contraseña incorrectos');
+    guardarSes(d);
+    await entrar();
+  } catch (e) { $('loginError').textContent = e.message; }
+  b.disabled = false;
+}
+async function entrar() {
+  const dueno = await api('rpc/fin_es_dueno', { method: 'POST', body: {} }).catch(() => false);
+  if (dueno !== true) { salir(); $('loginError').textContent = 'Esta cuenta no tiene acceso a Mis Finanzas.'; return; }
+  try { $('userEmail').textContent = JSON.parse(atob(ses.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email || ''; } catch (_) {}
+  $('loginScreen').style.display = 'none'; $('app').style.display = 'block';
+  $('loginPassword').value = '';
+  semana = lunes(hoy());
+  $('gFecha').value = $('iFecha').value = hoy();
+  await cargar();
+}
+function salir() {
+  try { localStorage.removeItem(KEY); } catch (_) {}
+  if (ses?.access_token) fetch(SUPA_URL + '/auth/v1/logout', { method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + ses.access_token } }).catch(() => {});
+  ses = null; ingresos = gastos = reglas = []; cfg = null;
+  $('app').style.display = 'none'; $('loginScreen').style.display = '';
+}
+['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, () => { ultimaAct = Date.now(); }, { passive: true }));
+setInterval(() => { if (ses && Date.now() - ultimaAct > IDLE_MIN * 60000) salir(); }, 30000);
+
+/* ── datos ── */
+async function cargar() {
+  [ingresos, gastos, reglas, cfg] = await Promise.all([
+    api('fin_ingresos?select=*&order=fecha.desc,created_at.desc'),
+    api('fin_gastos?select=*&order=fecha.desc,created_at.desc'),
+    api('fin_reglas?select=*&order=palabra'),
+    api('fin_config?select=*').then(r => r[0] || null),
+  ]);
+  if (!cfg) cfg = (await api('fin_config', { method: 'POST', body: {} }))[0];
+  render();
+}
+
+/* ── pantallas ── */
+function tab(t) {
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.t === t));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'p_' + t));
+}
+function moverSemana(n) { semana = sumarDias(semana, 7 * n); render(); }
+
+function render() {
+  const cats = [...new Set([...CATS, ...reglas.map(r => r.categoria), ...gastos.map(g => g.categoria)])].filter(Boolean);
+  $('catsList').innerHTML = cats.map(c => `<option value="${esc(c)}">`).join('');
+  $('gCat').innerHTML = '<option value="">✨ Automática</option>' + cats.map(c => `<option>${esc(c)}</option>`).join('');
+  $('gRubro').innerHTML = '<option value="">Disponible (75%)</option>' + [1, 2, 3, 4, 5, 6, 7].map(i => `<option value="${i}">2º diezmo · ${esc(rubroNombre(i))}</option>`).join('');
+
+  // ── semana
+  $('semLbl').textContent = `${fCorta(semana)} – ${fCorta(sumarDias(semana, 6))}`;
+  const ingS = ingresos.filter(i => i.semana === semana), gasS = gastos.filter(g => g.semana === semana);
+  const sum = (a, f) => a.reduce((t, x) => t + (+f(x) || 0), 0);
+  const ing = sum(ingS, i => i.monto), disp = sum(ingS, i => i.disponible);
+  const gasDisp = sum(gasS.filter(g => !g.rubro), g => g.monto);
+  const saldo = sum(ingresos, i => i.disponible) - sum(gastos.filter(g => !g.rubro), g => g.monto);
+  $('kIng').textContent = crc(ing); $('kDisp').textContent = crc(disp); $('kGas').textContent = crc(gasDisp);
+  $('kQueda').textContent = crc(disp - gasDisp);
+  $('kQueda').style.color = disp - gasDisp < 0 ? 'var(--red)' : '';
+  $('kSaldo').textContent = 'Saldo acumulado: ' + crc(saldo);
+
+  const sd = sum(ingS, i => i.segundo_diezmo);
+  $('repSem').innerHTML = `
+    <span>🙏 Diezmo (10%)</span><b>${crc(sum(ingS, i => i.diezmo))}</b>
+    <span>🌱 Primicia (5%)</span><b>${crc(sum(ingS, i => i.primicia))}</b>
+    <span>📦 Segundo diezmo (10%) · ${crc(sd / 7)} por rubro</span><b>${crc(sd)}</b>
+    <span>💵 Disponible (75%)</span><b>${crc(disp)}</b>`;
+
+  const porCat = {};
+  gasS.filter(g => !g.rubro).forEach(g => { porCat[g.categoria] = (porCat[g.categoria] || 0) + +g.monto; });
+  const filasCat = Object.entries(porCat).sort((a, b) => b[1] - a[1]);
+  const max = Math.max(1, ...filasCat.map(c => c[1]));
+  $('catSem').innerHTML = filasCat.length ? filasCat.map(([c, v]) => `
+    <div class="fila"><div class="grow">${esc(c)}<div class="bar"><i style="width:${(v / max * 100).toFixed(1)}%"></i></div></div>
+    <span class="m">${crc(v)}</span><span class="sub">${gasDisp ? Math.round(v / gasDisp * 100) : 0}%</span></div>`).join('')
+    : '<div class="tbl-empty">Sin gastos esta semana.</div>';
+
+  const movs = [...ingS.map(i => ({ ...i, t: 'in' })), ...gasS.map(g => ({ ...g, t: 'out' }))]
+    .sort((a, b) => (b.fecha + b.created_at).localeCompare(a.fecha + a.created_at));
+  $('movSem').innerHTML = movs.length ? movs.map(m => m.t === 'in' ? `
+    <div class="fila"><div class="grow">${esc(m.descripcion || 'Ingreso')}<div class="sub">${fCorta(m.fecha)}${m.origen === 'telegram' ? ' · Telegram' : ''}</div></div>
+      <span class="m in">+${crc(m.monto)}</span><button class="x" title="Borrar" onclick="borrar('fin_ingresos','${m.id}')">✕</button></div>` : `
+    <div class="fila"><div class="grow">${esc(m.descripcion || 'Gasto')}<div class="sub">${fCorta(m.fecha)}${m.rubro ? ' · 2º diezmo: ' + esc(rubroNombre(m.rubro)) : ''}${m.origen === 'telegram' ? ' · Telegram' : ''}</div></div>
+      ${m.rubro ? '' : `<select onchange="cambiarCat('${m.id}', this.value)">${cats.map(c => `<option${c === m.categoria ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>`}
+      <span class="m">−${crc(m.monto)}</span><button class="x" title="Borrar" onclick="borrar('fin_gastos','${m.id}')">✕</button></div>`).join('')
+    : '<div class="tbl-empty">Sin movimientos esta semana.</div>';
+
+  const pend = ingresos.filter(i => !i.entregado);
+  $('pendTot').textContent = pend.length ? 'Total: ' + crc(sum(pend, i => +i.diezmo + +i.primicia)) : '';
+  $('pendList').innerHTML = pend.length ? pend.map(i => `
+    <div class="fila"><div class="grow">${esc(i.descripcion || 'Ingreso')} · ${fCorta(i.fecha)}<div class="sub">Diezmo ${crc(i.diezmo)} · Primicia ${crc(i.primicia)}</div></div>
+      <span class="m">${crc(+i.diezmo + +i.primicia)}</span><button class="btn-ghost" onclick="entregado('${i.id}')">✓ Entregado</button></div>`).join('')
+    : '<div class="tbl-empty">Todo entregado 🙌</div>';
+
+  // ── rubros
+  const porRubro = sum(ingresos, i => i.segundo_diezmo) / 7;
+  $('rubrosList').innerHTML = [1, 2, 3, 4, 5, 6, 7].map(n => {
+    const usado = sum(gastos.filter(g => g.rubro === n), g => g.monto), queda = porRubro - usado;
+    return `<div class="fila"><div class="grow">${n}. ${esc(rubroNombre(n))}<div class="sub">Apartado ${crc(porRubro)} · Usado ${crc(usado)}</div></div>
+      <span class="m" style="color:${queda < 0 ? 'var(--red)' : 'var(--green)'}">${crc(queda)}</span></div>`;
+  }).join('');
+
+  // ── ajustes
+  $('rubrosForm').innerHTML = [1, 2, 3, 4, 5, 6, 7].map(n =>
+    `<div class="f-field"><label>Rubro ${n}</label><input id="rb${n}" value="${esc(rubroNombre(n))}" maxlength="40"></div>`).join('');
+  $('reglasList').innerHTML = reglas.length ? reglas.map(r => `
+    <div class="fila"><div class="grow">"${esc(r.palabra)}" → <b>${esc(r.categoria)}</b></div>
+      <button class="x" onclick="borrarRegla('${encodeURIComponent(r.palabra)}')">✕</button></div>`).join('')
+    : '<div class="tbl-empty">Aún no ha agregado palabras propias.</div>';
+  renderTelegram();
+  previewIngreso();
+}
+
+function renderTelegram() {
+  const box = $('tgBox');
+  if (cfg?.telegram_chat_id) {
+    box.innerHTML = `<p>✅ Telegram vinculado. Escríbale al bot, por ejemplo <b>5000 almuerzo</b>, <b>+ 250000 salario</b> o <b>/resumen</b>.</p>
+      <div class="form-actions"><button class="btn-ghost" onclick="desvincular()">Desvincular</button></div>`;
+  } else if (cfg?.telegram_codigo) {
+    box.innerHTML = `<p>Abra su bot en Telegram y envíele este mensaje:</p>
+      <p style="margin:12px 0"><span class="codigo">/vincular ${esc(cfg.telegram_codigo)}</span></p>
+      <p class="hint">El código sirve una sola vez. Después de enviarlo, toque “Ya lo envié”.</p>
+      <div class="form-actions"><button class="btn-ghost" onclick="generarCodigo()">Otro código</button><button class="btn-primary" onclick="cargar()">Ya lo envié</button></div>`;
+  } else {
+    box.innerHTML = `<p>Registre gastos mandando un mensaje desde el celular. Primero hay que crear el bot (ver instrucciones en <code>supabase/functions/finanzas-telegram</code>).</p>
+      <div class="form-actions"><button class="btn-primary" onclick="generarCodigo()">Vincular Telegram</button></div>`;
+  }
+}
+
+/* ── acciones ── */
+function previewIngreso() {
+  const m = +$('iMonto').value;
+  if (!(m > 0)) { $('iPrev').innerHTML = ''; return; }
+  const r = reparto(m);
+  $('iPrev').innerHTML = `<span>🙏 Diezmo 10%</span><b>${crc(r.diezmo)}</b><span>🌱 Primicia 5%</span><b>${crc(r.primicia)}</b>
+    <span>📦 Segundo diezmo 10% (${crc(r.segundo / 7)} × 7)</span><b>${crc(r.segundo)}</b><span>💵 Disponible 75%</span><b>${crc(r.disponible)}</b>`;
+}
+function msg(id, t, ok) { const e = $(id); e.textContent = t; e.className = 'form-msg ' + (ok ? 'ok' : 'err'); if (ok) setTimeout(() => { e.textContent = ''; }, 3500); }
+
+async function guardarGasto() {
+  const monto = +$('gMonto').value;
+  if (!(monto > 0)) return msg('gMsg', 'Ponga un monto.', false);
+  try {
+    const [g] = await api('fin_gastos', { method: 'POST', body: {
+      monto, descripcion: $('gDesc').value.trim() || null, fecha: $('gFecha').value || hoy(),
+      categoria: $('gCat').value || null, rubro: $('gRubro').value ? +$('gRubro').value : null } });
+    gastos.unshift(g);
+    $('gMonto').value = $('gDesc').value = ''; $('gCat').value = ''; $('gRubro').value = '';
+    render(); msg('gMsg', `✓ Guardado en ${g.rubro ? rubroNombre(g.rubro) : g.categoria}`, true);
+  } catch (e) { msg('gMsg', e.message, false); }
+}
+async function guardarIngreso() {
+  const monto = +$('iMonto').value;
+  if (!(monto > 0)) return msg('iMsg', 'Ponga un monto.', false);
+  try {
+    const [i] = await api('fin_ingresos', { method: 'POST', body: { monto, descripcion: $('iDesc').value.trim() || null, fecha: $('iFecha').value || hoy() } });
+    ingresos.unshift(i);
+    $('iMonto').value = $('iDesc').value = '';
+    render(); msg('iMsg', '✓ Ingreso guardado', true);
+  } catch (e) { msg('iMsg', e.message, false); }
+}
+async function borrar(tabla, id) {
+  if (!confirm('¿Borrar este movimiento?')) return;
+  await api(`${tabla}?id=eq.${id}`, { method: 'DELETE', prefer: 'return=minimal' });
+  if (tabla === 'fin_gastos') gastos = gastos.filter(g => g.id !== id); else ingresos = ingresos.filter(i => i.id !== id);
+  render();
+}
+async function cambiarCat(id, categoria) {
+  const [g] = await api(`fin_gastos?id=eq.${id}`, { method: 'PATCH', body: { categoria } });
+  gastos = gastos.map(x => x.id === id ? g : x); render();
+}
+async function entregado(id) {
+  const [i] = await api(`fin_ingresos?id=eq.${id}`, { method: 'PATCH', body: { entregado: true } });
+  ingresos = ingresos.map(x => x.id === id ? i : x); render();
+}
+async function guardarRubros() {
+  const rubros = [1, 2, 3, 4, 5, 6, 7].map(n => $('rb' + n).value.trim() || 'Rubro ' + n);
+  try { [cfg] = await api('fin_config?owner=not.is.null', { method: 'PATCH', body: { rubros, updated_at: new Date().toISOString() } }); render(); msg('rMsg', '✓ Guardado', true); }
+  catch (e) { msg('rMsg', e.message, false); }
+}
+async function guardarRegla() {
+  const palabra = $('rgPal').value.trim().toLowerCase(), categoria = $('rgCat').value.trim().toLowerCase();
+  if (!palabra || !categoria) return msg('rgMsg', 'Complete palabra y categoría.', false);
+  try {
+    await api('fin_reglas', { method: 'POST', prefer: 'return=representation,resolution=merge-duplicates', body: { palabra, categoria } });
+    $('rgPal').value = $('rgCat').value = '';
+    reglas = await api('fin_reglas?select=*&order=palabra'); render(); msg('rgMsg', '✓ Agregada (aplica a gastos nuevos)', true);
+  } catch (e) { msg('rgMsg', e.message, false); }
+}
+async function borrarRegla(p) {
+  await api('fin_reglas?palabra=eq.' + p, { method: 'DELETE', prefer: 'return=minimal' });
+  reglas = reglas.filter(r => encodeURIComponent(r.palabra) !== p); render();
+}
+async function generarCodigo() {
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', b = crypto.getRandomValues(new Uint8Array(10));
+  const codigo = Array.from(b, x => abc[x % abc.length]).join('');
+  [cfg] = await api('fin_config?owner=not.is.null', { method: 'PATCH', body: { telegram_codigo: codigo } });
+  renderTelegram();
+}
+async function desvincular() {
+  if (!confirm('¿Desvincular Telegram? El bot dejará de registrar sus mensajes.')) return;
+  [cfg] = await api('fin_config?owner=not.is.null', { method: 'PATCH', body: { telegram_chat_id: null, telegram_codigo: null } });
+  renderTelegram();
+}
+
+/* ── arranque ── */
+$('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+(async () => {
+  try { ses = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (_) { ses = null; }
+  if (ses?.access_token) { try { await entrar(); } catch (_) { salir(); } }
+})();
+</script>
+</body>
+</html>

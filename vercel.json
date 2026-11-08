@@ -16,6 +16,7 @@
     { "source": "/planilla", "destination": "/planilla.html" },
     { "source": "/conciliacion", "destination": "/conciliacion.html" },
     { "source": "/horarios", "destination": "/horarios.html" },
-    { "source": "/factura", "destination": "/factura.html" }
+    { "source": "/factura", "destination": "/factura.html" },
+    { "source": "/finanzas", "destination": "/finanzas.html" }
   ]
 }
