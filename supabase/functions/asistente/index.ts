@@ -17,6 +17,8 @@
 //    { accion: 'solicitar_anulacion', factura, motivo } → pide anular una factura de caja y avisa a
 //        Administración y al coordinador de la sede (ver anulaciones.sql)
 //    { accion: 'resolver_anulacion', solicitud, aprobar, nota } → aprueba (anula) o rechaza y avisa a quien la pidió
+//    { accion: 'aviso_apertura', cierre } → el turno abrió con más o menos efectivo que el cierre anterior:
+//        avisa a Administración y al coordinador de la sede (una sola vez; ver caja_apertura.sql)
 //
 //  Secretos: ANTHROPIC_API_KEY (el mismo de analizar-datafono) y, para las
 //  notificaciones push, VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY (la pública es la
@@ -399,6 +401,34 @@ Deno.serve(async (req) => {
         }).catch(() => 0);
       }
       return json({ ok: true, estado: r.estado, nota: r.nota });
+    }
+
+    // Apertura de caja con diferencia: los datos se leen de la base (los calcula caja_apertura.sql), no del navegador
+    if (body.accion === 'aviso_apertura') {
+      const { data: c } = await asCaller.from('cierres_caja')
+        .select('id, sede, fecha, turno_num, estado, caja_inicial, apertura_esperado, apertura_diferencia, apertura_ref, apertura_den_dif, apertura_motivo, apertura_avisado_at, created_at')
+        .eq('id', String(body.cierre || '')).maybeSingle();
+      if (!c) return json({ error: 'Turno no encontrado' }, 404);
+      const dif = Math.round(Number(c.apertura_diferencia) || 0);
+      const reciente = Date.now() - new Date(c.created_at).getTime() < 60 * 60 * 1000;
+      if (c.estado !== 'abierto' || !dif || c.apertura_avisado_at || !reciente) return json({ ok: true, avisados: 0 });
+      // Marca el aviso primero: si llegan dos llamadas, solo una envía
+      const { data: marcado } = await admin.from('cierres_caja').update({ apertura_avisado_at: new Date().toISOString() })
+        .eq('id', c.id).is('apertura_avisado_at', null).select('id');
+      if (!marcado?.length) return json({ ok: true, avisados: 0 });
+      const crc = (n: number) => '₡' + Math.round(Number(n) || 0).toLocaleString('es-CR');
+      const r = (c.apertura_ref || {}) as { fecha?: string; turno_num?: number; estado?: string };
+      const [, mes, dia] = String(r.fecha || '').split('-');
+      const den = Object.entries((c.apertura_den_dif || {}) as Record<string, number>)
+        .map(([k, v]) => [Number(k), Number(v)]).filter(([, v]) => v).sort((a, b) => b[0] - a[0])
+        .map(([d, v]) => `${Math.abs(v)} × ${crc(d)} ${v < 0 ? 'menos' : 'de más'}`).join(', ');
+      const avisados = await avisarAprobadores(admin, c.sede, caller.user.id, {
+        title: `Caja ${c.sede} · Turno ${c.turno_num ?? ''}: abrió con ${crc(Math.abs(dif))} ${dif < 0 ? 'menos' : 'de más'}`,
+        body: recorte(`Esperado ${crc(c.apertura_esperado)} (${r.estado === 'final' ? 'cierre final' : 'cierre'} ${dia || '?'}/${mes || '?'} T${r.turno_num ?? '?'}), contado ${crc(c.caja_inicial)}.`
+          + (den ? ` ${den}.` : '') + (c.apertura_motivo ? ` Motivo: ${c.apertura_motivo}.` : '') + ` Abrió: ${yo.nombre || caller.user.email}.`, 220),
+        tag: 'apertura-' + c.id, url: '/caja',
+      });
+      return json({ ok: true, avisados });
     }
 
     if (!ANTHROPIC_API_KEY) return json({ error: 'Falta configurar ANTHROPIC_API_KEY en los secretos de la función.' }, 500);

@@ -667,6 +667,10 @@ table.hist tbody tr:hover td { background:var(--fill); }
         <tfoot><tr class="tot"><td></td><td>Efectivo inicial</td><td id="aEfectivoCell">₡0</td></tr></tfoot>
       </table>
       <div class="hint" id="aEfectivoHint" style="margin:6px 0 16px;"></div>
+      <div id="aMotivoWrap" style="display:none;margin:-6px 0 16px;">
+        <label for="aMotivo" style="display:block;font-size:13px;font-weight:600;color:var(--sec);margin-bottom:4px;">Motivo de la diferencia <span style="font-weight:400;">(opcional)</span></label>
+        <input id="aMotivo" maxlength="300" placeholder="Ej. se usó para el depósito, faltó un billete en el sobre…" style="width:100%;box-sizing:border-box;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;">
+      </div>
       <div style="display:flex;align-items:center;gap:10px;margin:10px 0 8px;">
         <div style="font-size:13px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;">📦 Inventario contado (obligatorio, a ciegas)</div>
         <button type="button" class="btn-ghost" style="margin-left:auto;white-space:nowrap;" onclick="imprimirListaInventario('apertura')">🖨️ Imprimir hoja</button>
@@ -854,7 +858,10 @@ function updateTurnoUI(){
   const bA=document.getElementById('btnAbrirTurno'), bP=document.getElementById('btnParcial'), bF=document.getElementById('btnFinal');
   if(turnoActual){
     est.innerHTML=`<span class="pill ok" style="font-size:12px;padding:5px 12px;">🟢 Turno ${turnoActual.turno_num} ABIERTO</span>`;
-    info.textContent=`Apertura ${turnoActual.hora_apertura?new Date(turnoActual.hora_apertura).toLocaleString('es-CR'):'—'} · Caja inicial ${fmt(turnoActual.caja_inicial)}`;
+    { const ley=leyendaApertura(turnoActual), dif=Number(turnoActual.apertura_diferencia)||0;
+      info.innerHTML=esc(`Apertura ${turnoActual.hora_apertura?new Date(turnoActual.hora_apertura).toLocaleString('es-CR'):'—'} · Caja inicial ${fmt(turnoActual.caja_inicial)}`)
+        +(ley?`<br><span style="color:${dif?'var(--warn)':'var(--success)'};font-weight:${dif?700:500};">${dif?'⚠ ':''}${esc(ley)}</span>`
+          +(dif?` <button type="button" class="btn-ghost" style="padding:2px 10px;min-height:0;font-size:12px;" onclick="editarMotivoApertura()">✏️ ${turnoActual.apertura_motivo?'Cambiar motivo':'Agregar motivo'}</button>`:''):''); }
     { const li=document.getElementById('liveInfo'); if(li) li.textContent=esAdmin()?'🟢 En vivo (caja de recepción)':'🟢 En vivo'; }
     bA.style.display='none';
     [bP,bF].forEach(b=>{b.disabled=false;b.style.opacity=1;b.style.cursor='pointer';});
@@ -958,9 +965,10 @@ async function openAbrirModal(){
   document.getElementById('aDenomBody').innerHTML=DENOMS.map(d=>`
     <tr><td><input type="number" min="0" step="1" id="aden_${d}" value="0" oninput="calcAperturaEfectivo()"></td>
     <td><span class="chip">₡${d.toLocaleString('es-CR')}</span></td><td id="asub_${d}" class="sub">₡0</td></tr>`).join('');
-  window._aExpected=null;
-  if(num>1){ const prev=hoy.filter(c=>c.estado!=='abierto').sort((a,b)=>(b.turno_num||0)-(a.turno_num||0))[0]; if(prev) window._aExpected=Math.round(Number(prev.efectivo_final||prev.efectivo||0)); }
+  window._aExpected=null; window._aRef=null;
+  document.getElementById('aMotivo').value='';
   calcAperturaEfectivo();
+  aperturaReferencia(num).then(ref=>{ window._aRef=ref; window._aExpected=ref?ref.esperado:null; calcAperturaEfectivo(); });
   // Inventario a ciegas (no se muestra el sistema; no se actualiza el stock)
   document.getElementById('aInvList').innerHTML='<div style="padding:12px;color:var(--muted);">Cargando inventario…</div>';
   try{ window._invAp=await cargarInvCaja(currentSede); }catch(_){ window._invAp=[]; }
@@ -996,13 +1004,64 @@ function imprimirListaInventario(origen){
   if(!w){ alert('Permití las ventanas emergentes para imprimir la hoja.'); return; }
   w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch(_){} },350);
 }
+// ── Diferencia al abrir: contra el último turno cerrado de la sede (el cierre final del día
+//    anterior, o el turno anterior del mismo día). Misma regla que caja_apertura.sql, que es
+//    la que guarda la diferencia: aquí solo se muestra mientras se cuenta. No bloquea la apertura.
+const denTotal=d=>Object.entries(d||{}).reduce((s,[k,v])=>s+(Number(k)||0)*(Number(v)||0),0);
+async function aperturaReferencia(num){
+  const hoy=todayStr(), sede=currentSede;
+  try{
+    const r=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(sede)}`
+      +`&and=(or(estado.in.(parcial,final),estado.is.null),or(fecha.lt.${hoy},and(fecha.eq.${hoy},turno_num.lt.${num})))`
+      +`&order=fecha.desc,turno_num.desc.nullslast,created_at.desc&limit=1&select=id,fecha,turno_num,estado,efectivo,efectivo_final,denominaciones,created_by`))||[];
+    const c=r[0]; if(!c||sede!==currentSede) return null;
+    const esperado=Math.round(Number(c.efectivo_final)||Number(c.efectivo)||0);
+    const comparable=c.denominaciones&&typeof c.denominaciones==='object'&&esperado>0&&denTotal(c.denominaciones)===esperado;
+    return { id:c.id, fecha:c.fecha, turno_num:c.turno_num, estado:c.estado||'final', por:c.created_by, esperado, den:comparable?c.denominaciones:null };
+  }catch(_){ return null; }
+}
+// "1 × ₡5 000 menos · 2 × ₡1 000 de más"
+function textoDenDif(dd){
+  return Object.entries(dd||{}).map(([k,v])=>[Number(k),Number(v)]).filter(([,v])=>v).sort((a,b)=>b[0]-a[0])
+    .map(([d,v])=>`${Math.abs(v)} × ${fmt(d)} ${v<0?'menos':'de más'}`).join(' · ');
+}
 function calcAperturaEfectivo(){
   let ef=0; DENOMS.forEach(d=>{ const c=Number(document.getElementById('aden_'+d).value)||0; const s=c*d; ef+=s; const el=document.getElementById('asub_'+d); if(el)el.textContent=fmt(s); });
   document.getElementById('aEfectivoCell').textContent=fmt(ef);
-  const h=document.getElementById('aEfectivoHint');
-  if(window._aExpected!=null){ const dif=ef-window._aExpected; h.innerHTML=`Esperado (efectivo final del turno anterior): <b>${fmt(window._aExpected)}</b> — ${dif===0?'<span style="color:var(--success);font-weight:700;">✓ cuadra</span>':`<span style="color:var(--warn);font-weight:700;">diferencia ${fmt(Math.abs(dif))}</span>`}`; }
-  else h.textContent='Primer turno del día: cuente el efectivo con que abre la caja.';
+  const h=document.getElementById('aEfectivoHint'), r=window._aRef, mw=document.getElementById('aMotivoWrap');
+  if(r){
+    const dif=ef-r.esperado;
+    let html=`Esperado: <b>${fmt(r.esperado)}</b> — lo que dejó el ${r.estado==='final'?'cierre final':'cierre parcial'} del ${esc(fechaCorta(r.fecha))} · Turno ${esc(r.turno_num||'—')}${r.por?' ('+esc(r.por)+')':''}.<br>`;
+    if(dif===0) html+='<span style="color:var(--success);font-weight:700;">✓ Cuadra</span>';
+    else{
+      html+=`<span style="color:var(--warn);font-weight:700;">Abre con ${fmt(Math.abs(dif))} ${dif<0?'menos':'de más'}</span> <span style="color:var(--sec);">· no impide abrir: queda anotado en el turno y se avisa a Administración.</span>`;
+      if(r.den){ const dd={}; DENOMS.forEach(d=>{ const v=(Number(document.getElementById('aden_'+d).value)||0)-(Number(r.den[d])||0); if(v) dd[d]=v; });
+        const t=textoDenDif(dd); if(t) html+=`<br>Por billete: ${esc(t)}`; }
+      else html+='<br><span style="color:var(--sec);">No se puede comparar por billete: ese cierre contó el sobre junto con el efectivo.</span>';
+    }
+    h.innerHTML=html; mw.style.display=dif===0?'none':'';
+  }else{
+    h.textContent=window._turnoNum>1?'Cuente el efectivo con que abre la caja.':'No hay un cierre anterior para comparar: cuente el efectivo con que abre la caja.';
+    mw.style.display='none';
+  }
   return ef;
+}
+// Leyenda del turno: con cuánto abrió frente al cierre anterior
+function leyendaApertura(t){
+  if(!t||t.apertura_diferencia==null) return '';
+  const dif=Math.round(Number(t.apertura_diferencia)||0), r=t.apertura_ref||{};
+  const base=`${r.estado==='final'?'cierre final':'cierre'} del ${fechaCorta(r.fecha)} · T${r.turno_num||'—'}`;
+  if(!dif) return `✓ Abrió cuadrado con el ${base}`;
+  const den=textoDenDif(t.apertura_den_dif);
+  return `Abrió con ${fmt(Math.abs(dif))} ${dif<0?'menos':'de más'} que el ${base} (esperado ${fmt(t.apertura_esperado)}, contado ${fmt(t.caja_inicial)})`
+    +(den?` · ${den}`:'')+(t.apertura_motivo?` · Motivo: ${t.apertura_motivo}`:'');
+}
+async function editarMotivoApertura(){
+  const t=turnoActual; if(!t) return;
+  const m=prompt('Motivo de la diferencia al abrir (opcional):', t.apertura_motivo||'');
+  if(m==null) return;
+  try{ await supaFetch(`/cierres_caja?id=eq.${t.id}`,{method:'PATCH',body:{apertura_motivo:m.trim()||null}}); await loadCierres(); }
+  catch(e){ alert('No se pudo guardar el motivo: '+mensajeError(e)); }
 }
 
 async function abrirTurno(){
@@ -1015,8 +1074,13 @@ async function abrirTurno(){
   try{
     inv.forEach((p,i)=>{ const raw=document.getElementById('ainv_'+i).value; contados[p.producto]=raw===''?null:(Number(raw)||0); });
     const rec={ sede:currentSede, fecha:todayStr(), turno:'Turno '+window._turnoNum, turno_num:window._turnoNum, estado:'abierto', hora_apertura:new Date().toISOString(), caja_inicial:efectivo, denominaciones_apertura:denom, created_by:currentEmail||null };
-    const creado=await supaFetch('/cierres_caja',{method:'POST',prefer:'return=representation',body:rec});
+    const motivo=document.getElementById('aMotivo').value.trim();
+    let creado;
+    try{ creado=await supaFetch('/cierres_caja',{method:'POST',prefer:'return=representation',body:motivo?{...rec,apertura_motivo:motivo}:rec}); }
+    catch(e1){ if(motivo&&/apertura_motivo/.test(e1.message)) creado=await supaFetch('/cierres_caja',{method:'POST',prefer:'return=representation',body:rec}); else throw e1; }   // si aún no se corrió caja_apertura.sql
     const nuevo=Array.isArray(creado)?creado[0]:creado;
+    // Abrió con más o menos que el cierre anterior: aviso al teléfono de Administración (no frena nada si falla)
+    if(nuevo&&nuevo.id&&Number(nuevo.apertura_diferencia)) fxAsistente({accion:'aviso_apertura',cierre:nuevo.id}).catch(()=>{});
     // El conteo se compara en la base (recepción no recibe las cantidades del sistema)
     if(inv.length&&nuevo&&nuevo.id){
       try{
@@ -1030,7 +1094,8 @@ async function abrirTurno(){
     document.getElementById('abrirModal').style.display='none';
     await loadCierres();
     const sm=document.getElementById('saveMsg'); sm.className='msg ok';
-    sm.innerHTML=`✅ Turno ${window._turnoNum} abierto (efectivo ${fmt(efectivo)}). Arriba, en <b>🟢 Para WStudio</b>, están los montos para abrir allá.`+esc(avisoConteo)+(inv.length&&!avisoConteo?(discrep.length?` <span style="color:var(--warn);">⚠ Inventario con ${discrep.length} diferencia(s): ${discrep.slice(0,5).map(esc).join('; ')}${discrep.length>5?'…':''}</span>`:' <span style="color:var(--success);">Inventario cuadra ✓</span>'):'');
+    const leyAp=nuevo&&Number(nuevo.apertura_diferencia)?` <span style="color:var(--warn);">⚠ ${esc(leyendaApertura(nuevo))}. Se avisó a Administración.</span>`:'';
+    sm.innerHTML=`✅ Turno ${window._turnoNum} abierto (efectivo ${fmt(efectivo)}). Arriba, en <b>🟢 Para WStudio</b>, están los montos para abrir allá.`+leyAp+esc(avisoConteo)+(inv.length&&!avisoConteo?(discrep.length?` <span style="color:var(--warn);">⚠ Inventario con ${discrep.length} diferencia(s): ${discrep.slice(0,5).map(esc).join('; ')}${discrep.length>5?'…':''}</span>`:' <span style="color:var(--success);">Inventario cuadra ✓</span>'):'');
   }catch(e){ err.textContent='No se pudo abrir: '+e.message; }
   finally{ btn.disabled=false; btn.textContent='🔓 Abrir turno'; }
 }
@@ -2197,7 +2262,7 @@ function renderHist(){
   const estBadge=e=> e==='abierto'?'<span class="pill" style="background:var(--green-tint);color:var(--green);">abierto</span>':e==='parcial'?'<span class="pill" style="background:var(--orange-tint);color:var(--orange);">parcial</span>':e==='final'?'<span class="pill" style="background:rgba(88,86,214,.14);color:var(--indigo);">final</span>':'';
   tb.innerHTML=cierres.map(c=>`<tr>
     <td>${esc(c.fecha)}</td><td>${c.turno_num?('Turno '+c.turno_num):esc(c.turno)||'—'} ${estBadge(c.estado)}</td>
-    <td class="num">${fmt(c.caja_inicial)}</td><td class="num">${fmt(c.efectivo)}</td>
+    <td class="num">${fmt(c.caja_inicial)}${Number(c.apertura_diferencia)?`<div><span class="pill" style="background:var(--orange-tint);color:var(--orange);font-size:11px;" title="${esc(leyendaApertura(c))}">Abrió ${Number(c.apertura_diferencia)<0?'−':'+'}${fmt(Math.abs(c.apertura_diferencia))}</span></div>`:''}</td><td class="num">${fmt(c.efectivo)}</td>
     <td class="num">${fmt(c.total_ventas)}</td><td class="num">${fmt(c.minita)}</td>
     <td class="num" style="color:${Math.round(c.diferencia||0)===0?'var(--green)':'var(--red)'};">${fmt(c.diferencia)}</td>
     <td>${Math.round(c.diferencia||0)===0?'<span class="pill ok">OK</span>':(Math.round(c.diferencia||0)>0?'<span class="pill dif">Faltante</span>':'<span class="pill dif" style="background:var(--blue-tint);color:var(--blue);">Sobrante</span>')}${faltantesCruce(c.sinpe_reporte&&c.sinpe_reporte.cruce)&&!(sinpeDia(c.sinpe_reporte)||{}).aclarado?` <span class="pill dif" title="Cobros SINPE sin transferencia: abra el cierre para ver quiénes">⚠ SINPE ${faltantesCruce(c.sinpe_reporte.cruce)}</span>`:''}</td>
@@ -2895,6 +2960,12 @@ function generarPDF(){
   doc.text(document.getElementById('cFecha').value+(document.getElementById('cTurno').value?'   ·   '+document.getElementById('cTurno').value:''),X+W-11,y-4,{align:'right'}); y+=RH;
   y+=6;
   row('CAJA INICIAL',c.cajaIni,'ECECEC');
+  { const fc=_formCierre(), dif=fc?Math.round(Number(fc.apertura_diferencia)||0):0;
+    if(dif){ const r=fc.apertura_ref||{}, sinTilde=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(156,0,24);
+      const txt=sinTilde(`Abrio con ${money(Math.abs(dif))} ${dif<0?'menos':'de mas'} que el cierre ${r.estado==='final'?'final ':''}del ${r.fecha||''} T${r.turno_num||''} (esperado ${money(fc.apertura_esperado)})`
+        +(textoDenDif(fc.apertura_den_dif)?' · '+textoDenDif(fc.apertura_den_dif).replace(/₡/g,''):'')+(fc.apertura_motivo?' · Motivo: '+fc.apertura_motivo:''));
+      doc.splitTextToSize(txt,W-22).forEach(l=>{ doc.text(l,X+11,y+4); y+=11; }); y+=6; } }
   row('MEMBRESIAS',c.membresias,'FFFF99');
   y+=6;
   head('BILLETES Y MONEDAS','EBFFBF');
