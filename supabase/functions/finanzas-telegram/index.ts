@@ -11,14 +11,16 @@
 //    /deshacer                → borra lo último que registró por Telegram
 //    /vincular CODIGO         → liga este chat a su cuenta (código en /finanzas → Ajustes)
 //
-//  Deploy (una vez):
-//    1. En Telegram, hable con @BotFather → /newbot → copie el token.
-//    2. supabase secrets set FIN_TELEGRAM_TOKEN=<token> FIN_TELEGRAM_SECRET=<texto-largo-al-azar>
-//    3. supabase functions deploy finanzas-telegram --no-verify-jwt
-//       (Telegram no manda sesión de Supabase; la función se protege con el
-//        secreto del paso 2, que Telegram envía en cada mensaje.)
-//    4. Registrar el webhook (una vez, desde el navegador o curl):
-//       https://api.telegram.org/bot<token>/setWebhook?url=https://<PROJECT_REF>.supabase.co/functions/v1/finanzas-telegram&secret_token=<FIN_TELEGRAM_SECRET>
+//  Puesta en marcha (una vez):
+//    1. En Telegram, hable con @BotFather → /newbot → copie el token del bot.
+//    2. Supabase → Edge Functions → Secrets: FIN_TELEGRAM_SECRET = texto largo al azar
+//       (solo letras, números, _ y -). El token del bot NO se guarda aquí: la
+//       función responde dentro de la misma petición y nunca llama a Telegram.
+//    3. Desplegar sin verificación JWT (Telegram no manda sesión de Supabase; la
+//       función se protege con FIN_TELEGRAM_SECRET, que Telegram envía en cada mensaje):
+//         supabase functions deploy finanzas-telegram --no-verify-jwt
+//    4. Registrar el webhook abriendo en el navegador:
+//       https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<PROJECT_REF>.supabase.co/functions/v1/finanzas-telegram&secret_token=<FIN_TELEGRAM_SECRET>&allowed_updates=["message"]
 // ════════════════════════════════════════════════════════════════════════
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
