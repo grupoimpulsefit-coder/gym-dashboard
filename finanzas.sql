@@ -32,7 +32,7 @@ create or replace function public.fin_es_dueno()
 returns boolean
 language sql stable security definer set search_path = public
 as $$ select exists (select 1 from fin_duenos where user_id = auth.uid()) $$;
-revoke all on function public.fin_es_dueno() from public;
+revoke all on function public.fin_es_dueno() from public, anon;
 grant execute on function public.fin_es_dueno() to authenticated;
 
 -- ── Configuración: nombres de los 7 rubros y vínculo con Telegram ───────────
@@ -92,7 +92,7 @@ create table if not exists fin_reglas (
 -- ── Categorización automática ───────────────────────────────────────────────
 --  Busca palabras completas en la descripción: primero las suyas, luego estas.
 create or replace function public.fin_normalizar(t text)
-returns text language sql immutable
+returns text language sql immutable set search_path = public
 as $$ select ' ' || btrim(regexp_replace(translate(lower(coalesce(t, '')), 'áéíóúüñ', 'aeiouun'), '[^a-z0-9]+', ' ', 'g')) || ' ' $$;
 
 create or replace function public.fin_categorizar(p_owner uuid, p_texto text)
