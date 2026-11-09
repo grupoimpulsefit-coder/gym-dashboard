@@ -38,7 +38,7 @@ create table if not exists sinpe_aclaraciones (
 );
 create index if not exists sinpe_acl_sede_idx on sinpe_aclaraciones (sede, created_at desc);
 alter table sinpe_aclaraciones drop constraint if exists sinpe_aclaraciones_tipo_check;
-alter table sinpe_aclaraciones add constraint sinpe_aclaraciones_tipo_check check (tipo in ('excedente','faltante','factura'));
+alter table sinpe_aclaraciones add constraint sinpe_aclaraciones_tipo_check check (tipo in ('excedente','faltante','factura','asumido'));
 
 alter table sinpe_aclaraciones enable row level security;
 drop policy if exists sinpe_acl_admin_select on sinpe_aclaraciones;
@@ -122,6 +122,8 @@ revoke all on function public.sinpe_marcar_dias(uuid, text, numeric, jsonb, uuid
 -- p_tipo 'excedente': p_monto (0 < monto ≤ saldo) y p_nota.
 -- p_tipo 'faltante':  p_refs con los SINPE del reporte que faltaban; el monto es su suma.
 -- p_tipo 'factura':   factura anulada/duplicada: p_monto (≤ faltante), p_refs [{factura, fecha, cliente, monto}].
+-- p_tipo 'asumido':   faltante que asume la empresa (p. ej. el cliente transfirió unos colones de menos):
+--                     p_monto (≤ faltante) y p_nota; no pide reporte ni factura.
 create or replace function public.aclarar_sinpe(p_sede text, p_tipo text, p_monto numeric,
                                                 p_nota text, p_refs jsonb default '[]'::jsonb, p_archivo text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
@@ -139,7 +141,7 @@ begin
   if public.mi_rol() not in ('admin','admin_sedes','admin_g') then
     raise exception 'Solo un administrador puede aclarar el saldo SINPE.' using errcode = '42501';
   end if;
-  if p_tipo not in ('excedente','faltante','factura') then raise exception 'Tipo de aclaración inválido.'; end if;
+  if p_tipo not in ('excedente','faltante','factura','asumido') then raise exception 'Tipo de aclaración inválido.'; end if;
   if length(btrim(coalesce(p_nota, ''))) < 8 then
     raise exception 'Escriba una nota que explique la aclaración (al menos 8 caracteres).';
   end if;
@@ -169,6 +171,13 @@ begin
       raise exception 'Indique el número de la factura anulada o duplicada.';
     end if;
     v_refs := p_refs;
+    v_desp := v_antes + v_monto;
+  elsif p_tipo = 'asumido' then
+    if v_antes >= 0 then raise exception 'La sede no tiene faltante de SINPE (saldo %).', v_antes; end if;
+    v_monto := round(coalesce(p_monto, 0));
+    if v_monto <= 0 or v_monto > -v_antes then
+      raise exception 'El monto a asumir debe estar entre 1 y el faltante (%).', -v_antes;
+    end if;
     v_desp := v_antes + v_monto;
   else
     if v_antes >= 0 then raise exception 'La sede no tiene faltante de SINPE (saldo %).', v_antes; end if;
