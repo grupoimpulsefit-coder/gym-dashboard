@@ -836,8 +836,8 @@ function piRenderPagos() {
       </table>
     </div></div>
     <div class="form-actions" style="padding:0 var(--gut) 24px;">
-      <div class="hint" style="margin-right:auto;">El Excel trae una hoja por sede, solo con lo necesario para pagar: instructor, cédula, cuenta o SINPE y monto.</div>
-      <button class="btn-primary" onclick="piExcel()">⬇️ Excel de pagos por sede</button>
+      <div class="hint" style="margin-right:auto;">Se descarga un Excel por sede, solo con lo necesario para pagar: instructor, cédula, cuenta o SINPE y monto.</div>
+      <button class="btn-primary" onclick="piExcel()">⬇️ Excel de pagos (uno por sede)</button>
     </div>`;
 }
 
@@ -868,7 +868,7 @@ async function piDescargarXml(id) {
   } catch (e) { alert('No se pudo descargar: ' + e.message); }
 }
 
-// Excel de pagos: una hoja por sede, solo lo necesario para pagar
+// Excel de pagos: un archivo por sede, solo lo necesario para pagar
 async function piExcel() {
   const sedes = esAdmin() ? SEDES : (currentSedes.length ? currentSedes : [currentSede]);
   const lun = piYMD(piSemana), dom = piYMD(piSumarDias(piSemana, 6));
@@ -878,10 +878,12 @@ async function piExcel() {
   const etiqueta = piEtiquetaDia(piDia);
   if (!rows.length) { alert(`No hay pagos para ${etiqueta}.`); return; }
   const caja = piDia === 'caja';
-  const wb = XLSX.utils.book_new();
-  sedes.forEach(sede => {
+  const fechaArchivo = caja ? piYMD(piSumarDias(piSemana, 5)) : piYMD(piSumarDias(piSemana, piDia === 'vie' ? 4 : 2));
+  const diaArchivo = caja ? 'caja' : piDia === 'vie' ? 'viernes' : 'miercoles';
+  // Un archivo de Excel por sede (Pinares, Natación, …), cada uno solo con sus pagos
+  const conPagos = sedes.filter(sede => rows.some(g => g.sede === sede));
+  conPagos.forEach((sede, n) => {
     const rs = rows.filter(g => g.sede === sede);
-    if (!rs.length) return;
     const grupos = piAgrupar(rs);
     const fis = piFiscal[sede];
     const aoa = [
@@ -901,10 +903,16 @@ async function piExcel() {
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = [{ wch: 30 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 30 }, { wch: 14 }, { wch: 20 }];
     filasMonto.forEach(r => { const ref = XLSX.utils.encode_cell({ r, c: 5 }); if (ws[ref]) ws[ref].z = '#,##0'; });
+    const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sede.replace(/[\\/?*[\]:]/g, '').slice(0, 31));
+    const archivo = `pago_instructores_${phSlug(sede)}_${diaArchivo}_${fechaArchivo}.xlsx`;
+    // Un poco de espera entre archivos: algunos navegadores bloquean descargas seguidas
+    setTimeout(() => XLSX.writeFile(wb, archivo), n * 700);
   });
-  const fechaArchivo = caja ? piYMD(piSumarDias(piSemana, 5)) : piYMD(piSumarDias(piSemana, piDia === 'vie' ? 4 : 2));
-  XLSX.writeFile(wb, `pago_instructores_${caja ? 'caja' : piDia === 'vie' ? 'viernes' : 'miercoles'}_${fechaArchivo}.xlsx`);
+  if (conPagos.length > 1) {
+    const aviso = document.querySelector('#vista_pagos .form-actions .hint');
+    if (aviso) aviso.textContent = `Se descargaron ${conPagos.length} archivos, uno por sede (${conPagos.join(', ')}). Si el navegador pregunta, permita descargar varios archivos.`;
+  }
 }
 
 // ══ 4) Configuración (solo admin) ══════════════════════════════════════════
