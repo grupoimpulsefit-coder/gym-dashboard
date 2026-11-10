@@ -17,7 +17,7 @@ let piTarifas = [];        // tarifas activas
 let piTarifasTodas = [];   // incluye desactivadas (configuración)
 let piHoraTarifas = [];      // tarifas por hora (planilla por horas)
 let piHoraTarifasTodas = [];
-const PI_VISTAS = ['xml', 'aprobar', 'horas', 'pagos', 'config'];
+const PI_VISTAS = ['xml', 'recibos', 'aprobar', 'horas', 'pagos', 'config'];
 let piFiscal = {};         // sede → { razon_social, cedula_juridica }
 let piF = null;            // factura en carga
 let piSemana = null;       // lunes de la semana que se muestra en «Pago de la semana»
@@ -44,6 +44,7 @@ function piMostrar(tab) {
   if (tab === 'xml') { piRenderCarga(); if (piF) piValidar(); }
   if (tab === 'aprobar') piCargarPendientes();
   if (tab === 'horas') phCargar();
+  if (tab === 'recibos') rcCargar();
   if (tab === 'pagos') piCargarPagos();
   if (tab === 'config') piCargarConfig();
 }
@@ -78,6 +79,7 @@ function piRefrescar() {
   if (piTab === 'xml') { piRenderCarga(); if (piF) piValidar(); }
   if (piTab === 'pagos') piCargarPagos();
   if (piTab === 'horas') { phCambios = false; phCargar(); }
+  if (piTab === 'recibos') rcCargar();
 }
 
 // Recarga la lista de Gastos sin ocultar la pantalla actual
@@ -676,7 +678,7 @@ async function piTraerPagos(sedes, lun, dom) {
   const filtroSede = sedes.length === 1
     ? `sede=eq.${encodeURIComponent(sedes[0])}`
     : `sede=in.(${sedes.map(s => encodeURIComponent('"' + s + '"')).join(',')})`;
-  return supaFetchTodo(`/gastos?origen=in.(xml,horas)&${filtroSede}`
+  return supaFetchTodo(`/gastos?origen=in.(xml,horas,recibo)&${filtroSede}`
     + `&or=(and(dia_pago.gte.${lun},dia_pago.lte.${dom}),and(pago_tipo.eq.caja,fecha_clase.gte.${lun},fecha_clase.lte.${dom}))`
     + `&select=${PI_COLS}&order=emisor.asc,id.asc`);
 }
@@ -688,7 +690,7 @@ async function piCargarPagos() {
   const lun = piYMD(piSemana), dom = piYMD(piSumarDias(piSemana, 6));
   try {
     piPagos = await piTraerPagos([currentSede], lun, dom);
-    piAtrasados = (await supaFetch(`/gastos?origen=in.(xml,horas)&sede=eq.${encodeURIComponent(currentSede)}&pagado_at=is.null&dia_pago=lt.${lun}&select=id,monto,dia_pago`)) || [];
+    piAtrasados = (await supaFetch(`/gastos?origen=in.(xml,horas,recibo)&sede=eq.${encodeURIComponent(currentSede)}&pagado_at=is.null&dia_pago=lt.${lun}&select=id,monto,dia_pago`)) || [];
     piRenderPagos();
   } catch (e) {
     v.innerHTML = `<div class="empty-state" style="display:block;">⚠️ No se pudieron cargar los pagos: ${esc(e.message)}`
@@ -770,6 +772,14 @@ function piRenderPagos() {
           <b>${fmtCRC(r.monto)}</b>
           <span class="hint">${r.pagado_at ? `Pagada ${esc(piHora(r.pagado_at))}${r.pagado_por ? ' por ' + esc(r.pagado_por) : ''}` : 'Pendiente'}</span>
           <button class="btn-edit" onclick="phReciboGasto(piGrupos[${i}].rows.find(x => x.id === '${r.id}'))">📄 Recibo</button>
+        </div>` : r.origen === 'recibo' ? `<div style="display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:4px 0;">
+          <span class="pill info">Recibo</span>
+          <span>Clases ${esc([...new Set((r.detalle_clases || []).map(c => piFechaCorta(c.fecha)))].join(', ') || piFechaCorta(r.fecha_clase))}</span>
+          <span>${esc(piResumenClases([r]))}</span>
+          <b>${fmtCRC(r.monto)}</b>
+          ${r.nota_diferencia ? `<span style="color:var(--orange);">Nota: ${esc(r.nota_diferencia)}</span>` : ''}
+          <span class="hint">Registrado ${esc(piHora(r.cargado_at))}${r.pagado_at ? ` · pagado ${esc(piHora(r.pagado_at))}${r.pagado_por ? ' por ' + esc(r.pagado_por) : ''}` : ''}</span>
+          <button class="btn-edit" onclick="rcReciboPDF([piGrupos[${i}].rows.find(x => x.id === '${r.id}')])">📄 Recibo</button>
         </div>` : `<div style="display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:4px 0;">
           <span>Factura …${esc(String(r.numero_factura || '').slice(-6))}</span>
           <span>Clase ${esc(piFechaCorta(r.fecha_clase))}</span>
