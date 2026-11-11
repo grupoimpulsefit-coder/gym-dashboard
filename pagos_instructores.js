@@ -869,6 +869,18 @@ async function piDescargarXml(id) {
 }
 
 // Excel de pagos: un archivo por sede, solo lo necesario para pagar
+// Excel: el emisor es el nombre que viene en la factura; sin factura, el instructor
+function piEmisorExcel(gr) {
+  const em = [...new Set(gr.rows.filter(r => r.origen === 'xml' && r.emisor).map(r => r.emisor))];
+  return em.length ? em.join(' / ') : gr.nombre;
+}
+// N.º de factura electrónica (consecutivo de 20 dígitos); recibos y horas no tienen
+function piFacturasExcel(gr) {
+  const nums = gr.rows.map(r => r.origen === 'xml' ? (r.numero_factura || '—')
+    : r.origen === 'recibo' ? 'Recibo' : 'Planilla por horas');
+  return [...new Set(nums)].join(', ');
+}
+
 async function piExcel() {
   const sedes = esAdmin() ? SEDES : (currentSedes.length ? currentSedes : [currentSede]);
   const lun = piYMD(piSemana), dom = piYMD(piSumarDias(piSemana, 6));
@@ -891,17 +903,17 @@ async function piExcel() {
       [fis?.razon_social ? `${fis.razon_social}${fis.cedula_juridica ? ' · ' + fis.cedula_juridica : ''}` : ''],
       [`Generado: ${new Date().toLocaleString('es-CR')}`],
       [],
-      ['Instructor', 'Cédula', 'Forma de pago', 'Cuenta / SINPE', 'Detalle', 'Monto', 'Estado'],
+      ['Emisor', 'N.º de factura electrónica', 'Forma de pago', 'Cuenta / SINPE', 'Detalle', 'Monto', 'Estado'],
     ];
     const filasMonto = [];
     grupos.forEach(gr => {
-      aoa.push([gr.nombre, gr.cedula, gr.banco, gr.cuenta, piResumenClases(gr.rows), Math.round(gr.total), piEstado(gr, caja).txt]);
+      aoa.push([piEmisorExcel(gr), piFacturasExcel(gr), gr.banco, gr.cuenta, piResumenClases(gr.rows), Math.round(gr.total), piEstado(gr, caja).txt]);
       filasMonto.push(aoa.length - 1);
     });
     aoa.push(['TOTAL', '', '', '', '', Math.round(grupos.reduce((s, g) => s + g.total, 0)), '']);
     filasMonto.push(aoa.length - 1);
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 30 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 30 }, { wch: 14 }, { wch: 20 }];
+    ws['!cols'] = [{ wch: 30 }, { wch: 24 }, { wch: 16 }, { wch: 28 }, { wch: 30 }, { wch: 14 }, { wch: 20 }];
     filasMonto.forEach(r => { const ref = XLSX.utils.encode_cell({ r, c: 5 }); if (ws[ref]) ws[ref].z = '#,##0'; });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sede.replace(/[\\/?*[\]:]/g, '').slice(0, 31));
