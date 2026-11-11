@@ -971,9 +971,9 @@ async function openAbrirModal(){
   aperturaReferencia(num).then(ref=>{ window._aRef=ref; window._aExpected=ref?ref.esperado:null; calcAperturaEfectivo(); });
   // Inventario a ciegas (no se muestra el sistema; no se actualiza el stock)
   document.getElementById('aInvList').innerHTML='<div style="padding:12px;color:var(--muted);">Cargando inventario…</div>';
-  try{ window._invAp=await cargarInvCaja(currentSede); }catch(_){ window._invAp=[]; }
+  try{ window._invAp=ordenarInvPorCategoria(await cargarInvCaja(currentSede)); }catch(_){ window._invAp=[]; }
   const inv=window._invAp;
-  document.getElementById('aInvList').innerHTML = inv.length ? inv.map((p,i)=>`
+  document.getElementById('aInvList').innerHTML = inv.length ? inv.map((p,i)=>encabezadoCat(inv,i)+`
     <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--hair);">
       <span style="flex:1;font-size:13px;">${esc(p.producto)}</span>
       <input type="number" step="1" id="ainv_${i}" placeholder="conteo" style="width:82px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:right;font-weight:700;">
@@ -982,17 +982,34 @@ async function openAbrirModal(){
   document.getElementById('abrirModal').style.display='flex';
 }
 // Hoja imprimible para contar el inventario a mano (todas las cantidades en 0).
+// Inventario en el orden de la hoja: por categoría (como el desglose de la minita) y por nombre
+function ordenarInvPorCategoria(inv){
+  return (inv||[]).map(p=>({...p, _cat:resolverOtro(p.producto).cat}))
+    .sort((a,b)=>(CAT_ORDER.indexOf(a._cat)-CAT_ORDER.indexOf(b._cat))||String(a.producto).localeCompare(String(b.producto),'es'));
+}
+// Encabezado de categoría en las listas de conteo, cuando cambia la categoría
+function encabezadoCat(inv,i){
+  const c=inv[i]._cat; if(i>0&&inv[i-1]._cat===c) return '';
+  return `<div style="padding:8px 10px 4px;font-size:12px;font-weight:700;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;background:var(--fill);">${esc(CAT_LABEL[c]||c)}</div>`;
+}
 function imprimirListaInventario(origen){
   const inv=origen==='cierre'?(window._ccInv||[]):(window._invAp||[]);
   if(!inv.length){ alert('Esta sede no tiene productos en inventario para imprimir.'); return; }
   const fecha=todayStr(), turno=window._turnoNum||'';
-  const rows=inv.map((p,i)=>`<tr><td class="n">${i+1}</td><td>${esc(p.producto)}</td><td class="c">0</td></tr>`).join('');
+  // Agrupada por categoría (mismas categorías que el desglose de la minita), cada una ordenada por nombre
+  const grupos={}; inv.forEach(p=>{ const c=resolverOtro(p.producto).cat; (grupos[c]=grupos[c]||[]).push(p); });
+  let n=0;
+  const rows=CAT_ORDER.filter(c=>grupos[c]&&grupos[c].length).map(c=>
+    `<tr class="cat"><td colspan="3">${esc(CAT_LABEL[c]||c)} <span>(${grupos[c].length})</span></td></tr>`
+    +grupos[c].sort((a,b)=>String(a.producto).localeCompare(String(b.producto),'es'))
+      .map(p=>`<tr><td class="n">${++n}</td><td>${esc(p.producto)}</td><td class="c">0</td></tr>`).join('')).join('');
   const html=`<!doctype html><html><head><meta charset="utf-8"><title>Conteo inventario ${esc(currentSede)} ${fecha}</title>
   <style>*{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;} body{margin:22px;color:#111;}
   h1{font-size:18px;margin:0 0 2px;} .sub{font-size:12px;color:#555;margin:0 0 14px;}
   table{width:100%;border-collapse:collapse;font-size:13px;} th,td{border:1px solid #999;padding:9px 8px;text-align:left;}
   th{background:#eee;} td.n{width:34px;text-align:center;color:#777;} td.c{width:150px;text-align:center;color:#bbb;font-weight:700;}
   tr{page-break-inside:avoid;} .foot{margin-top:16px;font-size:11px;color:#555;}
+  tr.cat td{background:#ddd;font-weight:700;font-size:13.5px;padding:7px 8px;page-break-after:avoid;} tr.cat td span{font-weight:400;color:#555;}
   @media print{.noprint{display:none;}}</style></head><body>
   <h1>Hoja de conteo de inventario</h1>
   <div class="sub">Sede: <b>${esc(currentSede)}</b> · Fecha: ${fecha}${turno?` · Turno ${turno}`:''} · ${inv.length} productos</div>
@@ -2040,10 +2057,11 @@ async function openConteoCierre(){
   let inv=[];
   try{ inv=await cargarInvCaja(currentSede); }
   catch(e){ err.textContent='No se pudo cargar el inventario: '+e.message; }
+  inv=ordenarInvPorCategoria(inv);
   window._ccInv=inv;
   list.innerHTML = inv.length ? inv.map((p,i)=>{
     const prev=inventarioCierre&&inventarioCierre[p.producto]; const val=(prev&&prev.contado!=null)?prev.contado:'';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--hair);">
+    return encabezadoCat(inv,i)+`<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--hair);">
       <span style="flex:1;font-size:13px;">${esc(p.producto)}</span>
       <input type="number" step="1" id="cc_${i}" value="${val}" placeholder="conteo" style="width:82px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:right;font-weight:700;"></div>`;
   }).join('') : '<div style="padding:12px;color:var(--muted);">Esta sede no tiene productos en inventario.</div>';

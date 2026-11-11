@@ -41,6 +41,7 @@
 .ph-tabla .ph-nombre { position: sticky; left: 0; background: var(--card); z-index: 1; min-width: 170px; }
 .ph-tabla select.ph-tarifa { font-size: 12px; min-height: 30px; padding: 0 26px 0 8px; max-width: 230px; }
 @media (max-width: 520px) { .ph-tabla .ph-nombre { min-width: 130px; max-width: 150px; } .ph-tabla select.ph-tarifa { max-width: 130px; } }
+@media (max-width: 1279px) { #piTabs { grid-auto-flow: row; grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 900px) { #piTabs { grid-template-columns: 1fr 1fr 1fr !important; } }
 @media (max-width: 520px) { #piTabs { grid-template-columns: 1fr 1fr !important; } }
 @media (max-width: 900px) { #piTabs { grid-auto-flow: row; } #piTabs .tab { padding: 4px 8px; font-size: 13px; white-space: normal; text-align: center; } }
@@ -105,6 +106,7 @@
     <button class="tab active" data-tab="gastos" onclick="piMostrar('gastos')">🧾 Gastos del mes</button>
     <button class="tab" data-tab="xml" onclick="piMostrar('xml')">📥 Cargar factura XML</button>
     <button class="tab" data-tab="aprobar" id="piTabAprobar" onclick="piMostrar('aprobar')" style="display:none;">📨 Por aprobar <span id="piPendCount"></span></button>
+    <button class="tab" data-tab="recibos" onclick="piMostrar('recibos')">🧾 Recibos</button>
     <button class="tab" data-tab="horas" onclick="piMostrar('horas')">🕐 Horas <span id="phCount"></span></button>
     <button class="tab" data-tab="pagos" onclick="piMostrar('pagos')">💸 Pago de la semana</button>
     <button class="tab" data-tab="config" id="piTabConfig" onclick="piMostrar('config')" style="display:none;">⚙️ Configuración</button>
@@ -113,6 +115,7 @@
   <div id="vista_xml" style="display:none;"></div>
   <div id="vista_aprobar" style="display:none;"></div>
   <div id="vista_horas" style="display:none;"></div>
+  <div id="vista_recibos" style="display:none;"></div>
   <div id="vista_pagos" style="display:none;"></div>
   <div id="vista_config" style="display:none;"></div>
 
@@ -247,6 +250,7 @@
 <script src="/factura_xml.js"></script>
 <script src="/pagos_instructores.js"></script>
 <script src="/horas_instructores.js"></script>
+<script src="/recibos_instructores.js"></script>
 <script>
 // ── Supabase ──────────────────────────────────────────────────────────────
 const SUPA_URL = '__SUPA_URL__';
@@ -472,9 +476,10 @@ function poblarMeses() {
 const esPagoCaja = g => g.pago_tipo === 'caja' || g.metodo_pago === 'caja' || g.banco_pago === 'Pago de caja';
 // Texto extra de las facturas cargadas por XML: día de pago y si ya se pagó
 function infoPagoXml(g) {
-  if (g.origen !== 'xml' && g.origen !== 'horas') return '';
+  if (!['xml', 'horas', 'recibo'].includes(g.origen)) return '';
   const xml = g.origen === 'horas'
     ? ' <span class="pill info" title="Planilla por horas (sin factura)">Por horas</span>'
+    : g.origen === 'recibo' ? ' <span class="pill info" title="Pago por clase con recibo (sin factura)">Recibo</span>'
     : ' <span class="pill info" title="Cargada desde el XML de la factura electrónica">XML</span>';
   if (esPagoCaja(g)) return xml;
   const dia = g.dia_pago ? parseFecha(g.dia_pago).toLocaleDateString('es-CR', { weekday:'short', day:'2-digit', month:'2-digit' }) : '';
@@ -861,6 +866,7 @@ async function guardarInstructor() {
     await cargarInstructores();
     if (id) { document.getElementById('fInstructor').value = id; onInstructorChange(); }
     if (!editar && id && typeof phTrasNuevoInstructor === 'function') phTrasNuevoInstructor(id);
+    if (!editar && id && typeof rcTrasNuevoInstructor === 'function') rcTrasNuevoInstructor(id);
     closeInstructorModal();
   } catch(e) {
     err.textContent = /cedula/i.test(e.message) ? 'Ya existe un instructor con esa cédula.' : /duplicate|unique/i.test(e.message) ? 'Ya existe un instructor con ese nombre.' : e.message;

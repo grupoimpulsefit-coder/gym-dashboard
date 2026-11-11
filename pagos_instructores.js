@@ -17,7 +17,7 @@ let piTarifas = [];        // tarifas activas
 let piTarifasTodas = [];   // incluye desactivadas (configuración)
 let piHoraTarifas = [];      // tarifas por hora (planilla por horas)
 let piHoraTarifasTodas = [];
-const PI_VISTAS = ['xml', 'aprobar', 'horas', 'pagos', 'config'];
+const PI_VISTAS = ['xml', 'recibos', 'aprobar', 'horas', 'pagos', 'config'];
 let piFiscal = {};         // sede → { razon_social, cedula_juridica }
 let piF = null;            // factura en carga
 let piSemana = null;       // lunes de la semana que se muestra en «Pago de la semana»
@@ -44,6 +44,7 @@ function piMostrar(tab) {
   if (tab === 'xml') { piRenderCarga(); if (piF) piValidar(); }
   if (tab === 'aprobar') piCargarPendientes();
   if (tab === 'horas') phCargar();
+  if (tab === 'recibos') rcCargar();
   if (tab === 'pagos') piCargarPagos();
   if (tab === 'config') piCargarConfig();
 }
@@ -78,6 +79,7 @@ function piRefrescar() {
   if (piTab === 'xml') { piRenderCarga(); if (piF) piValidar(); }
   if (piTab === 'pagos') piCargarPagos();
   if (piTab === 'horas') { phCambios = false; phCargar(); }
+  if (piTab === 'recibos') rcCargar();
 }
 
 // Recarga la lista de Gastos sin ocultar la pantalla actual
@@ -676,7 +678,7 @@ async function piTraerPagos(sedes, lun, dom) {
   const filtroSede = sedes.length === 1
     ? `sede=eq.${encodeURIComponent(sedes[0])}`
     : `sede=in.(${sedes.map(s => encodeURIComponent('"' + s + '"')).join(',')})`;
-  return supaFetchTodo(`/gastos?origen=in.(xml,horas)&${filtroSede}`
+  return supaFetchTodo(`/gastos?origen=in.(xml,horas,recibo)&${filtroSede}`
     + `&or=(and(dia_pago.gte.${lun},dia_pago.lte.${dom}),and(pago_tipo.eq.caja,fecha_clase.gte.${lun},fecha_clase.lte.${dom}))`
     + `&select=${PI_COLS}&order=emisor.asc,id.asc`);
 }
@@ -688,7 +690,7 @@ async function piCargarPagos() {
   const lun = piYMD(piSemana), dom = piYMD(piSumarDias(piSemana, 6));
   try {
     piPagos = await piTraerPagos([currentSede], lun, dom);
-    piAtrasados = (await supaFetch(`/gastos?origen=in.(xml,horas)&sede=eq.${encodeURIComponent(currentSede)}&pagado_at=is.null&dia_pago=lt.${lun}&select=id,monto,dia_pago`)) || [];
+    piAtrasados = (await supaFetch(`/gastos?origen=in.(xml,horas,recibo)&sede=eq.${encodeURIComponent(currentSede)}&pagado_at=is.null&dia_pago=lt.${lun}&select=id,monto,dia_pago`)) || [];
     piRenderPagos();
   } catch (e) {
     v.innerHTML = `<div class="empty-state" style="display:block;">⚠️ No se pudieron cargar los pagos: ${esc(e.message)}`
@@ -770,6 +772,14 @@ function piRenderPagos() {
           <b>${fmtCRC(r.monto)}</b>
           <span class="hint">${r.pagado_at ? `Pagada ${esc(piHora(r.pagado_at))}${r.pagado_por ? ' por ' + esc(r.pagado_por) : ''}` : 'Pendiente'}</span>
           <button class="btn-edit" onclick="phReciboGasto(piGrupos[${i}].rows.find(x => x.id === '${r.id}'))">📄 Recibo</button>
+        </div>` : r.origen === 'recibo' ? `<div style="display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:4px 0;">
+          <span class="pill info">Recibo</span>
+          <span>Clases ${esc([...new Set((r.detalle_clases || []).map(c => piFechaCorta(c.fecha)))].join(', ') || piFechaCorta(r.fecha_clase))}</span>
+          <span>${esc(piResumenClases([r]))}</span>
+          <b>${fmtCRC(r.monto)}</b>
+          ${r.nota_diferencia ? `<span style="color:var(--orange);">Nota: ${esc(r.nota_diferencia)}</span>` : ''}
+          <span class="hint">Registrado ${esc(piHora(r.cargado_at))}${r.pagado_at ? ` · pagado ${esc(piHora(r.pagado_at))}${r.pagado_por ? ' por ' + esc(r.pagado_por) : ''}` : ''}</span>
+          <button class="btn-edit" onclick="rcReciboPDF([piGrupos[${i}].rows.find(x => x.id === '${r.id}')])">📄 Recibo</button>
         </div>` : `<div style="display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:4px 0;">
           <span>Factura …${esc(String(r.numero_factura || '').slice(-6))}</span>
           <span>Clase ${esc(piFechaCorta(r.fecha_clase))}</span>
@@ -826,8 +836,8 @@ function piRenderPagos() {
       </table>
     </div></div>
     <div class="form-actions" style="padding:0 var(--gut) 24px;">
-      <div class="hint" style="margin-right:auto;">El Excel trae una hoja por sede, solo con lo necesario para pagar: instructor, cédula, cuenta o SINPE y monto.</div>
-      <button class="btn-primary" onclick="piExcel()">⬇️ Excel de pagos por sede</button>
+      <div class="hint" style="margin-right:auto;">Se descarga un Excel por sede, solo con lo necesario para pagar: instructor, cédula, cuenta o SINPE y monto.</div>
+      <button class="btn-primary" onclick="piExcel()">⬇️ Excel de pagos (uno por sede)</button>
     </div>`;
 }
 
@@ -858,7 +868,7 @@ async function piDescargarXml(id) {
   } catch (e) { alert('No se pudo descargar: ' + e.message); }
 }
 
-// Excel de pagos: una hoja por sede, solo lo necesario para pagar
+// Excel de pagos: un archivo por sede, solo lo necesario para pagar
 async function piExcel() {
   const sedes = esAdmin() ? SEDES : (currentSedes.length ? currentSedes : [currentSede]);
   const lun = piYMD(piSemana), dom = piYMD(piSumarDias(piSemana, 6));
@@ -868,10 +878,12 @@ async function piExcel() {
   const etiqueta = piEtiquetaDia(piDia);
   if (!rows.length) { alert(`No hay pagos para ${etiqueta}.`); return; }
   const caja = piDia === 'caja';
-  const wb = XLSX.utils.book_new();
-  sedes.forEach(sede => {
+  const fechaArchivo = caja ? piYMD(piSumarDias(piSemana, 5)) : piYMD(piSumarDias(piSemana, piDia === 'vie' ? 4 : 2));
+  const diaArchivo = caja ? 'caja' : piDia === 'vie' ? 'viernes' : 'miercoles';
+  // Un archivo de Excel por sede (Pinares, Natación, …), cada uno solo con sus pagos
+  const conPagos = sedes.filter(sede => rows.some(g => g.sede === sede));
+  conPagos.forEach((sede, n) => {
     const rs = rows.filter(g => g.sede === sede);
-    if (!rs.length) return;
     const grupos = piAgrupar(rs);
     const fis = piFiscal[sede];
     const aoa = [
@@ -891,10 +903,16 @@ async function piExcel() {
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = [{ wch: 30 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 30 }, { wch: 14 }, { wch: 20 }];
     filasMonto.forEach(r => { const ref = XLSX.utils.encode_cell({ r, c: 5 }); if (ws[ref]) ws[ref].z = '#,##0'; });
+    const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sede.replace(/[\\/?*[\]:]/g, '').slice(0, 31));
+    const archivo = `pago_instructores_${phSlug(sede)}_${diaArchivo}_${fechaArchivo}.xlsx`;
+    // Un poco de espera entre archivos: algunos navegadores bloquean descargas seguidas
+    setTimeout(() => XLSX.writeFile(wb, archivo), n * 700);
   });
-  const fechaArchivo = caja ? piYMD(piSumarDias(piSemana, 5)) : piYMD(piSumarDias(piSemana, piDia === 'vie' ? 4 : 2));
-  XLSX.writeFile(wb, `pago_instructores_${caja ? 'caja' : piDia === 'vie' ? 'viernes' : 'miercoles'}_${fechaArchivo}.xlsx`);
+  if (conPagos.length > 1) {
+    const aviso = document.querySelector('#vista_pagos .form-actions .hint');
+    if (aviso) aviso.textContent = `Se descargaron ${conPagos.length} archivos, uno por sede (${conPagos.join(', ')}). Si el navegador pregunta, permita descargar varios archivos.`;
+  }
 }
 
 // ══ 4) Configuración (solo admin) ══════════════════════════════════════════
