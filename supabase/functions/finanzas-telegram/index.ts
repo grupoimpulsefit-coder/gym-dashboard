@@ -38,7 +38,7 @@ const AYUDA = [
   '• /deshacer — borra lo último',
 ].join('\n');
 
-const crc = (n: number) => '₡' + Math.round(n).toLocaleString('es-CR');
+const crc = (n: number) => (n < 0 ? '−' : '') + '₡' + Math.abs(Math.round(n)).toLocaleString('es-CR');
 
 function hoyCR(offsetDias = 0): string {
   const d = new Date(Date.now() + offsetDias * 86400000);
