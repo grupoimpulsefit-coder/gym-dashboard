@@ -89,11 +89,14 @@ async function semanaActual(grupo: string[]) {
 
 async function resumen(grupo: string[]): Promise<string> {
   const { sem, fila } = await semanaActual(grupo);
-  const [gas, pend, pres] = await Promise.all([
+  const [gas, pend, pres, fon] = await Promise.all([
     db.from('fin_gastos').select('monto, categoria').in('owner', grupo).eq('semana', sem),
     db.from('fin_ingresos').select('diezmo').in('owner', grupo).eq('entregado', false),
     db.from('fin_prestamos').select('tipo, persona, monto, fin_prestamo_pagos(monto)').in('owner', grupo),
+    db.from('fin_fondos').select('nombre, fin_fondo_movs(monto)').in('owner', grupo).order('created_at'),
   ]);
+  const lineasFon = (fon.data || []).map((f: any) =>
+    `   🐷 ${f.nombre}: ${crc((f.fin_fondo_movs || []).reduce((a: number, x: any) => a + +x.monto, 0))}`);
   const cats: Record<string, number> = {};
   for (const g of gas.data || []) cats[g.categoria] = (cats[g.categoria] || 0) + +g.monto;
   const lineasCat = Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([c, v]) => `   ${c}: ${crc(v)}`);
@@ -109,11 +112,13 @@ async function resumen(grupo: string[]): Promise<string> {
     ...(ant ? [`${ant < 0 ? '🔻 Faltante' : '➕ Sobrante'} de la semana anterior: ${crc(ant)}`] : []),
     `Ingresos: ${crc(+fila.ingresos)} (disponible ${crc(+fila.disponible)})`,
     ...(+fila.prestamos ? [`Préstamos (neto): ${crc(+fila.prestamos)}`] : []),
+    ...(+fila.ahorro ? [`Ahorro (aportes − retiros): ${crc(+fila.ahorro)}`] : []),
     `Gastado: ${crc(+fila.gastos)}`,
     ...lineasCat,
     `${+fila.queda < 0 ? '⚠️ Faltante' : 'Le queda'}: ${crc(+fila.queda)}`,
     ...(porDiezmo > 0 ? ['', `🙏 Diezmo por entregar: ${crc(porDiezmo)}`] : []),
     ...(lineasPres.length ? ['', 'Préstamos pendientes:', ...lineasPres] : []),
+    ...(lineasFon.length ? ['', 'Ahorro:', ...lineasFon] : []),
   ].join('\n');
 }
 
