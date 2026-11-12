@@ -17,7 +17,7 @@
 .bar { height: 8px; border-radius: 4px; background: var(--fill2); overflow: hidden; margin-top: 4px; }
 .bar i { display: block; height: 100%; border-radius: 4px; background: var(--brand); }
 .lista { background: var(--card); border-radius: 12px; box-shadow: var(--shadow); margin: 0 var(--gut) 12px; }
-.fila { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-bottom: .5px solid var(--hair); font-size: 14px; }
+.fila { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-bottom: .5px solid var(--hair); font-size: 14px; flex-wrap: wrap; }
 .fila:last-child { border-bottom: 0; }
 .fila .grow { flex: 1; min-width: 0; }
 .fila .sub { color: var(--sec); font-size: 12px; }
@@ -25,8 +25,17 @@
 .fila .m.in { color: var(--green); }
 .fila select { background: var(--fill); border: 0; border-radius: 8px; padding: 4px 6px; font-size: 12px; color: var(--label); }
 .fila button.x { border: 0; background: none; color: var(--red); font-size: 16px; cursor: pointer; padding: 4px; }
-.reparto { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 14px; }
+.reparto { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 15px; }
 .reparto b { text-align: right; font-variant-numeric: tabular-nums; }
+.neg { color: var(--red) !important; }
+.pos { color: var(--green) !important; }
+.abono { display: flex; gap: 6px; width: 100%; margin-top: 8px; flex-wrap: wrap; }
+.abono input { flex: 1; min-width: 110px; background: var(--fill); border: 1.5px solid transparent; border-radius: 10px; padding: 0 10px; min-height: 36px; font-size: 15px; color: var(--label); outline: none; }
+.abono input:focus { border-color: var(--brand); background: var(--card); }
+.pagos { width: 100%; font-size: 12px; color: var(--sec); margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+.pagos button { border: 0; background: none; color: var(--red); cursor: pointer; font-size: 12px; }
+.chk { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.chk input { accent-color: var(--brand); transform: scale(1.2); }
 .codigo { font: 700 22px ui-monospace, Menlo, monospace; letter-spacing: .08em; background: var(--fill); padding: 8px 14px; border-radius: 10px; display: inline-block; user-select: all; }
 .tabs { max-width: calc(100% - 2 * var(--gut)); }
 @media (max-width: 520px) { .tabs { grid-auto-flow: row; grid-template-columns: 1fr 1fr; } .tab { padding: 0 8px; } }
@@ -49,7 +58,7 @@
 <div id="app">
   <div class="header">
     <div class="header-icon">💰</div>
-    <div><h1>Mis Finanzas</h1><p>Ingresos semanales, diezmo y gastos</p></div>
+    <div><h1>Mis Finanzas</h1><p>Ingresos semanales, diezmo, gastos y préstamos</p></div>
     <div class="header-right">
       <span id="userEmail"></span>
       <button class="logout-btn" onclick="salir()">Cerrar sesión</button>
@@ -59,7 +68,7 @@
   <div class="tabs" role="tablist">
     <button class="tab active" data-t="semana" onclick="tab('semana')">📅 Semana</button>
     <button class="tab" data-t="registrar" onclick="tab('registrar')">➕ Registrar</button>
-    <button class="tab" data-t="rubros" onclick="tab('rubros')">📦 2º diezmo</button>
+    <button class="tab" data-t="prestamos" onclick="tab('prestamos')">🤝 Préstamos</button>
     <button class="tab" data-t="ajustes" onclick="tab('ajustes')">⚙️ Ajustes</button>
   </div>
 
@@ -72,18 +81,18 @@
       <button class="btn-ghost" onclick="semana = lunes(hoy()); render()">Hoy</button>
     </div>
     <div class="kpi-row">
-      <div class="kpi"><div class="kpi-label">Ingresos</div><div class="kpi-value" id="kIng">—</div></div>
-      <div class="kpi teal"><div class="kpi-label">Disponible (75%)</div><div class="kpi-value" id="kDisp">—</div></div>
-      <div class="kpi orange"><div class="kpi-label">Gastado</div><div class="kpi-value" id="kGas">—</div></div>
-      <div class="kpi green"><div class="kpi-label">Le queda</div><div class="kpi-value" id="kQueda">—</div><div class="kpi-sub" id="kSaldo"></div></div>
+      <div class="kpi"><div class="kpi-label" id="kAntLbl">Viene de la semana anterior</div><div class="kpi-value" id="kAnt">—</div></div>
+      <div class="kpi teal"><div class="kpi-label">Disponible (75%)</div><div class="kpi-value" id="kDisp">—</div><div class="kpi-sub" id="kIng"></div></div>
+      <div class="kpi orange"><div class="kpi-label">Gastado</div><div class="kpi-value" id="kGas">—</div><div class="kpi-sub" id="kPre"></div></div>
+      <div class="kpi green"><div class="kpi-label" id="kQuedaLbl">Le queda</div><div class="kpi-value" id="kQueda">—</div></div>
     </div>
-    <div class="section"><div class="section-title">Reparto de la semana</div></div>
+    <div class="section"><div class="section-title">Diezmo de la semana</div></div>
     <div class="form-card"><div class="reparto" id="repSem"></div></div>
     <div class="section"><div class="section-title">Gastos por categoría</div></div>
     <div class="lista" id="catSem"></div>
     <div class="section"><div class="section-title">Movimientos de la semana</div></div>
     <div class="lista" id="movSem"></div>
-    <div class="section"><div class="section-title">Diezmo y primicia por entregar <span class="section-note" id="pendTot"></span></div></div>
+    <div class="section"><div class="section-title">Diezmo por entregar <span class="section-note" id="pendTot"></span></div></div>
     <div class="lista" id="pendList"></div>
   </div>
 
@@ -96,7 +105,6 @@
         <div class="f-field"><label>Descripción</label><input id="gDesc" placeholder="Ej. almuerzo, gasolina, Netflix"></div>
         <div class="f-field"><label>Fecha</label><input id="gFecha" type="date"></div>
         <div class="f-field"><label>Categoría</label><select id="gCat"></select></div>
-        <div class="f-field"><label>Sale de</label><select id="gRubro"></select></div>
       </div>
       <div class="form-actions"><span class="form-msg" id="gMsg"></span><button class="btn-primary" onclick="guardarGasto()">Guardar gasto</button></div>
     </div>
@@ -113,21 +121,29 @@
     </div>
   </div>
 
-  <!-- ── SEGUNDO DIEZMO ── -->
-  <div class="tab-panel" id="p_rubros">
-    <div class="section"><div class="section-title">Segundo diezmo · saldo por rubro <span class="section-note">acumulado de todos los ingresos menos lo gastado de cada rubro</span></div></div>
-    <div class="lista" id="rubrosList"></div>
+  <!-- ── PRÉSTAMOS ── -->
+  <div class="tab-panel" id="p_prestamos">
+    <div class="section"><div class="section-title">Nuevo préstamo</div></div>
+    <div class="form-card">
+      <div class="form-grid">
+        <div class="f-field"><label>Tipo</label><select id="pTipo"><option value="preste">Yo presté (me deben)</option><option value="me_prestaron">Me prestaron (yo debo)</option></select></div>
+        <div class="f-field"><label>Persona</label><input id="pPersona" placeholder="¿A quién / quién?"></div>
+        <div class="f-field"><label>Monto ₡</label><input id="pMonto" type="number" inputmode="decimal" min="0" step="any"></div>
+        <div class="f-field"><label>Fecha</label><input id="pFecha" type="date"></div>
+        <div class="f-field full"><label>Nota</label><input id="pDesc" placeholder="Opcional"></div>
+      </div>
+      <label class="chk" style="margin-top:14px"><input type="checkbox" id="pAfecta" checked> Mover el disponible de la semana (sale o entra la plata)</label>
+      <div class="form-actions"><span class="form-msg" id="pMsg"></span><button class="btn-primary" onclick="guardarPrestamo()">Guardar préstamo</button></div>
+    </div>
+    <div class="section"><div class="section-title">Pendientes <span class="section-note" id="presTot"></span></div></div>
+    <div class="lista" id="presAct"></div>
+    <div class="section"><div class="section-title">Pagados</div></div>
+    <div class="lista" id="presFin"></div>
   </div>
 
   <!-- ── AJUSTES ── -->
   <div class="tab-panel" id="p_ajustes">
-    <div class="section"><div class="section-title">Nombres de los 7 rubros</div></div>
-    <div class="form-card">
-      <div class="form-grid" id="rubrosForm"></div>
-      <div class="form-actions"><span class="form-msg" id="rMsg"></span><button class="btn-primary" onclick="guardarRubros()">Guardar nombres</button></div>
-    </div>
-
-    <div class="section"><div class="section-title">Palabras para categorizar <span class="section-note">si la descripción trae esta palabra, va a esa categoría (además de las que ya trae: super, gasolina, Netflix, alquiler…)</span></div></div>
+    <div class="section"><div class="section-title">Palabras para categorizar <span class="section-note">si la descripción trae esta palabra, va a esa categoría (además de las que ya trae: super, gasolina, Netflix, alquiler…). Sirven para todo el grupo.</span></div></div>
     <div class="form-card">
       <div class="form-grid">
         <div class="f-field"><label>Palabra</label><input id="rgPal" placeholder="Ej. pricesmart"></div>
@@ -138,7 +154,7 @@
     </div>
     <div class="lista" id="reglasList"></div>
 
-    <div class="section"><div class="section-title">Telegram</div></div>
+    <div class="section"><div class="section-title">Telegram <span class="section-note">cada persona vincula su propio chat</span></div></div>
     <div class="form-card" id="tgBox"></div>
   </div>
 </div>
@@ -150,19 +166,23 @@ const KEY = 'finSesion';           // sesión propia: no se mezcla con la del gi
 const IDLE_MIN = 20;
 const CATS = ['comida', 'alquiler', 'aplicaciones', 'carro', 'otros'];
 
-let ses = null, ingresos = [], gastos = [], reglas = [], cfg = null, semana = null, ultimaAct = Date.now();
+let ses = null, yo = null, miembros = {}, semanas = [], ingresos = [], gastos = [], prestamos = [], reglas = [], cfg = null;
+let semana = null, ultimaAct = Date.now();
 
 /* ── utilidades ── */
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const crc = n => '₡' + Math.round(+n || 0).toLocaleString('es-CR');
+const crc = n => (n < 0 ? '−' : '') + '₡' + Math.abs(Math.round(+n || 0)).toLocaleString('es-CR');
 const r2 = n => Math.round(n * 100) / 100;
+const sum = (a, f) => a.reduce((t, x) => t + (+f(x) || 0), 0);
 const hoy = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Costa_Rica' }).format(new Date());
 function lunes(f) { const d = new Date(f + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); }
 function sumarDias(f, n) { const d = new Date(f + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function fCorta(f) { return new Date(f + 'T12:00:00Z').toLocaleDateString('es-CR', { day: 'numeric', month: 'short', timeZone: 'UTC' }); }
-function reparto(m) { const d = r2(m * .10), p = r2(m * .05), s = r2(m * .10); return { diezmo: d, primicia: p, segundo: s, disponible: r2(m - d - p - s) }; }
-const rubroNombre = i => (cfg?.rubros || [])[i - 1] || ('Rubro ' + i);
+function claims(t) { try { return JSON.parse(decodeURIComponent(escape(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))))); } catch (_) { return {}; } }
+// "· Keity" al lado de cada movimiento, solo si el grupo tiene más de una persona
+const quien = owner => Object.keys(miembros).length > 1 && miembros[owner] ? ' · ' + esc(miembros[owner]) : '';
+const saldoPrestamo = p => r2(+p.monto - sum(p.fin_prestamo_pagos || [], x => x.monto));
 
 /* ── sesión ── */
 function guardarSes(d) {
@@ -209,33 +229,41 @@ async function doLogin() {
 async function entrar() {
   const dueno = await api('rpc/fin_es_dueno', { method: 'POST', body: {} }).catch(() => false);
   if (dueno !== true) { salir(); $('loginError').textContent = 'Esta cuenta no tiene acceso a Mis Finanzas.'; return; }
-  try { $('userEmail').textContent = JSON.parse(atob(ses.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email || ''; } catch (_) {}
+  const c = claims(ses.access_token);
+  yo = c.sub; $('userEmail').textContent = c.email || '';
   $('loginScreen').style.display = 'none'; $('app').style.display = 'block';
   $('loginPassword').value = '';
   semana = lunes(hoy());
-  $('gFecha').value = $('iFecha').value = hoy();
+  $('gFecha').value = $('iFecha').value = $('pFecha').value = hoy();
   await cargar();
 }
 function salir() {
   try { localStorage.removeItem(KEY); } catch (_) {}
   if (ses?.access_token) fetch(SUPA_URL + '/auth/v1/logout', { method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + ses.access_token } }).catch(() => {});
-  ses = null; ingresos = gastos = reglas = []; cfg = null;
+  ses = null; yo = null; miembros = {}; semanas = ingresos = gastos = prestamos = reglas = []; cfg = null;
   $('app').style.display = 'none'; $('loginScreen').style.display = '';
 }
 ['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, () => { ultimaAct = Date.now(); }, { passive: true }));
 setInterval(() => { if (ses && Date.now() - ultimaAct > IDLE_MIN * 60000) salir(); }, 30000);
 
 /* ── datos ── */
+const cargarSemanas = async () => { semanas = await api('rpc/fin_semanas', { method: 'POST', body: {} }) || []; };
+const cargarPrestamos = async () => { prestamos = await api('fin_prestamos?select=*,fin_prestamo_pagos(*)&order=fecha.desc,created_at.desc'); };
 async function cargar() {
-  [ingresos, gastos, reglas, cfg] = await Promise.all([
+  let mi;
+  [ingresos, gastos, reglas, mi] = await Promise.all([
     api('fin_ingresos?select=*&order=fecha.desc,created_at.desc'),
     api('fin_gastos?select=*&order=fecha.desc,created_at.desc'),
     api('fin_reglas?select=*&order=palabra'),
-    api('fin_config?select=*').then(r => r[0] || null),
+    api('rpc/fin_miembros', { method: 'POST', body: {} }),
+    cargarSemanas(), cargarPrestamos(),
   ]);
-  if (!cfg) cfg = (await api('fin_config', { method: 'POST', body: {} }))[0];
+  miembros = Object.fromEntries((mi || []).map(m => [m.user_id, m.nombre]));
+  cfg = (await api('fin_config?select=*&owner=eq.' + yo))[0] || (await api('fin_config', { method: 'POST', body: {} }))[0];
   render();
 }
+// Tras registrar algo: refresca el arrastre semanal y redibuja
+async function refrescar() { await cargarSemanas(); render(); }
 
 /* ── pantallas ── */
 function tab(t) {
@@ -244,88 +272,122 @@ function tab(t) {
 }
 function moverSemana(n) { semana = sumarDias(semana, 7 * n); render(); }
 
+// Fila de fin_semanas para la semana elegida (con arrastre). Fuera del rango: arrastra la última.
+function filaSemana(s) {
+  const f = semanas.find(x => x.semana === s);
+  if (f) return f;
+  const prev = semanas.filter(x => x.semana < s).pop();
+  const ant = prev ? +prev.queda : 0;
+  return { semana: s, ingresos: 0, diezmo: 0, disponible: 0, gastos: 0, prestamos: 0, anterior: ant, queda: ant };
+}
+
 function render() {
   const cats = [...new Set([...CATS, ...reglas.map(r => r.categoria), ...gastos.map(g => g.categoria)])].filter(Boolean);
   $('catsList').innerHTML = cats.map(c => `<option value="${esc(c)}">`).join('');
   $('gCat').innerHTML = '<option value="">✨ Automática</option>' + cats.map(c => `<option>${esc(c)}</option>`).join('');
-  $('gRubro').innerHTML = '<option value="">Disponible (75%)</option>' + [1, 2, 3, 4, 5, 6, 7].map(i => `<option value="${i}">2º diezmo · ${esc(rubroNombre(i))}</option>`).join('');
 
   // ── semana
   $('semLbl').textContent = `${fCorta(semana)} – ${fCorta(sumarDias(semana, 6))}`;
-  const ingS = ingresos.filter(i => i.semana === semana), gasS = gastos.filter(g => g.semana === semana);
-  const sum = (a, f) => a.reduce((t, x) => t + (+f(x) || 0), 0);
-  const ing = sum(ingS, i => i.monto), disp = sum(ingS, i => i.disponible);
-  const gasDisp = sum(gasS.filter(g => !g.rubro), g => g.monto);
-  const saldo = sum(ingresos, i => i.disponible) - sum(gastos.filter(g => !g.rubro), g => g.monto);
-  $('kIng').textContent = crc(ing); $('kDisp').textContent = crc(disp); $('kGas').textContent = crc(gasDisp);
-  $('kQueda').textContent = crc(disp - gasDisp);
-  $('kQueda').style.color = disp - gasDisp < 0 ? 'var(--red)' : '';
-  $('kSaldo').textContent = 'Saldo acumulado: ' + crc(saldo);
+  const f = filaSemana(semana);
+  const ant = +f.anterior, queda = +f.queda, pre = +f.prestamos;
+  $('kAntLbl').textContent = ant < 0 ? 'Faltante de la semana anterior' : 'Sobrante de la semana anterior';
+  $('kAnt').textContent = crc(ant); $('kAnt').className = 'kpi-value' + (ant < 0 ? ' neg' : ant > 0 ? ' pos' : '');
+  $('kDisp').textContent = crc(f.disponible); $('kIng').textContent = 'Ingresos: ' + crc(f.ingresos);
+  $('kGas').textContent = crc(f.gastos); $('kPre').textContent = pre ? 'Préstamos (neto): ' + crc(pre) : '';
+  $('kQuedaLbl').textContent = queda < 0 ? 'Faltante (pasa a la próxima)' : 'Le queda (pasa a la próxima)';
+  $('kQueda').textContent = crc(queda); $('kQueda').className = 'kpi-value' + (queda < 0 ? ' neg' : '');
+  $('repSem').innerHTML = `<span>🙏 Diezmo (25%)</span><b>${crc(f.diezmo)}</b><span>💵 Disponible (75%)</span><b>${crc(f.disponible)}</b>`;
 
-  const sd = sum(ingS, i => i.segundo_diezmo);
-  $('repSem').innerHTML = `
-    <span>🙏 Diezmo (10%)</span><b>${crc(sum(ingS, i => i.diezmo))}</b>
-    <span>🌱 Primicia (5%)</span><b>${crc(sum(ingS, i => i.primicia))}</b>
-    <span>📦 Segundo diezmo (10%) · ${crc(sd / 7)} por rubro</span><b>${crc(sd)}</b>
-    <span>💵 Disponible (75%)</span><b>${crc(disp)}</b>`;
-
+  const gasS = gastos.filter(g => g.semana === semana);
   const porCat = {};
-  gasS.filter(g => !g.rubro).forEach(g => { porCat[g.categoria] = (porCat[g.categoria] || 0) + +g.monto; });
+  gasS.forEach(g => { porCat[g.categoria] = (porCat[g.categoria] || 0) + +g.monto; });
   const filasCat = Object.entries(porCat).sort((a, b) => b[1] - a[1]);
-  const max = Math.max(1, ...filasCat.map(c => c[1]));
+  const max = Math.max(1, ...filasCat.map(c => c[1])), totG = sum(gasS, g => g.monto);
   $('catSem').innerHTML = filasCat.length ? filasCat.map(([c, v]) => `
     <div class="fila"><div class="grow">${esc(c)}<div class="bar"><i style="width:${(v / max * 100).toFixed(1)}%"></i></div></div>
-    <span class="m">${crc(v)}</span><span class="sub">${gasDisp ? Math.round(v / gasDisp * 100) : 0}%</span></div>`).join('')
+    <span class="m">${crc(v)}</span><span class="sub">${totG ? Math.round(v / totG * 100) : 0}%</span></div>`).join('')
     : '<div class="tbl-empty">Sin gastos esta semana.</div>';
 
-  const movs = [...ingS.map(i => ({ ...i, t: 'in' })), ...gasS.map(g => ({ ...g, t: 'out' }))]
-    .sort((a, b) => (b.fecha + b.created_at).localeCompare(a.fecha + a.created_at));
-  $('movSem').innerHTML = movs.length ? movs.map(m => m.t === 'in' ? `
-    <div class="fila"><div class="grow">${esc(m.descripcion || 'Ingreso')}<div class="sub">${fCorta(m.fecha)}${m.origen === 'telegram' ? ' · Telegram' : ''}</div></div>
-      <span class="m in">+${crc(m.monto)}</span><button class="x" title="Borrar" onclick="borrar('fin_ingresos','${m.id}')">✕</button></div>` : `
-    <div class="fila"><div class="grow">${esc(m.descripcion || 'Gasto')}<div class="sub">${fCorta(m.fecha)}${m.rubro ? ' · 2º diezmo: ' + esc(rubroNombre(m.rubro)) : ''}${m.origen === 'telegram' ? ' · Telegram' : ''}</div></div>
-      ${m.rubro ? '' : `<select onchange="cambiarCat('${m.id}', this.value)">${cats.map(c => `<option${c === m.categoria ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>`}
-      <span class="m">−${crc(m.monto)}</span><button class="x" title="Borrar" onclick="borrar('fin_gastos','${m.id}')">✕</button></div>`).join('')
-    : '<div class="tbl-empty">Sin movimientos esta semana.</div>';
+  const movs = [
+    ...ingresos.filter(i => i.semana === semana).map(i => ({ ...i, t: 'in' })),
+    ...gasS.map(g => ({ ...g, t: 'out' })),
+    ...prestamos.filter(p => p.semana === semana).map(p => ({ ...p, t: 'pre' })),
+    ...prestamos.flatMap(p => (p.fin_prestamo_pagos || []).filter(a => a.semana === semana).map(a => ({ ...a, t: 'abono', p }))),
+  ].sort((a, b) => (b.fecha + b.created_at).localeCompare(a.fecha + a.created_at));
+  const tg = m => m.origen === 'telegram' ? ' · Telegram' : '';
+  $('movSem').innerHTML = movs.length ? movs.map(m => {
+    if (m.t === 'in') return `
+    <div class="fila"><div class="grow">${esc(m.descripcion || 'Ingreso')}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${tg(m)}</div></div>
+      <span class="m in">+${crc(m.monto)}</span><button class="x" title="Borrar" onclick="borrar('fin_ingresos','${m.id}')">✕</button></div>`;
+    if (m.t === 'out') return `
+    <div class="fila"><div class="grow">${esc(m.descripcion || 'Gasto')}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${tg(m)}</div></div>
+      <select onchange="cambiarCat('${m.id}', this.value)">${cats.map(c => `<option${c === m.categoria ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>
+      <span class="m">−${crc(m.monto)}</span><button class="x" title="Borrar" onclick="borrar('fin_gastos','${m.id}')">✕</button></div>`;
+    if (m.t === 'pre') {
+      const entra = m.tipo === 'me_prestaron';
+      return `<div class="fila"><div class="grow">🤝 ${entra ? 'Me prestó' : 'Le presté a'} ${esc(m.persona)}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${m.afecta_saldo ? '' : ' · no mueve el disponible'}</div></div>
+      <span class="m ${entra ? 'in' : ''}">${entra ? '+' : '−'}${crc(m.monto)}</span></div>`;
+    }
+    const entra = m.p.tipo === 'preste';
+    return `<div class="fila"><div class="grow">🤝 Abono ${entra ? 'de' : 'a'} ${esc(m.p.persona)}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${m.p.afecta_saldo ? '' : ' · no mueve el disponible'}</div></div>
+      <span class="m ${entra ? 'in' : ''}">${entra ? '+' : '−'}${crc(m.monto)}</span></div>`;
+  }).join('') : '<div class="tbl-empty">Sin movimientos esta semana.</div>';
 
   const pend = ingresos.filter(i => !i.entregado);
-  $('pendTot').textContent = pend.length ? 'Total: ' + crc(sum(pend, i => +i.diezmo + +i.primicia)) : '';
+  $('pendTot').textContent = pend.length ? 'Total: ' + crc(sum(pend, i => i.diezmo)) : '';
   $('pendList').innerHTML = pend.length ? pend.map(i => `
-    <div class="fila"><div class="grow">${esc(i.descripcion || 'Ingreso')} · ${fCorta(i.fecha)}<div class="sub">Diezmo ${crc(i.diezmo)} · Primicia ${crc(i.primicia)}</div></div>
-      <span class="m">${crc(+i.diezmo + +i.primicia)}</span><button class="btn-ghost" onclick="entregado('${i.id}')">✓ Entregado</button></div>`).join('')
+    <div class="fila"><div class="grow">${esc(i.descripcion || 'Ingreso')} · ${fCorta(i.fecha)}<div class="sub">25% de ${crc(i.monto)}${quien(i.owner)}</div></div>
+      <span class="m">${crc(i.diezmo)}</span><button class="btn-ghost" onclick="entregado('${i.id}')">✓ Entregado</button></div>`).join('')
     : '<div class="tbl-empty">Todo entregado 🙌</div>';
 
-  // ── rubros
-  const porRubro = sum(ingresos, i => i.segundo_diezmo) / 7;
-  $('rubrosList').innerHTML = [1, 2, 3, 4, 5, 6, 7].map(n => {
-    const usado = sum(gastos.filter(g => g.rubro === n), g => g.monto), queda = porRubro - usado;
-    return `<div class="fila"><div class="grow">${n}. ${esc(rubroNombre(n))}<div class="sub">Apartado ${crc(porRubro)} · Usado ${crc(usado)}</div></div>
-      <span class="m" style="color:${queda < 0 ? 'var(--red)' : 'var(--green)'}">${crc(queda)}</span></div>`;
-  }).join('');
+  renderPrestamos();
 
   // ── ajustes
-  $('rubrosForm').innerHTML = [1, 2, 3, 4, 5, 6, 7].map(n =>
-    `<div class="f-field"><label>Rubro ${n}</label><input id="rb${n}" value="${esc(rubroNombre(n))}" maxlength="40"></div>`).join('');
   $('reglasList').innerHTML = reglas.length ? reglas.map(r => `
-    <div class="fila"><div class="grow">"${esc(r.palabra)}" → <b>${esc(r.categoria)}</b></div>
-      <button class="x" onclick="borrarRegla('${encodeURIComponent(r.palabra)}')">✕</button></div>`).join('')
-    : '<div class="tbl-empty">Aún no ha agregado palabras propias.</div>';
+    <div class="fila"><div class="grow">"${esc(r.palabra)}" → <b>${esc(r.categoria)}</b><span class="sub">${quien(r.owner)}</span></div>
+      <button class="x" onclick="borrarRegla('${r.owner}','${encodeURIComponent(r.palabra)}')">✕</button></div>`).join('')
+    : '<div class="tbl-empty">Aún no hay palabras propias.</div>';
   renderTelegram();
   previewIngreso();
+}
+
+function renderPrestamos() {
+  const act = prestamos.filter(p => saldoPrestamo(p) > 0), fin = prestamos.filter(p => saldoPrestamo(p) <= 0);
+  const meDeben = sum(act.filter(p => p.tipo === 'preste'), saldoPrestamo), debo = sum(act.filter(p => p.tipo === 'me_prestaron'), saldoPrestamo);
+  $('presTot').textContent = act.length ? `Me deben ${crc(meDeben)} · Debo ${crc(debo)}` : '';
+  const pagos = p => (p.fin_prestamo_pagos || []).sort((a, b) => a.fecha.localeCompare(b.fecha)).map(a =>
+    `<div>${fCorta(a.fecha)} · abono ${crc(a.monto)}${quien(a.owner)} <button onclick="borrarAbono('${a.id}')">quitar</button></div>`).join('');
+  const titulo = p => p.tipo === 'preste' ? `${esc(p.persona)} me debe` : `Le debo a ${esc(p.persona)}`;
+  $('presAct').innerHTML = act.length ? act.map(p => {
+    const s = saldoPrestamo(p), pct = Math.round((1 - s / p.monto) * 100);
+    return `<div class="fila"><div class="grow">${titulo(p)}<div class="sub">${crc(p.monto)} el ${fCorta(p.fecha)}${p.descripcion ? ' · ' + esc(p.descripcion) : ''}${quien(p.owner)}${p.afecta_saldo ? '' : ' · no mueve el disponible'}</div>
+        <div class="bar"><i style="width:${pct}%"></i></div></div>
+      <span class="m">${crc(s)}</span>
+      <div class="abono"><input type="number" inputmode="decimal" min="0" step="any" id="ab_${p.id}" placeholder="Monto del abono">
+        <button class="btn-ghost" onclick="abonar('${p.id}')">Abonar</button>
+        <button class="btn-primary" onclick="abonar('${p.id}', true)">Pagar todo</button>
+        <button class="x" title="Borrar préstamo" onclick="borrarPrestamo('${p.id}')">✕</button></div>
+      ${(p.fin_prestamo_pagos || []).length ? `<div class="pagos">${pagos(p)}</div>` : ''}</div>`;
+  }).join('') : '<div class="tbl-empty">No hay préstamos pendientes.</div>';
+  $('presFin').innerHTML = fin.length ? fin.map(p => `
+    <div class="fila"><div class="grow">✅ ${titulo(p)} — pagado<div class="sub">${crc(p.monto)} el ${fCorta(p.fecha)}${quien(p.owner)}</div>
+      <div class="pagos">${pagos(p)}</div></div>
+      <button class="x" title="Borrar préstamo" onclick="borrarPrestamo('${p.id}')">✕</button></div>`).join('')
+    : '<div class="tbl-empty">Ninguno todavía.</div>';
 }
 
 function renderTelegram() {
   const box = $('tgBox');
   if (cfg?.telegram_chat_id) {
-    box.innerHTML = `<p>✅ Telegram vinculado. Escríbale al bot, por ejemplo <b>5000 almuerzo</b>, <b>+ 250000 salario</b> o <b>/resumen</b>.</p>
+    box.innerHTML = `<p>✅ Su Telegram está vinculado. Escríbale al bot, por ejemplo <b>5000 almuerzo</b>, <b>+ 250000 salario</b> o <b>/resumen</b>.</p>
       <div class="form-actions"><button class="btn-ghost" onclick="desvincular()">Desvincular</button></div>`;
   } else if (cfg?.telegram_codigo) {
-    box.innerHTML = `<p>Abra su bot en Telegram y envíele este mensaje:</p>
+    box.innerHTML = `<p>Abra el bot en Telegram y envíele este mensaje:</p>
       <p style="margin:12px 0"><span class="codigo">/vincular ${esc(cfg.telegram_codigo)}</span></p>
       <p class="hint">El código sirve una sola vez. Después de enviarlo, toque “Ya lo envié”.</p>
       <div class="form-actions"><button class="btn-ghost" onclick="generarCodigo()">Otro código</button><button class="btn-primary" onclick="cargar()">Ya lo envié</button></div>`;
   } else {
-    box.innerHTML = `<p>Registre gastos mandando un mensaje desde el celular. Primero hay que crear el bot (ver instrucciones en <code>supabase/functions/finanzas-telegram</code>).</p>
+    box.innerHTML = `<p>Registre gastos mandando un mensaje desde el celular.</p>
       <div class="form-actions"><button class="btn-primary" onclick="generarCodigo()">Vincular Telegram</button></div>`;
   }
 }
@@ -334,76 +396,108 @@ function renderTelegram() {
 function previewIngreso() {
   const m = +$('iMonto').value;
   if (!(m > 0)) { $('iPrev').innerHTML = ''; return; }
-  const r = reparto(m);
-  $('iPrev').innerHTML = `<span>🙏 Diezmo 10%</span><b>${crc(r.diezmo)}</b><span>🌱 Primicia 5%</span><b>${crc(r.primicia)}</b>
-    <span>📦 Segundo diezmo 10% (${crc(r.segundo / 7)} × 7)</span><b>${crc(r.segundo)}</b><span>💵 Disponible 75%</span><b>${crc(r.disponible)}</b>`;
+  const d = r2(m * .25);
+  $('iPrev').innerHTML = `<span>🙏 Diezmo 25%</span><b>${crc(d)}</b><span>💵 Disponible 75%</span><b>${crc(r2(m - d))}</b>`;
 }
 function msg(id, t, ok) { const e = $(id); e.textContent = t; e.className = 'form-msg ' + (ok ? 'ok' : 'err'); if (ok) setTimeout(() => { e.textContent = ''; }, 3500); }
+async function hacer(fn, msgId) { try { await fn(); } catch (e) { if (msgId) msg(msgId, e.message, false); else alert(e.message); } }
 
 async function guardarGasto() {
   const monto = +$('gMonto').value;
   if (!(monto > 0)) return msg('gMsg', 'Ponga un monto.', false);
-  try {
+  await hacer(async () => {
     const [g] = await api('fin_gastos', { method: 'POST', body: {
-      monto, descripcion: $('gDesc').value.trim() || null, fecha: $('gFecha').value || hoy(),
-      categoria: $('gCat').value || null, rubro: $('gRubro').value ? +$('gRubro').value : null } });
+      monto, descripcion: $('gDesc').value.trim() || null, fecha: $('gFecha').value || hoy(), categoria: $('gCat').value || null } });
     gastos.unshift(g);
-    $('gMonto').value = $('gDesc').value = ''; $('gCat').value = ''; $('gRubro').value = '';
-    render(); msg('gMsg', `✓ Guardado en ${g.rubro ? rubroNombre(g.rubro) : g.categoria}`, true);
-  } catch (e) { msg('gMsg', e.message, false); }
+    $('gMonto').value = $('gDesc').value = ''; $('gCat').value = '';
+    await refrescar(); msg('gMsg', `✓ Guardado en ${g.categoria}`, true);
+  }, 'gMsg');
 }
 async function guardarIngreso() {
   const monto = +$('iMonto').value;
   if (!(monto > 0)) return msg('iMsg', 'Ponga un monto.', false);
-  try {
+  await hacer(async () => {
     const [i] = await api('fin_ingresos', { method: 'POST', body: { monto, descripcion: $('iDesc').value.trim() || null, fecha: $('iFecha').value || hoy() } });
     ingresos.unshift(i);
     $('iMonto').value = $('iDesc').value = '';
-    render(); msg('iMsg', '✓ Ingreso guardado', true);
-  } catch (e) { msg('iMsg', e.message, false); }
+    await refrescar(); msg('iMsg', '✓ Ingreso guardado', true);
+  }, 'iMsg');
 }
 async function borrar(tabla, id) {
   if (!confirm('¿Borrar este movimiento?')) return;
-  await api(`${tabla}?id=eq.${id}`, { method: 'DELETE', prefer: 'return=minimal' });
-  if (tabla === 'fin_gastos') gastos = gastos.filter(g => g.id !== id); else ingresos = ingresos.filter(i => i.id !== id);
-  render();
+  await hacer(async () => {
+    await api(`${tabla}?id=eq.${id}`, { method: 'DELETE', prefer: 'return=minimal' });
+    if (tabla === 'fin_gastos') gastos = gastos.filter(g => g.id !== id); else ingresos = ingresos.filter(i => i.id !== id);
+    await refrescar();
+  });
 }
 async function cambiarCat(id, categoria) {
-  const [g] = await api(`fin_gastos?id=eq.${id}`, { method: 'PATCH', body: { categoria } });
-  gastos = gastos.map(x => x.id === id ? g : x); render();
+  await hacer(async () => {
+    const [g] = await api(`fin_gastos?id=eq.${id}`, { method: 'PATCH', body: { categoria } });
+    gastos = gastos.map(x => x.id === id ? g : x); render();
+  });
 }
 async function entregado(id) {
-  const [i] = await api(`fin_ingresos?id=eq.${id}`, { method: 'PATCH', body: { entregado: true } });
-  ingresos = ingresos.map(x => x.id === id ? i : x); render();
+  await hacer(async () => {
+    const [i] = await api(`fin_ingresos?id=eq.${id}`, { method: 'PATCH', body: { entregado: true } });
+    ingresos = ingresos.map(x => x.id === id ? i : x); render();
+  });
 }
-async function guardarRubros() {
-  const rubros = [1, 2, 3, 4, 5, 6, 7].map(n => $('rb' + n).value.trim() || 'Rubro ' + n);
-  try { [cfg] = await api('fin_config?owner=not.is.null', { method: 'PATCH', body: { rubros, updated_at: new Date().toISOString() } }); render(); msg('rMsg', '✓ Guardado', true); }
-  catch (e) { msg('rMsg', e.message, false); }
+
+async function guardarPrestamo() {
+  const monto = +$('pMonto').value, persona = $('pPersona').value.trim();
+  if (!persona) return msg('pMsg', 'Ponga el nombre de la persona.', false);
+  if (!(monto > 0)) return msg('pMsg', 'Ponga un monto.', false);
+  await hacer(async () => {
+    await api('fin_prestamos', { method: 'POST', body: { tipo: $('pTipo').value, persona, monto, fecha: $('pFecha').value || hoy(),
+      descripcion: $('pDesc').value.trim() || null, afecta_saldo: $('pAfecta').checked } });
+    $('pMonto').value = $('pPersona').value = $('pDesc').value = '';
+    await cargarPrestamos(); await refrescar(); msg('pMsg', '✓ Préstamo guardado', true);
+  }, 'pMsg');
 }
+async function abonar(id, todo) {
+  const p = prestamos.find(x => x.id === id), saldo = saldoPrestamo(p);
+  const monto = todo ? saldo : +$('ab_' + id).value;
+  if (!(monto > 0)) return alert('Ponga el monto del abono.');
+  if (monto > saldo) return alert('El abono es mayor que el saldo (' + crc(saldo) + ').');
+  if (todo && !confirm(`¿Registrar el pago total de ${crc(saldo)}?`)) return;
+  await hacer(async () => {
+    await api('fin_prestamo_pagos', { method: 'POST', body: { prestamo_id: id, monto, fecha: hoy() } });
+    await cargarPrestamos(); await refrescar();
+  });
+}
+async function borrarAbono(id) {
+  if (!confirm('¿Quitar este abono?')) return;
+  await hacer(async () => { await api('fin_prestamo_pagos?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' }); await cargarPrestamos(); await refrescar(); });
+}
+async function borrarPrestamo(id) {
+  if (!confirm('¿Borrar este préstamo y todos sus abonos?')) return;
+  await hacer(async () => { await api('fin_prestamos?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' }); await cargarPrestamos(); await refrescar(); });
+}
+
 async function guardarRegla() {
   const palabra = $('rgPal').value.trim().toLowerCase(), categoria = $('rgCat').value.trim().toLowerCase();
   if (!palabra || !categoria) return msg('rgMsg', 'Complete palabra y categoría.', false);
-  try {
+  await hacer(async () => {
     await api('fin_reglas', { method: 'POST', prefer: 'return=representation,resolution=merge-duplicates', body: { palabra, categoria } });
     $('rgPal').value = $('rgCat').value = '';
     reglas = await api('fin_reglas?select=*&order=palabra'); render(); msg('rgMsg', '✓ Agregada (aplica a gastos nuevos)', true);
-  } catch (e) { msg('rgMsg', e.message, false); }
+  }, 'rgMsg');
 }
-async function borrarRegla(p) {
-  await api('fin_reglas?palabra=eq.' + p, { method: 'DELETE', prefer: 'return=minimal' });
-  reglas = reglas.filter(r => encodeURIComponent(r.palabra) !== p); render();
+async function borrarRegla(owner, p) {
+  await hacer(async () => {
+    await api(`fin_reglas?owner=eq.${owner}&palabra=eq.${p}`, { method: 'DELETE', prefer: 'return=minimal' });
+    reglas = reglas.filter(r => !(r.owner === owner && encodeURIComponent(r.palabra) === p)); render();
+  });
 }
 async function generarCodigo() {
   const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', b = crypto.getRandomValues(new Uint8Array(10));
   const codigo = Array.from(b, x => abc[x % abc.length]).join('');
-  [cfg] = await api('fin_config?owner=not.is.null', { method: 'PATCH', body: { telegram_codigo: codigo } });
-  renderTelegram();
+  await hacer(async () => { [cfg] = await api('fin_config?owner=eq.' + yo, { method: 'PATCH', body: { telegram_codigo: codigo } }); renderTelegram(); });
 }
 async function desvincular() {
   if (!confirm('¿Desvincular Telegram? El bot dejará de registrar sus mensajes.')) return;
-  [cfg] = await api('fin_config?owner=not.is.null', { method: 'PATCH', body: { telegram_chat_id: null, telegram_codigo: null } });
-  renderTelegram();
+  await hacer(async () => { [cfg] = await api('fin_config?owner=eq.' + yo, { method: 'PATCH', body: { telegram_chat_id: null, telegram_codigo: null } }); renderTelegram(); });
 }
 
 /* ── arranque ── */
