@@ -69,6 +69,7 @@
     <button class="tab active" data-t="semana" onclick="tab('semana')">📅 Semana</button>
     <button class="tab" data-t="registrar" onclick="tab('registrar')">➕ Registrar</button>
     <button class="tab" data-t="prestamos" onclick="tab('prestamos')">🤝 Préstamos</button>
+    <button class="tab" data-t="ahorro" onclick="tab('ahorro')">🐷 Ahorro</button>
     <button class="tab" data-t="ajustes" onclick="tab('ajustes')">⚙️ Ajustes</button>
   </div>
 
@@ -79,6 +80,7 @@
       <span class="lbl" id="semLbl"></span>
       <button class="btn-ghost" onclick="moverSemana(1)">›</button>
       <button class="btn-ghost" onclick="semana = lunes(hoy()); render()">Hoy</button>
+      <button class="btn-ghost" onclick="ajustarSaldo()" title="Corregir lo que le queda esta semana">⚖️ Ajustar saldo</button>
     </div>
     <div class="kpi-row">
       <div class="kpi"><div class="kpi-label" id="kAntLbl">Viene de la semana anterior</div><div class="kpi-value" id="kAnt">—</div></div>
@@ -141,6 +143,21 @@
     <div class="lista" id="presFin"></div>
   </div>
 
+  <!-- ── AHORRO ── -->
+  <div class="tab-panel" id="p_ahorro">
+    <div class="section"><div class="section-title">Fondos de ahorro <span class="section-note" id="fonTot">plata apartada que no cuenta en el disponible de la semana</span></div></div>
+    <div class="lista" id="fonList"></div>
+    <div class="section"><div class="section-title">Nuevo fondo</div></div>
+    <div class="form-card">
+      <div class="form-grid">
+        <div class="f-field"><label>Nombre</label><input id="fNombre" placeholder="Ej. Chloe, viaje, emergencias"></div>
+        <div class="f-field"><label>Ya tiene ₡ (opcional)</label><input id="fInicial" type="number" inputmode="decimal" min="0" step="any" placeholder="0"></div>
+      </div>
+      <p class="hint" style="margin-top:10px">Lo que ya tiene no se resta del disponible de la semana.</p>
+      <div class="form-actions"><span class="form-msg" id="fMsg"></span><button class="btn-primary" onclick="crearFondo()">Crear fondo</button></div>
+    </div>
+  </div>
+
   <!-- ── AJUSTES ── -->
   <div class="tab-panel" id="p_ajustes">
     <div class="section"><div class="section-title">Palabras para categorizar <span class="section-note">si la descripción trae esta palabra, va a esa categoría (además de las que ya trae: super, gasolina, Netflix, alquiler…). Sirven para todo el grupo.</span></div></div>
@@ -164,9 +181,9 @@ const SUPA_URL = '__SUPA_URL__';
 const SUPA_KEY = '__SUPA_KEY__';
 const KEY = 'finSesion';           // sesión propia: no se mezcla con la del gimnasio
 const IDLE_MIN = 20;
-const CATS = ['comida', 'alquiler', 'aplicaciones', 'carro', 'otros'];
+const CATS = ['comida', 'alquiler', 'aplicaciones', 'carro', 'salud', 'cuidado personal', 'servicios', 'bb', 'otros'];
 
-let ses = null, yo = null, miembros = {}, semanas = [], ingresos = [], gastos = [], prestamos = [], reglas = [], cfg = null;
+let ses = null, yo = null, miembros = {}, semanas = [], ingresos = [], gastos = [], prestamos = [], ajustes = [], fondos = [], reglas = [], cfg = null;
 let semana = null, ultimaAct = Date.now();
 
 /* ── utilidades ── */
@@ -240,7 +257,7 @@ async function entrar() {
 function salir() {
   try { localStorage.removeItem(KEY); } catch (_) {}
   if (ses?.access_token) fetch(SUPA_URL + '/auth/v1/logout', { method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + ses.access_token } }).catch(() => {});
-  ses = null; yo = null; miembros = {}; semanas = ingresos = gastos = prestamos = reglas = []; cfg = null;
+  ses = null; yo = null; miembros = {}; semanas = ingresos = gastos = prestamos = ajustes = fondos = reglas = []; cfg = null;
   $('app').style.display = 'none'; $('loginScreen').style.display = '';
 }
 ['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, () => { ultimaAct = Date.now(); }, { passive: true }));
@@ -248,15 +265,18 @@ setInterval(() => { if (ses && Date.now() - ultimaAct > IDLE_MIN * 60000) salir(
 
 /* ── datos ── */
 const cargarSemanas = async () => { semanas = await api('rpc/fin_semanas', { method: 'POST', body: {} }) || []; };
+const cargarFondos = async () => { fondos = await api('fin_fondos?select=*,fin_fondo_movs(*)&order=created_at'); };
+const saldoFondo = f => r2(sum(f.fin_fondo_movs || [], m => m.monto));
 const cargarPrestamos = async () => { prestamos = await api('fin_prestamos?select=*,fin_prestamo_pagos(*)&order=fecha.desc,created_at.desc'); };
 async function cargar() {
   let mi;
-  [ingresos, gastos, reglas, mi] = await Promise.all([
+  [ingresos, gastos, reglas, ajustes, mi] = await Promise.all([
     api('fin_ingresos?select=*&order=fecha.desc,created_at.desc'),
     api('fin_gastos?select=*&order=fecha.desc,created_at.desc'),
     api('fin_reglas?select=*&order=palabra'),
+    api('fin_ajustes?select=*&order=fecha.desc,created_at.desc'),
     api('rpc/fin_miembros', { method: 'POST', body: {} }),
-    cargarSemanas(), cargarPrestamos(),
+    cargarSemanas(), cargarPrestamos(), cargarFondos(),
   ]);
   miembros = Object.fromEntries((mi || []).map(m => [m.user_id, m.nombre]));
   cfg = (await api('fin_config?select=*&owner=eq.' + yo))[0] || (await api('fin_config', { method: 'POST', body: {} }))[0];
@@ -278,7 +298,7 @@ function filaSemana(s) {
   if (f) return f;
   const prev = semanas.filter(x => x.semana < s).pop();
   const ant = prev ? +prev.queda : 0;
-  return { semana: s, ingresos: 0, diezmo: 0, disponible: 0, gastos: 0, prestamos: 0, anterior: ant, queda: ant };
+  return { semana: s, ingresos: 0, diezmo: 0, disponible: 0, gastos: 0, prestamos: 0, ajustes: 0, ahorro: 0, anterior: ant, queda: ant };
 }
 
 function render() {
@@ -289,11 +309,11 @@ function render() {
   // ── semana
   $('semLbl').textContent = `${fCorta(semana)} – ${fCorta(sumarDias(semana, 6))}`;
   const f = filaSemana(semana);
-  const ant = +f.anterior, queda = +f.queda, pre = +f.prestamos;
+  const ant = +f.anterior, queda = +f.queda, pre = +f.prestamos, aju = +f.ajustes || 0, aho = +f.ahorro || 0;
   $('kAntLbl').textContent = ant < 0 ? 'Faltante de la semana anterior' : 'Sobrante de la semana anterior';
   $('kAnt').textContent = crc(ant); $('kAnt').className = 'kpi-value' + (ant < 0 ? ' neg' : ant > 0 ? ' pos' : '');
   $('kDisp').textContent = crc(f.disponible); $('kIng').textContent = 'Ingresos: ' + crc(f.ingresos);
-  $('kGas').textContent = crc(f.gastos); $('kPre').textContent = pre ? 'Préstamos (neto): ' + crc(pre) : '';
+  $('kGas').textContent = crc(f.gastos); $('kPre').textContent = [pre ? 'Préstamos (neto): ' + crc(pre) : '', aho ? 'Ahorro: ' + crc(aho) : '', aju ? 'Ajustes: ' + crc(aju) : ''].filter(Boolean).join(' · ');
   $('kQuedaLbl').textContent = queda < 0 ? 'Faltante (pasa a la próxima)' : 'Le queda (pasa a la próxima)';
   $('kQueda').textContent = crc(queda); $('kQueda').className = 'kpi-value' + (queda < 0 ? ' neg' : '');
   $('repSem').innerHTML = `<span>🙏 Diezmo (25%)</span><b>${crc(f.diezmo)}</b><span>💵 Disponible (75%)</span><b>${crc(f.disponible)}</b>`;
@@ -313,6 +333,8 @@ function render() {
     ...gasS.map(g => ({ ...g, t: 'out' })),
     ...prestamos.filter(p => p.semana === semana).map(p => ({ ...p, t: 'pre' })),
     ...prestamos.flatMap(p => (p.fin_prestamo_pagos || []).filter(a => a.semana === semana).map(a => ({ ...a, t: 'abono', p }))),
+    ...ajustes.filter(a => a.semana === semana).map(a => ({ ...a, t: 'aju' })),
+    ...fondos.flatMap(f => (f.fin_fondo_movs || []).filter(m => m.semana === semana).map(m => ({ ...m, t: 'fon', f }))),
   ].sort((a, b) => (b.fecha + b.created_at).localeCompare(a.fecha + a.created_at));
   const tg = m => m.origen === 'telegram' ? ' · Telegram' : '';
   $('movSem').innerHTML = movs.length ? movs.map(m => {
@@ -323,6 +345,14 @@ function render() {
     <div class="fila"><div class="grow">${esc(m.descripcion || 'Gasto')}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${tg(m)}</div></div>
       <select onchange="cambiarCat('${m.id}', this.value)">${cats.map(c => `<option${c === m.categoria ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>
       <span class="m">−${crc(m.monto)}</span><button class="x" title="Borrar" onclick="borrar('fin_gastos','${m.id}')">✕</button></div>`;
+    if (m.t === 'fon') {
+      const aporte = m.monto > 0;
+      return `<div class="fila"><div class="grow">🐷 ${aporte ? 'Aporte a' : 'Retiro de'} ${esc(m.f.nombre)}${m.nota ? ' · ' + esc(m.nota) : ''}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${m.afecta_saldo ? '' : ' · no mueve el disponible'}</div></div>
+      ${m.afecta_saldo ? `<span class="m ${aporte ? '' : 'in'}">${aporte ? '−' : '+'}${crc(Math.abs(m.monto))}</span>` : `<span class="m sub">${crc(Math.abs(m.monto))}</span>`}</div>`;
+    }
+    if (m.t === 'aju') return `
+    <div class="fila"><div class="grow">⚖️ Ajuste de saldo${m.nota ? ' · ' + esc(m.nota) : ''}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}</div></div>
+      <span class="m ${m.monto > 0 ? 'in' : ''}">${m.monto > 0 ? '+' : ''}${crc(m.monto)}</span><button class="x" title="Borrar" onclick="borrarAjuste('${m.id}')">✕</button></div>`;
     if (m.t === 'pre') {
       const entra = m.tipo === 'me_prestaron';
       return `<div class="fila"><div class="grow">🤝 ${entra ? 'Me prestó' : 'Le presté a'} ${esc(m.persona)}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${m.afecta_saldo ? '' : ' · no mueve el disponible'}</div></div>
@@ -341,6 +371,7 @@ function render() {
     : '<div class="tbl-empty">Todo entregado 🙌</div>';
 
   renderPrestamos();
+  renderFondos();
 
   // ── ajustes
   $('reglasList').innerHTML = reglas.length ? reglas.map(r => `
@@ -374,6 +405,21 @@ function renderPrestamos() {
       <div class="pagos">${pagos(p)}</div></div>
       <button class="x" title="Borrar préstamo" onclick="borrarPrestamo('${p.id}')">✕</button></div>`).join('')
     : '<div class="tbl-empty">Ninguno todavía.</div>';
+}
+
+function renderFondos() {
+  $('fonTot').textContent = fondos.length > 1 ? 'Total ahorrado: ' + crc(sum(fondos, saldoFondo)) : 'plata apartada que no cuenta en el disponible de la semana';
+  $('fonList').innerHTML = fondos.length ? fondos.map(f => {
+    const movs = (f.fin_fondo_movs || []).slice().sort((a, b) => (b.fecha + b.created_at).localeCompare(a.fecha + a.created_at));
+    return `<div class="fila"><div class="grow"><b>🐷 ${esc(f.nombre)}</b><div class="sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${quien(f.owner)}</div></div>
+      <span class="m pos" style="font-size:20px">${crc(saldoFondo(f))}</span>
+      <div class="abono"><input type="number" inputmode="decimal" min="0" step="any" id="fm_${f.id}" placeholder="Monto">
+        <button class="btn-primary" onclick="moverFondo('${f.id}', 1)">Aportar</button>
+        <button class="btn-ghost" onclick="moverFondo('${f.id}', -1)">Retirar</button>
+        <button class="x" title="Borrar fondo" onclick="borrarFondo('${f.id}')">✕</button></div>
+      <label class="chk" style="width:100%;font-size:13px;color:var(--sec)"><input type="checkbox" id="fa_${f.id}" checked> Sale del / vuelve al disponible de la semana</label>
+      ${movs.length ? `<div class="pagos">${movs.map(m => `<div>${fCorta(m.fecha)} · ${m.monto > 0 ? 'aporte' : 'retiro'} ${crc(Math.abs(m.monto))}${m.nota ? ' · ' + esc(m.nota) : ''}${m.afecta_saldo ? '' : ' (no mueve el disponible)'}${quien(m.owner)} <button onclick="borrarMovFondo('${m.id}')">quitar</button></div>`).join('')}</div>` : ''}</div>`;
+  }).join('') : '<div class="tbl-empty">Aún no hay fondos.</div>';
 }
 
 function renderTelegram() {
@@ -442,6 +488,57 @@ async function entregado(id) {
     const [i] = await api(`fin_ingresos?id=eq.${id}`, { method: 'PATCH', body: { entregado: true } });
     ingresos = ingresos.map(x => x.id === id ? i : x); render();
   });
+}
+
+// "¿Cuánto tiene ahora?" → guarda la diferencia como ajuste en la semana elegida
+async function ajustarSaldo() {
+  const f = filaSemana(semana), actual = +f.queda;
+  const txt = prompt(`Le queda ${crc(actual)} esta semana.\n¿Cuánto debería quedarle? (ej. 60000)`);
+  if (txt == null) return;
+  let n = String(txt).replace(/[₡\s]/g, '');
+  n = /^\d{1,3}([.,]\d{3})+$/.test(n) ? n.replace(/[.,]/g, '') : n.replace(',', '.');   // 60.000 / 60,000 → 60000
+  const real = +n;
+  if (!isFinite(real) || String(txt).trim() === '') return alert('Escriba solo el monto, por ejemplo 60000.');
+  const monto = r2(real - actual);
+  if (!monto) return alert('Ya está en ' + crc(real) + '.');
+  const fin = sumarDias(semana, 6), fecha = hoy() < semana ? semana : hoy() > fin ? fin : hoy();
+  await hacer(async () => {
+    const [a] = await api('fin_ajustes', { method: 'POST', body: { monto, fecha, nota: 'saldo real ' + crc(real) } });
+    ajustes.unshift(a); await refrescar();
+  });
+}
+async function borrarAjuste(id) {
+  if (!confirm('¿Borrar este ajuste?')) return;
+  await hacer(async () => { await api('fin_ajustes?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' }); ajustes = ajustes.filter(a => a.id !== id); await refrescar(); });
+}
+
+async function crearFondo() {
+  const nombre = $('fNombre').value.trim(), inicial = +$('fInicial').value || 0;
+  if (!nombre) return msg('fMsg', 'Ponga un nombre.', false);
+  if (inicial < 0) return msg('fMsg', 'El monto inicial no puede ser negativo.', false);
+  await hacer(async () => {
+    const [f] = await api('fin_fondos', { method: 'POST', body: { nombre } });
+    if (inicial > 0) await api('fin_fondo_movs', { method: 'POST', body: { fondo_id: f.id, monto: inicial, fecha: hoy(), nota: 'saldo inicial', afecta_saldo: false } });
+    $('fNombre').value = $('fInicial').value = '';
+    await cargarFondos(); await refrescar(); msg('fMsg', '✓ Fondo creado', true);
+  }, 'fMsg');
+}
+async function moverFondo(id, signo) {
+  const f = fondos.find(x => x.id === id), monto = +$('fm_' + id).value;
+  if (!(monto > 0)) return alert('Ponga el monto.');
+  if (signo < 0 && monto > saldoFondo(f)) return alert('El fondo solo tiene ' + crc(saldoFondo(f)) + '.');
+  await hacer(async () => {
+    await api('fin_fondo_movs', { method: 'POST', body: { fondo_id: id, monto: signo * monto, fecha: hoy(), afecta_saldo: $('fa_' + id).checked } });
+    await cargarFondos(); await refrescar();
+  });
+}
+async function borrarMovFondo(id) {
+  if (!confirm('¿Quitar este movimiento del fondo?')) return;
+  await hacer(async () => { await api('fin_fondo_movs?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' }); await cargarFondos(); await refrescar(); });
+}
+async function borrarFondo(id) {
+  if (!confirm('¿Borrar este fondo y todos sus movimientos?')) return;
+  await hacer(async () => { await api('fin_fondos?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' }); await cargarFondos(); await refrescar(); });
 }
 
 async function guardarPrestamo() {
