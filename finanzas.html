@@ -79,6 +79,7 @@
       <span class="lbl" id="semLbl"></span>
       <button class="btn-ghost" onclick="moverSemana(1)">›</button>
       <button class="btn-ghost" onclick="semana = lunes(hoy()); render()">Hoy</button>
+      <button class="btn-ghost" onclick="ajustarSaldo()" title="Corregir lo que le queda esta semana">⚖️ Ajustar saldo</button>
     </div>
     <div class="kpi-row">
       <div class="kpi"><div class="kpi-label" id="kAntLbl">Viene de la semana anterior</div><div class="kpi-value" id="kAnt">—</div></div>
@@ -166,7 +167,7 @@ const KEY = 'finSesion';           // sesión propia: no se mezcla con la del gi
 const IDLE_MIN = 20;
 const CATS = ['comida', 'alquiler', 'aplicaciones', 'carro', 'otros'];
 
-let ses = null, yo = null, miembros = {}, semanas = [], ingresos = [], gastos = [], prestamos = [], reglas = [], cfg = null;
+let ses = null, yo = null, miembros = {}, semanas = [], ingresos = [], gastos = [], prestamos = [], ajustes = [], reglas = [], cfg = null;
 let semana = null, ultimaAct = Date.now();
 
 /* ── utilidades ── */
@@ -240,7 +241,7 @@ async function entrar() {
 function salir() {
   try { localStorage.removeItem(KEY); } catch (_) {}
   if (ses?.access_token) fetch(SUPA_URL + '/auth/v1/logout', { method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + ses.access_token } }).catch(() => {});
-  ses = null; yo = null; miembros = {}; semanas = ingresos = gastos = prestamos = reglas = []; cfg = null;
+  ses = null; yo = null; miembros = {}; semanas = ingresos = gastos = prestamos = ajustes = reglas = []; cfg = null;
   $('app').style.display = 'none'; $('loginScreen').style.display = '';
 }
 ['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, () => { ultimaAct = Date.now(); }, { passive: true }));
@@ -251,10 +252,11 @@ const cargarSemanas = async () => { semanas = await api('rpc/fin_semanas', { met
 const cargarPrestamos = async () => { prestamos = await api('fin_prestamos?select=*,fin_prestamo_pagos(*)&order=fecha.desc,created_at.desc'); };
 async function cargar() {
   let mi;
-  [ingresos, gastos, reglas, mi] = await Promise.all([
+  [ingresos, gastos, reglas, ajustes, mi] = await Promise.all([
     api('fin_ingresos?select=*&order=fecha.desc,created_at.desc'),
     api('fin_gastos?select=*&order=fecha.desc,created_at.desc'),
     api('fin_reglas?select=*&order=palabra'),
+    api('fin_ajustes?select=*&order=fecha.desc,created_at.desc'),
     api('rpc/fin_miembros', { method: 'POST', body: {} }),
     cargarSemanas(), cargarPrestamos(),
   ]);
@@ -278,7 +280,7 @@ function filaSemana(s) {
   if (f) return f;
   const prev = semanas.filter(x => x.semana < s).pop();
   const ant = prev ? +prev.queda : 0;
-  return { semana: s, ingresos: 0, diezmo: 0, disponible: 0, gastos: 0, prestamos: 0, anterior: ant, queda: ant };
+  return { semana: s, ingresos: 0, diezmo: 0, disponible: 0, gastos: 0, prestamos: 0, ajustes: 0, anterior: ant, queda: ant };
 }
 
 function render() {
@@ -289,11 +291,11 @@ function render() {
   // ── semana
   $('semLbl').textContent = `${fCorta(semana)} – ${fCorta(sumarDias(semana, 6))}`;
   const f = filaSemana(semana);
-  const ant = +f.anterior, queda = +f.queda, pre = +f.prestamos;
+  const ant = +f.anterior, queda = +f.queda, pre = +f.prestamos, aju = +f.ajustes || 0;
   $('kAntLbl').textContent = ant < 0 ? 'Faltante de la semana anterior' : 'Sobrante de la semana anterior';
   $('kAnt').textContent = crc(ant); $('kAnt').className = 'kpi-value' + (ant < 0 ? ' neg' : ant > 0 ? ' pos' : '');
   $('kDisp').textContent = crc(f.disponible); $('kIng').textContent = 'Ingresos: ' + crc(f.ingresos);
-  $('kGas').textContent = crc(f.gastos); $('kPre').textContent = pre ? 'Préstamos (neto): ' + crc(pre) : '';
+  $('kGas').textContent = crc(f.gastos); $('kPre').textContent = [pre ? 'Préstamos (neto): ' + crc(pre) : '', aju ? 'Ajustes: ' + crc(aju) : ''].filter(Boolean).join(' · ');
   $('kQuedaLbl').textContent = queda < 0 ? 'Faltante (pasa a la próxima)' : 'Le queda (pasa a la próxima)';
   $('kQueda').textContent = crc(queda); $('kQueda').className = 'kpi-value' + (queda < 0 ? ' neg' : '');
   $('repSem').innerHTML = `<span>🙏 Diezmo (25%)</span><b>${crc(f.diezmo)}</b><span>💵 Disponible (75%)</span><b>${crc(f.disponible)}</b>`;
@@ -313,6 +315,7 @@ function render() {
     ...gasS.map(g => ({ ...g, t: 'out' })),
     ...prestamos.filter(p => p.semana === semana).map(p => ({ ...p, t: 'pre' })),
     ...prestamos.flatMap(p => (p.fin_prestamo_pagos || []).filter(a => a.semana === semana).map(a => ({ ...a, t: 'abono', p }))),
+    ...ajustes.filter(a => a.semana === semana).map(a => ({ ...a, t: 'aju' })),
   ].sort((a, b) => (b.fecha + b.created_at).localeCompare(a.fecha + a.created_at));
   const tg = m => m.origen === 'telegram' ? ' · Telegram' : '';
   $('movSem').innerHTML = movs.length ? movs.map(m => {
@@ -323,6 +326,9 @@ function render() {
     <div class="fila"><div class="grow">${esc(m.descripcion || 'Gasto')}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${tg(m)}</div></div>
       <select onchange="cambiarCat('${m.id}', this.value)">${cats.map(c => `<option${c === m.categoria ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>
       <span class="m">−${crc(m.monto)}</span><button class="x" title="Borrar" onclick="borrar('fin_gastos','${m.id}')">✕</button></div>`;
+    if (m.t === 'aju') return `
+    <div class="fila"><div class="grow">⚖️ Ajuste de saldo${m.nota ? ' · ' + esc(m.nota) : ''}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}</div></div>
+      <span class="m ${m.monto > 0 ? 'in' : ''}">${m.monto > 0 ? '+' : ''}${crc(m.monto)}</span><button class="x" title="Borrar" onclick="borrarAjuste('${m.id}')">✕</button></div>`;
     if (m.t === 'pre') {
       const entra = m.tipo === 'me_prestaron';
       return `<div class="fila"><div class="grow">🤝 ${entra ? 'Me prestó' : 'Le presté a'} ${esc(m.persona)}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${m.afecta_saldo ? '' : ' · no mueve el disponible'}</div></div>
@@ -442,6 +448,28 @@ async function entregado(id) {
     const [i] = await api(`fin_ingresos?id=eq.${id}`, { method: 'PATCH', body: { entregado: true } });
     ingresos = ingresos.map(x => x.id === id ? i : x); render();
   });
+}
+
+// "¿Cuánto tiene ahora?" → guarda la diferencia como ajuste en la semana elegida
+async function ajustarSaldo() {
+  const f = filaSemana(semana), actual = +f.queda;
+  const txt = prompt(`Le queda ${crc(actual)} esta semana.\n¿Cuánto debería quedarle? (ej. 60000)`);
+  if (txt == null) return;
+  let n = String(txt).replace(/[₡\s]/g, '');
+  n = /^\d{1,3}([.,]\d{3})+$/.test(n) ? n.replace(/[.,]/g, '') : n.replace(',', '.');   // 60.000 / 60,000 → 60000
+  const real = +n;
+  if (!isFinite(real) || String(txt).trim() === '') return alert('Escriba solo el monto, por ejemplo 60000.');
+  const monto = r2(real - actual);
+  if (!monto) return alert('Ya está en ' + crc(real) + '.');
+  const fin = sumarDias(semana, 6), fecha = hoy() < semana ? semana : hoy() > fin ? fin : hoy();
+  await hacer(async () => {
+    const [a] = await api('fin_ajustes', { method: 'POST', body: { monto, fecha, nota: 'saldo real ' + crc(real) } });
+    ajustes.unshift(a); await refrescar();
+  });
+}
+async function borrarAjuste(id) {
+  if (!confirm('¿Borrar este ajuste?')) return;
+  await hacer(async () => { await api('fin_ajustes?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' }); ajustes = ajustes.filter(a => a.id !== id); await refrescar(); });
 }
 
 async function guardarPrestamo() {
