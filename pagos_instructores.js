@@ -662,7 +662,7 @@ async function piRechazar() {
 }
 
 // ══ 3) Pago de la semana ══════════════════════════════════════════════════
-const PI_COLS = 'id,origen,sede,fecha_clase,emisor,emisor_cedula,instructor_id,numero_factura,monto,monto_esperado,nota_diferencia,banco_pago,cuenta_pago,metodo_pago,pago_tipo,dia_pago,cargado_at,pagado_at,pagado_por,detalle_clases';
+const PI_COLS = 'id,origen,sede,fecha_clase,emisor,emisor_cedula,instructor_id,numero_factura,clave_hacienda,monto,monto_esperado,nota_diferencia,banco_pago,cuenta_pago,metodo_pago,pago_tipo,dia_pago,cargado_at,pagado_at,pagado_por,detalle_clases';
 
 function piSemanaInicial() {
   const hoy = piAhoraCR();
@@ -788,6 +788,7 @@ function piRenderPagos() {
           ${r.nota_diferencia ? `<span style="color:var(--orange);">Nota: ${esc(r.nota_diferencia)}</span>` : ''}
           <span class="hint">Cargada ${esc(piHora(r.cargado_at))}${r.pagado_at ? ` · pagada ${esc(piHora(r.pagado_at))}${r.pagado_por ? ' por ' + esc(r.pagado_por) : ''}` : ''}</span>
           <button class="btn-edit" onclick="piDescargarXml('${r.id}')">⬇️ XML</button>
+          ${piBotonClave(r.clave_hacienda)}
         </div>`).join('')}
       </td></tr>` : '';
     return `<tr>
@@ -879,6 +880,18 @@ function piFacturasExcel(gr) {
   const nums = gr.rows.map(r => r.origen === 'xml' ? (r.numero_factura || '—')
     : r.origen === 'recibo' ? 'Recibo' : 'Planilla por horas');
   return [...new Set(nums)].join(', ');
+}
+
+// Botón para copiar la clave de Hacienda (50 dígitos) sin mostrarla en pantalla
+function piBotonClave(clave) {
+  const c = String(clave || '').replace(/\D/g, '');
+  return c ? `<button class="btn-edit" data-clave="${c}" title="Copia la clave de 50 dígitos de la factura electrónica" onclick="event.stopPropagation(); piCopiarClave(this)">📋 Copiar clave</button>` : '';
+}
+function piCopiarClave(btn) {
+  const c = btn.dataset.clave, txt = btn.textContent;
+  const listo = () => { btn.textContent = '✓ Clave copiada'; setTimeout(() => { btn.textContent = txt; }, 1800); };
+  const manual = () => prompt('Copie la clave de la factura:', c);
+  try { navigator.clipboard.writeText(c).then(listo, manual); } catch (_) { manual(); }
 }
 
 async function piExcel() {

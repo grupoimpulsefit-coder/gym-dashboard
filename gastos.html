@@ -520,7 +520,7 @@ function renderGastos() {
         <td>${esc(new Date(g.fecha_clase+'T00:00:00').toLocaleDateString('es-CR'))}</td>
         <td>${esc(g.emisor)}</td>
         <td>${g.documento_cobro ? esc(g.documento_cobro) : '<span class="pill">—</span>'}</td>
-        <td>${g.numero_factura ? esc(g.numero_factura) : '—'}${infoPagoXml(g)}</td>
+        <td>${g.numero_factura ? esc(g.numero_factura) : '—'}${infoPagoXml(g)}${g.clave_hacienda ? '<br>' + piBotonClave(g.clave_hacienda) : ''}</td>
         <td>${g.banco_pago ? esc(g.banco_pago) : '—'}${g.cuenta_pago ? '<br><span style="font-size:11px;color:var(--muted);">'+esc(g.cuenta_pago)+'</span>' : ''}</td>
         <td class="num">${fmtCRC(g.monto)}</td>
         ${acc ? `<td class="num" style="white-space:nowrap;">${edit ? `<button class="btn-edit" title="Editar factura" onclick="editarGasto('${g.id}')">✏️</button>` : ''}${adm ? ` <button class="btn-del" title="Eliminar gasto" onclick="deleteGasto('${g.id}')">🗑</button>` : ''}</td>` : ''}
