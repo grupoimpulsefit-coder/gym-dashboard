@@ -773,7 +773,7 @@ function piRenderPagos() {
           <span class="hint">${r.pagado_at ? `Pagada ${esc(piHora(r.pagado_at))}${r.pagado_por ? ' por ' + esc(r.pagado_por) : ''}` : 'Pendiente'}</span>
           <button class="btn-edit" onclick="phReciboGasto(piGrupos[${i}].rows.find(x => x.id === '${r.id}'))">📄 Recibo</button>
         </div>` : r.origen === 'recibo' ? `<div style="display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:4px 0;">
-          <span class="pill info">Recibo</span>
+          <span class="pill info" title="Pago con recibo (sin factura)">Clase grupal</span>
           <span>Clases ${esc([...new Set((r.detalle_clases || []).map(c => piFechaCorta(c.fecha)))].join(', ') || piFechaCorta(r.fecha_clase))}</span>
           <span>${esc(piResumenClases([r]))}</span>
           <b>${fmtCRC(r.monto)}</b>
@@ -878,7 +878,7 @@ function piEmisorExcel(gr) {
 // N.º de factura electrónica (consecutivo de 20 dígitos); recibos y horas no tienen
 function piFacturasExcel(gr) {
   const nums = gr.rows.map(r => r.origen === 'xml' ? (r.numero_factura || '—')
-    : r.origen === 'recibo' ? 'Recibo' : 'Planilla por horas');
+    : r.origen === 'recibo' ? 'Clase grupal' : 'Planilla por horas');
   return [...new Set(nums)].join(', ');
 }
 

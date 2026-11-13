@@ -479,7 +479,7 @@ function infoPagoXml(g) {
   if (!['xml', 'horas', 'recibo'].includes(g.origen)) return '';
   const xml = g.origen === 'horas'
     ? ' <span class="pill info" title="Planilla por horas (sin factura)">Por horas</span>'
-    : g.origen === 'recibo' ? ' <span class="pill info" title="Pago por clase con recibo (sin factura)">Recibo</span>'
+    : g.origen === 'recibo' ? ' <span class="pill info" title="Pago por clase con recibo (sin factura)">Clase grupal</span>'
     : ' <span class="pill info" title="Cargada desde el XML de la factura electrónica">XML</span>';
   if (esPagoCaja(g)) return xml;
   const dia = g.dia_pago ? parseFecha(g.dia_pago).toLocaleDateString('es-CR', { weekday:'short', day:'2-digit', month:'2-digit' }) : '';
