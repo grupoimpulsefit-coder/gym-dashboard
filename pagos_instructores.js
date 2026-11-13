@@ -837,7 +837,7 @@ function piRenderPagos() {
       </table>
     </div></div>
     <div class="form-actions" style="padding:0 var(--gut) 24px;">
-      <div class="hint" style="margin-right:auto;">Se descarga un Excel por sede, solo con lo necesario para pagar: instructor, cédula, cuenta o SINPE y monto.</div>
+      <div class="hint" style="margin-right:auto;">Se descarga un Excel por sede, con lo que pide el protocolo de pagos: emisor, n.º de factura, nombre a quien se transfiere, cuenta o SINPE y monto.</div>
       <button class="btn-primary" onclick="piExcel()">⬇️ Excel de pagos (uno por sede)</button>
     </div>`;
 }
