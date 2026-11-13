@@ -916,18 +916,18 @@ async function piExcel() {
       [fis?.razon_social ? `${fis.razon_social}${fis.cedula_juridica ? ' · ' + fis.cedula_juridica : ''}` : ''],
       [`Generado: ${new Date().toLocaleString('es-CR')}`],
       [],
-      ['Emisor', 'N.º de factura electrónica', 'Forma de pago', 'Cuenta / SINPE', 'Detalle', 'Monto', 'Estado'],
+      ['Emisor', 'N.º de factura electrónica', 'Nombre a quien se transfiere', 'Forma de pago', 'Cuenta / SINPE', 'Detalle', 'Monto', 'Estado'],
     ];
     const filasMonto = [];
     grupos.forEach(gr => {
-      aoa.push([piEmisorExcel(gr), piFacturasExcel(gr), gr.banco, gr.cuenta, piResumenClases(gr.rows), Math.round(gr.total), piEstado(gr, caja).txt]);
+      aoa.push([piEmisorExcel(gr), piFacturasExcel(gr), gr.nombre, gr.banco, gr.cuenta, piResumenClases(gr.rows), Math.round(gr.total), piEstado(gr, caja).txt]);
       filasMonto.push(aoa.length - 1);
     });
-    aoa.push(['TOTAL', '', '', '', '', Math.round(grupos.reduce((s, g) => s + g.total, 0)), '']);
+    aoa.push(['TOTAL', '', '', '', '', '', Math.round(grupos.reduce((s, g) => s + g.total, 0)), '']);
     filasMonto.push(aoa.length - 1);
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 30 }, { wch: 24 }, { wch: 16 }, { wch: 28 }, { wch: 30 }, { wch: 14 }, { wch: 20 }];
-    filasMonto.forEach(r => { const ref = XLSX.utils.encode_cell({ r, c: 5 }); if (ws[ref]) ws[ref].z = '#,##0'; });
+    ws['!cols'] = [{ wch: 30 }, { wch: 24 }, { wch: 30 }, { wch: 16 }, { wch: 28 }, { wch: 30 }, { wch: 14 }, { wch: 20 }];
+    filasMonto.forEach(r => { const ref = XLSX.utils.encode_cell({ r, c: 6 }); if (ws[ref]) ws[ref].z = '#,##0'; });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sede.replace(/[\\/?*[\]:]/g, '').slice(0, 31));
     const archivo = `pago_instructores_${phSlug(sede)}_${diaArchivo}_${fechaArchivo}.xlsx`;
