@@ -736,7 +736,11 @@ function piResumenClases(rows) {
   return Object.entries(t).map(([k, n]) => `${n} ${k}`).join(' · ') || '—';
 }
 function piEstado(gr, caja) {
-  if (caja) return { txt: 'Caja', pill: '' };
+  if (caja) {
+    const pagC = gr.rows.filter(r => r.pagado_at);
+    if (pagC.length === gr.rows.length) return { txt: 'Pagado de caja ' + piHora(pagC.map(r => r.pagado_at).sort().pop()), pill: 'ok', pagado: true };
+    return { txt: pagC.length ? `Caja · ${pagC.length}/${gr.rows.length} pagados` : 'Caja · pendiente', pill: '' };
+  }
   const pag = gr.rows.filter(r => r.pagado_at);
   if (pag.length === gr.rows.length) {
     const ult = pag.map(r => r.pagado_at).sort().pop();
