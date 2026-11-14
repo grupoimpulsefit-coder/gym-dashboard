@@ -217,12 +217,14 @@ const ICONS={
   proyecciones:'<svg viewBox="0 0 24 24"><path d="M4 18L10 11l4 4 6-8"/><path d="M15 7h5v5"/></svg>',
   arqueo:'<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8 13l3 3 5-6"/></svg>',
   mediciones:'<svg viewBox="0 0 24 24"><path d="M2 9h20v6H2z"/><path d="M6 9v3M10 9v4M14 9v3M18 9v4"/></svg>',
-  minita:'<svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>'
+  minita:'<svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>',
+  pagos:'<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 11l2 2 4-4"/></svg>'
 };
 const MODS=[
   {id:'caja',label:'Caja',color:'var(--brand)'},
   {id:'minita',label:'Minita',color:'var(--green)'},
   {id:'gastos',label:'Gastos',color:'var(--orange)'},
+  {id:'pagos',label:'Pagos',color:'var(--indigo)'},
   {id:'inventario',label:'Inventario',color:'var(--amber)'},
   {id:'arqueo',label:'Arqueo',color:'#FF2D55',arqueo:true},
   {id:'mediciones',label:'Mediciones',color:'var(--purple)',med:true},
@@ -428,13 +430,15 @@ async function renderHub(showLoading){
   document.getElementById('nav').innerHTML=`<div class="row"><button class="back" onclick="back()"><svg viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(backLabel())}</button><span class="tt">${esc(s)}</span><button class="act" onclick="abrirCaja()">Abrir caja</button></div><div class="row"><span class="st">${esc(fechaLarga(selDate))}</span><span id="hubEstado"></span></div>`;
   const v=document.getElementById('view');
   if(showLoading) v.innerHTML='<div class="tiles"><div class="skel" style="margin:0;height:70px"></div><div class="skel" style="margin:0;height:70px"></div></div><div class="mods">'+'<div class="skel" style="margin:0;width:60px;height:60px;border-radius:14px"></div>'.repeat(4)+'</div>';
-  const [r1,r2,r3]=await Promise.allSettled([loadDia(), supaFetch(`/envios_mercaderia?sede=eq.${encodeURIComponent(s)}&estado=eq.pendiente&select=id`), !puedeVerStock()?Promise.resolve([]):invCache[s]?Promise.resolve(invCache[s]):loadInventario(s)]);
+  const [r1,r2,r3,r4]=await Promise.allSettled([loadDia(), supaFetch(`/envios_mercaderia?sede=eq.${encodeURIComponent(s)}&estado=eq.pendiente&select=id`), !puedeVerStock()?Promise.resolve([]):invCache[s]?Promise.resolve(invCache[s]):loadInventario(s),
+    esAdmin()?supaFetch(`/facturas_pendientes?sede=eq.${encodeURIComponent(s)}&estado=eq.pendiente&select=id`):Promise.resolve([])]);
   if(r1.status==='rejected'){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(r1.reason?.message||'error')}</div>`; return; }
   const c=ultimoTurno(s); const di=difInfo(c);
   const nEnv=r2.status==='fulfilled'?(r2.value||[]).length:0;
   const inv=r3.status==='fulfilled'?(r3.value||[]):[]; const nBajo=inv.filter(r=>Number(r.cantidad)<Number(r.cantidad_minima||0)).length;
   const pend=pendientesDe(s);
-  const badges={caja:pend.length,inventario:nBajo,envios:nEnv};
+  const nFact=r4.status==='fulfilled'?(r4.value||[]).length:0;
+  const badges={caja:pend.length,inventario:nBajo,envios:nEnv,pagos:nFact};
   const est=document.getElementById('hubEstado'); if(est) est.innerHTML=estadoPill(c);
   const mods=MODS.filter(modVisible).map(m=>`<button class="mod" onclick="goMod('${m.id}',()=>goHub('${esc(s)}'))"><span class="app" style="background:${m.color}">${ICONS[m.id]}${badges[m.id]?`<span class="badge">${badges[m.id]}</span>`:''}</span>${m.label}</button>`).join('');
   v.innerHTML=`
@@ -444,10 +448,11 @@ async function renderHub(showLoading){
       <div class="tile wide"><div><span class="l">Diferencia de caja</span><div class="n num" style="color:${!di?'var(--sec)':di.cls==='ok'?'var(--green)':di.cls==='bad'?'var(--red)':'var(--blue)'}">${c?fmt(Math.abs(Math.round(Number(c.diferencia)||0))):'—'}</div></div>${di?`<span class="pill ${di.cls}">${di.txt}</span>`:'<span class="pill warn">Sin turno</span>'}</div>
     </div>
     <div class="sect"><div class="hdr">Módulos de ${esc(s)}</div><div class="mods">${mods}</div></div>
-    ${pend.length||nBajo||nEnv?`<div class="sect"><div class="hdr">Revisar</div><div class="group">
+    ${pend.length||nBajo||nEnv||nFact?`<div class="sect"><div class="hdr">Revisar</div><div class="group">
       ${pend.map(t=>`<button class="cell" onclick="goMod('caja',()=>goHub('${esc(s)}'))"><div class="main"><span class="t">${esc(t)}</span><span class="s">Caja · turno ${c?c.turno_num:''}</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`).join('')}
       ${nBajo?`<button class="cell" onclick="goMod('inventario',()=>goHub('${esc(s)}'))"><div class="main"><span class="t">${nBajo} producto(s) bajo mínimo</span><span class="s">Inventario</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`:''}
       ${nEnv?`<button class="cell" onclick="goMod('envios',()=>goHub('${esc(s)}'))"><div class="main"><span class="t">${nEnv} envío(s) por aceptar</span><span class="s">Envíos de mercadería</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`:''}
+      ${nFact?`<button class="cell" onclick="goMod('pagos',()=>goHub('${esc(s)}'))"><div class="main"><span class="t">${nFact} factura(s) por aprobar</span><span class="s">Pagos a instructores</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`:''}
     </div></div>`:`<div class="sect"><div class="ftr" style="text-align:center">Nada pendiente por revisar en ${esc(s)}.</div></div>`}`;
 }
 
@@ -463,6 +468,7 @@ async function renderMod(showLoading){
   if(curMod==='arqueoVer') return renderArqueoVer();
   if(curMod==='inventario') return renderInventarioMod();
   if(curMod==='gastos') return renderGastosMod();
+  if(curMod==='pagos') return renderPagosMod();
   if(curMod==='cierres') return renderCierresMod();
   if(curMod==='envios') return renderEnviosMod();
   if(curMod==='mediciones') return renderMedicionesMod();
@@ -903,6 +909,74 @@ async function renderGastosMod(){
     ${cats.length?`<div class="sect"><div class="hdr">Por categoría</div><div class="group">${cats.map(cId=>{const arr=porCat[cId];const sub=arr.reduce((s,g)=>s+Number(g.monto||0),0);return `<div class="cell"><div class="main"><span class="t">${esc(catLabel(cId))}</span><span class="s">${arr.length} factura(s)</span></div><span class="v strong num">${fmt(sub)}</span></div>`;}).join('')}</div></div>`:''}
     <div class="sect"><div class="hdr">Detalle</div><div class="group">${rows.length?rows.map(g=>`<div class="cell"><div class="main"><span class="t">${esc(g.emisor||'—')}</span><span class="s">${esc(fechaDMY(g.fecha_clase))} · ${esc(catLabel(g.categoria))}${g.banco_pago?' · '+esc(g.banco_pago):''}${g.numero_factura?' · #'+esc(g.numero_factura):''}</span></div><span class="v num">${fmt(g.monto)}</span></div>`).join(''):'<div class="cell"><span class="s">Sin gastos registrados en este mes.</span></div>'}</div>
       <div class="ftr">Gastos de ${esc(detSede)} registrados en el módulo de Gastos (incluye los pagos de caja; no incluye depósitos).</div></div>`;
+}
+
+/* ══ Pagos a instructores: facturas por aprobar (admins) y recibos ══
+   La revisión completa (XML, Hacienda, clases, tarifas) es la de /gastos: «Revisar y aprobar» la abre
+   con esa factura cargada. Rechazar sí se hace aquí. */
+let pagPend=[];
+function abrirGastos(params){ handoff(detSede||me.sede); location.href='/gastos?from=movil&'+params; }
+async function renderPagosMod(){
+  navMod('Pagos');
+  const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
+  const sede=encodeURIComponent(detSede);
+  const [rp,rr]=await Promise.allSettled([
+    esAdmin()?supaFetch(`/facturas_pendientes?sede=eq.${sede}&estado=eq.pendiente&order=created_at.asc&select=id,sede,numero_factura,emisor_nombre,emisor_cedula,monto,clases,pago_forma,pago_banco,pago_numero,telefono,nota,created_at`):Promise.resolve([]),
+    supaFetch(`/gastos?sede=eq.${sede}&origen=eq.recibo&order=cargado_at.desc&limit=10&select=id,emisor,monto,cargado_at,dia_pago,pago_tipo,pagado_at`)]);
+  if(rp.status==='rejected'){ v.innerHTML=`<div class="empty">No se pudieron cargar las facturas: ${esc(rp.reason?.message||'error')}</div>`; return; }
+  pagPend=rp.value||[]; const recibos=rr.status==='fulfilled'?(rr.value||[]):[];
+  const chev='<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg>';
+  const pagoTxt=g=>g.pago_tipo==='caja'?'De caja':g.dia_pago?'Pago '+fechaDMY(g.dia_pago):'';
+  v.innerHTML=`
+    <div class="actionbar"><button class="btn primary" onclick="abrirGastos('vista=recibos')">${ICONS.pagos}Crear recibo</button></div>
+    ${esAdmin()?`<div class="sect"><div class="hdr">Facturas por aprobar</div><div class="group">${pagPend.length?pagPend.map(p=>`<button class="cell" onclick="verPendiente('${p.id}')"><div class="main"><span class="t">${esc(p.emisor_nombre||'—')}</span><span class="s">Factura …${esc(String(p.numero_factura||'').slice(-6))} · enviada ${esc(fechaHora(p.created_at))}</span></div><span class="v strong num">${fmt(p.monto)}</span>${chev}</button>`).join('')
+      :'<div class="cell"><span class="s">No hay facturas esperando aprobación en esta sede.</span></div>'}</div>
+      <div class="ftr">Las envían los instructores desde jykc.dev/factura. Tocá una para ver el detalle, aprobarla o rechazarla.</div></div>`:''}
+    <div class="sect"><div class="hdr">Recibos recientes</div><div class="group">${recibos.length?recibos.map(g=>`<div class="cell"><div class="main"><span class="t">${esc(g.emisor||'—')}</span><span class="s">${esc(fechaHora(g.cargado_at))}${pagoTxt(g)?' · '+esc(pagoTxt(g)):''}${g.pagado_at?' · pagado':''}</span></div><span class="v num">${fmt(g.monto)}</span></div>`).join('')
+      :'<div class="cell"><span class="s">Sin recibos registrados en esta sede.</span></div>'}</div>
+      <div class="ftr">Recibos de clase grupal (instructores que cobran por clase sin factura). «Crear recibo» abre Gastos → Recibos: a mano o desde la plantilla semanal.</div></div>`;
+}
+function verPendiente(id){
+  const p=pagPend.find(x=>x.id===id); if(!p) return;
+  const fila=(t,val)=>`<div class="cell"><div class="main"><span class="t">${t}</span></div><span class="v" style="text-align:right;white-space:normal">${val}</span></div>`;
+  const clases=(Array.isArray(p.clases)?p.clases:[]).map(c=>`${esc(c.cantidad)} ${esc(c.tipo)} (${esc(fechaDMY(c.fecha))})`).join('<br>')||'—';
+  const pago=[p.pago_forma==='sinpe'?'SINPE Móvil':p.pago_banco||p.pago_forma||'',p.pago_numero||''].filter(Boolean).join(' · ')||'—';
+  const sh=document.getElementById('sheet');
+  sh.innerHTML=`<div class="sheet-bg" onclick="cerrarSheet()"></div>
+    <div class="sheet-panel" role="dialog" aria-label="Factura por aprobar">
+      <div class="sheet-h"><button class="act" onclick="cerrarSheet()">Cerrar</button><span class="tt">Factura por aprobar</span><span class="act" style="visibility:hidden">Cerrar</span></div>
+      <div class="sheet-body">
+        <div class="group" style="margin:0">
+          ${fila('Emisor',esc(p.emisor_nombre||'—'))}
+          ${fila('Cédula',esc(p.emisor_cedula||'—'))}
+          ${fila('N.º de factura',esc(p.numero_factura||'—'))}
+          ${fila('Monto','<b class="num">'+fmt(p.monto)+'</b>')}
+          ${fila('Clases que indicó',clases)}
+          ${fila('Se le paga a',esc(pago))}
+          ${p.telefono?fila('Teléfono',esc(p.telefono)):''}
+          ${p.nota?fila('Nota',esc(p.nota)):''}
+          ${fila('Enviada',esc(fechaHora(p.created_at)))}
+        </div>
+        <div style="padding-top:18px;display:flex;flex-direction:column;gap:10px">
+          <button class="btn primary" onclick="abrirGastos('aprobar=${encodeURIComponent(p.id)}')">Revisar y aprobar</button>
+          <button class="btn danger" id="btnRechFact" onclick="rechazarPendiente('${p.id}')">Rechazar</button>
+        </div>
+        <div class="ftr" style="padding:10px 0 0">«Revisar y aprobar» abre la factura en Gastos: el sistema revisa el XML y el estado en Hacienda, usted confirma las clases y toca «Aprobar y enviar a Gastos».</div>
+      </div></div>`;
+  sh.hidden=false; document.body.style.overflow='hidden';
+}
+async function rechazarPendiente(id){
+  if(!esAdmin()) return;
+  const p=pagPend.find(x=>x.id===id); if(!p) return;
+  const motivo=prompt(`¿Por qué se rechaza la factura de ${p.emisor_nombre||'este instructor'}?\n(Avísele al instructor: puede corregirla y volver a enviarla.)`);
+  if(motivo===null) return;
+  if(!motivo.trim()){ alert('Escriba el motivo del rechazo.'); return; }
+  const b=document.getElementById('btnRechFact'); if(b){ b.disabled=true; b.textContent='Rechazando…'; }
+  try{
+    await supaFetch(`/facturas_pendientes?id=eq.${encodeURIComponent(id)}&estado=eq.pendiente`,{method:'PATCH',
+      body:{estado:'rechazada',motivo_rechazo:motivo.trim(),revisado_por:auth.email||null,revisado_at:new Date().toISOString()}});
+    cerrarSheet(); toast(`Factura de ${p.emisor_nombre||'el instructor'} rechazada`); renderPagosMod();
+  }catch(e){ alert('No se pudo rechazar: '+e.message); if(b){ b.disabled=false; b.textContent='Rechazar'; } }
 }
 
 // Cierres: historial de la sede
