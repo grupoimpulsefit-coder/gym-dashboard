@@ -8,6 +8,7 @@
 //  Mensajes que entiende (en un chat privado con el bot):
 //    5000 almuerzo            → gasto (la categoría se detecta sola)
 //    ayer 20 mil gasolina     → gasto con fecha de ayer
+//    cucho 5000 almuerzo      → gasto pagado con el fondo "Cucho" (no toca la semana)
 //    + 250000 salario         → ingreso (responde con el diezmo de 25 %)
 //    /resumen                 → cómo va la semana
 //    /deshacer                → borra lo último que registró por Telegram
@@ -33,6 +34,7 @@ const AYUDA = [
   'Escríbame así:',
   '• 5000 almuerzo — gasto',
   '• ayer 20 mil gasolina — gasto de ayer',
+  '• cucho 5000 almuerzo — gasto pagado con un fondo',
   '• + 250000 salario — ingreso',
   '• /resumen — cómo va la semana',
   '• /deshacer — borra lo último',
@@ -87,10 +89,13 @@ async function semanaActual(grupo: string[]) {
   return { sem, fila: fila || { ingresos: 0, disponible: 0, gastos: 0, prestamos: 0, anterior: 0, queda: 0 } };
 }
 
+const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
 async function resumen(grupo: string[]): Promise<string> {
+  await db.rpc('fin_fondos_al_dia');   // aportes mensuales pendientes
   const { sem, fila } = await semanaActual(grupo);
   const [gas, pend, pres, fon] = await Promise.all([
-    db.from('fin_gastos').select('monto, categoria').in('owner', grupo).eq('semana', sem),
+    db.from('fin_gastos').select('monto, categoria').in('owner', grupo).eq('semana', sem).is('fondo_id', null),
     db.from('fin_ingresos').select('diezmo').in('owner', grupo).eq('entregado', false),
     db.from('fin_prestamos').select('tipo, persona, monto, fin_prestamo_pagos(monto)').in('owner', grupo),
     db.from('fin_fondos').select('nombre, fin_fondo_movs(monto)').in('owner', grupo).order('created_at'),
@@ -180,6 +185,16 @@ Deno.serve(async (req) => {
     const esIngreso = /^\s*(\+|ingreso\b)/i.test(t);
     if (esIngreso) t = t.replace(/^\s*(\+|ingreso\b)/i, '');
 
+    // ── Gasto pagado con un fondo: el mensaje empieza con el nombre del fondo ──
+    let fondo: { id: string; nombre: string } | null = null;
+    if (!esIngreso) {
+      const { data: fondos } = await db.from('fin_fondos').select('id, nombre').in('owner', grupo);
+      const tn = norm(t);
+      fondo = (fondos || []).sort((a, b) => b.nombre.length - a.nombre.length)
+        .find((f) => tn === norm(f.nombre) || tn.startsWith(norm(f.nombre) + ' ')) || null;
+      if (fondo) t = t.trim().slice(fondo.nombre.length);
+    }
+
     const p = leerMonto(t);
     if (!p) return responder(chatId, 'No encontré el monto. ' + AYUDA);
     const descripcion = p.resto || null;
@@ -199,14 +214,20 @@ Deno.serve(async (req) => {
     }
 
     const { data, error } = await db.from('fin_gastos')
-      .insert({ owner, fecha, monto: p.monto, descripcion, origen: 'telegram' })
+      .insert({ owner, fecha, monto: p.monto, descripcion, origen: 'telegram', fondo_id: fondo?.id ?? null })
       .select('monto, categoria').single();
-    if (error) throw error;
+    if (error) {
+      if (fondo && /solo tiene/.test(error.message)) return responder(chatId, `⚠️ El fondo ${fondo.nombre} no alcanza. ${error.message}`);
+      throw error;
+    }
+    const linea = `✅ Gasto ${crc(data.monto)} · ${data.categoria}${descripcion ? ' · ' + descripcion : ''}` + (fecha !== hoyCR() ? ` (${fecha})` : '');
+    if (fondo) {
+      const { data: movs } = await db.from('fin_fondo_movs').select('monto').eq('fondo_id', fondo.id);
+      const saldo = (movs || []).reduce((a, r) => a + +r.monto, 0);
+      return responder(chatId, `${linea}\n🐷 Pagado con ${fondo.nombre}. Le quedan: ${crc(saldo)}`);
+    }
     const { fila } = await semanaActual(grupo);
-    return responder(chatId,
-      `✅ Gasto ${crc(data.monto)} · ${data.categoria}${descripcion ? ' · ' + descripcion : ''}` +
-      (fecha !== hoyCR() ? ` (${fecha})` : '') +
-      `\n${+fila.queda < 0 ? '⚠️ Faltante' : 'Le queda'} esta semana: ${crc(+fila.queda)}`);
+    return responder(chatId, `${linea}\n${+fila.queda < 0 ? '⚠️ Faltante' : 'Le queda'} esta semana: ${crc(+fila.queda)}`);
   } catch (e) {
     console.error(e);
     return responder(chatId, '⚠️ No se pudo registrar. Intente de nuevo.');
