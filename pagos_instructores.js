@@ -54,6 +54,14 @@ async function piInit() {
   document.getElementById('piTabAprobar').style.display = esAdmin() ? '' : 'none';
   await piCargarCatalogos();
   if (esAdmin()) { piContarPendientes(); phContar(); }
+  // Enlaces desde la app móvil: /gastos?aprobar=<id> abre esa factura por aprobar; ?vista=recibos abre esa pestaña
+  const q = new URLSearchParams(location.search), aprobar = q.get('aprobar'), vista = q.get('vista');
+  if (aprobar || vista) {
+    q.delete('aprobar'); q.delete('vista');
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
+    if (aprobar && esAdmin()) piRevisarPendientePorId(aprobar);
+    else if (vista && PI_VISTAS.includes(vista) && document.querySelector(`#piTabs .tab[data-tab="${vista}"]`)?.style.display !== 'none') piMostrar(vista);
+  }
 }
 
 async function piContarPendientes() {
@@ -617,11 +625,13 @@ function piCopiarEnlace(btn) {
 
 // Abre la factura en la pantalla de revisión (la misma de «Cargar factura XML»)
 async function piRevisarPendiente(i) {
-  const resumen = piPorAprobar[i]; if (!resumen) return;
+  const resumen = piPorAprobar[i]; if (resumen) return piRevisarPendientePorId(resumen.id);
+}
+async function piRevisarPendientePorId(id) {
   let p;
-  try { p = ((await supaFetch(`/facturas_pendientes?id=eq.${encodeURIComponent(resumen.id)}&select=*`)) || [])[0]; }
+  try { p = ((await supaFetch(`/facturas_pendientes?id=eq.${encodeURIComponent(id)}&select=*`)) || [])[0]; }
   catch (e) { alert('No se pudo abrir: ' + e.message); return; }
-  if (!p || p.estado !== 'pendiente') { alert('Esta factura ya fue revisada.'); piCargarPendientes(); return; }
+  if (!p || p.estado !== 'pendiente') { alert('Esta factura ya fue revisada.'); piMostrar('aprobar'); return; }
   let x;
   try { x = piParseXML(p.xml); } catch (e) { alert('El XML guardado no se pudo leer: ' + e.message); return; }
   // La factura se revisa en su sede
