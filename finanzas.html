@@ -48,11 +48,44 @@
     <div class="login-logo">💰</div>
     <h2>Mis Finanzas</h2>
     <p class="login-sub">Privado · solo su cuenta personal</p>
-    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" autocomplete="username"></div>
+    <div class="login-field"><label>Correo o usuario</label><input type="text" id="loginEmail" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
     <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" autocomplete="current-password"></div>
     <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
     <div id="loginError"></div>
   </div>
+</div>
+
+<!-- ── VISTA DE UN SOLO FONDO (usuario de fondo, ej. Cucho) ── -->
+<div id="fondoApp" style="display:none;padding-bottom:40px">
+  <div class="header">
+    <div class="header-icon">🐷</div>
+    <div><h1 id="foTitulo">Mi fondo</h1><p>Gastos de este fondo y envíos</p></div>
+    <div class="header-right"><span id="foUser"></span><button class="logout-btn" onclick="salir()">Cerrar sesión</button></div>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi green"><div class="kpi-label">Disponible en el fondo</div><div class="kpi-value" id="foSaldo">—</div><div class="kpi-sub" id="foMensual"></div></div>
+    <div class="kpi orange"><div class="kpi-label">Gastado este mes</div><div class="kpi-value" id="foGastoMes">—</div></div>
+    <div class="kpi"><div class="kpi-label">Enviado este mes</div><div class="kpi-value" id="foEnvioMes">—</div></div>
+  </div>
+  <div class="section"><div class="section-title">Registrar gasto</div></div>
+  <div class="form-card">
+    <div class="form-grid">
+      <div class="f-field"><label>Monto ₡</label><input id="foMonto" type="number" inputmode="decimal" min="0" step="any"></div>
+      <div class="f-field"><label>Descripción</label><input id="foDesc" placeholder="Ej. almuerzo, gasolina"></div>
+      <div class="f-field"><label>Fecha</label><input id="foFecha" type="date"></div>
+    </div>
+    <div class="form-actions"><span class="form-msg" id="foMsg"></span><button class="btn-primary" onclick="foGasto()">Guardar gasto</button></div>
+  </div>
+  <div class="section"><div class="section-title">Enviar plata <span class="section-note" id="foEnvioNota"></span></div></div>
+  <div class="form-card">
+    <div class="form-grid">
+      <div class="f-field"><label>Monto ₡</label><input id="foEnvMonto" type="number" inputmode="decimal" min="0" step="any"></div>
+      <div class="f-field"><label>Nota (opcional)</label><input id="foEnvNota" placeholder="Ej. para el súper"></div>
+    </div>
+    <div class="form-actions"><span class="form-msg" id="foEnvMsg"></span><button class="btn-ghost" onclick="foEnviar(true)">Enviar todo</button><button class="btn-primary" onclick="foEnviar()">Enviar</button></div>
+  </div>
+  <div class="section"><div class="section-title">Movimientos</div></div>
+  <div class="lista" id="foMovs"></div>
 </div>
 
 <div id="app">
@@ -233,12 +266,14 @@ async function api(path, opt = {}) {
   if (!r.ok) throw new Error(data?.message || 'Error ' + r.status);
   return data;
 }
+// Usuario sin "@" (ej. "cucho") → cuenta interna cucho@finanzas.local (sin correo real)
+const correoDe = v => { v = String(v || '').trim().toLowerCase(); return v.includes('@') ? v : v + '@finanzas.local'; };
 async function doLogin() {
   const b = $('loginBtn'); b.disabled = true; $('loginError').textContent = '';
   try {
     const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=password', {
       method: 'POST', headers: { apikey: SUPA_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: $('loginEmail').value.trim(), password: $('loginPassword').value }) });
+      body: JSON.stringify({ email: correoDe($('loginEmail').value), password: $('loginPassword').value }) });
     const d = await r.json();
     if (!d.access_token) throw new Error('Correo o contraseña incorrectos');
     guardarSes(d);
@@ -247,8 +282,9 @@ async function doLogin() {
   b.disabled = false;
 }
 async function entrar() {
-  const dueno = await api('rpc/fin_es_dueno', { method: 'POST', body: {} }).catch(() => false);
-  if (dueno !== true) { salir(); $('loginError').textContent = 'Esta cuenta no tiene acceso a Mis Finanzas.'; return; }
+  const acceso = await api('rpc/fin_mi_acceso', { method: 'POST', body: {} }).catch(() => null);
+  if (acceso === 'fondo') return entrarFondo();
+  if (acceso !== 'grupo') { salir(); $('loginError').textContent = 'Esta cuenta no tiene acceso a Mis Finanzas.'; return; }
   const c = claims(ses.access_token);
   yo = c.sub; $('userEmail').textContent = c.email || '';
   $('loginScreen').style.display = 'none'; $('app').style.display = 'block';
@@ -261,7 +297,7 @@ function salir() {
   try { localStorage.removeItem(KEY); } catch (_) {}
   if (ses?.access_token) fetch(SUPA_URL + '/auth/v1/logout', { method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + ses.access_token } }).catch(() => {});
   ses = null; yo = null; miembros = {}; semanas = ingresos = gastos = prestamos = ajustes = fondos = reglas = []; cfg = null;
-  $('app').style.display = 'none'; $('loginScreen').style.display = '';
+  $('app').style.display = 'none'; $('fondoApp').style.display = 'none'; $('loginScreen').style.display = '';
 }
 ['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, () => { ultimaAct = Date.now(); }, { passive: true }));
 setInterval(() => { if (ses && Date.now() - ultimaAct > IDLE_MIN * 60000) salir(); }, 30000);
@@ -358,7 +394,7 @@ function render() {
     }
     if (m.t === 'fon') {
       const aporte = m.monto > 0;
-      return `<div class="fila"><div class="grow">🐷 ${aporte ? 'Aporte a' : m.afecta_saldo ? 'Pasado a la semana desde' : 'Retiro de'} ${esc(m.f.nombre)}${m.nota ? ' · ' + esc(m.nota) : ''}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${m.afecta_saldo ? '' : ' · no mueve el disponible'}</div></div>
+      return `<div class="fila"><div class="grow">🐷 ${aporte ? 'Aporte a' : m.afecta_saldo ? (miembros[m.owner] ? 'Pasado a la semana desde' : 'Enviado a la semana desde') : 'Retiro de'} ${esc(m.f.nombre)}${m.nota ? ' · ' + esc(m.nota) : ''}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${m.afecta_saldo ? '' : ' · no mueve el disponible'}</div></div>
       ${m.afecta_saldo ? `<span class="m ${aporte ? '' : 'in'}">${aporte ? '−' : '+'}${crc(Math.abs(m.monto))}</span>` : `<span class="m sub">${crc(Math.abs(m.monto))}</span>`}</div>`;
     }
     if (m.t === 'aju') return `
@@ -614,6 +650,72 @@ async function generarCodigo() {
 async function desvincular() {
   if (!confirm('¿Desvincular Telegram? El bot dejará de registrar sus mensajes.')) return;
   await hacer(async () => { [cfg] = await api('fin_config?owner=eq.' + yo, { method: 'PATCH', body: { telegram_chat_id: null, telegram_codigo: null } }); renderTelegram(); });
+}
+
+/* ── vista de un solo fondo (usuario de fondo) ── */
+let miFondo = null;
+async function entrarFondo() {
+  const c = claims(ses.access_token);
+  yo = c.sub; $('foUser').textContent = String(c.email || '').replace('@finanzas.local', '');
+  $('loginScreen').style.display = 'none'; $('fondoApp').style.display = 'block';
+  $('loginPassword').value = ''; $('foFecha').value = hoy();
+  await cargarFondo();
+}
+async function cargarFondo() {
+  await api('rpc/fin_fondos_al_dia', { method: 'POST', body: {} }).catch(() => {});
+  [miFondo] = await api('fin_fondos?select=*,fin_fondo_movs(*)&order=created_at&limit=1');
+  if (!miFondo) { salir(); $('loginError').textContent = 'No se encontró su fondo.'; return; }
+  renderFondo();
+}
+function renderFondo() {
+  const f = miFondo, mes = hoy().slice(0, 7), movs = (f.fin_fondo_movs || []).slice()
+    .sort((a, b) => (b.fecha + b.created_at).localeCompare(a.fecha + a.created_at));
+  const saldo = saldoFondo(f);
+  $('foTitulo').textContent = 'Fondo ' + f.nombre;
+  $('foSaldo').textContent = crc(saldo);
+  $('foMensual').textContent = f.aporte_mensual ? `Recibe ${crc(f.aporte_mensual)} el día ${f.dia_mes} de cada mes` : '';
+  $('foGastoMes').textContent = crc(-sum(movs.filter(m => m.gasto_id && m.fecha.startsWith(mes)), m => m.monto));
+  $('foEnvioMes').textContent = crc(-sum(movs.filter(m => !m.gasto_id && m.monto < 0 && m.afecta_saldo && m.fecha.startsWith(mes)), m => m.monto));
+  $('foEnvioNota').textContent = 'llega al disponible de la semana';
+  $('foMovs').innerHTML = movs.length ? movs.map(m => {
+    const tipo = m.gasto_id ? '🧾 ' + esc((m.nota || 'gasto').replace(/^gasto: /, '')) : m.monto > 0 ? (m.periodo ? '📅 Aporte mensual' : '➕ Aporte') : '📤 Enviado' + (m.nota ? ' · ' + esc(m.nota) : '');
+    const mio = m.owner === yo;
+    return `<div class="fila"><div class="grow">${tipo}<div class="sub">${fCorta(m.fecha)}${mio ? '' : ' · registrado por ellos'}</div></div>
+      <span class="m ${m.monto > 0 ? 'in' : ''}">${m.monto > 0 ? '+' : '−'}${crc(Math.abs(m.monto))}</span>
+      ${mio ? `<button class="x" title="Borrar" onclick="foBorrar('${m.id}', ${m.gasto_id ? `'${m.gasto_id}'` : 'null'})">✕</button>` : ''}</div>`;
+  }).join('') : '<div class="tbl-empty">Sin movimientos todavía.</div>';
+}
+async function foGasto() {
+  const monto = +$('foMonto').value;
+  if (!(monto > 0)) return msg('foMsg', 'Ponga un monto.', false);
+  if (monto > saldoFondo(miFondo)) return msg('foMsg', 'El fondo solo tiene ' + crc(saldoFondo(miFondo)) + '.', false);
+  await hacer(async () => {
+    await api('fin_gastos', { method: 'POST', prefer: 'return=minimal', body: {
+      monto, descripcion: $('foDesc').value.trim() || null, fecha: $('foFecha').value || hoy(), fondo_id: miFondo.id } });
+    $('foMonto').value = $('foDesc').value = '';
+    await cargarFondo(); msg('foMsg', '✓ Gasto guardado', true);
+  }, 'foMsg');
+}
+async function foEnviar(todo) {
+  const saldo = saldoFondo(miFondo), monto = todo ? saldo : +$('foEnvMonto').value;
+  if (!(monto > 0)) return msg('foEnvMsg', todo ? 'El fondo está en ₡0.' : 'Ponga un monto.', false);
+  if (monto > saldo) return msg('foEnvMsg', 'El fondo solo tiene ' + crc(saldo) + '.', false);
+  if (!confirm(`¿Enviar ${crc(monto)} al disponible de la semana?`)) return;
+  await hacer(async () => {
+    await api('fin_fondo_movs', { method: 'POST', prefer: 'return=minimal', body: {
+      fondo_id: miFondo.id, monto: -monto, fecha: hoy(), afecta_saldo: true,
+      nota: $('foEnvNota').value.trim() || 'enviado por ' + $('foUser').textContent } });
+    $('foEnvMonto').value = $('foEnvNota').value = '';
+    await cargarFondo(); msg('foEnvMsg', '✓ Enviado', true);
+  }, 'foEnvMsg');
+}
+async function foBorrar(id, gastoId) {
+  if (!confirm('¿Borrar este movimiento?')) return;
+  await hacer(async () => {
+    if (gastoId) await api('fin_gastos?id=eq.' + gastoId, { method: 'DELETE', prefer: 'return=minimal' });
+    else await api('fin_fondo_movs?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' });
+    await cargarFondo();
+  });
 }
 
 /* ── arranque ── */
