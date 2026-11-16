@@ -243,14 +243,17 @@
         <div class="form-grid">
           <div class="f-field"><label>Nombre</label><input id="ivNombre" placeholder="Ej. Arroz 2 kg"></div>
           <div class="f-field"><label>Código de barras</label><div class="f-inline"><div class="f-field"><input id="ivCodigo" inputmode="numeric" placeholder="Escanee o escriba"></div><button class="btn-ghost" onclick="abrirScan('form')">📷</button></div></div>
-          <div class="f-field" id="ivCantWrap"><label>Cantidad que hay</label><input id="ivCant" type="number" inputmode="decimal" min="0" step="any" value="1"></div>
+          <div class="f-field" id="ivCantWrap"><label>Cuántas unidades hay</label><input id="ivCant" type="number" inputmode="decimal" min="0" step="any" value="1"></div>
           <div class="f-field"><label>Avisar cuando queden (opcional)</label><input id="ivMin" type="number" inputmode="decimal" min="0" step="any" placeholder="Ej. 1"></div>
-          <div class="f-field"><label>Unidad (opcional)</label><input id="ivUnidad" placeholder="unidades, kg, paquetes…"></div>
+          <div class="f-field"><label>Unidad (opcional)</label><input id="ivUnidad" placeholder="rollos, latas, kg…"></div>
+          <div class="f-field"><label>Precio del paquete ₡ (opcional)</label><input id="ivPrecio" type="number" inputmode="decimal" min="0" step="any" placeholder="Ej. 4600" oninput="ivCostoU()"></div>
+          <div class="f-field"><label>Unidades por paquete</label><input id="ivPorPaq" type="number" inputmode="decimal" min="1" step="any" value="1" oninput="ivCostoU()"><span class="hint" id="ivCostoU"></span></div>
           <div class="f-field"><label>Foto</label><input id="ivFoto" type="file" accept="image/*" capture="environment"></div>
           <div class="f-field full"><label>Nota (opcional)</label><input id="ivNota" placeholder="Ej. en la alacena de arriba"></div>
         </div>
         <div class="form-actions"><span class="form-msg" id="ivMsg"></span><button class="btn-ghost" onclick="invCerrarForm()">Cancelar</button><button class="btn-primary" id="ivGuardar" onclick="invGuardar()">Guardar</button></div>
       </div>
+      <div class="inv-solo-grupo" id="invEstim"></div>
       <div class="lista" id="invList"></div>
     </div>
   </div>
@@ -783,6 +786,7 @@ async function foBorrar(id, gastoId) {
 
 /* ── inventario de la casa ── */
 const INV_BUCKET = 'fin-inventario', QR_LIB = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+let invCons = {};
 let inv = [], invFotos = {}, invEdita = false, invGrupo = null, invPersonas = {}, invEditId = null, scanModo = null, scanner = null;
 const encPath = p => p.split('/').map(encodeURIComponent).join('/');
 async function sto(path, opt = {}) {   // Storage de Supabase con la misma sesión
@@ -796,12 +800,14 @@ async function sto(path, opt = {}) {   // Storage de Supabase con la misma sesi�
   return d;
 }
 async function cargarInv() {
-  const [items, ed, gr, per] = await Promise.all([
+  const [items, ed, gr, per, cons] = await Promise.all([
     api('fin_inventario?select=*&order=nombre'),
     api('rpc/fin_inv_edita', { method: 'POST', body: {} }),
     api('rpc/fin_inv_grupo', { method: 'POST', body: {} }),
     api('rpc/fin_inv_personas', { method: 'POST', body: {} }),
+    api('rpc/fin_inv_consumo', { method: 'POST', body: {} }).catch(() => []),
   ]);
+  invCons = Object.fromEntries((cons || []).map(c => [c.item_id, c]));
   inv = items || []; invEdita = ed === true; invGrupo = gr;
   invPersonas = Object.fromEntries((per || []).map(x => [x.user_id, x.nombre]));
   document.querySelectorAll('.inv-solo-grupo').forEach(el => { el.style.display = invEdita ? '' : 'none'; });
@@ -819,6 +825,36 @@ async function firmarFotos() {   // URLs temporales de las fotos (bucket privado
   } catch (_) {}
 }
 const invBajo = i => i.minimo != null && +i.cantidad <= +i.minimo;
+// Costo por unidad (₡4 600 / 12 rollos = ₡383) y consumo por mes según lo que han sacado
+const costoU = i => i.precio != null ? +i.precio / (+i.por_paquete || 1) : null;
+function consumoMes(i) {
+  const c = invCons[i.id]; if (!c || +c.salidas <= 0) return null;
+  return +c.salidas / Math.max(+c.dias, 7) * 30.4;   // con menos de una semana de historial, se toma una semana
+}
+const pocoHist = i => (+invCons[i.id]?.dias || 0) < 14;
+function aComprar(i) {   // paquetes sugeridos: lo de un mes (o al menos 1 paquete)
+  const m = consumoMes(i), pq = +i.por_paquete || 1;
+  return Math.max(1, m ? Math.ceil((m - +i.cantidad) / pq) : 1);
+}
+function renderEstim() {
+  if (!invEdita) { $('invEstim').innerHTML = ''; return; }
+  const conPrecio = inv.filter(i => costoU(i) != null);
+  const mes = sum(conPrecio, i => (consumoMes(i) || 0) * costoU(i));
+  const valor = sum(conPrecio, i => +i.cantidad * costoU(i));
+  const lista = inv.filter(invBajo);
+  const totLista = sum(lista.filter(i => i.precio != null), i => aComprar(i) * +i.precio);
+  const sinPrecio = inv.length - conPrecio.length, poco = conPrecio.some(i => consumoMes(i) && pocoHist(i));
+  $('invEstim').innerHTML = `
+    <div class="kpi-row" style="padding-top:0">
+      <div class="kpi orange"><div class="kpi-label">Compra de la casa (estimado)</div><div class="kpi-value">${crc(mes)}<span style="font-size:14px;font-weight:600"> /mes</span></div><div class="kpi-sub">≈ ${crc(mes / 4.33)} por semana${poco ? ' · aún con poco historial' : ''}</div></div>
+      <div class="kpi teal"><div class="kpi-label">Lo que hay en la casa vale</div><div class="kpi-value">${crc(valor)}</div>${sinPrecio ? `<div class="kpi-sub">${sinPrecio} producto${sinPrecio === 1 ? '' : 's'} sin precio</div>` : ''}</div>
+      <div class="kpi"><div class="kpi-label">Lista de compras</div><div class="kpi-value">${crc(totLista)}</div><div class="kpi-sub">${lista.length} producto${lista.length === 1 ? '' : 's'} por acabarse</div></div>
+    </div>
+    ${lista.length ? `<div class="section" style="padding-top:4px"><div class="section-title">🛒 Lista de compras</div></div>
+    <div class="lista">${lista.map(i => { const n = aComprar(i), pq = +i.por_paquete || 1;
+      return `<div class="fila"><div class="grow">${esc(i.nombre)}<div class="sub">Quedan ${invCant(i)}${i.unidad ? ' ' + esc(i.unidad) : ''} · comprar ${n} paquete${n === 1 ? '' : 's'}${pq > 1 ? ` (${invCant({ cantidad: n * pq })} ${esc(i.unidad || 'unidades')})` : ''}</div></div>
+        <span class="m">${i.precio != null ? '≈ ' + crc(n * +i.precio) : '<span class="sub">sin precio</span>'}</span></div>`; }).join('')}</div>` : ''}`;
+}
 const invCant = i => (+i.cantidad % 1 ? (+i.cantidad).toFixed(2) : String(+i.cantidad));
 const fotoHtml = i => `<div class="inv-foto">${i.foto && invFotos[i.foto] ? `<img src="${invFotos[i.foto]}" alt="" loading="lazy">` : '📦'}</div>`;
 function renderInv() {
@@ -827,10 +863,11 @@ function renderInv() {
     .sort((a, b) => (invBajo(b) - invBajo(a)) || a.nombre.localeCompare(b.nombre, 'es'));
   const bajos = inv.filter(invBajo).length;
   $('invResumen').textContent = `${inv.length} producto${inv.length === 1 ? '' : 's'}${bajos ? ` · ${bajos} por acabarse` : ''}`;
+  renderEstim();
   $('invList').innerHTML = lista.length ? lista.map(i => `
     <div class="fila inv" onclick="abrirDet('${i.id}')">${fotoHtml(i)}
       <div class="grow">${esc(i.nombre)}${invBajo(i) ? ' <span class="pill low">Se está acabando</span>' : ''}
-        <div class="sub">${[i.unidad, i.codigo].filter(Boolean).map(esc).join(' · ')}</div></div>
+        <div class="sub">${[i.unidad, invEdita && costoU(i) != null && crc(costoU(i)) + ' c/u', i.codigo].filter(Boolean).map(esc).join(' · ')}</div></div>
       <div class="inv-cant" onclick="event.stopPropagation()">
         <button onclick="invMover('${i.id}', -1)" aria-label="Restar">−</button><b>${invCant(i)}</b><button onclick="invMover('${i.id}', 1)" aria-label="Sumar">+</button></div></div>`).join('')
     : `<div class="tbl-empty">${inv.length ? 'Nada coincide con la búsqueda.' : 'Aún no hay productos.' + (invEdita ? ' Toque “Nuevo” o escanee un código.' : '')}</div>`;
@@ -840,7 +877,9 @@ async function invMover(id, cambio, nota) {
   if (cambio < 0 && +i.cantidad + cambio < 0) return alert(`No queda ${i.nombre}.`);
   await hacer(async () => {
     const nueva = await api('rpc/fin_inv_mover', { method: 'POST', body: { p_item: id, p_cambio: cambio, p_nota: nota || null } });
-    i.cantidad = nueva; renderInv();
+    i.cantidad = nueva;
+    if (cambio < 0 && invCons[id]) invCons[id].salidas = +invCons[id].salidas - cambio;
+    renderInv();
     if ($('invDet').classList.contains('open')) abrirDet(id);
   });
 }
@@ -852,6 +891,12 @@ async function abrirDet(id) {
   $('idBody').innerHTML = `${i.foto && invFotos[i.foto] ? `<img class="inv-det-foto" src="${invFotos[i.foto]}" alt="">` : ''}
     <div class="fila" style="padding:0"><div class="grow"><div class="sub">${[i.unidad, i.codigo && 'Código ' + i.codigo, i.minimo != null && 'Avisar con ' + invCant({ cantidad: i.minimo })].filter(Boolean).map(esc).join(' · ')}</div>${i.nota ? `<div class="sub">${esc(i.nota)}</div>` : ''}</div>
       <div class="inv-cant"><button onclick="invMover('${i.id}', -1)">−</button><b style="font-size:22px">${invCant(i)}</b><button onclick="invMover('${i.id}', 1)">+</button></div></div>
+    ${+i.por_paquete > 1 ? `<button class="btn-primary" onclick="invMover('${i.id}', ${+i.por_paquete}, 'compré 1 paquete')">🛒 Compré 1 paquete (+${invCant({ cantidad: i.por_paquete })})</button>` : ''}
+    ${invEdita && (costoU(i) != null || consumoMes(i)) ? `<div class="pay-box">${[
+      costoU(i) != null && `Paquete ${crc(i.precio)}${+i.por_paquete > 1 ? ` (${invCant({ cantidad: i.por_paquete })} ${esc(i.unidad || 'unidades')}) · ${crc(costoU(i))} c/u` : ''}`,
+      consumoMes(i) && `Usan ≈ ${(Math.round(consumoMes(i) * 10) / 10).toLocaleString('es-CR')} ${esc(i.unidad || 'unidades')} al mes${costoU(i) != null ? ` ≈ <b>${crc(consumoMes(i) * costoU(i))} al mes</b>` : ''}${pocoHist(i) ? ' (estimado con pocos días)' : ''}`,
+      costoU(i) != null && +i.cantidad > 0 && `En la casa: ${crc(+i.cantidad * costoU(i))}`,
+    ].filter(Boolean).join('<br>')}</div>` : ''}
     <div class="abono" style="margin:0"><input id="idOtra" type="number" inputmode="decimal" min="0" step="any" placeholder="Otra cantidad"><input id="idNota" placeholder="Nota (opcional)">
       <button class="btn-ghost" onclick="invOtra('${i.id}', -1)">Sacar</button><button class="btn-primary" onclick="invOtra('${i.id}', 1)">Meter</button></div>
     <div><div class="section-title" style="padding:6px 0">Historial</div><div class="pagos" id="idHist">Cargando…</div></div>`;
@@ -873,7 +918,8 @@ function invOtra(id, signo) {
 // Crear / editar (solo el grupo)
 function invNuevo(codigo) {
   invEditId = ''; $('invFormTit').textContent = 'Nuevo producto'; $('ivCantWrap').style.display = '';
-  ['ivNombre', 'ivMin', 'ivUnidad', 'ivNota', 'ivFoto'].forEach(k => { $(k).value = ''; });
+  ['ivNombre', 'ivMin', 'ivUnidad', 'ivNota', 'ivFoto', 'ivPrecio'].forEach(k => { $(k).value = ''; });
+  $('ivPorPaq').value = 1; ivCostoU();
   $('ivCodigo').value = codigo || ''; $('ivCant').value = 1; $('ivMsg').textContent = '';
   $('invForm').style.display = ''; $('ivNombre').focus();
 }
@@ -882,7 +928,12 @@ function invEditar(id) {
   $('invFormTit').textContent = 'Editar producto'; $('ivCantWrap').style.display = 'none';
   $('ivNombre').value = i.nombre; $('ivCodigo').value = i.codigo || ''; $('ivMin').value = i.minimo ?? '';
   $('ivUnidad').value = i.unidad || ''; $('ivNota').value = i.nota || ''; $('ivFoto').value = ''; $('ivMsg').textContent = '';
+  $('ivPrecio').value = i.precio ?? ''; $('ivPorPaq').value = +i.por_paquete || 1; ivCostoU();
   $('invForm').style.display = ''; $('invForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function ivCostoU() {
+  const pr = +$('ivPrecio').value, pq = +$('ivPorPaq').value || 1;
+  $('ivCostoU').textContent = pr > 0 && pq > 1 ? `= ${crc(pr / pq)} por unidad` : '';
 }
 function invCerrarForm() { invEditId = null; $('invForm').style.display = 'none'; }
 // Achica la foto antes de subirla (≈900 px, JPEG) para que cargue rápido
@@ -903,7 +954,9 @@ async function invGuardar() {
   const nombre = $('ivNombre').value.trim(), codigo = $('ivCodigo').value.trim() || null;
   if (!nombre) return msg('ivMsg', 'Ponga el nombre.', false);
   const min = $('ivMin').value === '' ? null : +$('ivMin').value, file = $('ivFoto').files[0];
-  const datos = { nombre, codigo, minimo: min, unidad: $('ivUnidad').value.trim() || null, nota: $('ivNota').value.trim() || null };
+  const precio = $('ivPrecio').value === '' ? null : +$('ivPrecio').value, porPaq = +$('ivPorPaq').value || 1;
+  if ((precio != null && precio < 0) || porPaq <= 0) return msg('ivMsg', 'Revise el precio y las unidades por paquete.', false);
+  const datos = { nombre, codigo, minimo: min, unidad: $('ivUnidad').value.trim() || null, nota: $('ivNota').value.trim() || null, precio, por_paquete: porPaq };
   $('ivGuardar').disabled = true;
   await hacer(async () => {
     let foto;
