@@ -189,6 +189,7 @@ table.det .num { text-align:right; }
 
 </div>
 
+<script src="/util.js"></script>
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
 <script src="/metas.js"></script>
@@ -341,7 +342,6 @@ function marcarRapido(tipo) {
 const tonoPct = p => p >= 70 ? 'var(--green)' : p >= 40 ? 'var(--orange)' : 'var(--red)';
 const pillPct = p => `<span class="pill ${p >= 70 ? 'ok' : p >= 40 ? 'low' : 'falt'}">${p.toFixed(1)}%</span>`;
 const escQ = s => s.replace(/'/g, "\\'");
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const idSede = s => norm(s).replace(/\s/g, '-');
 
 // ── Precios de respaldo desde plan_prices (cuando el snapshot trae ValorPlan 0) ──

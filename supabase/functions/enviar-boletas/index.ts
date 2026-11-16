@@ -20,7 +20,7 @@
 //  Deploy:
 //    supabase functions deploy enviar-boletas
 // ════════════════════════════════════════════════════════════════════════
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.0';
 import nodemailer from 'npm:nodemailer@6.9.14';
 
 const CORS = {

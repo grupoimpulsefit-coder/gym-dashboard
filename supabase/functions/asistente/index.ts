@@ -19,8 +19,8 @@
 //    supabase functions deploy asistente
 //  (SUPABASE_URL, SUPABASE_ANON_KEY y SUPABASE_SERVICE_ROLE_KEY ya vienen inyectadas.)
 // ════════════════════════════════════════════════════════════════════════
-import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import Anthropic from 'npm:@anthropic-ai/sdk';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.119.0';
+import Anthropic from 'npm:@anthropic-ai/sdk@1.8.0';
 import webpush from 'npm:web-push@3.6.7';
 import { MANUAL } from './manual.ts';
 
@@ -33,6 +33,7 @@ const CORS = {
 const MODEL = 'claude-haiku-5-5';
 const MAX_MENSAJES = 40;          // historial que se acepta del navegador (unos 10 intercambios)
 const MAX_HISTORIAL_BYTES = 300_000;
+const MAX_POR_HORA = 60;          // mensajes por persona por hora
 const TIPOS = ['duda', 'anular_venta', 'revisar_sinpe', 'descuadre_caja', 'error_app', 'otro'] as const;
 const ADMIN_ROLES = ['admin', 'admin_sedes', 'admin_g'];
 
@@ -173,6 +174,15 @@ Deno.serve(async (req) => {
     }
 
     if (!ANTHROPIC_API_KEY) return json({ error: 'Falta configurar ANTHROPIC_API_KEY en los secretos de la función.' }, 500);
+
+    // Tope por persona: cada mensaje cuesta en la API de Anthropic (tabla asistente_uso: ver seguridad_auditoria.sql)
+    const haceUnaHora = new Date(Date.now() - 3600_000).toISOString();
+    await admin.from('asistente_uso').delete().eq('user_id', caller.user.id).lt('at', haceUnaHora);
+    const { count: usados } = await admin.from('asistente_uso')
+      .select('user_id', { count: 'exact', head: true }).eq('user_id', caller.user.id);
+    if ((usados ?? 0) >= MAX_POR_HORA)
+      return json({ error: 'Llegó al máximo de mensajes por hora. Intente de nuevo más tarde o consulte a Administración.' }, 429);
+    await admin.from('asistente_uso').insert({ user_id: caller.user.id });
 
     // 2) Mensaje nuevo + historial que guarda el navegador ---------------------
     const mensaje = String(body.mensaje || '').trim().slice(0, 4000);

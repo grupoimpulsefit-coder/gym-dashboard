@@ -172,6 +172,7 @@
 
 </div>
 
+<script src="/util.js"></script>
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
 <script src="/metas.js"></script>
@@ -304,7 +305,6 @@ function aplicarTemaGraficas() {
 }
 let _ultimoLatest = null;
 _mqOscuro.addEventListener('change', () => { if (_ultimoLatest) buildDashboard(_ultimoLatest); });
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const SEDES = ['3 Ríos','Natación','Pinares','Sabanilla'];
 
 const PT_KW = ['personal training','personal 2026'];

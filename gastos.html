@@ -207,6 +207,7 @@
   </div>
 </div>
 
+<script src="/util.js"></script>
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
 <script>
@@ -276,7 +277,6 @@ function mesEtiqueta(d) { return MESES_ES[d.getMonth()] + ' ' + d.getFullYear();
 function mesOrden(d)    { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
 // fecha 'YYYY-MM-DD' → Date local (evita corrimiento por zona horaria)
 function parseFecha(s) { const [y,m,d] = String(s).split('-').map(Number); return new Date(y, m-1, d); }
-function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 // ── Login ───────────────────────────────────────────────────────────────
 async function doLogin() {

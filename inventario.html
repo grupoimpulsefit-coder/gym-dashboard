@@ -109,6 +109,7 @@
   </div>
 </div>
 
+<script src="/util.js"></script>
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
 <script>
@@ -147,7 +148,6 @@ function sedesDisponibles(){
 }
 const SEDE_META={'3 Ríos':{icon:'🌊'},'Natación':{icon:'🏊'},'Pinares':{icon:'🌲'},'Sabanilla':{icon:'🏙️'}};
 const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let items=[];  // {id?, producto, precio, cantidad, cantidad_minima, moneda, conteo, _nuevo, _mod, _del}
 
 async function doLogin(){

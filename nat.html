@@ -855,6 +855,7 @@
   </div>
 </div>
 
+<script src="/util.js"></script>
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
 <script src="/catalogo.js"></script>
@@ -4135,10 +4136,7 @@ function switchTab(id, el) {
 // ─────────────────────────────────────────
 // ESCAPE HTML
 // ─────────────────────────────────────────
-function esc(s) {
-  if (!s) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+// esc(): en util.js
 
 // ─────────────────────────────────────────
 // EXPORTAR PDF

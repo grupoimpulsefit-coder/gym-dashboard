@@ -267,6 +267,7 @@ table.tbl tr:last-child td{border-bottom:0}
 
 <div class="toast" id="toast"></div>
 
+<script src="/util.js"></script>
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
 <script>
@@ -299,7 +300,6 @@ function _sesionExpirada(motivo) {
 }
 
 // ── Helpers ──
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
 const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const todayStr=()=>ymd(new Date());

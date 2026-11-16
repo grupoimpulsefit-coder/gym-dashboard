@@ -12,7 +12,7 @@
 //  (SUPABASE_URL, SUPABASE_ANON_KEY y SUPABASE_SERVICE_ROLE_KEY ya vienen
 //   inyectadas por defecto en las Edge Functions; no hay que configurarlas.)
 // ════════════════════════════════════════════════════════════════════════
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.0';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
     const sede = String(body.sede || '').trim() || null;
 
     if (!email || !password) return json({ error: 'Correo y contraseña son obligatorios' }, 400);
-    if (password.length < 6) return json({ error: 'La contraseña debe tener al menos 6 caracteres' }, 400);
+    if (password.length < 8) return json({ error: 'La contraseña debe tener al menos 8 caracteres' }, 400);
     if (!ROLES.includes(role)) return json({ error: 'Rol inválido' }, 400);
     if (ROLES_CON_SEDE.includes(role) && !SEDES.includes(sede || '')) {
       return json({ error: 'Debe indicar una sede válida para este rol' }, 400);
@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
       id: uid,
       role,
       nombre: nombre || email,
-      sede: ['recepcion', 'admin_sucursal', 'instructor'].includes(role) ? sede : null,
+      sede: ROLES_CON_SEDE.includes(role) ? sede : null,
     });
     if (insErr) {
       // Rollback: borrar el usuario auth para no dejar cuentas huérfanas

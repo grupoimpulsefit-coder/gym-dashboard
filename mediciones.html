@@ -330,6 +330,7 @@ td.pasado .cell{opacity:.55}
 
 <div class="toast" id="toast"></div>
 
+<script src="/util.js"></script>
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
 <script>
@@ -380,7 +381,6 @@ let vistaSemana=mqAncho.matches;
 mqAncho.addEventListener('change',e=>{vistaSemana=e.matches;render();});
 
 // ── Helpers ──
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const todayStr=()=>ymd(new Date());
 function lunesDe(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);x.setHours(0,0,0,0);return x;}

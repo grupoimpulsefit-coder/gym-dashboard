@@ -177,6 +177,7 @@ table.lad tr.foco td{outline:2px solid var(--brand);outline-offset:-2px}
   </div>
 </div>
 
+<script src="/util.js"></script>
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
 <script>
@@ -211,7 +212,6 @@ function sedesDisponibles(){
 }
 const fmt=n=>(Number(n)<0?'−':'')+'₡'+Math.abs(Math.round(Number(n)||0)).toLocaleString('es-CR');
 const fmtS=n=>(Math.round(n)>0?'+':'')+fmt(n);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 async function doLogin(){
   const email=document.getElementById('loginEmail').value.trim(),pwd=document.getElementById('loginPassword').value;

@@ -10,11 +10,11 @@
 //  function → Via Editor) con el nombre exacto: analizar-datafono
 //  (SUPABASE_URL, SUPABASE_ANON_KEY y SUPABASE_SERVICE_ROLE_KEY ya vienen inyectadas.)
 // ════════════════════════════════════════════════════════════════════════
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.0';
 import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
-import Anthropic from 'npm:@anthropic-ai/sdk';
-import { zodOutputFormat } from 'npm:@anthropic-ai/sdk/helpers/zod';
-import { z } from 'npm:zod';
+import Anthropic from 'npm:@anthropic-ai/sdk@1.8.0';
+import { zodOutputFormat } from 'npm:@anthropic-ai/sdk@1.8.0/helpers/zod';
+import { z } from 'npm:zod@4.6.7';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     const { data: caller } = await asCaller.auth.getUser();
     if (!caller?.user) return json({ error: 'Sesión inválida' }, 401);
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-    const { data: rolRow } = await admin.from('user_roles').select('role').eq('id', caller.user.id).single();
+    const { data: rolRow } = await admin.from('user_roles').select('role, sede, sedes_extra').eq('id', caller.user.id).single();
     if (!rolRow || !ROLES_OK.includes(rolRow.role)) return json({ error: 'Sin permiso' }, 403);
 
     // 2) Obtener la imagen: por path en Storage (cierres-caja) o base64 directo ----
@@ -63,6 +63,12 @@ Deno.serve(async (req) => {
     let mediaType = String(body.media_type || 'image/jpeg');
     if (!b64 && body.path) {
       // Siempre la carpeta de cierres: quien llama no elige otra (p. ej. documentos de RRHH)
+      // y, salvo Administración, solo fotos de sus sedes (la carpeta es la sede, como en caja.html)
+      const carpeta = String(body.path).split('/')[0];
+      const slug = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_');
+      const suyas = [rolRow.sede, ...(rolRow.sedes_extra || [])].filter(Boolean).map(slug);
+      const libre = ['admin', 'admin_sedes', 'admin_g'].includes(rolRow.role) || (rolRow.role === 'coordinador' && !rolRow.sede);
+      if (!libre && !suyas.includes(carpeta)) return json({ error: 'Esa foto no es de su sede.' }, 403);
       const { data: file, error: dlErr } = await admin.storage.from('cierres-caja').download(String(body.path));
       if (dlErr || !file) return json({ error: 'No se pudo leer la imagen del Storage: ' + (dlErr?.message || '') }, 400);
       mediaType = file.type || mediaType;

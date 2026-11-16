@@ -682,6 +682,7 @@ table.hist tbody tr:hover td { background:var(--fill); }
   </div>
 </div>
 
+<script src="/util.js"></script>
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
 <script>
@@ -788,7 +789,6 @@ async function cargarSistemaConteos(cierreId){
   catch(_){}   // tabla aún no creada: se sigue con lo que traiga el cierre
 }
 const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function parseFecha(s){const[y,m,d]=String(s).split('-').map(Number);return new Date(y,m-1,d);}
 function mesEt(d){return MESES_ES[d.getMonth()]+' '+d.getFullYear();}
 function mesOrd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}

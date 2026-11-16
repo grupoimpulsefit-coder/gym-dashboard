@@ -191,6 +191,7 @@
 <div id="sheet" hidden></div>
 <div class="toast" id="toast"></div>
 
+<script src="/util.js"></script>
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
 <script>
@@ -232,7 +233,6 @@ const modVisible=m=>m.arqueo?puedeArquear():m.med?puedeVerMed():m.id==='inventar
 
 // ── Helpers (van ANTES del estado: el estado inicial los usa) ──
 const fmt=n=>'₡'+Math.round(Number(n)||0).toLocaleString('es-CR');
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const todayStr=()=>ymd(new Date());
 const ayerStr=()=>{const d=new Date();d.setDate(d.getDate()-1);return ymd(d);};

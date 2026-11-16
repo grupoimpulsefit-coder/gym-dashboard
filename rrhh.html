@@ -285,6 +285,7 @@
   </div>
 </div>
 
+<script src="/util.js"></script>
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
 <script src="/tasas.js"></script>
@@ -352,7 +353,6 @@ const salarioDiario = mensual => (Number(mensual) || 0) / DIAS_POR_MES;
 function deduccionCCSS(e){ return aseguradoCCSS(e) ? baseMensual(e) * CCSS_TRABAJADOR : 0; }
 function cargaPatronalCCSS(e){ return aseguradoCCSS(e) ? baseMensual(e) * CCSS_PATRONO : 0; }
 function salarioNeto(e){ return baseMensual(e) - deduccionCCSS(e); }
-function esc(s){ return String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function parseFecha(s){ if(!s) return null; const [y,m,d]=String(s).split('-').map(Number); return new Date(y,m-1,d); }
 function fmtFecha(s){ const d=parseFecha(s); return d ? d.toLocaleDateString('es-CR') : '—'; }
 function mesesTrabajados(fi, hasta){ if(!fi) return 0; let m=(hasta.getFullYear()-fi.getFullYear())*12+(hasta.getMonth()-fi.getMonth()); if(hasta.getDate()<fi.getDate()) m--; return Math.max(0,m); }
@@ -783,7 +783,7 @@ async function crearAcceso(id){
   if (!e.correo){ alert('El empleado no tiene correo. Edítelo primero para poder crear el acceso.'); return; }
   const pwd = prompt(`Contraseña temporal para el acceso de ${e.nombre} (${e.correo}):`);
   if (pwd===null) return;
-  if (pwd.length < 6){ alert('La contraseña debe tener al menos 6 caracteres.'); return; }
+  if (pwd.length < 8){ alert('La contraseña debe tener al menos 8 caracteres.'); return; }
   try {
     const res = await fetch(`${SUPA_URL}/functions/v1/crear-usuario`, { method:'POST',
       headers:{'Authorization':'Bearer '+currentToken,'apikey':SUPA_KEY,'Content-Type':'application/json'},

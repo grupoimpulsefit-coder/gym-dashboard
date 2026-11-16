@@ -149,6 +149,7 @@ table.tbl input.cost-input.saved { border-color:var(--green); background:var(--g
 
 </div>
 
+<script src="/util.js"></script>
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
 <script>
@@ -594,7 +595,7 @@ function renderCatSections() {
       const costVal = (costMap[norm(p.base)] != null) ? costMap[norm(p.base)] : '';
       return `<tr>
         <td>
-          <div class="prod-name">${escapeHtml(p.base)}</div>
+          <div class="prod-name">${esc(p.base)}</div>
           <div class="prod-sedes">${sedeList}</div>
         </td>
         <td class="num">${fmtN(p.units)}</td>
@@ -632,7 +633,7 @@ function renderCatSections() {
           <tbody>
             ${rows}
             <tr class="cat-total">
-              <td>Total ${escapeHtml(cc.label)}</td>
+              <td>Total ${esc(cc.label)}</td>
               <td class="num">${fmtN(cUnits)}</td>
               <td class="num">—</td>
               <td class="num">—</td>
@@ -656,7 +657,6 @@ async function onCostChange(input, base, categoria) {
   render(); // recalcular KPIs, sedes y tablas con el nuevo costo
 }
 
-function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function escapeAttr(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
 </script>
 </body>
