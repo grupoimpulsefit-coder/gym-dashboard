@@ -39,6 +39,23 @@
 .codigo { font: 700 22px ui-monospace, Menlo, monospace; letter-spacing: .08em; background: var(--fill); padding: 8px 14px; border-radius: 10px; display: inline-block; user-select: all; }
 .tabs { max-width: calc(100% - 2 * var(--gut)); }
 @media (max-width: 520px) { .tabs { grid-auto-flow: row; grid-template-columns: 1fr 1fr; } .tab { padding: 0 8px; } }
+/* Inventario */
+.inv-bar { display: flex; gap: 8px; padding: 0 var(--gut) 12px; flex-wrap: wrap; }
+.inv-bar input { flex: 1; min-width: 150px; background: var(--fill); border: 1.5px solid transparent; border-radius: 10px; padding: 0 12px; min-height: 40px; font-size: 15px; color: var(--label); outline: none; }
+.inv-bar input:focus { border-color: var(--brand); background: var(--card); }
+.inv-foto { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; background: var(--fill); flex: none; display: flex; align-items: center; justify-content: center; font-size: 26px; overflow: hidden; }
+.inv-foto img { width: 100%; height: 100%; object-fit: cover; }
+.inv-cant { display: flex; align-items: center; gap: 6px; }
+.inv-cant button { width: 34px; height: 34px; border-radius: 17px; border: 0; background: var(--fill); color: var(--label); font-size: 20px; font-weight: 600; cursor: pointer; line-height: 1; }
+.inv-cant b { min-width: 34px; text-align: center; font-size: 17px; font-variant-numeric: tabular-nums; }
+.fila.inv { cursor: pointer; flex-wrap: nowrap; }
+.inv-det-foto { width: 100%; max-height: 300px; object-fit: contain; border-radius: 12px; background: var(--fill); }
+#invScan { position: fixed; inset: 0; z-index: 10001; background: #000; display: none; flex-direction: column; }
+#invScan.open { display: flex; }
+#invScanReg { flex: 1; min-height: 0; }
+#invScanReg video { object-fit: cover; }
+.inv-scan-pie { background: var(--card); padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; }
+.inv-scan-pie .f-inline input { flex: 1; min-height: 40px; background: var(--fill); border: 0; border-radius: 10px; padding: 0 12px; font-size: 16px; color: var(--label); }
 </style>
 </head>
 <body>
@@ -86,7 +103,24 @@
   </div>
   <div class="section"><div class="section-title">Movimientos</div></div>
   <div class="lista" id="foMovs"></div>
+  <div id="foInvSlot"></div>
 </div>
+
+<!-- Escáner de código de barras -->
+<div id="invScan">
+  <div id="invScanReg"></div>
+  <div class="inv-scan-pie">
+    <div class="hint" id="invScanMsg">Apunte la cámara al código de barras</div>
+    <div class="f-inline"><input id="invScanManual" inputmode="numeric" placeholder="…o escriba el código" onkeydown="if(event.key==='Enter')scanManual()"><button class="btn-ghost" onclick="scanManual()">Buscar</button></div>
+    <button class="btn-ghost" onclick="cerrarScan()">Cerrar</button>
+  </div>
+</div>
+<!-- Detalle de un producto -->
+<div class="modal-back" id="invDet" onclick="if(event.target===this)cerrarDet()"><div class="modal">
+  <div class="modal-head" id="idNombre"></div>
+  <div class="modal-body" id="idBody"></div>
+  <div class="modal-foot"><button class="btn-ghost inv-solo-grupo" id="idEditar">✏️ Editar</button><button class="btn-ghost inv-solo-grupo" id="idBorrar" style="color:var(--red)">Borrar</button><button class="btn-primary" onclick="cerrarDet()">Listo</button></div>
+</div></div>
 
 <div id="app">
   <div class="header">
@@ -103,6 +137,7 @@
     <button class="tab" data-t="registrar" onclick="tab('registrar')">➕ Registrar</button>
     <button class="tab" data-t="prestamos" onclick="tab('prestamos')">🤝 Préstamos</button>
     <button class="tab" data-t="ahorro" onclick="tab('ahorro')">🐷 Ahorro</button>
+    <button class="tab" data-t="inventario" onclick="tab('inventario'); cargarInv()">📦 Inventario</button>
     <button class="tab" data-t="ajustes" onclick="tab('ajustes')">⚙️ Ajustes</button>
   </div>
 
@@ -191,6 +226,32 @@
       </div>
       <p class="hint" style="margin-top:10px">Lo que ya tiene y lo que recibe cada mes no se restan del disponible ni pagan diezmo. El aporte mensual empieza este mes.</p>
       <div class="form-actions"><span class="form-msg" id="fMsg"></span><button class="btn-primary" onclick="crearFondo()">Crear fondo</button></div>
+    </div>
+  </div>
+
+  <!-- ── INVENTARIO (este bloque se muda a la vista de Cucho si entra él) ── -->
+  <div class="tab-panel" id="p_inventario">
+    <div id="invBox">
+      <div class="section"><div class="section-title">Inventario de la casa <span class="section-note" id="invResumen"></span></div></div>
+      <div class="inv-bar">
+        <input id="invBuscar" type="search" placeholder="Buscar por nombre o código" oninput="renderInv()">
+        <button class="btn-primary" onclick="abrirScan('buscar')">📷 Escanear</button>
+        <button class="btn-ghost inv-solo-grupo" onclick="invNuevo()">➕ Nuevo</button>
+      </div>
+      <div class="form-card inv-solo-grupo" id="invForm" style="display:none">
+        <div class="section-title" id="invFormTit" style="padding:0 0 12px">Nuevo producto</div>
+        <div class="form-grid">
+          <div class="f-field"><label>Nombre</label><input id="ivNombre" placeholder="Ej. Arroz 2 kg"></div>
+          <div class="f-field"><label>Código de barras</label><div class="f-inline"><div class="f-field"><input id="ivCodigo" inputmode="numeric" placeholder="Escanee o escriba"></div><button class="btn-ghost" onclick="abrirScan('form')">📷</button></div></div>
+          <div class="f-field" id="ivCantWrap"><label>Cantidad que hay</label><input id="ivCant" type="number" inputmode="decimal" min="0" step="any" value="1"></div>
+          <div class="f-field"><label>Avisar cuando queden (opcional)</label><input id="ivMin" type="number" inputmode="decimal" min="0" step="any" placeholder="Ej. 1"></div>
+          <div class="f-field"><label>Unidad (opcional)</label><input id="ivUnidad" placeholder="unidades, kg, paquetes…"></div>
+          <div class="f-field"><label>Foto</label><input id="ivFoto" type="file" accept="image/*" capture="environment"></div>
+          <div class="f-field full"><label>Nota (opcional)</label><input id="ivNota" placeholder="Ej. en la alacena de arriba"></div>
+        </div>
+        <div class="form-actions"><span class="form-msg" id="ivMsg"></span><button class="btn-ghost" onclick="invCerrarForm()">Cancelar</button><button class="btn-primary" id="ivGuardar" onclick="invGuardar()">Guardar</button></div>
+      </div>
+      <div class="lista" id="invList"></div>
     </div>
   </div>
 
@@ -288,7 +349,7 @@ async function entrar() {
   const c = claims(ses.access_token);
   yo = c.sub; $('userEmail').textContent = c.email || '';
   $('loginScreen').style.display = 'none'; $('app').style.display = 'block';
-  $('loginPassword').value = '';
+  $('loginPassword').value = ''; $('p_inventario').appendChild($('invBox'));
   semana = lunes(hoy());
   $('gFecha').value = $('iFecha').value = $('pFecha').value = hoy();
   await cargar();
@@ -659,7 +720,9 @@ async function entrarFondo() {
   yo = c.sub; $('foUser').textContent = String(c.email || '').replace('@finanzas.local', '');
   $('loginScreen').style.display = 'none'; $('fondoApp').style.display = 'block';
   $('loginPassword').value = ''; $('foFecha').value = hoy();
+  $('foInvSlot').appendChild($('invBox'));
   await cargarFondo();
+  await cargarInv();
 }
 async function cargarFondo() {
   await api('rpc/fin_fondos_al_dia', { method: 'POST', body: {} }).catch(() => {});
@@ -716,6 +779,191 @@ async function foBorrar(id, gastoId) {
     else await api('fin_fondo_movs?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' });
     await cargarFondo();
   });
+}
+
+/* ── inventario de la casa ── */
+const INV_BUCKET = 'fin-inventario', QR_LIB = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+let inv = [], invFotos = {}, invEdita = false, invGrupo = null, invPersonas = {}, invEditId = null, scanModo = null, scanner = null;
+const encPath = p => p.split('/').map(encodeURIComponent).join('/');
+async function sto(path, opt = {}) {   // Storage de Supabase con la misma sesión
+  if (ses && ses.exp - Date.now() < 120000) await renovar();
+  const go = () => fetch(SUPA_URL + '/storage/v1/' + path, { method: opt.method || 'GET', body: opt.body,
+    headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + ses.access_token, ...(opt.headers || {}) } });
+  let r = await go();
+  if (r.status === 401 && await renovar()) r = await go();
+  const txt = await r.text(); let d = null; try { d = txt ? JSON.parse(txt) : null; } catch (_) {}
+  if (!r.ok) throw new Error(d?.message || d?.error || 'Error ' + r.status);
+  return d;
+}
+async function cargarInv() {
+  const [items, ed, gr, per] = await Promise.all([
+    api('fin_inventario?select=*&order=nombre'),
+    api('rpc/fin_inv_edita', { method: 'POST', body: {} }),
+    api('rpc/fin_inv_grupo', { method: 'POST', body: {} }),
+    api('rpc/fin_inv_personas', { method: 'POST', body: {} }),
+  ]);
+  inv = items || []; invEdita = ed === true; invGrupo = gr;
+  invPersonas = Object.fromEntries((per || []).map(x => [x.user_id, x.nombre]));
+  document.querySelectorAll('.inv-solo-grupo').forEach(el => { el.style.display = invEdita ? '' : 'none'; });
+  if (invEdita) $('invForm').style.display = invEditId !== null ? '' : 'none';
+  await firmarFotos();
+  renderInv();
+}
+async function firmarFotos() {   // URLs temporales de las fotos (bucket privado)
+  const faltan = inv.map(i => i.foto).filter(f => f && !invFotos[f]);
+  if (!faltan.length) return;
+  try {
+    const r = await sto('object/sign/' + INV_BUCKET, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresIn: 3600 * 6, paths: faltan }) });
+    (r || []).forEach(x => { if (x.signedURL) invFotos[x.path] = SUPA_URL + '/storage/v1' + x.signedURL; });
+  } catch (_) {}
+}
+const invBajo = i => i.minimo != null && +i.cantidad <= +i.minimo;
+const invCant = i => (+i.cantidad % 1 ? (+i.cantidad).toFixed(2) : String(+i.cantidad));
+const fotoHtml = i => `<div class="inv-foto">${i.foto && invFotos[i.foto] ? `<img src="${invFotos[i.foto]}" alt="" loading="lazy">` : '📦'}</div>`;
+function renderInv() {
+  const q = ($('invBuscar').value || '').trim().toLowerCase();
+  const lista = inv.filter(i => !q || i.nombre.toLowerCase().includes(q) || (i.codigo || '').includes(q))
+    .sort((a, b) => (invBajo(b) - invBajo(a)) || a.nombre.localeCompare(b.nombre, 'es'));
+  const bajos = inv.filter(invBajo).length;
+  $('invResumen').textContent = `${inv.length} producto${inv.length === 1 ? '' : 's'}${bajos ? ` · ${bajos} por acabarse` : ''}`;
+  $('invList').innerHTML = lista.length ? lista.map(i => `
+    <div class="fila inv" onclick="abrirDet('${i.id}')">${fotoHtml(i)}
+      <div class="grow">${esc(i.nombre)}${invBajo(i) ? ' <span class="pill low">Se está acabando</span>' : ''}
+        <div class="sub">${[i.unidad, i.codigo].filter(Boolean).map(esc).join(' · ')}</div></div>
+      <div class="inv-cant" onclick="event.stopPropagation()">
+        <button onclick="invMover('${i.id}', -1)" aria-label="Restar">−</button><b>${invCant(i)}</b><button onclick="invMover('${i.id}', 1)" aria-label="Sumar">+</button></div></div>`).join('')
+    : `<div class="tbl-empty">${inv.length ? 'Nada coincide con la búsqueda.' : 'Aún no hay productos.' + (invEdita ? ' Toque “Nuevo” o escanee un código.' : '')}</div>`;
+}
+async function invMover(id, cambio, nota) {
+  const i = inv.find(x => x.id === id);
+  if (cambio < 0 && +i.cantidad + cambio < 0) return alert(`No queda ${i.nombre}.`);
+  await hacer(async () => {
+    const nueva = await api('rpc/fin_inv_mover', { method: 'POST', body: { p_item: id, p_cambio: cambio, p_nota: nota || null } });
+    i.cantidad = nueva; renderInv();
+    if ($('invDet').classList.contains('open')) abrirDet(id);
+  });
+}
+
+// Detalle: foto grande, cantidad con +/− y otra cantidad, historial
+async function abrirDet(id) {
+  const i = inv.find(x => x.id === id); if (!i) return;
+  $('idNombre').textContent = i.nombre;
+  $('idBody').innerHTML = `${i.foto && invFotos[i.foto] ? `<img class="inv-det-foto" src="${invFotos[i.foto]}" alt="">` : ''}
+    <div class="fila" style="padding:0"><div class="grow"><div class="sub">${[i.unidad, i.codigo && 'Código ' + i.codigo, i.minimo != null && 'Avisar con ' + invCant({ cantidad: i.minimo })].filter(Boolean).map(esc).join(' · ')}</div>${i.nota ? `<div class="sub">${esc(i.nota)}</div>` : ''}</div>
+      <div class="inv-cant"><button onclick="invMover('${i.id}', -1)">−</button><b style="font-size:22px">${invCant(i)}</b><button onclick="invMover('${i.id}', 1)">+</button></div></div>
+    <div class="abono" style="margin:0"><input id="idOtra" type="number" inputmode="decimal" min="0" step="any" placeholder="Otra cantidad"><input id="idNota" placeholder="Nota (opcional)">
+      <button class="btn-ghost" onclick="invOtra('${i.id}', -1)">Sacar</button><button class="btn-primary" onclick="invOtra('${i.id}', 1)">Meter</button></div>
+    <div><div class="section-title" style="padding:6px 0">Historial</div><div class="pagos" id="idHist">Cargando…</div></div>`;
+  $('idEditar').onclick = () => { cerrarDet(); invEditar(id); };
+  $('idBorrar').onclick = () => invBorrar(id);
+  $('invDet').classList.add('open');
+  try {
+    const h = await api(`fin_inv_movs?select=*&item_id=eq.${id}&order=created_at.desc&limit=15`);
+    $('idHist').innerHTML = h.length ? h.map(m => `<div>${new Date(m.created_at).toLocaleDateString('es-CR', { day: 'numeric', month: 'short' })} · ${m.cambio > 0 ? '+' : '−'}${invCant({ cantidad: Math.abs(m.cambio) })} → quedan ${invCant(m)}${m.nota ? ' · ' + esc(m.nota) : ''}${invPersonas[m.owner] ? ' · ' + esc(invPersonas[m.owner]) : ''}</div>`).join('') : 'Sin movimientos.';
+  } catch (_) { $('idHist').textContent = ''; }
+}
+function cerrarDet() { $('invDet').classList.remove('open'); }
+function invOtra(id, signo) {
+  const n = +$('idOtra').value;
+  if (!(n > 0)) return alert('Ponga la cantidad.');
+  invMover(id, signo * n, $('idNota').value.trim());
+}
+
+// Crear / editar (solo el grupo)
+function invNuevo(codigo) {
+  invEditId = ''; $('invFormTit').textContent = 'Nuevo producto'; $('ivCantWrap').style.display = '';
+  ['ivNombre', 'ivMin', 'ivUnidad', 'ivNota', 'ivFoto'].forEach(k => { $(k).value = ''; });
+  $('ivCodigo').value = codigo || ''; $('ivCant').value = 1; $('ivMsg').textContent = '';
+  $('invForm').style.display = ''; $('ivNombre').focus();
+}
+function invEditar(id) {
+  const i = inv.find(x => x.id === id); invEditId = id;
+  $('invFormTit').textContent = 'Editar producto'; $('ivCantWrap').style.display = 'none';
+  $('ivNombre').value = i.nombre; $('ivCodigo').value = i.codigo || ''; $('ivMin').value = i.minimo ?? '';
+  $('ivUnidad').value = i.unidad || ''; $('ivNota').value = i.nota || ''; $('ivFoto').value = ''; $('ivMsg').textContent = '';
+  $('invForm').style.display = ''; $('invForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function invCerrarForm() { invEditId = null; $('invForm').style.display = 'none'; }
+// Achica la foto antes de subirla (≈900 px, JPEG) para que cargue rápido
+function achicarFoto(file) {
+  return new Promise((ok, mal) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, 900 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      c.toBlob(b => b ? ok(b) : mal(new Error('No se pudo leer la foto')), 'image/jpeg', 0.82);
+    };
+    img.onerror = () => mal(new Error('No se pudo leer la foto'));
+    img.src = url;
+  });
+}
+async function invGuardar() {
+  const nombre = $('ivNombre').value.trim(), codigo = $('ivCodigo').value.trim() || null;
+  if (!nombre) return msg('ivMsg', 'Ponga el nombre.', false);
+  const min = $('ivMin').value === '' ? null : +$('ivMin').value, file = $('ivFoto').files[0];
+  const datos = { nombre, codigo, minimo: min, unidad: $('ivUnidad').value.trim() || null, nota: $('ivNota').value.trim() || null };
+  $('ivGuardar').disabled = true;
+  await hacer(async () => {
+    let foto;
+    if (file) {
+      const blob = await achicarFoto(file);
+      foto = `${invGrupo}/${crypto.randomUUID()}.jpg`;
+      await sto(`object/${INV_BUCKET}/${encPath(foto)}`, { method: 'POST', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
+      datos.foto = foto;
+    }
+    const vieja = invEditId ? inv.find(x => x.id === invEditId)?.foto : null;
+    if (invEditId) await api('fin_inventario?id=eq.' + invEditId, { method: 'PATCH', body: datos });
+    else await api('fin_inventario', { method: 'POST', body: { ...datos, cantidad: Math.max(0, +$('ivCant').value || 0) } });
+    if (foto && vieja) sto('object/' + INV_BUCKET, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: [vieja] }) }).catch(() => {});
+    invEditId = null; $('invForm').style.display = 'none';
+    await cargarInv();
+  }, 'ivMsg');
+  $('ivGuardar').disabled = false;
+}
+async function invBorrar(id) {
+  const i = inv.find(x => x.id === id);
+  if (!confirm(`¿Borrar ${i.nombre} del inventario?`)) return;
+  await hacer(async () => {
+    await api('fin_inventario?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' });
+    if (i.foto) sto('object/' + INV_BUCKET, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: [i.foto] }) }).catch(() => {});
+    cerrarDet(); await cargarInv();
+  });
+}
+
+// Escáner: cámara del celular (html5-qrcode, se carga solo cuando se usa) o código escrito a mano
+function cargarQr() {
+  if (window.Html5Qrcode) return Promise.resolve();
+  return new Promise((ok, mal) => { const s = document.createElement('script'); s.src = QR_LIB; s.onload = ok; s.onerror = () => mal(new Error('No se pudo cargar el lector')); document.head.appendChild(s); });
+}
+async function abrirScan(modo) {
+  scanModo = modo; $('invScanManual').value = ''; $('invScanMsg').textContent = 'Apunte la cámara al código de barras';
+  $('invScan').classList.add('open');
+  try {
+    await cargarQr();
+    const F = Html5QrcodeSupportedFormats;
+    scanner = new Html5Qrcode('invScanReg', { verbose: false, formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF, F.QR_CODE] });
+    await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: (w, h) => ({ width: Math.min(300, w * 0.85), height: Math.min(170, h * 0.4) }) },
+      codigo => { if (navigator.vibrate) navigator.vibrate(60); encontrado(codigo); }, () => {});
+  } catch (e) {
+    scanner = null;
+    $('invScanMsg').textContent = 'No se pudo usar la cámara (' + (e.message || e) + '). Escriba el código abajo.';
+  }
+}
+async function cerrarScan() {
+  $('invScan').classList.remove('open');
+  if (scanner) { try { await scanner.stop(); scanner.clear(); } catch (_) {} scanner = null; }
+}
+function scanManual() { const c = $('invScanManual').value.trim(); if (c) encontrado(c); }
+async function encontrado(codigo) {
+  codigo = String(codigo).trim();
+  const modo = scanModo; await cerrarScan();
+  if (modo === 'form') { $('ivCodigo').value = codigo; return; }
+  const i = inv.find(x => x.codigo === codigo);
+  if (i) return abrirDet(i.id);
+  if (invEdita) { if (confirm(`El código ${codigo} no está en el inventario. ¿Agregarlo como producto nuevo?`)) invNuevo(codigo); }
+  else alert(`El código ${codigo} no está en el inventario.`);
 }
 
 /* ── arranque ── */
