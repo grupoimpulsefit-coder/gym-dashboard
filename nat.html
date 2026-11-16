@@ -1715,7 +1715,7 @@ async function buildRenovMapFromSnapshots() {
         if (!r.Cliente || !r.Producto) return;
         if (r.EsClaseSuelta || r.EsSinClasificar) return;
         if (isAddon(r.Producto)) return;
-        if (!isMembershipPlan(r.Producto)) return;
+        if (!esMembresia(r.Producto, parseRenoDateTime(r.FechaStr))) return;
         const dedupeKey = `${norm(r.Cliente)}|${r.FechaStr}|${r.Producto}`;
         if (seen.has(dedupeKey)) return;
         seen.add(dedupeKey);
@@ -3509,6 +3509,14 @@ function isMembershipPlan(product) {
   }
   return /\b(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b|plan|promo|flash|anual|lealtad|fidelidad|bloqueado|verano|exclusivo|platium|semestral|trimest|bimest|estudiante|renovaci[oó]n|black|hal+owe+n|mensualidad|matr[ií]cula|nataci[oó]n|gym|aquafitness|estimulaci[oó]n|ejecutivo|\bpng\b|\bcps\b/i.test(p);
 }
+// Desde la pestaña Facturación de caja (6/10/2026) todo lo del informe de WStudio es membresía,
+// sin importar el nombre. Igual que esMembresia de index.html (el catálogo de la sede manda).
+const INICIO_FACTURACION = new Date(2026, 9, 7);
+function esMembresia(product, txDate) {
+  const _t = window.Catalogo && Catalogo.tipo(String(product||'').trim()); if (_t) return _t === 'plan';
+  if (txDate && txDate >= INICIO_FACTURACION) return true;
+  return isMembershipPlan(product);
+}
 function isClaseSuelta(product) {
   const _t = window.Catalogo && Catalogo.tipo(product); if (_t) return _t === 'clase';
   const pl = String(product||'').trim().toLowerCase();
@@ -3593,7 +3601,7 @@ function buildRenovacionesState(rawRows) {
       clasesSueltasData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
       return;
     }
-    if (!isMembershipPlan(producto)) {
+    if (!esMembresia(producto, txDate)) {
       sinClasificarData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
       return;
     }
