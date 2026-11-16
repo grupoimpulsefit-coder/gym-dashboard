@@ -218,6 +218,13 @@ table.denom tfoot td:last-child { border-radius:0 0 10px 0; }
 .fx-ev .d { font-size:12px; color:var(--sec); }
 .fx-ev .pr { display:flex; gap:6px; flex-wrap:wrap; font-size:12px; }
 .fx-ev .pr span { background:var(--fill); border-radius:6px; padding:2px 8px; font-variant-numeric:tabular-nums; }
+.fx-res { display:flex; align-items:center; gap:10px; padding:10px 0; border-top:.5px solid var(--hair); }
+.fx-res:first-child { border-top:0; }
+.fx-res .i { flex:1; min-width:0; }
+.fx-res .n { font-weight:600; font-size:14px; }
+.fx-res .d { font-size:12px; color:var(--sec); }
+.fx-res .s { font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.fx-res[aria-current="true"] { background:var(--brand-tint); border-radius:10px; padding:10px 8px; }
 .fx-seg2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0 10px; }
 .fx-seg2 button { border:1.5px solid var(--hair); background:var(--card); border-radius:10px; padding:8px; font-weight:600; font-size:14px;
   color:var(--label); display:flex; flex-direction:column; align-items:center; }
@@ -543,6 +550,7 @@ table.hist tbody tr:hover td { background:var(--fill); }
         <div><label class="fx-lbl" for="evFecha">Fecha del evento</label><input class="fx-inp" id="evFecha" type="date"></div>
         <div><label class="fx-lbl" for="evPm">Precio miembro (₡)</label><input class="fx-inp" id="evPm" type="number" min="0" step="1"></div>
         <div><label class="fx-lbl" for="evPn">Precio no miembro (₡)</label><input class="fx-inp" id="evPn" type="number" min="0" step="1"></div>
+        <div><label class="fx-lbl" for="evRes">% mínimo para reservar (opcional)</label><input class="fx-inp" id="evRes" type="number" min="1" max="99" step="1" placeholder="Ej. 30 · vacío = solo pago completo"></div>
       </div>
       <span class="fx-lbl">Métodos de pago que acepta</span>
       <div class="ev-checks" id="evMetodos"></div>
@@ -553,7 +561,7 @@ table.hist tbody tr:hover td { background:var(--fill); }
         <button class="btn-ghost" id="evBtnCancelar" onclick="evNuevo()" hidden>Cancelar edición</button>
       </div>
       <div class="msg" id="evMsg" style="margin-top:10px;"></div>
-      <div class="hint" style="margin-top:6px;">Se vende hasta el día del evento; después sale solo de Facturación. Miembro: se valida con el PIN contra la lista de clientes activos. No miembro: nombre y teléfono.</div>
+      <div class="hint" style="margin-top:6px;">Se vende hasta el día del evento; después sale solo de Facturación. Miembro: se valida con el PIN contra la lista de clientes activos. No miembro: nombre y teléfono. Con % de reserva, recepción puede reservar pagando al menos ese % del precio y luego abonar o cancelar el saldo.</div>
     </div>
 
     <div class="card">
@@ -568,10 +576,17 @@ table.hist tbody tr:hover td { background:var(--fill); }
       <h3><span id="evRepTit">Registro</span> <button class="btn-ghost" style="margin-left:auto;font-size:12px;padding:5px 10px;" onclick="evExportar()">⬇ Exportar CSV</button></h3>
       <div class="fx-tiles" id="evRepTiles" style="margin:0 0 12px;"></div>
       <div style="overflow-x:auto;"><table class="fx-tbl">
-        <thead><tr><th>Sede</th><th class="num">Inscritos</th><th class="num">💵 Efectivo</th><th class="num">💳 Tarjeta</th><th class="num">🔷 SINPE</th><th class="num">Total</th></tr></thead>
+        <thead><tr><th>Sede</th><th class="num">Cobros</th><th class="num">💵 Efectivo</th><th class="num">💳 Tarjeta</th><th class="num">🔷 SINPE</th><th class="num">Total</th></tr></thead>
         <tbody id="evRepSedes"></tbody>
       </table></div>
-      <div class="fx-lbl" style="margin-top:16px;">Inscritos</div>
+      <div id="evRepResWrap" hidden>
+        <div class="fx-lbl" style="margin-top:16px;">Reservas</div>
+        <div style="overflow-x:auto;"><table class="fx-tbl">
+          <thead><tr><th>Persona</th><th>Teléfono</th><th>Tipo</th><th>Sede</th><th class="num">Precio</th><th class="num">Pagado</th><th class="num">Saldo</th><th>Estado</th></tr></thead>
+          <tbody id="evRepRes"></tbody>
+        </table></div>
+      </div>
+      <div class="fx-lbl" style="margin-top:16px;">Cobros</div>
       <div style="overflow-x:auto;"><table class="fx-tbl">
         <thead><tr><th>Persona</th><th>Teléfono</th><th>Tipo</th><th>Sede</th><th>Pago</th><th class="num">Monto</th></tr></thead>
         <tbody id="evRepLista"></tbody>
@@ -591,6 +606,12 @@ table.hist tbody tr:hover td { background:var(--fill); }
         <div class="card" id="fxEvCard" hidden>
           <h3>🎟️ Eventos <span style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;">Una persona por cobro</span></h3>
           <div class="fx-evs" id="fxEventos"></div>
+        </div>
+        <div class="card" id="fxResCard" hidden>
+          <h3>🎟️ Reservas con saldo <span style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;" id="fxResN"></span></h3>
+          <input type="search" id="fxResQ" class="fx-search" placeholder="Buscar por nombre o teléfono…" oninput="renderFxReservas()">
+          <div id="fxReservas"></div>
+          <div class="hint" style="margin-top:8px;">Toque una reserva para abonar o cancelar el saldo.</div>
         </div>
         <div class="card">
           <h3>Productos <span style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;" id="fxProdInfo"></span></h3>
@@ -900,7 +921,7 @@ function limpiarEstadoSede(){
   turnoActual=null; cierres=[]; window._formCierreId=null; _lastServerUpd=null; _lastEditTs=0;
   window._sinpeReporte=null; window._ventasDetalle=null; window._informeVentas=null; window._otrosResumen=null;
   window._factCierre=null; fotoDatafono=null; inventarioCierre=null; window._invSis={}; window._enviosPend=[]; window._envioActual=null;
-  fxState.prods=[]; fxState.cart={}; fxState.facturas=[]; fxState.errFacturas=null; fxState.eventos=[]; fxState.evento=null;
+  fxState.prods=[]; fxState.cart={}; fxState.facturas=[]; fxState.errFacturas=null; fxState.eventos=[]; fxState.evento=null; fxState.reservas=[]; fxState.abono=null;
   ['sinpeResumen','fotoResumen','ventasHint','saveMsg','conteoCierreResumen','liveInfo','aperturaInvBody','factCierreBox'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=''; });
   ['fileVentas','fileSinpe','fileFoto'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   DENOMS.forEach(d=>{ const el=document.getElementById('den_'+d); if(el) el.value=0; });
@@ -2396,7 +2417,7 @@ const FX_VACIO={efectivo:0,tarjeta:0,sinpe:0,total:0,productos:0,eventos:0,n:0,d
 const fxProductos=f=>f.productos!=null?(Number(f.productos)||0):(Number(f.total)||0);
 let tabActual='cierre';
 const fxState={prods:[],cart:{},pago:'efectivo',cat:'todos',facturas:[],solicitudes:[],errFacturas:null,busy:false,
-  eventos:[], evento:null,
+  eventos:[], evento:null, reservas:[], abono:null,   // abono: { id, monto } — pago a una reserva de evento
   split:false, sel:['efectivo'], montos:{}};   // pago dividido: métodos elegidos y monto de cada uno   // evento: { id, tipo:'miembro'|'no_miembro', pin, nombre, tel, cliente } — uno por cobro
 const puedeAnular=()=>esAdmin()||currentRole==='coordinador';
 
@@ -2522,14 +2543,17 @@ function renderFxProds(){
 // ── Ticket ──
 function fxProd(id){ return fxState.prods.find(p=>p.id===id); }
 function fxAgregar(id){ const p=fxProd(id); if(!p) return; const q=fxState.cart[id]||0;
-  if(fxState.evento){ const m=document.getElementById('fxMsg'); m.className='msg err'; m.textContent='Cobre o quite el evento antes de vender productos (van en cobros separados).'; return; }
+  if(fxState.evento||fxState.abono){ const m=document.getElementById('fxMsg'); m.className='msg err'; m.textContent='Cobre o quite el evento antes de vender productos (van en cobros separados).'; return; }
   if(p.agotado) return; if(p.cantidad!=null&&q>=(Number(p.cantidad)||0)) return; fxState.cart[id]=q+1; document.getElementById('fxMsg').textContent=''; renderFxProds(); renderFxTicket(); }
 function fxQuitar(id){ if(!fxState.cart[id]) return; fxState.cart[id]--; if(fxState.cart[id]<=0) delete fxState.cart[id]; renderFxProds(); renderFxTicket(); }
-function fxVaciar(){ fxState.cart={}; fxState.evento=null; renderFxEventos(); renderFxProds(); renderFxTicket(); }
-function fxTotal(){ if(fxState.evento){ const e=fxEvento(); return e?Number(fxState.evento.tipo==='miembro'?e.precio_miembro:e.precio_no_miembro)||0:0; }
+function fxVaciar(){ fxState.cart={}; fxState.evento=null; fxState.abono=null; renderFxEventos(); renderFxReservas(); renderFxProds(); renderFxTicket(); }
+function fxTotal(){ if(fxState.abono) return Math.round(Number(fxState.abono.monto)||0);
+  if(fxState.evento){ const e=fxEvento(); if(!e) return 0; if(fxState.evento.modo==='reserva') return Math.round(Number(fxState.evento.monto)||0); return fxPrecioEv(e,fxState.evento.tipo); }
   return Object.entries(fxState.cart).reduce((a,[id,q])=>{ const p=fxProd(id); return a+(p?(Number(p.precio)||0)*q:0); },0); }
 function renderFxTicket(){
   renderFxPagos();
+  if(fxState.abono&&fxReserva()){ renderFxAbonoForm(); return; }
+  fxState.abono=null;
   if(fxState.evento&&fxEvento()){ renderFxEventoForm(); return; }
   fxState.evento=null;
   const L=Object.entries(fxState.cart).filter(([id])=>fxProd(id));
@@ -2608,11 +2632,12 @@ function fxMontoMetodo(f,m){
 function renderFxVuelto(){
   const el=document.getElementById('fxVuelto'), raw=document.getElementById('fxRecibido').value;
   if(raw===''){ el.textContent='—'; el.style.color=''; return; }
-  const base=fxState.split&&!fxState.evento?(Number(fxState.montos.efectivo)||0):fxTotal();   // con pago dividido, solo la parte en efectivo
+  const base=fxState.split&&!fxState.evento&&!fxState.abono?(Number(fxState.montos.efectivo)||0):fxTotal();   // con pago dividido, solo la parte en efectivo
   const d=(Number(raw)||0)-base;
   el.textContent=d>=0?fmt(d):'Faltan '+fmt(-d); el.style.color=d>=0?'var(--green)':'var(--red)';
 }
 async function fxFacturar(){
+  if(fxState.abono) return fxCobrarAbono();
   if(fxState.evento) return fxCobrarEvento();
   const msg=document.getElementById('fxMsg');
   if(fxState.busy) return;
@@ -2758,6 +2783,7 @@ async function loadFxEventos(){
   if(fxState.evento&&!fxEvento()) fxState.evento=null;
   card.hidden=!fxState.eventos.length;
   renderFxEventos(); renderFxTicket();
+  loadFxReservas();
 }
 function renderFxEventos(){
   document.getElementById('fxEventos').innerHTML=fxState.eventos.map(e=>`<button type="button" class="fx-ev" aria-pressed="${!!fxState.evento&&fxState.evento.id===e.id}" onclick="fxSelEvento('${e.id}')">
@@ -2767,13 +2793,17 @@ function renderFxEventos(){
 function fxSelEvento(id){
   const m=document.getElementById('fxMsg');
   if(Object.keys(fxState.cart).length){ m.className='msg err'; m.textContent='Cobre o vacíe los productos antes de cobrar un evento (van en cobros separados).'; return; }
-  fxState.evento=(fxState.evento&&fxState.evento.id===id)?null:{id,tipo:'miembro',pin:'',nombre:'',tel:'',cliente:null};
-  m.textContent=''; renderFxEventos(); renderFxTicket();
+  fxState.abono=null;
+  fxState.evento=(fxState.evento&&fxState.evento.id===id)?null:{id,tipo:'miembro',pin:'',nombre:'',tel:'',cliente:null,modo:'completo',monto:''};
+  m.textContent=''; renderFxEventos(); renderFxReservas(); renderFxTicket();
 }
-function fxEvTipo(t){ if(!fxState.evento) return; fxState.evento.tipo=t; renderFxTicket(); }
+function fxEvTipo(t){ if(!fxState.evento) return; fxState.evento.tipo=t; if(fxState.evento.modo==='reserva') fxState.evento.monto=fxMinReserva(fxEvento(),t); renderFxTicket(); }
+const fxPrecioEv=(e,tipo)=>Number(tipo==='miembro'?e.precio_miembro:e.precio_no_miembro)||0;
+const fxMinReserva=(e,tipo)=>e&&e.reserva_pct?Math.ceil(fxPrecioEv(e,tipo)*Number(e.reserva_pct)/100):0;
+function fxEvModo(m){ const ev=fxState.evento; if(!ev) return; ev.modo=m; ev.monto=m==='reserva'?fxMinReserva(fxEvento(),ev.tipo):''; renderFxTicket(); }
 // Solo los métodos de pago que acepta el evento
 function renderFxPagos(){
-  const e=fxState.evento&&fxEvento(); const ok=e?(e.metodos||[]):['efectivo','tarjeta','sinpe'];
+  const e=fxState.abono&&fxReserva()?fxReserva().eventos_caja:fxState.evento&&fxEvento(); const ok=e?(e.metodos||[]):['efectivo','tarjeta','sinpe'];
   document.querySelectorAll('#fxPay button').forEach(b=>{ b.hidden=!ok.includes(b.dataset.m); });
   const nota=document.getElementById('fxPagoNota');
   nota.hidden=!e||ok.length===3; nota.textContent=e?`Este evento solo acepta ${ok.map(m=>FX_METODOS[m]).join(' y ')}.`:'';
@@ -2794,6 +2824,12 @@ function renderFxEventoForm(){
     <div class="fx-seg2">
       <button type="button" aria-pressed="${miembro}" onclick="fxEvTipo('miembro')">Miembro<small>${fmt(e.precio_miembro)}</small></button>
       <button type="button" aria-pressed="${!miembro}" onclick="fxEvTipo('no_miembro')">No miembro<small>${fmt(e.precio_no_miembro)}</small></button></div>
+    ${e.reserva_pct?`<div class="fx-seg2">
+      <button type="button" aria-pressed="${ev.modo!=='reserva'}" onclick="fxEvModo('completo')">Pago completo<small>${fmt(fxPrecioEv(e,ev.tipo))}</small></button>
+      <button type="button" aria-pressed="${ev.modo==='reserva'}" onclick="fxEvModo('reserva')">Reservar<small>desde ${fmt(fxMinReserva(e,ev.tipo))} (${esc(e.reserva_pct)} %)</small></button></div>
+      ${ev.modo==='reserva'?`<label class="fx-lbl" for="fxEvMonto">Monto que paga hoy (₡)</label>
+        <input class="fx-inp" id="fxEvMonto" type="number" min="${fxMinReserva(e,ev.tipo)}" max="${fxPrecioEv(e,ev.tipo)-1}" step="1" value="${esc(ev.monto)}" oninput="fxState.evento.monto=this.value;fxEvMontoCambio()">
+        <div class="hint" id="fxEvSaldo" style="margin-top:4px;">${fxEvSaldoTxt(e,ev)}</div>`:''}`:''}
     ${miembro?`<label class="fx-lbl" for="fxEvPin">PIN del cliente</label>
       <div style="display:flex;gap:8px;"><input class="fx-inp" id="fxEvPin" inputmode="numeric" value="${esc(ev.pin)}" placeholder="PIN"
         oninput="fxState.evento.pin=this.value;fxState.evento.cliente=null;document.getElementById('fxEvCli').innerHTML=''" onkeydown="if(event.key==='Enter')fxBuscarPin()">
@@ -2805,9 +2841,15 @@ function renderFxEventoForm(){
       <input class="fx-inp" id="fxEvTel" inputmode="tel" value="${esc(ev.tel)}" placeholder="8888-8888" oninput="fxState.evento.tel=this.value">`}`;
   const t=fxTotal();
   document.getElementById('fxTot').textContent=fmt(t);
-  const b=document.getElementById('fxBtn'); b.textContent=fxState.busy?'Cobrando…':`Cobrar ${fmt(t)}`; b.disabled=fxState.busy||!turnoActual;
+  const b=document.getElementById('fxBtn'); b.textContent=fxState.busy?'Cobrando…':`${ev.modo==='reserva'?'Reservar':'Cobrar'} ${fmt(t)}`; b.disabled=fxState.busy||!turnoActual;
   renderFxVuelto();
 }
+function fxEvSaldoTxt(e,ev){ const precio=fxPrecioEv(e,ev.tipo), m=Math.round(Number(ev.monto)||0);
+  return `Precio ${fmt(precio)} · mínimo ${fmt(fxMinReserva(e,ev.tipo))} · queda pendiente <b>${fmt(Math.max(0,precio-m))}</b>`; }
+function fxEvMontoCambio(){ const e=fxEvento(), ev=fxState.evento; if(!e||!ev) return;
+  const t=fxTotal(); document.getElementById('fxTot').textContent=fmt(t);
+  const sal=document.getElementById('fxEvSaldo'); if(sal) sal.innerHTML=fxEvSaldoTxt(e,ev);
+  const b=document.getElementById('fxBtn'); if(!fxState.busy) b.textContent=`Reservar ${fmt(t)}`; renderFxVuelto(); }
 async function fxBuscarPin(){
   const ev=fxState.evento; if(!ev) return null;
   const pin=String(ev.pin||'').trim(); if(!pin){ ev.cliente={error:'Anote el PIN.'}; renderFxTicket(); return null; }
@@ -2831,28 +2873,110 @@ async function fxCobrarEvento(){
     if(!String(ev.nombre||'').trim()) return err('Anote el nombre de la persona.');
     if(String(ev.tel||'').replace(/\D/g,'').length<8) return err('Anote un teléfono de 8 dígitos.');
   }
-  const total=fxTotal(), pago=fxState.pago;
+  const total=fxTotal(), pago=fxState.pago, reserva=ev.modo==='reserva';
+  if(reserva){ const min=fxMinReserva(e,ev.tipo), precio=fxPrecioEv(e,ev.tipo);
+    if(total<min) return err(`Para reservar se paga al menos ${fmt(min)} (${e.reserva_pct} %).`);
+    if(total>=precio) return err('Ese monto cubre todo el precio: use «Pago completo».'); }
   const rawRec=document.getElementById('fxRecibido').value, ref=document.getElementById('fxRef').value.trim();
   if(pago==='efectivo'&&rawRec!==''&&(Number(rawRec)||0)<total) return err(`El efectivo recibido no cubre el total (${fmt(total)}).`);
   if(pago==='sinpe'&&ref.replace(/\D/g,'').length<4) return err('Anote la referencia del SINPE (al menos los últimos 4 dígitos).');
   fxState.busy=true; renderFxTicket(); msg.className='msg'; msg.textContent='';
   try{
-    const r=await supaFetch('/rpc/vender_evento_caja',{method:'POST',prefer:'return=representation',body:{
+    const r=await supaFetch('/rpc/vender_evento_caja',{method:'POST',prefer:'return=representation',body:{...(reserva?{p_monto:total}:{}),
       p_cierre:turnoActual.id, p_evento:e.id, p_tipo_precio:ev.tipo, p_metodo:pago,
       p_nombre:ev.tipo==='no_miembro'?ev.nombre.trim():null, p_telefono:ev.tipo==='no_miembro'?ev.tel:null,
       p_pin:ev.tipo==='miembro'?String(ev.pin).trim():null,
       p_recibido:pago==='efectivo'&&rawRec!==''?Number(rawRec):null, p_referencia:pago==='sinpe'?ref:null }});
     const vuelto=pago==='efectivo'&&rawRec!==''?` Vuelto ${fmt((Number(rawRec)||0)-(Number(r&&r.total)||total))}.`:'';
-    msg.className='msg ok'; msg.textContent=`✓ ${(r&&r.nombre)||''} inscrito en ${e.nombre} (cobro #${r&&r.numero}, ${fmt(r&&r.total!=null?r.total:total)}, ${FX_METODOS[pago]}).${vuelto}`;
+    msg.className='msg ok'; msg.textContent=reserva
+      ? `✓ Reserva de ${(r&&r.nombre)||''} para ${e.nombre} (cobro #${r&&r.numero}, ${fmt(r&&r.total!=null?r.total:total)}, ${FX_METODOS[pago]}). Queda pendiente ${fmt(r&&r.saldo!=null?r.saldo:0)}.${vuelto}`
+      : `✓ ${(r&&r.nombre)||''} inscrito en ${e.nombre} (cobro #${r&&r.numero}, ${fmt(r&&r.total!=null?r.total:total)}, ${FX_METODOS[pago]}).${vuelto}`;
     fxState.evento=null; document.getElementById('fxRecibido').value=''; document.getElementById('fxRef').value='';
   }catch(x){ err('⚠ '+mensajeError(x)); }
   finally{ fxState.busy=false; }
   renderFxEventos(); renderFxTicket();
-  await loadFacturasDia();
+  await loadFacturasDia(); loadFxReservas();
+}
+
+// ── Reservas de eventos con saldo: abonos y cancelación del saldo (eventos_reservas.sql) ──
+function fxReserva(){ return fxState.abono&&fxState.reservas.find(r=>r.id===fxState.abono.id); }
+async function loadFxReservas(){
+  const sede=currentSede, card=document.getElementById('fxResCard'); if(!card) return;
+  let rows=[];
+  try{ rows=(await supaFetch('/eventos_reservas?estado=eq.pendiente&order=created_at.desc&limit=300&select=*,eventos_caja(nombre,fecha,sedes,metodos)'))||[]; }
+  catch(_){ rows=[]; }   // eventos_reservas.sql aún no corrió
+  if(sede!==currentSede) return;
+  fxState.reservas=rows.filter(r=>r.eventos_caja&&(r.eventos_caja.sedes||[]).includes(sede));
+  if(fxState.abono&&!fxReserva()) fxState.abono=null;
+  card.hidden=!fxState.reservas.length;
+  renderFxReservas(); renderFxTicket();
+}
+function renderFxReservas(){
+  const el=document.getElementById('fxReservas'); if(!el) return;
+  const q=(document.getElementById('fxResQ')?.value||'').trim().toLowerCase(), qd=q.replace(/\D/g,'');
+  const L=fxState.reservas.filter(r=>!q||String(r.cliente_nombre||'').toLowerCase().includes(q)||(qd&&String(r.cliente_telefono||'').includes(qd))||String(r.eventos_caja?.nombre||'').toLowerCase().includes(q));
+  document.getElementById('fxResN').textContent=fxState.reservas.length?`${fxState.reservas.length} pendiente(s)`:'';
+  el.innerHTML=L.length?L.map(r=>{ const sal=(Number(r.total)||0)-(Number(r.pagado)||0);
+    return `<div class="fx-res" aria-current="${!!fxState.abono&&fxState.abono.id===r.id}"><div class="i"><div class="n">${esc(r.cliente_nombre||'—')}</div>
+      <div class="d">${esc(r.eventos_caja?.nombre||'')} · ${esc(fechaCorta(r.eventos_caja?.fecha))}${r.cliente_telefono?' · '+esc(r.cliente_telefono):''} · pagó ${fmt(r.pagado)} de ${fmt(r.total)}</div></div>
+      <span class="s">${fmt(sal)}</span><button type="button" class="btn-ghost" style="font-size:12px;padding:5px 10px;" onclick="fxSelAbono('${r.id}')">${fxState.abono&&fxState.abono.id===r.id?'Quitar':'Abonar'}</button></div>`; }).join('')
+    :'<div class="hint" style="padding:8px 0;">Ninguna reserva coincide.</div>';
+}
+function fxSelAbono(id){
+  const m=document.getElementById('fxMsg');
+  if(Object.keys(fxState.cart).length){ m.className='msg err'; m.textContent='Cobre o vacíe los productos antes de abonar a una reserva (van en cobros separados).'; return; }
+  const r=fxState.reservas.find(x=>x.id===id); if(!r) return;
+  fxState.evento=null;
+  fxState.abono=(fxState.abono&&fxState.abono.id===id)?null:{id,monto:Math.round((Number(r.total)||0)-(Number(r.pagado)||0))};
+  m.textContent=''; renderFxEventos(); renderFxReservas(); renderFxTicket();
+}
+function renderFxAbonoForm(){
+  const r=fxReserva(), e=r.eventos_caja||{}, sal=Math.round((Number(r.total)||0)-(Number(r.pagado)||0));
+  document.getElementById('fxLines').innerHTML=`
+    <div class="fx-line" style="grid-template-columns:minmax(0,1fr) auto;">
+      <div><div class="n">🎟️ ${esc(e.nombre||'Evento')} · abono a reserva</div><div class="u">${esc(r.cliente_nombre||'')} · ${esc(fechaCorta(e.fecha))}</div></div>
+      <button type="button" class="btn-ghost" style="font-size:12px;padding:5px 10px;" onclick="fxVaciar()">Quitar</button></div>
+    <div class="hint" style="margin:6px 0 8px;">Precio ${fmt(r.total)} · pagado ${fmt(r.pagado)} · <b>saldo ${fmt(sal)}</b></div>
+    <label class="fx-lbl" for="fxAbMonto">Monto del abono (₡)</label>
+    <div style="display:flex;gap:8px;"><input class="fx-inp" id="fxAbMonto" type="number" min="1" max="${sal}" step="1" value="${esc(fxState.abono.monto)}" oninput="fxState.abono.monto=this.value;fxAbonoCambio()">
+      <button type="button" class="btn-ghost" style="white-space:nowrap;" onclick="fxState.abono.monto=${sal};renderFxTicket()">Cancelar saldo</button></div>
+    <div class="hint" id="fxAbQueda" style="margin-top:4px;">${fxAbonoQueda(sal)}</div>`;
+  fxAbonoCambio();
+}
+function fxAbonoQueda(sal){ const m=Math.round(Number(fxState.abono?.monto)||0);
+  return m>=sal?'✓ Con este pago la reserva queda <b>cancelada</b> (pagada por completo).':`Después del abono quedan pendientes <b>${fmt(Math.max(0,sal-m))}</b>.`; }
+function fxAbonoCambio(){ const r=fxReserva(); if(!r) return; const sal=Math.round((Number(r.total)||0)-(Number(r.pagado)||0));
+  const t=fxTotal(); document.getElementById('fxTot').textContent=fmt(t);
+  const q=document.getElementById('fxAbQueda'); if(q) q.innerHTML=fxAbonoQueda(sal);
+  const b=document.getElementById('fxBtn'); b.textContent=fxState.busy?'Cobrando…':`${t>=sal?'Cancelar saldo':'Abonar'} ${fmt(t)}`; b.disabled=fxState.busy||!turnoActual||t<=0;
+  renderFxVuelto(); }
+async function fxCobrarAbono(){
+  const msg=document.getElementById('fxMsg'), r=fxReserva(); if(fxState.busy||!r) return;
+  const err=t=>{ msg.className='msg err'; msg.textContent=t; };
+  if(!turnoActual) return err('Abra el turno para cobrar.');
+  const sal=Math.round((Number(r.total)||0)-(Number(r.pagado)||0)), total=fxTotal(), pago=fxState.pago;
+  if(total<=0) return err('Anote el monto del abono.');
+  if(total>sal) return err(`El abono no puede ser mayor que el saldo (${fmt(sal)}).`);
+  const rawRec=document.getElementById('fxRecibido').value, ref=document.getElementById('fxRef').value.trim();
+  if(pago==='efectivo'&&rawRec!==''&&(Number(rawRec)||0)<total) return err(`El efectivo recibido no cubre el monto (${fmt(total)}).`);
+  if(pago==='sinpe'&&ref.replace(/\D/g,'').length<4) return err('Anote la referencia del SINPE (al menos los últimos 4 dígitos).');
+  fxState.busy=true; renderFxTicket(); msg.className='msg'; msg.textContent='';
+  try{
+    const x=await supaFetch('/rpc/abonar_reserva_evento',{method:'POST',prefer:'return=representation',body:{
+      p_cierre:turnoActual.id, p_reserva:r.id, p_metodo:pago, p_monto:total,
+      p_recibido:pago==='efectivo'&&rawRec!==''?Number(rawRec):null, p_referencia:pago==='sinpe'?ref:null }});
+    const vuelto=pago==='efectivo'&&rawRec!==''?` Vuelto ${fmt((Number(rawRec)||0)-total)}.`:'';
+    const queda=Number(x&&x.saldo)||0;
+    msg.className='msg ok'; msg.textContent=`✓ ${queda>0?'Abono':'Saldo cancelado'} de ${r.cliente_nombre||''} para ${r.eventos_caja?.nombre||'el evento'} (cobro #${x&&x.numero}, ${fmt(total)}, ${FX_METODOS[pago]}).${queda>0?` Queda pendiente ${fmt(queda)}.`:' La reserva quedó pagada.'}${vuelto}`;
+    fxState.abono=null; document.getElementById('fxRecibido').value=''; document.getElementById('fxRef').value='';
+  }catch(e){ err('⚠ '+mensajeError(e)); }
+  finally{ fxState.busy=false; }
+  renderFxTicket();
+  await loadFacturasDia(); await loadFxReservas();
 }
 
 // ── Administración de eventos (solo admin) ──
-const evState={lista:[], edit:null, rep:null, repRows:[]};
+const evState={lista:[], edit:null, rep:null, repRows:[], repRes:[]};
 async function evCargar(){
   if(!esAdmin()) return;
   try{ evState.lista=(await supaFetch('/eventos_caja?order=fecha.desc&limit=100&select=*'))||[]; }
@@ -2867,7 +2991,7 @@ function renderEvChecks(metodos,sedes){
 }
 function evNuevo(){
   evState.edit=null;
-  ['evNom','evFecha','evPm','evPn'].forEach(id=>document.getElementById(id).value='');
+  ['evNom','evFecha','evPm','evPn','evRes'].forEach(id=>document.getElementById(id).value='');
   renderEvChecks(['efectivo','tarjeta','sinpe'],SEDES);
   document.getElementById('evFormTit').textContent='Nuevo evento';
   document.getElementById('evBtnGuardar').textContent='Crear evento';
@@ -2878,6 +3002,7 @@ function evEditar(id){
   evState.edit=id;
   document.getElementById('evNom').value=e.nombre; document.getElementById('evFecha').value=e.fecha;
   document.getElementById('evPm').value=e.precio_miembro; document.getElementById('evPn').value=e.precio_no_miembro;
+  document.getElementById('evRes').value=e.reserva_pct!=null?e.reserva_pct:'';
   renderEvChecks(e.metodos||[],e.sedes||[]);
   document.getElementById('evFormTit').textContent='Editar evento';
   document.getElementById('evBtnGuardar').textContent='Guardar cambios';
@@ -2894,9 +3019,12 @@ async function evGuardar(){
   if(!nombre) return err('Escriba el nombre del evento.');
   if(!fecha) return err('Elija la fecha del evento.');
   if(pmRaw===''||pnRaw===''||Number(pmRaw)<0||Number(pnRaw)<0) return err('Ponga los dos precios (miembro y no miembro).');
+  const resRaw=document.getElementById('evRes').value;
+  if(resRaw!==''&&!(Number(resRaw)>0&&Number(resRaw)<100)) return err('El % para reservar va de 1 a 99 (o déjelo vacío).');
   if(!metodos.length) return err('Elija al menos un método de pago.');
   if(!sedes.length) return err('Elija al menos una sede.');
   const body={nombre,fecha,precio_miembro:Math.round(Number(pmRaw)),precio_no_miembro:Math.round(Number(pnRaw)),metodos,sedes,updated_at:new Date().toISOString()};
+  if(resRaw!==''||evState.lista.some(x=>'reserva_pct' in x)) body.reserva_pct=resRaw===''?null:Number(resRaw);   // columna de eventos_reservas.sql
   const btn=document.getElementById('evBtnGuardar'); btn.disabled=true;
   try{
     if(evState.edit) await supaFetch(`/eventos_caja?id=eq.${evState.edit}`,{method:'PATCH',body});
@@ -2918,7 +3046,7 @@ function renderEvLista(){
     const est=!e.activo?'<span class="fx-tag">Inactivo</span>':e.fecha<hoy?'<span class="fx-tag">Pasado</span>':'<span class="fx-tag m">A la venta</span>';
     return `<tr><td><b>${esc(e.nombre)}</b><div style="margin-top:3px;">${est}</div></td><td>${esc(fechaCorta(e.fecha))}</td>
       <td class="num">${fmt(e.precio_miembro)}</td><td class="num">${fmt(e.precio_no_miembro)}</td>
-      <td>${(e.metodos||[]).map(m=>FX_METODOS[m].split(' ')[0]).join(' ')}</td>
+      <td>${(e.metodos||[]).map(m=>FX_METODOS[m].split(' ')[0]).join(' ')}${e.reserva_pct?`<div class="hint" style="font-size:11px;">Reserva ${esc(e.reserva_pct)} %</div>`:''}</td>
       <td style="font-size:12px;">${(e.sedes||[]).length===SEDES.length?'Las 4':(e.sedes||[]).map(esc).join(', ')}</td>
       <td style="white-space:nowrap;"><button class="btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="evVerRegistro('${e.id}')">Registro</button>
         <button class="btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="evEditar('${e.id}')">Editar</button>
@@ -2930,27 +3058,41 @@ async function evVerRegistro(id){
   evState.rep=id;
   const card=document.getElementById('evRepCard'); card.hidden=false;
   document.getElementById('evRepTit').textContent=`Registro · ${e.nombre} (${fechaCorta(e.fecha)})`;
-  try{ evState.repRows=(await supaFetch(`/facturas_caja?evento_id=eq.${id}&order=created_at.asc&select=numero,fecha,sede,metodo,total,estado,tipo_precio,cliente_nombre,cliente_telefono,cliente_pin,created_at,created_by`))||[]; }
+  try{ evState.repRows=(await supaFetch(`/facturas_caja?evento_id=eq.${id}&order=created_at.asc&select=*`))||[]; }
   catch(x){ evState.repRows=[]; document.getElementById('evRepLista').innerHTML=`<tr><td colspan="6" style="color:var(--red);">${esc(mensajeError(x))}</td></tr>`; return; }
+  try{ evState.repRes=(await supaFetch(`/eventos_reservas?evento_id=eq.${id}&order=created_at.asc&select=*`))||[]; }catch(_){ evState.repRes=[]; }
   const L=evState.repRows, A=L.filter(f=>f.estado!=='anulada'), sum=a=>a.reduce((s,f)=>s+(Number(f.total)||0),0);
+  // Personas: cobros completos (sin reserva) + reservas no anuladas
+  const R=evState.repRes.filter(r=>r.estado!=='anulada'), P=[...A.filter(f=>!f.reserva_id),...R];
+  const porCobrar=R.reduce((s,r)=>s+Math.max(0,(Number(r.total)||0)-(Number(r.pagado)||0)),0);
   document.getElementById('evRepTiles').innerHTML=`<div class="tile"><div class="tl">Total recaudado</div><div class="tv">${fmt(sum(A))}</div></div>
-    <div class="tile"><div class="tl">Inscritos</div><div class="tv">${A.length}</div></div>
-    <div class="tile"><div class="tl">Miembros / no miembros</div><div class="tv">${A.filter(f=>f.tipo_precio==='miembro').length} / ${A.filter(f=>f.tipo_precio!=='miembro').length}</div></div>`;
+    <div class="tile"><div class="tl">Inscritos</div><div class="tv">${P.length}</div></div>
+    <div class="tile"><div class="tl">Miembros / no miembros</div><div class="tv">${P.filter(f=>f.tipo_precio==='miembro').length} / ${P.filter(f=>f.tipo_precio!=='miembro').length}</div></div>
+    ${evState.repRes.length?`<div class="tile"><div class="tl">Por cobrar (reservas)</div><div class="tv" style="color:${porCobrar?'var(--orange)':'var(--green)'}">${fmt(porCobrar)}</div></div>`:''}`;
+  document.getElementById('evRepResWrap').hidden=!evState.repRes.length;
+  document.getElementById('evRepRes').innerHTML=evState.repRes.map(r=>{ const sal=Math.max(0,(Number(r.total)||0)-(Number(r.pagado)||0));
+    return `<tr class="${r.estado==='anulada'?'anulada':''}"><td>${esc(r.cliente_nombre||'')}${r.cliente_pin?`<div class="hint" style="font-size:11px;">PIN ${esc(r.cliente_pin)}</div>`:''}</td>
+      <td class="num" style="text-align:left;">${esc(r.cliente_telefono||'')}</td>
+      <td>${r.tipo_precio==='miembro'?'<span class="fx-tag m">Miembro</span>':'<span class="fx-tag nm">No miembro</span>'}</td><td>${esc(r.sede)}</td>
+      <td class="num">${fmt(r.total)}</td><td class="num">${fmt(r.pagado)}</td><td class="num"><b>${fmt(sal)}</b></td>
+      <td>${r.estado==='pagada'?'<span class="fx-tag m">Pagada</span>':r.estado==='anulada'?'<span class="pill dif">Anulada</span>':'<span class="fx-tag nm">Con saldo</span>'}</td></tr>`; }).join('');
   const sedes=[...new Set([...(e.sedes||[]),...A.map(f=>f.sede)])];
   const fila=(lbl,F)=>`<tr><td>${lbl}</td><td class="num">${F.length}</td>${['efectivo','tarjeta','sinpe'].map(m=>`<td class="num">${fmt(sum(F.filter(f=>f.metodo===m)))}</td>`).join('')}<td class="num"><b>${fmt(sum(F))}</b></td></tr>`;
   document.getElementById('evRepSedes').innerHTML=sedes.map(s=>fila(esc(s),A.filter(f=>f.sede===s))).join('')+fila('<b>Total</b>',A);
   document.getElementById('evRepLista').innerHTML=L.length?L.map(f=>`<tr class="${f.estado==='anulada'?'anulada':''}"><td>${esc(f.cliente_nombre||'')}${f.cliente_pin?`<div class="hint" style="font-size:11px;">PIN ${esc(f.cliente_pin)}</div>`:''}</td>
       <td class="num" style="text-align:left;">${esc(f.cliente_telefono||'')}</td>
       <td>${f.tipo_precio==='miembro'?'<span class="fx-tag m">Miembro</span>':'<span class="fx-tag nm">No miembro</span>'}</td>
-      <td>${esc(f.sede)}</td><td>${FX_METODOS[f.metodo]||esc(f.metodo)}</td><td class="num">${fmt(f.total)}${f.estado==='anulada'?' <span class="pill dif">Anulado</span>':''}</td></tr>`).join('')
+      <td>${esc(f.sede)}</td><td>${FX_METODOS[f.metodo]||esc(f.metodo)}${f.reserva_id?`<div class="hint" style="font-size:11px;">${esc(evTipoCobro(f))}</div>`:''}</td><td class="num">${fmt(f.total)}${f.estado==='anulada'?' <span class="pill dif">Anulado</span>':''}</td></tr>`).join('')
     :'<tr><td colspan="6" class="hint" style="text-align:center;padding:14px;">Aún no hay inscritos.</td></tr>';
 }
+function evTipoCobro(f){ const n=String(f.items&&f.items[0]&&f.items[0].producto||'');
+  return !f.reserva_id?'Pago completo':/cancelación/.test(n)?'Cancelación del saldo':/abono/.test(n)?'Abono':'Reserva'; }
 function evExportar(){
   const e=evState.lista.find(x=>x.id===evState.rep); if(!e) return;
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
-  const filas=[['Fecha cobro','Sede','Persona','Teléfono','PIN','Tipo','Método','Monto','Estado']].concat(
+  const filas=[['Fecha cobro','Sede','Persona','Teléfono','PIN','Tipo','Cobro','Método','Monto','Estado']].concat(
     evState.repRows.map(f=>[new Date(f.created_at).toLocaleString('es-CR'),f.sede,f.cliente_nombre,f.cliente_telefono,f.cliente_pin,
-      f.tipo_precio==='miembro'?'Miembro':'No miembro',f.metodo,Math.round(Number(f.total)||0),f.estado]));
+      f.tipo_precio==='miembro'?'Miembro':'No miembro',evTipoCobro(f),f.metodo,Math.round(Number(f.total)||0),f.estado]));
   const csv='﻿'+filas.map(r=>r.map(q).join(',')).join('\r\n');
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
   a.download=`evento_${e.nombre.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w]+/g,'_')}_${e.fecha}.csv`;
