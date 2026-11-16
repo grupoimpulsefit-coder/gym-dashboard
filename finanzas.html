@@ -48,11 +48,44 @@
     <div class="login-logo">💰</div>
     <h2>Mis Finanzas</h2>
     <p class="login-sub">Privado · solo su cuenta personal</p>
-    <div class="login-field"><label>Correo electrónico</label><input type="email" id="loginEmail" autocomplete="username"></div>
+    <div class="login-field"><label>Correo o usuario</label><input type="text" id="loginEmail" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
     <div class="login-field"><label>Contraseña</label><input type="password" id="loginPassword" autocomplete="current-password"></div>
     <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
     <div id="loginError"></div>
   </div>
+</div>
+
+<!-- ── VISTA DE UN SOLO FONDO (usuario de fondo, ej. Cucho) ── -->
+<div id="fondoApp" style="display:none;padding-bottom:40px">
+  <div class="header">
+    <div class="header-icon">🐷</div>
+    <div><h1 id="foTitulo">Mi fondo</h1><p>Gastos de este fondo y envíos</p></div>
+    <div class="header-right"><span id="foUser"></span><button class="logout-btn" onclick="salir()">Cerrar sesión</button></div>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi green"><div class="kpi-label">Disponible en el fondo</div><div class="kpi-value" id="foSaldo">—</div><div class="kpi-sub" id="foMensual"></div></div>
+    <div class="kpi orange"><div class="kpi-label">Gastado este mes</div><div class="kpi-value" id="foGastoMes">—</div></div>
+    <div class="kpi"><div class="kpi-label">Enviado este mes</div><div class="kpi-value" id="foEnvioMes">—</div></div>
+  </div>
+  <div class="section"><div class="section-title">Registrar gasto</div></div>
+  <div class="form-card">
+    <div class="form-grid">
+      <div class="f-field"><label>Monto ₡</label><input id="foMonto" type="number" inputmode="decimal" min="0" step="any"></div>
+      <div class="f-field"><label>Descripción</label><input id="foDesc" placeholder="Ej. almuerzo, gasolina"></div>
+      <div class="f-field"><label>Fecha</label><input id="foFecha" type="date"></div>
+    </div>
+    <div class="form-actions"><span class="form-msg" id="foMsg"></span><button class="btn-primary" onclick="foGasto()">Guardar gasto</button></div>
+  </div>
+  <div class="section"><div class="section-title">Enviar plata <span class="section-note" id="foEnvioNota"></span></div></div>
+  <div class="form-card">
+    <div class="form-grid">
+      <div class="f-field"><label>Monto ₡</label><input id="foEnvMonto" type="number" inputmode="decimal" min="0" step="any"></div>
+      <div class="f-field"><label>Nota (opcional)</label><input id="foEnvNota" placeholder="Ej. para el súper"></div>
+    </div>
+    <div class="form-actions"><span class="form-msg" id="foEnvMsg"></span><button class="btn-ghost" onclick="foEnviar(true)">Enviar todo</button><button class="btn-primary" onclick="foEnviar()">Enviar</button></div>
+  </div>
+  <div class="section"><div class="section-title">Movimientos</div></div>
+  <div class="lista" id="foMovs"></div>
 </div>
 
 <div id="app">
@@ -107,6 +140,7 @@
         <div class="f-field"><label>Descripción</label><input id="gDesc" placeholder="Ej. almuerzo, gasolina, Netflix"></div>
         <div class="f-field"><label>Fecha</label><input id="gFecha" type="date"></div>
         <div class="f-field"><label>Categoría</label><select id="gCat"></select></div>
+        <div class="f-field"><label>Sale de</label><select id="gFondo"></select></div>
       </div>
       <div class="form-actions"><span class="form-msg" id="gMsg"></span><button class="btn-primary" onclick="guardarGasto()">Guardar gasto</button></div>
     </div>
@@ -152,8 +186,10 @@
       <div class="form-grid">
         <div class="f-field"><label>Nombre</label><input id="fNombre" placeholder="Ej. Chloe, viaje, emergencias"></div>
         <div class="f-field"><label>Ya tiene ₡ (opcional)</label><input id="fInicial" type="number" inputmode="decimal" min="0" step="any" placeholder="0"></div>
+        <div class="f-field"><label>Recibe cada mes ₡ (opcional)</label><input id="fMensual" type="number" inputmode="decimal" min="0" step="any" placeholder="Ej. 40000"></div>
+        <div class="f-field"><label>Día del mes</label><input id="fDia" type="number" inputmode="numeric" min="1" max="28" value="1"></div>
       </div>
-      <p class="hint" style="margin-top:10px">Lo que ya tiene no se resta del disponible de la semana.</p>
+      <p class="hint" style="margin-top:10px">Lo que ya tiene y lo que recibe cada mes no se restan del disponible ni pagan diezmo. El aporte mensual empieza este mes.</p>
       <div class="form-actions"><span class="form-msg" id="fMsg"></span><button class="btn-primary" onclick="crearFondo()">Crear fondo</button></div>
     </div>
   </div>
@@ -230,12 +266,14 @@ async function api(path, opt = {}) {
   if (!r.ok) throw new Error(data?.message || 'Error ' + r.status);
   return data;
 }
+// Usuario sin "@" (ej. "cucho") → cuenta interna cucho@finanzas.local (sin correo real)
+const correoDe = v => { v = String(v || '').trim().toLowerCase(); return v.includes('@') ? v : v + '@finanzas.local'; };
 async function doLogin() {
   const b = $('loginBtn'); b.disabled = true; $('loginError').textContent = '';
   try {
     const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=password', {
       method: 'POST', headers: { apikey: SUPA_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: $('loginEmail').value.trim(), password: $('loginPassword').value }) });
+      body: JSON.stringify({ email: correoDe($('loginEmail').value), password: $('loginPassword').value }) });
     const d = await r.json();
     if (!d.access_token) throw new Error('Correo o contraseña incorrectos');
     guardarSes(d);
@@ -244,8 +282,9 @@ async function doLogin() {
   b.disabled = false;
 }
 async function entrar() {
-  const dueno = await api('rpc/fin_es_dueno', { method: 'POST', body: {} }).catch(() => false);
-  if (dueno !== true) { salir(); $('loginError').textContent = 'Esta cuenta no tiene acceso a Mis Finanzas.'; return; }
+  const acceso = await api('rpc/fin_mi_acceso', { method: 'POST', body: {} }).catch(() => null);
+  if (acceso === 'fondo') return entrarFondo();
+  if (acceso !== 'grupo') { salir(); $('loginError').textContent = 'Esta cuenta no tiene acceso a Mis Finanzas.'; return; }
   const c = claims(ses.access_token);
   yo = c.sub; $('userEmail').textContent = c.email || '';
   $('loginScreen').style.display = 'none'; $('app').style.display = 'block';
@@ -258,7 +297,7 @@ function salir() {
   try { localStorage.removeItem(KEY); } catch (_) {}
   if (ses?.access_token) fetch(SUPA_URL + '/auth/v1/logout', { method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + ses.access_token } }).catch(() => {});
   ses = null; yo = null; miembros = {}; semanas = ingresos = gastos = prestamos = ajustes = fondos = reglas = []; cfg = null;
-  $('app').style.display = 'none'; $('loginScreen').style.display = '';
+  $('app').style.display = 'none'; $('fondoApp').style.display = 'none'; $('loginScreen').style.display = '';
 }
 ['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, () => { ultimaAct = Date.now(); }, { passive: true }));
 setInterval(() => { if (ses && Date.now() - ultimaAct > IDLE_MIN * 60000) salir(); }, 30000);
@@ -269,6 +308,7 @@ const cargarFondos = async () => { fondos = await api('fin_fondos?select=*,fin_f
 const saldoFondo = f => r2(sum(f.fin_fondo_movs || [], m => m.monto));
 const cargarPrestamos = async () => { prestamos = await api('fin_prestamos?select=*,fin_prestamo_pagos(*)&order=fecha.desc,created_at.desc'); };
 async function cargar() {
+  await api('rpc/fin_fondos_al_dia', { method: 'POST', body: {} }).catch(() => {});   // aportes mensuales pendientes
   let mi;
   [ingresos, gastos, reglas, ajustes, mi] = await Promise.all([
     api('fin_ingresos?select=*&order=fecha.desc,created_at.desc'),
@@ -305,6 +345,10 @@ function render() {
   const cats = [...new Set([...CATS, ...reglas.map(r => r.categoria), ...gastos.map(g => g.categoria)])].filter(Boolean);
   $('catsList').innerHTML = cats.map(c => `<option value="${esc(c)}">`).join('');
   $('gCat').innerHTML = '<option value="">✨ Automática</option>' + cats.map(c => `<option>${esc(c)}</option>`).join('');
+  const fSel = $('gFondo').value;
+  $('gFondo').innerHTML = '<option value="">💵 Disponible de la semana</option>' +
+    fondos.map(f => `<option value="${f.id}">🐷 Fondo ${esc(f.nombre)} (${crc(saldoFondo(f))})</option>`).join('');
+  $('gFondo').value = fondos.some(f => f.id === fSel) ? fSel : '';
 
   // ── semana
   $('semLbl').textContent = `${fCorta(semana)} – ${fCorta(sumarDias(semana, 6))}`;
@@ -320,9 +364,9 @@ function render() {
 
   const gasS = gastos.filter(g => g.semana === semana);
   const porCat = {};
-  gasS.forEach(g => { porCat[g.categoria] = (porCat[g.categoria] || 0) + +g.monto; });
+  gasS.filter(g => !g.fondo_id).forEach(g => { porCat[g.categoria] = (porCat[g.categoria] || 0) + +g.monto; });
   const filasCat = Object.entries(porCat).sort((a, b) => b[1] - a[1]);
-  const max = Math.max(1, ...filasCat.map(c => c[1])), totG = sum(gasS, g => g.monto);
+  const max = Math.max(1, ...filasCat.map(c => c[1])), totG = sum(gasS.filter(g => !g.fondo_id), g => g.monto);
   $('catSem').innerHTML = filasCat.length ? filasCat.map(([c, v]) => `
     <div class="fila"><div class="grow">${esc(c)}<div class="bar"><i style="width:${(v / max * 100).toFixed(1)}%"></i></div></div>
     <span class="m">${crc(v)}</span><span class="sub">${totG ? Math.round(v / totG * 100) : 0}%</span></div>`).join('')
@@ -334,20 +378,23 @@ function render() {
     ...prestamos.filter(p => p.semana === semana).map(p => ({ ...p, t: 'pre' })),
     ...prestamos.flatMap(p => (p.fin_prestamo_pagos || []).filter(a => a.semana === semana).map(a => ({ ...a, t: 'abono', p }))),
     ...ajustes.filter(a => a.semana === semana).map(a => ({ ...a, t: 'aju' })),
-    ...fondos.flatMap(f => (f.fin_fondo_movs || []).filter(m => m.semana === semana).map(m => ({ ...m, t: 'fon', f }))),
+    ...fondos.flatMap(f => (f.fin_fondo_movs || []).filter(m => m.semana === semana && !m.gasto_id).map(m => ({ ...m, t: 'fon', f }))),
   ].sort((a, b) => (b.fecha + b.created_at).localeCompare(a.fecha + a.created_at));
   const tg = m => m.origen === 'telegram' ? ' · Telegram' : '';
   $('movSem').innerHTML = movs.length ? movs.map(m => {
     if (m.t === 'in') return `
     <div class="fila"><div class="grow">${esc(m.descripcion || 'Ingreso')}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${tg(m)}</div></div>
       <span class="m in">+${crc(m.monto)}</span><button class="x" title="Borrar" onclick="borrar('fin_ingresos','${m.id}')">✕</button></div>`;
-    if (m.t === 'out') return `
-    <div class="fila"><div class="grow">${esc(m.descripcion || 'Gasto')}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${tg(m)}</div></div>
+    if (m.t === 'out') {
+      const fo = m.fondo_id && fondos.find(f => f.id === m.fondo_id);
+      return `
+    <div class="fila"><div class="grow">${esc(m.descripcion || 'Gasto')}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${tg(m)}${fo ? ' · 🐷 pagado con ' + esc(fo.nombre) + ' (no toca la semana)' : ''}</div></div>
       <select onchange="cambiarCat('${m.id}', this.value)">${cats.map(c => `<option${c === m.categoria ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>
-      <span class="m">−${crc(m.monto)}</span><button class="x" title="Borrar" onclick="borrar('fin_gastos','${m.id}')">✕</button></div>`;
+      <span class="m${fo ? ' sub' : ''}">−${crc(m.monto)}</span><button class="x" title="Borrar" onclick="borrar('fin_gastos','${m.id}')">✕</button></div>`;
+    }
     if (m.t === 'fon') {
       const aporte = m.monto > 0;
-      return `<div class="fila"><div class="grow">🐷 ${aporte ? 'Aporte a' : 'Retiro de'} ${esc(m.f.nombre)}${m.nota ? ' · ' + esc(m.nota) : ''}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${m.afecta_saldo ? '' : ' · no mueve el disponible'}</div></div>
+      return `<div class="fila"><div class="grow">🐷 ${aporte ? 'Aporte a' : m.afecta_saldo ? (miembros[m.owner] ? 'Pasado a la semana desde' : 'Enviado a la semana desde') : 'Retiro de'} ${esc(m.f.nombre)}${m.nota ? ' · ' + esc(m.nota) : ''}<div class="sub">${fCorta(m.fecha)}${quien(m.owner)}${m.afecta_saldo ? '' : ' · no mueve el disponible'}</div></div>
       ${m.afecta_saldo ? `<span class="m ${aporte ? '' : 'in'}">${aporte ? '−' : '+'}${crc(Math.abs(m.monto))}</span>` : `<span class="m sub">${crc(Math.abs(m.monto))}</span>`}</div>`;
     }
     if (m.t === 'aju') return `
@@ -411,14 +458,15 @@ function renderFondos() {
   $('fonTot').textContent = fondos.length > 1 ? 'Total ahorrado: ' + crc(sum(fondos, saldoFondo)) : 'plata apartada que no cuenta en el disponible de la semana';
   $('fonList').innerHTML = fondos.length ? fondos.map(f => {
     const movs = (f.fin_fondo_movs || []).slice().sort((a, b) => (b.fecha + b.created_at).localeCompare(a.fecha + a.created_at));
-    return `<div class="fila"><div class="grow"><b>🐷 ${esc(f.nombre)}</b><div class="sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${quien(f.owner)}</div></div>
+    const tipo = m => m.gasto_id ? '🧾 gasto' : m.monto > 0 ? (m.periodo ? '📅 aporte mensual' : 'aporte') : m.afecta_saldo ? '➡️ pasado a la semana' : 'retiro';
+    return `<div class="fila"><div class="grow"><b>🐷 ${esc(f.nombre)}</b><div class="sub">${f.aporte_mensual ? `Recibe ${crc(f.aporte_mensual)} el día ${f.dia_mes} de cada mes · ` : ''}${movs.length} movimiento${movs.length === 1 ? '' : 's'}${quien(f.owner)}</div></div>
       <span class="m pos" style="font-size:20px">${crc(saldoFondo(f))}</span>
       <div class="abono"><input type="number" inputmode="decimal" min="0" step="any" id="fm_${f.id}" placeholder="Monto">
         <button class="btn-primary" onclick="moverFondo('${f.id}', 1)">Aportar</button>
-        <button class="btn-ghost" onclick="moverFondo('${f.id}', -1)">Retirar</button>
+        <button class="btn-ghost" onclick="moverFondo('${f.id}', -1)">➡️ Pasar a la semana</button>
         <button class="x" title="Borrar fondo" onclick="borrarFondo('${f.id}')">✕</button></div>
-      <label class="chk" style="width:100%;font-size:13px;color:var(--sec)"><input type="checkbox" id="fa_${f.id}" checked> Sale del / vuelve al disponible de la semana</label>
-      ${movs.length ? `<div class="pagos">${movs.map(m => `<div>${fCorta(m.fecha)} · ${m.monto > 0 ? 'aporte' : 'retiro'} ${crc(Math.abs(m.monto))}${m.nota ? ' · ' + esc(m.nota) : ''}${m.afecta_saldo ? '' : ' (no mueve el disponible)'}${quien(m.owner)} <button onclick="borrarMovFondo('${m.id}')">quitar</button></div>`).join('')}</div>` : ''}</div>`;
+      <label class="chk" style="width:100%;font-size:13px;color:var(--sec)"><input type="checkbox" id="fa_${f.id}"> Solo en el fondo (no tocar el disponible de la semana)</label>
+      ${movs.length ? `<div class="pagos">${movs.map(m => `<div>${fCorta(m.fecha)} · ${tipo(m)} ${crc(Math.abs(m.monto))}${m.nota && !m.periodo ? ' · ' + esc(m.nota.replace(/^gasto: /, '')) : ''}${quien(m.owner)}${m.gasto_id ? '' : ` <button onclick="borrarMovFondo('${m.id}')">quitar</button>`}</div>`).join('')}</div>` : ''}</div>`;
   }).join('') : '<div class="tbl-empty">Aún no hay fondos.</div>';
 }
 
@@ -453,10 +501,13 @@ async function guardarGasto() {
   if (!(monto > 0)) return msg('gMsg', 'Ponga un monto.', false);
   await hacer(async () => {
     const [g] = await api('fin_gastos', { method: 'POST', body: {
-      monto, descripcion: $('gDesc').value.trim() || null, fecha: $('gFecha').value || hoy(), categoria: $('gCat').value || null } });
+      monto, descripcion: $('gDesc').value.trim() || null, fecha: $('gFecha').value || hoy(), categoria: $('gCat').value || null,
+      fondo_id: $('gFondo').value || null } });
     gastos.unshift(g);
     $('gMonto').value = $('gDesc').value = ''; $('gCat').value = '';
-    await refrescar(); msg('gMsg', `✓ Guardado en ${g.categoria}`, true);
+    if (g.fondo_id) { await cargarFondos(); $('gFondo').value = ''; }
+    const fo = g.fondo_id && fondos.find(f => f.id === g.fondo_id);
+    await refrescar(); msg('gMsg', `✓ Guardado en ${g.categoria}${fo ? ' · pagado con ' + fo.nombre : ''}`, true);
   }, 'gMsg');
 }
 async function guardarIngreso() {
@@ -473,7 +524,7 @@ async function borrar(tabla, id) {
   if (!confirm('¿Borrar este movimiento?')) return;
   await hacer(async () => {
     await api(`${tabla}?id=eq.${id}`, { method: 'DELETE', prefer: 'return=minimal' });
-    if (tabla === 'fin_gastos') gastos = gastos.filter(g => g.id !== id); else ingresos = ingresos.filter(i => i.id !== id);
+    if (tabla === 'fin_gastos') { gastos = gastos.filter(g => g.id !== id); await cargarFondos(); } else ingresos = ingresos.filter(i => i.id !== id);
     await refrescar();
   });
 }
@@ -513,13 +564,16 @@ async function borrarAjuste(id) {
 }
 
 async function crearFondo() {
-  const nombre = $('fNombre').value.trim(), inicial = +$('fInicial').value || 0;
+  const nombre = $('fNombre').value.trim(), inicial = +$('fInicial').value || 0, mensual = +$('fMensual').value || 0;
+  const dia = Math.min(28, Math.max(1, Math.round(+$('fDia').value || 1)));
   if (!nombre) return msg('fMsg', 'Ponga un nombre.', false);
-  if (inicial < 0) return msg('fMsg', 'El monto inicial no puede ser negativo.', false);
+  if (inicial < 0 || mensual < 0) return msg('fMsg', 'Los montos no pueden ser negativos.', false);
   await hacer(async () => {
-    const [f] = await api('fin_fondos', { method: 'POST', body: { nombre } });
+    const [f] = await api('fin_fondos', { method: 'POST', body: { nombre,
+      aporte_mensual: mensual || null, dia_mes: dia, aporte_desde: mensual ? hoy().slice(0, 8) + '01' : null } });
     if (inicial > 0) await api('fin_fondo_movs', { method: 'POST', body: { fondo_id: f.id, monto: inicial, fecha: hoy(), nota: 'saldo inicial', afecta_saldo: false } });
-    $('fNombre').value = $('fInicial').value = '';
+    if (mensual) await api('rpc/fin_fondos_al_dia', { method: 'POST', body: {} });
+    $('fNombre').value = $('fInicial').value = $('fMensual').value = ''; $('fDia').value = 1;
     await cargarFondos(); await refrescar(); msg('fMsg', '✓ Fondo creado', true);
   }, 'fMsg');
 }
@@ -528,7 +582,7 @@ async function moverFondo(id, signo) {
   if (!(monto > 0)) return alert('Ponga el monto.');
   if (signo < 0 && monto > saldoFondo(f)) return alert('El fondo solo tiene ' + crc(saldoFondo(f)) + '.');
   await hacer(async () => {
-    await api('fin_fondo_movs', { method: 'POST', body: { fondo_id: id, monto: signo * monto, fecha: hoy(), afecta_saldo: $('fa_' + id).checked } });
+    await api('fin_fondo_movs', { method: 'POST', body: { fondo_id: id, monto: signo * monto, fecha: hoy(), afecta_saldo: !$('fa_' + id).checked } });
     await cargarFondos(); await refrescar();
   });
 }
@@ -537,6 +591,7 @@ async function borrarMovFondo(id) {
   await hacer(async () => { await api('fin_fondo_movs?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' }); await cargarFondos(); await refrescar(); });
 }
 async function borrarFondo(id) {
+  if (gastos.some(g => g.fondo_id === id)) return alert('Este fondo tiene gastos pagados con él. Bórrelos o cámbielos primero.');
   if (!confirm('¿Borrar este fondo y todos sus movimientos?')) return;
   await hacer(async () => { await api('fin_fondos?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' }); await cargarFondos(); await refrescar(); });
 }
@@ -595,6 +650,72 @@ async function generarCodigo() {
 async function desvincular() {
   if (!confirm('¿Desvincular Telegram? El bot dejará de registrar sus mensajes.')) return;
   await hacer(async () => { [cfg] = await api('fin_config?owner=eq.' + yo, { method: 'PATCH', body: { telegram_chat_id: null, telegram_codigo: null } }); renderTelegram(); });
+}
+
+/* ── vista de un solo fondo (usuario de fondo) ── */
+let miFondo = null;
+async function entrarFondo() {
+  const c = claims(ses.access_token);
+  yo = c.sub; $('foUser').textContent = String(c.email || '').replace('@finanzas.local', '');
+  $('loginScreen').style.display = 'none'; $('fondoApp').style.display = 'block';
+  $('loginPassword').value = ''; $('foFecha').value = hoy();
+  await cargarFondo();
+}
+async function cargarFondo() {
+  await api('rpc/fin_fondos_al_dia', { method: 'POST', body: {} }).catch(() => {});
+  [miFondo] = await api('fin_fondos?select=*,fin_fondo_movs(*)&order=created_at&limit=1');
+  if (!miFondo) { salir(); $('loginError').textContent = 'No se encontró su fondo.'; return; }
+  renderFondo();
+}
+function renderFondo() {
+  const f = miFondo, mes = hoy().slice(0, 7), movs = (f.fin_fondo_movs || []).slice()
+    .sort((a, b) => (b.fecha + b.created_at).localeCompare(a.fecha + a.created_at));
+  const saldo = saldoFondo(f);
+  $('foTitulo').textContent = 'Fondo ' + f.nombre;
+  $('foSaldo').textContent = crc(saldo);
+  $('foMensual').textContent = f.aporte_mensual ? `Recibe ${crc(f.aporte_mensual)} el día ${f.dia_mes} de cada mes` : '';
+  $('foGastoMes').textContent = crc(-sum(movs.filter(m => m.gasto_id && m.fecha.startsWith(mes)), m => m.monto));
+  $('foEnvioMes').textContent = crc(-sum(movs.filter(m => !m.gasto_id && m.monto < 0 && m.afecta_saldo && m.fecha.startsWith(mes)), m => m.monto));
+  $('foEnvioNota').textContent = 'llega al disponible de la semana';
+  $('foMovs').innerHTML = movs.length ? movs.map(m => {
+    const tipo = m.gasto_id ? '🧾 ' + esc((m.nota || 'gasto').replace(/^gasto: /, '')) : m.monto > 0 ? (m.periodo ? '📅 Aporte mensual' : '➕ Aporte') : '📤 Enviado' + (m.nota ? ' · ' + esc(m.nota) : '');
+    const mio = m.owner === yo;
+    return `<div class="fila"><div class="grow">${tipo}<div class="sub">${fCorta(m.fecha)}${mio ? '' : ' · registrado por ellos'}</div></div>
+      <span class="m ${m.monto > 0 ? 'in' : ''}">${m.monto > 0 ? '+' : '−'}${crc(Math.abs(m.monto))}</span>
+      ${mio ? `<button class="x" title="Borrar" onclick="foBorrar('${m.id}', ${m.gasto_id ? `'${m.gasto_id}'` : 'null'})">✕</button>` : ''}</div>`;
+  }).join('') : '<div class="tbl-empty">Sin movimientos todavía.</div>';
+}
+async function foGasto() {
+  const monto = +$('foMonto').value;
+  if (!(monto > 0)) return msg('foMsg', 'Ponga un monto.', false);
+  if (monto > saldoFondo(miFondo)) return msg('foMsg', 'El fondo solo tiene ' + crc(saldoFondo(miFondo)) + '.', false);
+  await hacer(async () => {
+    await api('fin_gastos', { method: 'POST', prefer: 'return=minimal', body: {
+      monto, descripcion: $('foDesc').value.trim() || null, fecha: $('foFecha').value || hoy(), fondo_id: miFondo.id } });
+    $('foMonto').value = $('foDesc').value = '';
+    await cargarFondo(); msg('foMsg', '✓ Gasto guardado', true);
+  }, 'foMsg');
+}
+async function foEnviar(todo) {
+  const saldo = saldoFondo(miFondo), monto = todo ? saldo : +$('foEnvMonto').value;
+  if (!(monto > 0)) return msg('foEnvMsg', todo ? 'El fondo está en ₡0.' : 'Ponga un monto.', false);
+  if (monto > saldo) return msg('foEnvMsg', 'El fondo solo tiene ' + crc(saldo) + '.', false);
+  if (!confirm(`¿Enviar ${crc(monto)} al disponible de la semana?`)) return;
+  await hacer(async () => {
+    await api('fin_fondo_movs', { method: 'POST', prefer: 'return=minimal', body: {
+      fondo_id: miFondo.id, monto: -monto, fecha: hoy(), afecta_saldo: true,
+      nota: $('foEnvNota').value.trim() || 'enviado por ' + $('foUser').textContent } });
+    $('foEnvMonto').value = $('foEnvNota').value = '';
+    await cargarFondo(); msg('foEnvMsg', '✓ Enviado', true);
+  }, 'foEnvMsg');
+}
+async function foBorrar(id, gastoId) {
+  if (!confirm('¿Borrar este movimiento?')) return;
+  await hacer(async () => {
+    if (gastoId) await api('fin_gastos?id=eq.' + gastoId, { method: 'DELETE', prefer: 'return=minimal' });
+    else await api('fin_fondo_movs?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' });
+    await cargarFondo();
+  });
 }
 
 /* ── arranque ── */
