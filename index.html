@@ -1510,6 +1510,7 @@ async function showSedePicker() {
             cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre de caja','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
             cardsEl.appendChild(makeHandoffCard('📦','Inventario','Productos por sede','Stock, precios y faltantes','#fff8e1','#b9770e','/inventario'));
             cardsEl.appendChild(makeHandoffCard('🔷','Auditoría SINPE','Facturas vs transferencias','Qué facturas tienen su SINPE y cuáles no','#e8f4ff','#0c447c','/conciliacion'));
+            portalSiPlanilla(cardsEl, makeHandoffCard);   // Mi Portal si su cuenta está ligada a su ficha de RRHH
         }
     } catch(e) {
         statusEl.textContent = '⚠️ Error al cargar sedes: ' + e.message;

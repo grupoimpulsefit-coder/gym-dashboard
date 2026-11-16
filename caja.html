@@ -95,6 +95,10 @@ table.denom tfoot td:last-child { border-radius:0 0 10px 0; }
   border:1.5px solid transparent; border-radius:9px; background:var(--fill); color:var(--label);
   padding:0 10px; min-height:36px; font-size:14px; outline:none; font-family:inherit; }
 .line input.desc { flex:1; min-width:0; }
+.pago-caja { margin:-2px 0 10px; font-size:13px; color:var(--sec); }
+.pago-caja.ok { color:var(--success); }
+.pago-caja select { width:100%; min-height:34px; border-radius:9px; border:1.5px dashed var(--brand-text); background:var(--fill); color:var(--label); padding:0 10px; font-size:13px; font-family:inherit; }
+.pago-caja .linkbtn { background:none; border:0; color:var(--brand-text); font-weight:600; cursor:pointer; padding:0 4px; font-size:13px; }
 .line input.monto { width:110px; text-align:right; font-variant-numeric:tabular-nums; }
 .line select.gcat { max-width:170px; font-weight:600; appearance:none; -webkit-appearance:none; padding-right:26px;
   background-image:linear-gradient(45deg,transparent 50%,var(--sec) 50%),linear-gradient(135deg,var(--sec) 50%,transparent 50%);
@@ -923,7 +927,7 @@ function cargarTurnoEnForm(t){
   document.getElementById('cSobreModo').value=t.sobre_modo||'no';
   window._otrosResumen=t.otros_desglose||null;
   window._informeVentas=t.informe_ventas||null; window._ventasDetalle=(t.informe_ventas&&t.informe_ventas.detalle)||null;
-  gastos=(Array.isArray(t.gastos)&&t.gastos.length?t.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros'}));
+  gastos=(Array.isArray(t.gastos)&&t.gastos.length?t.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros',pago:g.pago||null}));
   ingresos=(Array.isArray(t.ingresos)&&t.ingresos.length?t.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc||'',monto:g.monto??''}));
   // Billetes/monedas: conteo de cierre en curso (del servidor) si existe; si no, arranca con el CONTEO DE APERTURA.
   const baseDen=(t.denominaciones&&Object.keys(t.denominaciones).length)?t.denominaciones:(t.denominaciones_apertura||null);
@@ -971,9 +975,9 @@ async function openAbrirModal(){
   aperturaReferencia(num).then(ref=>{ window._aRef=ref; window._aExpected=ref?ref.esperado:null; calcAperturaEfectivo(); });
   // Inventario a ciegas (no se muestra el sistema; no se actualiza el stock)
   document.getElementById('aInvList').innerHTML='<div style="padding:12px;color:var(--muted);">Cargando inventario…</div>';
-  try{ window._invAp=await cargarInvCaja(currentSede); }catch(_){ window._invAp=[]; }
+  try{ window._invAp=ordenarInvPorCategoria(await cargarInvCaja(currentSede)); }catch(_){ window._invAp=[]; }
   const inv=window._invAp;
-  document.getElementById('aInvList').innerHTML = inv.length ? inv.map((p,i)=>`
+  document.getElementById('aInvList').innerHTML = inv.length ? inv.map((p,i)=>encabezadoCat(inv,i)+`
     <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--hair);">
       <span style="flex:1;font-size:13px;">${esc(p.producto)}</span>
       <input type="number" step="1" id="ainv_${i}" placeholder="conteo" style="width:82px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:right;font-weight:700;">
@@ -982,17 +986,34 @@ async function openAbrirModal(){
   document.getElementById('abrirModal').style.display='flex';
 }
 // Hoja imprimible para contar el inventario a mano (todas las cantidades en 0).
+// Inventario en el orden de la hoja: por categoría (como el desglose de la minita) y por nombre
+function ordenarInvPorCategoria(inv){
+  return (inv||[]).map(p=>({...p, _cat:resolverOtro(p.producto).cat}))
+    .sort((a,b)=>(CAT_ORDER.indexOf(a._cat)-CAT_ORDER.indexOf(b._cat))||String(a.producto).localeCompare(String(b.producto),'es'));
+}
+// Encabezado de categoría en las listas de conteo, cuando cambia la categoría
+function encabezadoCat(inv,i){
+  const c=inv[i]._cat; if(i>0&&inv[i-1]._cat===c) return '';
+  return `<div style="padding:8px 10px 4px;font-size:12px;font-weight:700;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;background:var(--fill);">${esc(CAT_LABEL[c]||c)}</div>`;
+}
 function imprimirListaInventario(origen){
   const inv=origen==='cierre'?(window._ccInv||[]):(window._invAp||[]);
   if(!inv.length){ alert('Esta sede no tiene productos en inventario para imprimir.'); return; }
   const fecha=todayStr(), turno=window._turnoNum||'';
-  const rows=inv.map((p,i)=>`<tr><td class="n">${i+1}</td><td>${esc(p.producto)}</td><td class="c">0</td></tr>`).join('');
+  // Agrupada por categoría (mismas categorías que el desglose de la minita), cada una ordenada por nombre
+  const grupos={}; inv.forEach(p=>{ const c=resolverOtro(p.producto).cat; (grupos[c]=grupos[c]||[]).push(p); });
+  let n=0;
+  const rows=CAT_ORDER.filter(c=>grupos[c]&&grupos[c].length).map(c=>
+    `<tr class="cat"><td colspan="3">${esc(CAT_LABEL[c]||c)} <span>(${grupos[c].length})</span></td></tr>`
+    +grupos[c].sort((a,b)=>String(a.producto).localeCompare(String(b.producto),'es'))
+      .map(p=>`<tr><td class="n">${++n}</td><td>${esc(p.producto)}</td><td class="c">0</td></tr>`).join('')).join('');
   const html=`<!doctype html><html><head><meta charset="utf-8"><title>Conteo inventario ${esc(currentSede)} ${fecha}</title>
   <style>*{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;} body{margin:22px;color:#111;}
   h1{font-size:18px;margin:0 0 2px;} .sub{font-size:12px;color:#555;margin:0 0 14px;}
   table{width:100%;border-collapse:collapse;font-size:13px;} th,td{border:1px solid #999;padding:9px 8px;text-align:left;}
   th{background:#eee;} td.n{width:34px;text-align:center;color:#777;} td.c{width:150px;text-align:center;color:#bbb;font-weight:700;}
   tr{page-break-inside:avoid;} .foot{margin-top:16px;font-size:11px;color:#555;}
+  tr.cat td{background:#ddd;font-weight:700;font-size:13.5px;padding:7px 8px;page-break-after:avoid;} tr.cat td span{font-weight:400;color:#555;}
   @media print{.noprint{display:none;}}</style></head><body>
   <h1>Hoja de conteo de inventario</h1>
   <div class="sub">Sede: <b>${esc(currentSede)}</b> · Fecha: ${fecha}${turno?` · Turno ${turno}`:''} · ${inv.length} productos</div>
@@ -1178,7 +1199,7 @@ function applyRowToForm(row){
     document.getElementById('cTransfer').value=row.total_transferencia==null?'':row.total_transferencia;
     document.getElementById('cTotalVentas').value=sinFacturado(row,'total_ventas','total')||0;
     document.getElementById('cSobreModo').value=row.sobre_modo||'no';
-    gastos=(Array.isArray(row.gastos)&&row.gastos.length?row.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros'}));
+    gastos=(Array.isArray(row.gastos)&&row.gastos.length?row.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros',pago:g.pago||null}));
     ingresos=(Array.isArray(row.ingresos)&&row.ingresos.length?row.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc||'',monto:g.monto??''}));
     window._otrosResumen=row.otros_desglose||null; renderOtrosResumen(window._otrosResumen);
     const invCambio=JSON.stringify(row.inventario_cierre||null)!==JSON.stringify(inventarioCierre||null);
@@ -1273,13 +1294,44 @@ function calc(){
 }
 
 // ── Gastos / Ingresos dinámicos ──
+// Pagos a instructores que se pagan de caja (facturas, recibos o planilla por horas ya cargados en Gastos).
+// Al anotar la salida se elige el pago: no se crea otro gasto y el pago queda marcado como pagado al guardar el cierre.
+const CATS_PAGO=['clases_grupales','instructores_planta'];
+let pagosCaja={sede:null,rows:[],cargando:false};
+async function cargarPagosCaja(){
+  const sede=currentSede; if(!sede||pagosCaja.cargando) return;
+  pagosCaja={sede,rows:pagosCaja.sede===sede?pagosCaja.rows:[],cargando:true};
+  let rows=[]; try{ rows=(await supaFetch(`/gastos?sede=eq.${encodeURIComponent(sede)}&origen=in.(xml,recibo,horas)&pago_tipo=eq.caja&pagado_at=is.null&order=fecha_clase.asc&select=id,origen,emisor,monto,fecha_clase,numero_factura`))||[]; }catch(_){ rows=[]; }
+  if(sede!==currentSede){ pagosCaja.cargando=false; return; }
+  pagosCaja={sede,rows,cargando:false}; renderGastos();
+}
+const pagoCajaTxt=p=>`${p.emisor||'—'} · ${fmt(p.monto)} · ${p.origen==='xml'?'factura …'+String(p.numero_factura||'').slice(-6):p.origen==='recibo'?'recibo':'horas'} · ${fechaCorta(p.fecha_clase)}`;
+function elegirPagoCaja(i,id){
+  const g=gastos[i]; if(!g) return;
+  const p=pagosCaja.rows.find(x=>x.id===id);
+  if(p){ g.pago=p.id; g.desc=`${p.emisor||'Instructor'} · ${p.origen==='xml'?'factura …'+String(p.numero_factura||'').slice(-6):p.origen==='recibo'?'recibo clase grupal':'planilla por horas'}`; g.monto=Math.round(Number(p.monto)||0); }
+  else g.pago=null;
+  renderGastos(); calc(); saveDraft();
+}
 function renderGastos(){
+  const editable=!!turnoActual&&turnoActual.estado==='abierto'&&window._formCierreId===turnoActual.id;
+  if(editable&&pagosCaja.sede!==currentSede&&!pagosCaja.cargando) cargarPagosCaja();
+  const usados=new Set(gastos.map(g=>g.pago).filter(Boolean));
+  const filaPago=(g,i)=>{
+    if(!CATS_PAGO.includes(g.cat)) return '';
+    if(g.pago){ const p=pagosCaja.rows.find(x=>x.id===g.pago);
+      return `<div class="pago-caja ok">✓ Pago de caja${p?': '+esc(pagoCajaTxt(p)):''}. Ya está en Gastos: al guardar el cierre queda marcado como pagado y no se registra otra vez.${editable?` <button type="button" class="linkbtn" onclick="elegirPagoCaja(${i},'')">Quitar</button>`:''}</div>`; }
+    if(!editable) return '';
+    const libres=pagosCaja.rows.filter(p=>!usados.has(p.id));
+    if(!libres.length) return '';
+    return `<div class="pago-caja"><select onchange="elegirPagoCaja(${i},this.value)"><option value="">¿Es un pago de caja pendiente? Elíjalo aquí (${libres.length})</option>${libres.map(p=>`<option value="${p.id}">${esc(pagoCajaTxt(p))}</option>`).join('')}</select></div>`;
+  };
   document.getElementById('gastosLines').innerHTML=gastos.map((g,i)=>`
     <div class="line">
-    <select class="gcat" onchange="gastos[${i}].cat=this.value;saveDraft()">${CATS_GASTO.map(c=>`<option value="${c.id}"${(g.cat||'otros')===c.id?' selected':''}>${c.label}</option>`).join('')}</select>
+    <select class="gcat" onchange="gastos[${i}].cat=this.value;if(!CATS_PAGO.includes(this.value))gastos[${i}].pago=null;renderGastos();saveDraft()">${CATS_GASTO.map(c=>`<option value="${c.id}"${(g.cat||'otros')===c.id?' selected':''}>${c.label}</option>`).join('')}</select>
     <input class="desc" placeholder="Descripción" value="${esc(g.desc)}" oninput="gastos[${i}].desc=this.value;saveDraft()">
     <input class="monto" type="number" step="1" placeholder="0" value="${g.monto}" oninput="gastos[${i}].monto=this.value;calc()">
-    <button class="btn-del" onclick="gastos.splice(${i},1);renderGastos();calc()">🗑</button></div>`).join('');
+    <button class="btn-del" onclick="gastos.splice(${i},1);renderGastos();calc()">🗑</button></div>${filaPago(g,i)}`).join('');
 }
 function addGasto(){gastos.push({desc:'',monto:'',cat:'otros'});renderGastos();}
 function renderIngresos(){
@@ -2040,10 +2092,11 @@ async function openConteoCierre(){
   let inv=[];
   try{ inv=await cargarInvCaja(currentSede); }
   catch(e){ err.textContent='No se pudo cargar el inventario: '+e.message; }
+  inv=ordenarInvPorCategoria(inv);
   window._ccInv=inv;
   list.innerHTML = inv.length ? inv.map((p,i)=>{
     const prev=inventarioCierre&&inventarioCierre[p.producto]; const val=(prev&&prev.contado!=null)?prev.contado:'';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--hair);">
+    return encabezadoCat(inv,i)+`<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--hair);">
       <span style="flex:1;font-size:13px;">${esc(p.producto)}</span>
       <input type="number" step="1" id="cc_${i}" value="${val}" placeholder="conteo" style="width:82px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:right;font-weight:700;"></div>`;
   }).join('') : '<div style="padding:12px;color:var(--muted);">Esta sede no tiene productos en inventario.</div>';
@@ -2168,7 +2221,7 @@ async function cerrarTurno(estado){
   const conciliado=c.efectivo+c.tarjeta+c.sinpe+c.transfer+sobreOut+c.totGastosDia-c.totIngresosDia-c.cajaIni;
   const diferencia=Math.round(c.totalVentas-conciliado);
   const denominaciones={}; DENOMS.forEach(d=>denominaciones[d]=Number(document.getElementById('den_'+d).value)||0);
-  const gastosLimpios=gastos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Gasto de caja',monto:Number(g.monto)||0,cat:g.cat||'otros'}));
+  const gastosLimpios=gastos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Gasto de caja',monto:Number(g.monto)||0,cat:g.cat||'otros',...(g.pago&&CATS_PAGO.includes(g.cat)?{pago:g.pago}:{})}));
   const ingresosLimpios=ingresos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Ingreso',monto:Number(g.monto)||0}));
   const payload={
     membresias:c.membresias, total_ventas:c.totalVentas,
@@ -2200,7 +2253,16 @@ async function cerrarTurno(estado){
   try{
     await supaFetch(`/cierres_caja?id=eq.${turnoActual.id}`,{method:'PATCH',body:payload});
     // Los depósitos al banco salen de caja (cuentan para el cuadre) pero NO son gastos → no van al módulo de Gastos.
-    const gastosParaModulo=gastosLimpios.filter(g=>g.cat!=='deposito');
+    // Los pagos de caja a instructores ya están en Gastos (factura, recibo u horas): se marcan pagados, no se repiten.
+    const gastosParaModulo=gastosLimpios.filter(g=>g.cat!=='deposito'&&!g.pago);
+    const idsPago=gastosLimpios.map(g=>g.pago).filter(Boolean);
+    let pagoMsg='';
+    if(idsPago.length){
+      try{ const n=await supaFetch('/rpc/marcar_pago_caja',{method:'POST',body:{p_ids:idsPago},prefer:'return=representation'});
+        pagoMsg=` 💸 ${Number(n)||0} pago(s) de caja a instructores marcados como pagados.`; }
+      catch(pe){ pagoMsg=' ⚠ No se pudieron marcar los pagos de caja como pagados: '+pe.message; }
+      pagosCaja.sede=null;
+    }
     if(gastosParaModulo.length){
       const d=parseFecha(fecha);
       const filas=gastosParaModulo.map(g=>({ sede:currentSede, categoria:g.cat||'otros', fecha_clase:fecha, mes:mesEt(d), mes_orden:mesOrd(d),
@@ -2216,8 +2278,8 @@ async function cerrarTurno(estado){
     }
     else if(!esFinal&&sr) sinpeMsg=' 🔷 El SINPE se conciliará en el cierre final del día.';
     stopLivePoll();   // turno cerrado → detener refresco en vivo
-    const nDep=gastosLimpios.length-gastosParaModulo.length;
-    msg.className='msg ok'; msg.textContent=(estado==='final'?'⏹️ Turno cerrado (final).':'⏸️ Cierre parcial guardado. Puede abrir el siguiente turno.')+(gastosParaModulo.length?` ${gastosParaModulo.length} gasto(s) enviados a Gastos.`:'')+(nDep?` 🏦 ${nDep} depósito(s) (no van a Gastos).`:'')+sinpeMsg;
+    const nDep=gastosLimpios.filter(g=>g.cat==='deposito').length;
+    msg.className='msg ok'; msg.textContent=(estado==='final'?'⏹️ Turno cerrado (final).':'⏸️ Cierre parcial guardado. Puede abrir el siguiente turno.')+(gastosParaModulo.length?` ${gastosParaModulo.length} gasto(s) enviados a Gastos.`:'')+(nDep?` 🏦 ${nDep} depósito(s) (no van a Gastos).`:'')+pagoMsg+sinpeMsg;
     await loadCierres();
   }catch(e){ msg.className='msg err'; msg.textContent='⚠️ '+e.message; }
   finally{ btn.disabled=false; btn.textContent=bt0; }
@@ -2308,7 +2370,7 @@ function cargarCierre(id){
   document.getElementById('cTotalVentas').value=sinFacturado(c,'total_ventas','total')||0;
   document.getElementById('cSobreModo').value=c.sobre_modo||(c.sobre_retirado?'ya':'retira');
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=(c.denominaciones&&c.denominaciones[d])||0;});
-  gastos=(c.gastos&&c.gastos.length?c.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc,monto:g.monto,cat:g.cat||'otros'}));
+  gastos=(c.gastos&&c.gastos.length?c.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc,monto:g.monto,cat:g.cat||'otros',pago:g.pago||null}));
   ingresos=(c.ingresos&&c.ingresos.length?c.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc,monto:g.monto}));
   renderGastos(); renderIngresos();
   fotoDatafono=null; document.getElementById('fileFoto').value='';

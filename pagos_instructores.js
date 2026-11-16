@@ -17,7 +17,7 @@ let piTarifas = [];        // tarifas activas
 let piTarifasTodas = [];   // incluye desactivadas (configuración)
 let piHoraTarifas = [];      // tarifas por hora (planilla por horas)
 let piHoraTarifasTodas = [];
-const PI_VISTAS = ['xml', 'aprobar', 'horas', 'pagos', 'config'];
+const PI_VISTAS = ['xml', 'recibos', 'aprobar', 'horas', 'pagos', 'config'];
 let piFiscal = {};         // sede → { razon_social, cedula_juridica }
 let piF = null;            // factura en carga
 let piSemana = null;       // lunes de la semana que se muestra en «Pago de la semana»
@@ -44,6 +44,7 @@ function piMostrar(tab) {
   if (tab === 'xml') { piRenderCarga(); if (piF) piValidar(); }
   if (tab === 'aprobar') piCargarPendientes();
   if (tab === 'horas') phCargar();
+  if (tab === 'recibos') rcCargar();
   if (tab === 'pagos') piCargarPagos();
   if (tab === 'config') piCargarConfig();
 }
@@ -53,6 +54,14 @@ async function piInit() {
   document.getElementById('piTabAprobar').style.display = esAdmin() ? '' : 'none';
   await piCargarCatalogos();
   if (esAdmin()) { piContarPendientes(); phContar(); }
+  // Enlaces desde la app móvil: /gastos?aprobar=<id> abre esa factura por aprobar; ?vista=recibos abre esa pestaña
+  const q = new URLSearchParams(location.search), aprobar = q.get('aprobar'), vista = q.get('vista');
+  if (aprobar || vista) {
+    q.delete('aprobar'); q.delete('vista');
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
+    if (aprobar && esAdmin()) piRevisarPendientePorId(aprobar);
+    else if (vista && PI_VISTAS.includes(vista) && document.querySelector(`#piTabs .tab[data-tab="${vista}"]`)?.style.display !== 'none') piMostrar(vista);
+  }
 }
 
 async function piContarPendientes() {
@@ -78,6 +87,7 @@ function piRefrescar() {
   if (piTab === 'xml') { piRenderCarga(); if (piF) piValidar(); }
   if (piTab === 'pagos') piCargarPagos();
   if (piTab === 'horas') { phCambios = false; phCargar(); }
+  if (piTab === 'recibos') rcCargar();
 }
 
 // Recarga la lista de Gastos sin ocultar la pantalla actual
@@ -615,11 +625,13 @@ function piCopiarEnlace(btn) {
 
 // Abre la factura en la pantalla de revisión (la misma de «Cargar factura XML»)
 async function piRevisarPendiente(i) {
-  const resumen = piPorAprobar[i]; if (!resumen) return;
+  const resumen = piPorAprobar[i]; if (resumen) return piRevisarPendientePorId(resumen.id);
+}
+async function piRevisarPendientePorId(id) {
   let p;
-  try { p = ((await supaFetch(`/facturas_pendientes?id=eq.${encodeURIComponent(resumen.id)}&select=*`)) || [])[0]; }
+  try { p = ((await supaFetch(`/facturas_pendientes?id=eq.${encodeURIComponent(id)}&select=*`)) || [])[0]; }
   catch (e) { alert('No se pudo abrir: ' + e.message); return; }
-  if (!p || p.estado !== 'pendiente') { alert('Esta factura ya fue revisada.'); piCargarPendientes(); return; }
+  if (!p || p.estado !== 'pendiente') { alert('Esta factura ya fue revisada.'); piMostrar('aprobar'); return; }
   let x;
   try { x = piParseXML(p.xml); } catch (e) { alert('El XML guardado no se pudo leer: ' + e.message); return; }
   // La factura se revisa en su sede
@@ -660,7 +672,7 @@ async function piRechazar() {
 }
 
 // ══ 3) Pago de la semana ══════════════════════════════════════════════════
-const PI_COLS = 'id,origen,sede,fecha_clase,emisor,emisor_cedula,instructor_id,numero_factura,monto,monto_esperado,nota_diferencia,banco_pago,cuenta_pago,metodo_pago,pago_tipo,dia_pago,cargado_at,pagado_at,pagado_por,detalle_clases';
+const PI_COLS = 'id,origen,sede,fecha_clase,emisor,emisor_cedula,instructor_id,numero_factura,clave_hacienda,monto,monto_esperado,nota_diferencia,banco_pago,cuenta_pago,metodo_pago,pago_tipo,dia_pago,cargado_at,pagado_at,pagado_por,detalle_clases';
 
 function piSemanaInicial() {
   const hoy = piAhoraCR();
@@ -676,7 +688,7 @@ async function piTraerPagos(sedes, lun, dom) {
   const filtroSede = sedes.length === 1
     ? `sede=eq.${encodeURIComponent(sedes[0])}`
     : `sede=in.(${sedes.map(s => encodeURIComponent('"' + s + '"')).join(',')})`;
-  return supaFetchTodo(`/gastos?origen=in.(xml,horas)&${filtroSede}`
+  return supaFetchTodo(`/gastos?origen=in.(xml,horas,recibo)&${filtroSede}`
     + `&or=(and(dia_pago.gte.${lun},dia_pago.lte.${dom}),and(pago_tipo.eq.caja,fecha_clase.gte.${lun},fecha_clase.lte.${dom}))`
     + `&select=${PI_COLS}&order=emisor.asc,id.asc`);
 }
@@ -688,7 +700,7 @@ async function piCargarPagos() {
   const lun = piYMD(piSemana), dom = piYMD(piSumarDias(piSemana, 6));
   try {
     piPagos = await piTraerPagos([currentSede], lun, dom);
-    piAtrasados = (await supaFetch(`/gastos?origen=in.(xml,horas)&sede=eq.${encodeURIComponent(currentSede)}&pagado_at=is.null&dia_pago=lt.${lun}&select=id,monto,dia_pago`)) || [];
+    piAtrasados = (await supaFetch(`/gastos?origen=in.(xml,horas,recibo)&sede=eq.${encodeURIComponent(currentSede)}&pagado_at=is.null&dia_pago=lt.${lun}&select=id,monto,dia_pago`)) || [];
     piRenderPagos();
   } catch (e) {
     v.innerHTML = `<div class="empty-state" style="display:block;">⚠️ No se pudieron cargar los pagos: ${esc(e.message)}`
@@ -724,7 +736,11 @@ function piResumenClases(rows) {
   return Object.entries(t).map(([k, n]) => `${n} ${k}`).join(' · ') || '—';
 }
 function piEstado(gr, caja) {
-  if (caja) return { txt: 'Caja', pill: '' };
+  if (caja) {
+    const pagC = gr.rows.filter(r => r.pagado_at);
+    if (pagC.length === gr.rows.length) return { txt: 'Pagado de caja ' + piHora(pagC.map(r => r.pagado_at).sort().pop()), pill: 'ok', pagado: true };
+    return { txt: pagC.length ? `Caja · ${pagC.length}/${gr.rows.length} pagados` : 'Caja · pendiente', pill: '' };
+  }
   const pag = gr.rows.filter(r => r.pagado_at);
   if (pag.length === gr.rows.length) {
     const ult = pag.map(r => r.pagado_at).sort().pop();
@@ -770,6 +786,14 @@ function piRenderPagos() {
           <b>${fmtCRC(r.monto)}</b>
           <span class="hint">${r.pagado_at ? `Pagada ${esc(piHora(r.pagado_at))}${r.pagado_por ? ' por ' + esc(r.pagado_por) : ''}` : 'Pendiente'}</span>
           <button class="btn-edit" onclick="phReciboGasto(piGrupos[${i}].rows.find(x => x.id === '${r.id}'))">📄 Recibo</button>
+        </div>` : r.origen === 'recibo' ? `<div style="display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:4px 0;">
+          <span class="pill info" title="Pago con recibo (sin factura)">Clase grupal</span>
+          <span>Clases ${esc([...new Set((r.detalle_clases || []).map(c => piFechaCorta(c.fecha)))].join(', ') || piFechaCorta(r.fecha_clase))}</span>
+          <span>${esc(piResumenClases([r]))}</span>
+          <b>${fmtCRC(r.monto)}</b>
+          ${r.nota_diferencia ? `<span style="color:var(--orange);">Nota: ${esc(r.nota_diferencia)}</span>` : ''}
+          <span class="hint">Registrado ${esc(piHora(r.cargado_at))}${r.pagado_at ? ` · pagado ${esc(piHora(r.pagado_at))}${r.pagado_por ? ' por ' + esc(r.pagado_por) : ''}` : ''}</span>
+          <button class="btn-edit" onclick="rcReciboPDF([piGrupos[${i}].rows.find(x => x.id === '${r.id}')])">📄 Recibo</button>
         </div>` : `<div style="display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:4px 0;">
           <span>Factura …${esc(String(r.numero_factura || '').slice(-6))}</span>
           <span>Clase ${esc(piFechaCorta(r.fecha_clase))}</span>
@@ -778,6 +802,7 @@ function piRenderPagos() {
           ${r.nota_diferencia ? `<span style="color:var(--orange);">Nota: ${esc(r.nota_diferencia)}</span>` : ''}
           <span class="hint">Cargada ${esc(piHora(r.cargado_at))}${r.pagado_at ? ` · pagada ${esc(piHora(r.pagado_at))}${r.pagado_por ? ' por ' + esc(r.pagado_por) : ''}` : ''}</span>
           <button class="btn-edit" onclick="piDescargarXml('${r.id}')">⬇️ XML</button>
+          ${piBotonClave(r.clave_hacienda)}
         </div>`).join('')}
       </td></tr>` : '';
     return `<tr>
@@ -826,8 +851,8 @@ function piRenderPagos() {
       </table>
     </div></div>
     <div class="form-actions" style="padding:0 var(--gut) 24px;">
-      <div class="hint" style="margin-right:auto;">El Excel trae una hoja por sede, solo con lo necesario para pagar: instructor, cédula, cuenta o SINPE y monto.</div>
-      <button class="btn-primary" onclick="piExcel()">⬇️ Excel de pagos por sede</button>
+      <div class="hint" style="margin-right:auto;">Se descarga un Excel por sede, con lo que pide el protocolo de pagos: emisor, n.º de factura, nombre a quien se transfiere, cuenta o SINPE y monto.</div>
+      <button class="btn-primary" onclick="piExcel()">⬇️ Excel de pagos (uno por sede)</button>
     </div>`;
 }
 
@@ -858,7 +883,31 @@ async function piDescargarXml(id) {
   } catch (e) { alert('No se pudo descargar: ' + e.message); }
 }
 
-// Excel de pagos: una hoja por sede, solo lo necesario para pagar
+// Excel de pagos: un archivo por sede, solo lo necesario para pagar
+// Excel: el emisor es el nombre que viene en la factura; sin factura, el instructor
+function piEmisorExcel(gr) {
+  const em = [...new Set(gr.rows.filter(r => r.origen === 'xml' && r.emisor).map(r => r.emisor))];
+  return em.length ? em.join(' / ') : gr.nombre;
+}
+// N.º de factura electrónica (consecutivo de 20 dígitos); recibos y horas no tienen
+function piFacturasExcel(gr) {
+  const nums = gr.rows.map(r => r.origen === 'xml' ? (r.numero_factura || '—')
+    : r.origen === 'recibo' ? 'Clase grupal' : 'Planilla por horas');
+  return [...new Set(nums)].join(', ');
+}
+
+// Botón para copiar la clave de Hacienda (50 dígitos) sin mostrarla en pantalla
+function piBotonClave(clave) {
+  const c = String(clave || '').replace(/\D/g, '');
+  return c ? `<button class="btn-edit" data-clave="${c}" title="Copia la clave de 50 dígitos de la factura electrónica" onclick="event.stopPropagation(); piCopiarClave(this)">📋 Copiar clave</button>` : '';
+}
+function piCopiarClave(btn) {
+  const c = btn.dataset.clave, txt = btn.textContent;
+  const listo = () => { btn.textContent = '✓ Clave copiada'; setTimeout(() => { btn.textContent = txt; }, 1800); };
+  const manual = () => prompt('Copie la clave de la factura:', c);
+  try { navigator.clipboard.writeText(c).then(listo, manual); } catch (_) { manual(); }
+}
+
 async function piExcel() {
   const sedes = esAdmin() ? SEDES : (currentSedes.length ? currentSedes : [currentSede]);
   const lun = piYMD(piSemana), dom = piYMD(piSumarDias(piSemana, 6));
@@ -868,10 +917,12 @@ async function piExcel() {
   const etiqueta = piEtiquetaDia(piDia);
   if (!rows.length) { alert(`No hay pagos para ${etiqueta}.`); return; }
   const caja = piDia === 'caja';
-  const wb = XLSX.utils.book_new();
-  sedes.forEach(sede => {
+  const fechaArchivo = caja ? piYMD(piSumarDias(piSemana, 5)) : piYMD(piSumarDias(piSemana, piDia === 'vie' ? 4 : 2));
+  const diaArchivo = caja ? 'caja' : piDia === 'vie' ? 'viernes' : 'miercoles';
+  // Un archivo de Excel por sede (Pinares, Natación, …), cada uno solo con sus pagos
+  const conPagos = sedes.filter(sede => rows.some(g => g.sede === sede));
+  conPagos.forEach((sede, n) => {
     const rs = rows.filter(g => g.sede === sede);
-    if (!rs.length) return;
     const grupos = piAgrupar(rs);
     const fis = piFiscal[sede];
     const aoa = [
@@ -879,22 +930,38 @@ async function piExcel() {
       [fis?.razon_social ? `${fis.razon_social}${fis.cedula_juridica ? ' · ' + fis.cedula_juridica : ''}` : ''],
       [`Generado: ${new Date().toLocaleString('es-CR')}`],
       [],
-      ['Instructor', 'Cédula', 'Forma de pago', 'Cuenta / SINPE', 'Detalle', 'Monto', 'Estado'],
+      ['Emisor', 'N.º de factura electrónica', 'Nombre a quien se transfiere', 'Forma de pago', 'Cuenta / SINPE', 'Monto'],
     ];
-    const filasMonto = [];
-    grupos.forEach(gr => {
-      aoa.push([gr.nombre, gr.cedula, gr.banco, gr.cuenta, piResumenClases(gr.rows), Math.round(gr.total), piEstado(gr, caja).txt]);
-      filasMonto.push(aoa.length - 1);
-    });
-    aoa.push(['TOTAL', '', '', '', '', Math.round(grupos.reduce((s, g) => s + g.total, 0)), '']);
-    filasMonto.push(aoa.length - 1);
+    const ENC = aoa.length - 1, COLS = 6, MONTO = 5;
+    grupos.forEach(gr => aoa.push([piEmisorExcel(gr), piFacturasExcel(gr), gr.nombre, gr.banco, gr.cuenta, Math.round(gr.total)]));
+    aoa.push(['TOTAL', '', '', '', '', Math.round(grupos.reduce((s, g) => s + g.total, 0))]);
+    const TOT = aoa.length - 1;
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 30 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 30 }, { wch: 14 }, { wch: 20 }];
-    filasMonto.forEach(r => { const ref = XLSX.utils.encode_cell({ r, c: 5 }); if (ws[ref]) ws[ref].z = '#,##0'; });
+    ws['!cols'] = [{ wch: 32 }, { wch: 26 }, { wch: 32 }, { wch: 16 }, { wch: 28 }, { wch: 14 }];
+    ws['!merges'] = [0, 1, 2].map(r => ({ s: { r, c: 0 }, e: { r, c: COLS - 1 } }));
+    // Formato: título en negrita, encabezado con color, cuadrícula en toda la tabla y montos con miles
+    const borde = { style: 'thin', color: { rgb: '9AA5B1' } };
+    const cuadro = { top: borde, bottom: borde, left: borde, right: borde };
+    const celda = (r, c) => { const ref = XLSX.utils.encode_cell({ r, c }); return ws[ref] || (ws[ref] = { t: 's', v: '' }); };
+    celda(0, 0).s = { font: { bold: true, sz: 14 } };
+    for (let r = ENC; r <= TOT; r++) for (let c = 0; c < COLS; c++) {
+      const x = celda(r, c);
+      x.s = { border: cuadro, alignment: { vertical: 'center', wrapText: true } };
+      if (r === ENC) x.s = { ...x.s, font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { patternType: 'solid', fgColor: { rgb: '1F4E79' } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } };
+      else if (r === TOT) x.s = { ...x.s, font: { bold: true }, fill: { patternType: 'solid', fgColor: { rgb: 'DDEBF7' } } };
+      if (c === MONTO && r > ENC) x.z = '#,##0';
+    }
+    ws['!rows'] = []; ws['!rows'][ENC] = { hpt: 22 };
+    const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sede.replace(/[\\/?*[\]:]/g, '').slice(0, 31));
+    const archivo = `pago_instructores_${phSlug(sede)}_${diaArchivo}_${fechaArchivo}.xlsx`;
+    // Un poco de espera entre archivos: algunos navegadores bloquean descargas seguidas
+    setTimeout(() => XLSX.writeFile(wb, archivo), n * 700);
   });
-  const fechaArchivo = caja ? piYMD(piSumarDias(piSemana, 5)) : piYMD(piSumarDias(piSemana, piDia === 'vie' ? 4 : 2));
-  XLSX.writeFile(wb, `pago_instructores_${caja ? 'caja' : piDia === 'vie' ? 'viernes' : 'miercoles'}_${fechaArchivo}.xlsx`);
+  if (conPagos.length > 1) {
+    const aviso = document.querySelector('#vista_pagos .form-actions .hint');
+    if (aviso) aviso.textContent = `Se descargaron ${conPagos.length} archivos, uno por sede (${conPagos.join(', ')}). Si el navegador pregunta, permita descargar varios archivos.`;
+  }
 }
 
 // ══ 4) Configuración (solo admin) ══════════════════════════════════════════

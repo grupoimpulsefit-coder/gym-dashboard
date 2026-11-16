@@ -56,6 +56,8 @@
     <p id="hSub">Empleados, salarios y vacaciones</p>
   </div>
   <div class="header-right">
+    <button class="logout-btn" id="btnMiPortal" style="display:none;margin-right:8px;" onclick="verMiPortal()">🌴 Mi Portal</button>
+    <button class="logout-btn" id="btnVolverRRHH" style="display:none;margin-right:8px;" onclick="volverRRHH()">← Recursos Humanos</button>
     <span>👤 <span id="userNombre">—</span></span>
     <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
   </div>
@@ -106,7 +108,8 @@
 
   <div class="tab-panel" id="panelVac">
     <div class="section"><div class="section-title">🌴 Solicitudes de días libres (vacaciones o sin goce)
-      <select id="vacFiltro" class="ui" onchange="renderSolicitudes()" style="margin-left:auto;">
+      <button class="btn-primary" style="margin-left:auto;" onclick="abrirRegistrarDias()">＋ Registrar días</button>
+      <select id="vacFiltro" class="ui" onchange="renderSolicitudes()">
         <option value="pendiente">Pendientes</option><option value="all">Todas</option>
         <option value="aprobada">Aprobadas</option><option value="rechazada">Rechazadas</option>
       </select></div></div>
@@ -256,6 +259,34 @@
   </div>
 </div>
 
+<!-- Modal registrar días libres a un empleado (admin) -->
+<div class="modal-back" id="regVacModal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-head">🌴 Registrar días libres</div>
+    <div class="modal-body">
+      <div class="hint" style="margin-bottom:10px;">Para días que el empleado ya tomó o que ya se acordaron: quedan aprobados de una vez. Sus propias vacaciones pídalas desde 🌴 Mi Portal; las aprueba otro administrador.</div>
+      <div class="form-grid">
+        <div class="f-field full"><label>Empleado <span class="req">*</span></label><select id="rvEmp" onchange="rvInfo()"></select></div>
+        <div class="f-field full"><label>Tipo <span class="req">*</span></label>
+          <select id="rvTipo" onchange="rvInfo()">
+            <option value="vacaciones">🌴 Vacaciones (rebaja del saldo)</option>
+            <option value="sin_goce">📅 Libre sin goce de salario (se descuenta en Planilla)</option>
+          </select></div>
+        <div class="f-field"><label>Desde <span class="req">*</span></label><input type="date" id="rvDesde" onchange="rvCalcDias()"></div>
+        <div class="f-field"><label>Hasta <span class="req">*</span></label><input type="date" id="rvHasta" onchange="rvCalcDias()"></div>
+        <div class="f-field"><label>Días <span class="req">*</span></label><input type="number" id="rvDias" min="0.5" step="0.5" oninput="rvInfo()"></div>
+        <div class="f-field full"><label>Motivo / nota (opcional)</label><input type="text" id="rvMotivo" placeholder="Ej. vacaciones de fin de año"></div>
+      </div>
+      <div class="hint" id="rvHint" style="margin-top:8px;"></div>
+      <div id="rvErr" style="color:var(--warn);font-size:13px;min-height:16px;margin-top:8px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" type="button" onclick="document.getElementById('regVacModal').classList.remove('open')">Cancelar</button>
+      <button class="btn-primary" id="rvBtn" type="button" onclick="guardarRegistroDias()">Registrar como aprobados</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal liquidación (admin) -->
 <div class="modal-back" id="liqModal">
   <div class="modal">
@@ -322,7 +353,7 @@ async function supaFetch(path, opts = {}) {
 }
 
 // Portal: empleado, y el personal por sede que está en planilla (su cuenta ligada a una ficha)
-const ROLES_PERMITIDOS = ['admin_sedes', 'empleado', 'admin_sucursal', 'recepcion', 'coordinador', 'instructor'];
+const ROLES_PERMITIDOS = ['admin_sedes', 'admin_g', 'empleado', 'admin_sucursal', 'recepcion', 'coordinador', 'instructor'];
 const SEDES = ['3 Ríos', 'Natación', 'Pinares', 'Sabanilla'];
 const SEDE_META = { '3 Ríos':{icon:'🌊'}, 'Natación':{icon:'🏊'}, 'Pinares':{icon:'🌲'}, 'Sabanilla':{icon:'🏙️'} };
 
@@ -419,6 +450,10 @@ function arrancar(){
 
 // ══ ADMIN ══
 function initAdmin(){
+  document.getElementById('btnMiPortal').style.display = '';
+  document.getElementById('btnVolverRRHH').style.display = 'none';
+  document.getElementById('portal').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
   document.getElementById('hTitle').textContent = 'Recursos Humanos';
   document.getElementById('hSub').textContent = 'Empleados, salarios y vacaciones';
   document.getElementById('adminView').style.display='block';
@@ -513,8 +548,10 @@ function renderSolicitudes(){
   if (!rows.length){ tb.innerHTML=`<tr><td colspan="9" class="tbl-empty">Sin solicitudes ${filtro==='all'?'':'('+filtro+')'}.</td></tr>`; return; }
   rows.forEach(s=>{
     const badge = s.estado==='aprobada'?'<span class="pill apr">Aprobada</span>':s.estado==='rechazada'?'<span class="pill rec">Rechazada</span>':'<span class="pill pend">Pendiente</span>';
+    const propia = currentUserId && (s.user_id === currentUserId || empleados.find(e=>e.id===s.empleado_id)?.user_id === currentUserId);
     const acciones = s.estado==='pendiente'
-      ? `<button class="btn-ok" onclick="resolver('${s.id}','aprobada')">✓ Aprobar</button> <button class="btn-no" onclick="resolver('${s.id}','rechazada')">✕ Rechazar</button>`
+      ? (propia ? '<span class="hint">Su solicitud: la aprueba otro administrador</span>'
+        : `<button class="btn-ok" onclick="resolver('${s.id}','aprobada')">✓ Aprobar</button> <button class="btn-no" onclick="resolver('${s.id}','rechazada')">✕ Rechazar</button>`)
       : (s.comentario_admin ? esc(s.comentario_admin) : '—');
     const tr = tb.insertRow();
     tr.innerHTML = `
@@ -543,7 +580,55 @@ async function resolver(id, estado){
   try {
     await supaFetch(`/vacaciones_solicitudes?id=eq.${encodeURIComponent(id)}`, { method:'PATCH', body:{ estado, comentario_admin: comentario, resuelto_por: currentEmail, resuelto_at: new Date().toISOString() } });
     await loadAdmin();
-  } catch(e){ alert('No se pudo actualizar: ' + e.message); }
+  } catch(e){ alert('No se pudo actualizar: ' + mensajeError(e)); }
+}
+
+// ── Registrar días libres ya aprobados a un empleado (admin) ──
+function abrirRegistrarDias(){
+  const activos = empleados.filter(e => e.activo !== false && e.user_id !== currentUserId);
+  document.getElementById('rvEmp').innerHTML = '<option value="">— Seleccione —</option>' + activos.map(e=>`<option value="${esc(e.id)}">${esc(e.nombre)}</option>`).join('');
+  ['rvDesde','rvHasta','rvDias','rvMotivo'].forEach(id=>{ document.getElementById(id).value=''; });
+  document.getElementById('rvTipo').value = 'vacaciones';
+  document.getElementById('rvErr').textContent = '';
+  rvInfo();
+  document.getElementById('regVacModal').classList.add('open');
+}
+function rvCalcDias(){
+  const a = parseFecha(document.getElementById('rvDesde').value), b = parseFecha(document.getElementById('rvHasta').value);
+  if (a && b && b >= a) document.getElementById('rvDias').value = Math.round((b-a)/864e5)+1;
+  rvInfo();
+}
+function rvInfo(){
+  const emp = empleados.find(e=>e.id===document.getElementById('rvEmp').value);
+  const sg = document.getElementById('rvTipo').value === 'sin_goce', dias = Number(document.getElementById('rvDias').value)||0;
+  const h = document.getElementById('rvHint');
+  if (!emp){ h.textContent = 'Muestra los empleados activos de ' + currentSede + '.'; return; }
+  if (sg){ h.textContent = 'No rebaja las vacaciones; se descuenta del salario en la Planilla de esa quincena.'; return; }
+  const saldo = saldoVac(emp);
+  h.innerHTML = `Saldo actual de ${esc(emp.nombre)}: <b>${saldo.toFixed(1)}</b> día(s)` + (dias ? ` · después de registrar: <b style="color:${saldo-dias<0?'var(--warn)':'inherit'}">${(saldo-dias).toFixed(1)}</b>` : '');
+}
+async function guardarRegistroDias(){
+  const err = document.getElementById('rvErr');
+  const emp = empleados.find(e=>e.id===document.getElementById('rvEmp').value);
+  const desde = document.getElementById('rvDesde').value, hasta = document.getElementById('rvHasta').value;
+  const dias = Number(document.getElementById('rvDias').value);
+  if (!emp){ err.textContent = 'Elija el empleado.'; return; }
+  if (!desde || !hasta){ err.textContent = 'Indique las fechas.'; return; }
+  if (parseFecha(hasta) < parseFecha(desde)){ err.textContent = 'La fecha final no puede ser antes de la inicial.'; return; }
+  if (!(dias > 0)){ err.textContent = 'Indique los días.'; return; }
+  const sinGoce = document.getElementById('rvTipo').value === 'sin_goce';
+  const payload = { empleado_id: emp.id, user_id: emp.user_id || null, sede: emp.sede, fecha_inicio: desde, fecha_fin: hasta, dias,
+    motivo: document.getElementById('rvMotivo').value.trim() || null, estado: 'aprobada',
+    comentario_admin: 'Registrado por administración', resuelto_por: currentEmail, resuelto_at: new Date().toISOString() };
+  if (sinGoce) payload.tipo = 'sin_goce';
+  const btn = document.getElementById('rvBtn'); btn.disabled = true;
+  try {
+    await supaFetch('/vacaciones_solicitudes', { method:'POST', body: payload });
+    document.getElementById('regVacModal').classList.remove('open');
+    await loadAdmin();
+    document.getElementById('vacFiltro').value = 'aprobada'; renderSolicitudes();
+  } catch(e){ err.textContent = 'No se pudo registrar: ' + mensajeError(e); }
+  finally { btn.disabled = false; }
 }
 
 // Modal empleado
@@ -753,12 +838,12 @@ async function vincularCuenta(id){
   document.getElementById('vincModal').classList.add('open');
   try {
     const [cuentas, ligadas] = await Promise.all([
-      supaFetch('/user_roles?role=in.(recepcion,instructor,coordinador,admin_sucursal,empleado)&select=id,nombre,role,sede&order=nombre.asc'),
+      supaFetch('/user_roles?role=in.(recepcion,instructor,coordinador,admin_sucursal,empleado,admin_sedes,admin_g)&select=id,nombre,role,sede&order=nombre.asc'),
       supaFetch('/empleados?user_id=not.is.null&select=user_id')
     ]);
     const usadas = new Set((ligadas||[]).map(x=>x.user_id));
     const libres = (cuentas||[]).filter(c=>!usadas.has(c.id));
-    const nomRol = {recepcion:'Recepción',instructor:'Instructor',coordinador:'Coordinador',admin_sucursal:'Admin sucursal',empleado:'Solo portal'};
+    const nomRol = {recepcion:'Recepción',instructor:'Instructor',coordinador:'Coordinador',admin_sucursal:'Admin sucursal',empleado:'Solo portal',admin_sedes:'Administración',admin_g:'Administración'};
     // Primero las de la misma sede y con nombre parecido
     const n = t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     const pal = n(e.nombre).split(/\s+/).filter(w=>w.length>2);
@@ -810,6 +895,15 @@ function switchTab(t){
   });
 }
 
+// Los administradores también son empleados: su propio portal (saldo y solicitudes)
+function verMiPortal(){
+  document.getElementById('adminView').style.display = 'none';
+  document.getElementById('btnMiPortal').style.display = 'none';
+  document.getElementById('btnVolverRRHH').style.display = '';
+  initPortal();
+}
+function volverRRHH(){ initAdmin(); }
+
 // ══ PORTAL EMPLEADO ══
 async function initPortal(){
   document.getElementById('hTitle').textContent = 'Mi Portal';
@@ -823,7 +917,9 @@ async function initPortal(){
     if (!miEmpleado){
       document.getElementById('portal').style.display='none';
       document.getElementById('emptyState').style.display='block';
-      document.getElementById('emptyState').textContent = 'Su cuenta aún no está vinculada a una ficha de empleado. Contacte a administración.';
+      document.getElementById('emptyState').textContent = esAdmin()
+        ? 'Su cuenta de administrador todavía no está ligada a su ficha de empleado. En Recursos Humanos, busque su ficha y use 🔗 Vincular cuenta.'
+        : 'Su cuenta aún no está vinculada a una ficha de empleado. Contacte a administración.';
       return;
     }
     if (miEmpleado.activo === false){
