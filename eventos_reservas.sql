@@ -176,7 +176,7 @@ begin
                             'reserva_id', v_res, 'precio', v_precio, 'saldo', v_precio - v_cobro);
 end;
 $$;
-revoke all on function vender_evento_caja(uuid, uuid, text, text, text, text, text, numeric, text, numeric) from public;
+revoke all on function vender_evento_caja(uuid, uuid, text, text, text, text, text, numeric, text, numeric) from public, anon;
 grant execute on function vender_evento_caja(uuid, uuid, text, text, text, text, text, numeric, text, numeric) to authenticated;
 
 -- ── Abonar a una reserva o cancelar todo el saldo (p_monto null = todo) ───
@@ -242,7 +242,7 @@ begin
                             'saldo', v_saldo - v_monto, 'evento', v_e.nombre);
 end;
 $$;
-revoke all on function abonar_reserva_evento(uuid, uuid, text, numeric, numeric, text) from public;
+revoke all on function abonar_reserva_evento(uuid, uuid, text, numeric, numeric, text) from public, anon;
 grant execute on function abonar_reserva_evento(uuid, uuid, text, numeric, numeric, text) to authenticated;
 
 -- Comprobación
