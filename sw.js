@@ -1,6 +1,6 @@
 // Service worker mínimo para la app móvil (/movil).
 // Cachea SOLO la carcasa (página, manifest, iconos). Nunca cachea Supabase ni otras páginas.
-const VERSION = 'impulse-movil-2026-10-28a';
+const VERSION = 'impulse-movil-2026-11-01a';
 const SHELL = ['/movil', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png', '/icons/favicon-64.png'];
 
 self.addEventListener('install', (e) => {
@@ -36,9 +36,14 @@ self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   const url = new URL((e.notification.data && e.notification.data.url) || '/movil', self.location.origin);
   const tab = url.searchParams.get('asistente');
+  const anular = url.searchParams.get('anular');   // solicitud de anulación de factura (anulaciones.sql)
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((ws) => {
     const w = ws.find((c) => new URL(c.url).pathname.startsWith('/movil'));
-    if (w) { if (tab) w.postMessage({ tipo: 'abrir-asistente', tab }); return w.focus(); }   // app abierta: abrir el panel ahí
+    if (w) {   // app abierta: abrir ahí el panel de Chloe o la factura a aprobar
+      if (tab) w.postMessage({ tipo: 'abrir-asistente', tab });
+      if (anular) w.postMessage({ tipo: 'abrir-anulacion', id: anular });
+      return w.focus();
+    }
     return self.clients.openWindow(url.href);
   }));
 });

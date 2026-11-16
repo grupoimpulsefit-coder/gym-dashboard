@@ -117,3 +117,38 @@ revoke all on function guardar_push(text, text, text, text) from public;
 revoke all on function quitar_push(text) from public;
 grant execute on function guardar_push(text, text, text, text) to authenticated;
 grant execute on function quitar_push(text) to authenticated;
+
+
+-- ── Conocimiento que Administración le enseña a Chloe desde el chat (2026-10-29) ──
+--  Un admin le escribe a Chloe "agregá a tu conocimiento que…" y la Edge Function
+--  guarda la nota aquí (permisos de servidor). Chloe la usa en todas las consultas
+--  siguientes, igual que el manual. Administración la ve en la pestaña
+--  "Conocimiento" del chat y la puede quitar (activo = false) si quedó vieja.
+create table if not exists asistente_conocimiento (
+  id          bigserial primary key,
+  tema        text not null,
+  contenido   text not null,
+  activo      boolean not null default true,
+  creado_por  uuid default auth.uid(),
+  autor       text,                 -- nombre o correo de quien lo enseñó
+  quitado_por uuid,
+  quitado_at  timestamptz,
+  created_at  timestamptz not null default now()
+);
+create index if not exists asistente_conocimiento_activo on asistente_conocimiento (activo, created_at desc);
+
+alter table asistente_conocimiento enable row level security;
+
+drop policy if exists asistente_conocimiento_select on asistente_conocimiento;
+create policy asistente_conocimiento_select on asistente_conocimiento
+  for select to authenticated
+  using (public.mi_rol() in ('admin','admin_sedes','admin_g'));
+
+drop policy if exists asistente_conocimiento_update on asistente_conocimiento;
+create policy asistente_conocimiento_update on asistente_conocimiento
+  for update to authenticated
+  using (public.mi_rol() in ('admin','admin_sedes','admin_g'))
+  with check (public.mi_rol() in ('admin','admin_sedes','admin_g'));
+
+revoke all on asistente_conocimiento from anon;
+grant select, update on asistente_conocimiento to authenticated;

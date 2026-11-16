@@ -399,6 +399,7 @@
             <button class="tab-btn" onclick="switchTab('tab-renovaciones', this)">🔄 Análisis de Renovaciones</button>
             <button class="tab-btn" onclick="switchTab('tab-validacion', this)">💳 Validación Descuentos</button>
             <button class="tab-btn" onclick="switchTab('tab-seguimiento', this)">📋 Seguimiento Vencidos</button>
+            <button class="tab-btn" onclick="switchTab('tab-promos', this)">🎟️ Promos</button>
             <button class="tab-btn" onclick="switchTab('tab-historial', this)">📅 Historial</button>
         </div>
 
@@ -680,6 +681,54 @@
                 <div id="segTableInfo" style="padding:12px 0;font-size:13px;color:var(--sec);"></div>
             </div>
         </div><!-- /tab-seguimiento -->
+
+        <!-- ── TAB PROMOS: CLIENTES AUTORIZADOS POR PROMO (promo_clientes) ── -->
+        <div id="tab-promos" class="tab-panel">
+            <div class="controls">
+                <div class="controls-title">🎟️ Promos y planes con lista de clientes</div>
+                <div class="filter-group">
+                    <div class="filter-item"><label>Promo</label>
+                        <select id="promoSel" onchange="renderPromos()"></select></div>
+                    <div class="filter-item"><label>Buscar cliente</label>
+                        <input type="text" id="promoSearch" placeholder="Nombre, PIN o teléfono..." oninput="renderPromos()"></div>
+                    <div class="filter-item" style="justify-content:flex-end;">
+                        <button class="btn btn-green" onclick="descargarPromoExcel()" style="margin-top:auto;">⬇ Descargar Excel</button></div>
+                </div>
+                <div id="promoAgregar" style="display:none;margin-top:14px;">
+                    <div class="filter-group">
+                        <div class="filter-item"><label>Agregar cliente (nombre como sale en el sistema)</label>
+                            <input type="text" id="promoNuevoNombre" placeholder="Nombre completo"></div>
+                        <div class="filter-item"><label>PIN</label>
+                            <input type="text" id="promoNuevoPin" placeholder="Opcional"></div>
+                        <div class="filter-item"><label>Teléfono</label>
+                            <input type="text" id="promoNuevoTel" placeholder="Opcional"></div>
+                        <div class="filter-item"><label>Plan</label>
+                            <input type="text" id="promoNuevoPlan" placeholder="Opcional"></div>
+                        <div class="filter-item"><label>Nota</label>
+                            <input type="text" id="promoNuevoNota" placeholder="Opcional"></div>
+                        <div class="filter-item" style="justify-content:flex-end;">
+                            <button class="btn btn-purple" onclick="agregarPromoCliente()" style="margin-top:auto;">➕ Agregar</button></div>
+                    </div>
+                </div>
+                <p style="margin:12px 0 0;font-size:13px;color:var(--sec);">
+                    Al subir Ventas por Producto, quien pague una de estas promos o planes y no esté en la lista sale marcado.
+                    <b>Black November</b> no usa lista: se revisa por regla (nuevos y reingresos de más de 30 días, en planes mensuales o trimestres).
+                </p>
+            </div>
+            <div class="table-section">
+                <div class="section-title">Clientes autorizados</div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr>
+                            <th>#</th><th>Cliente</th><th>PIN</th><th>Teléfono</th><th>Plan</th><th id="promoPagoTh">Pago</th><th>Nota</th><th>Agregado por</th><th></th>
+                        </tr></thead>
+                        <tbody id="promoBody"></tbody>
+                    </table>
+                </div>
+                <div id="promoInfo" style="padding:12px 0;font-size:13px;color:var(--sec);"></div>
+                <div id="promoAjenos"></div>
+            </div>
+        </div><!-- /tab-promos -->
 
         <!-- ── TAB 4: HISTORIAL ── -->
         <div id="tab-historial" class="tab-panel">
@@ -1461,6 +1510,7 @@ async function showSedePicker() {
             cardsEl.appendChild(makeHandoffCard('💵','Cierre de Caja','Conteo y cuadre de caja','Efectivo, ventas y diferencia','#eafaf1','#148f77','/caja'));
             cardsEl.appendChild(makeHandoffCard('📦','Inventario','Productos por sede','Stock, precios y faltantes','#fff8e1','#b9770e','/inventario'));
             cardsEl.appendChild(makeHandoffCard('🔷','Auditoría SINPE','Facturas vs transferencias','Qué facturas tienen su SINPE y cuáles no','#e8f4ff','#0c447c','/conciliacion'));
+            portalSiPlanilla(cardsEl, makeHandoffCard);   // Mi Portal si su cuenta está ligada a su ficha de RRHH
         }
     } catch(e) {
         statusEl.textContent = '⚠️ Error al cargar sedes: ' + e.message;
@@ -1578,6 +1628,7 @@ function switchTab(id, btn) {
     if (id === 'tab-renovaciones' && renovacionesData.length) renderRenovaciones();
     if (id === 'tab-validacion' && allValidacion.length) renderValidacion();
     if (id === 'tab-seguimiento' && usersData.length) renderSeguimiento();
+    if (id === 'tab-promos') loadPromos();
     if (id === 'tab-historial') loadAndRenderHistorial();
 }
 
@@ -1681,7 +1732,17 @@ function isMembershipPlan(product) {
     if (/\d+\s*x\s*\d+\s*mil/i.test(p)) return true;
     // Incluye palabras de planes de natación (natación, gym, aquafitness, estimulación) para
     // clasificar bien esa sede — su renov_data se comparte con index.html.
-    return /\b(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b|plan|promo|flash|anual|lealtad|fidelidad|bloqueado|verano|exclusivo|platium|semestral|trimest|bimest|estudiante|renovaci[oó]n|black|ejecutivo|mensualidad|matr[ií]cula|nataci[oó]n|gym|aquafitness|estimulaci[oó]n|\bpng\b|\bcps\b/i.test(p);
+    return /\b(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b|plan|promo|flash|anual|lealtad|fidelidad|bloqueado|verano|exclusivo|platium|semestral|trimest|bimest|estudiante|renovaci[oó]n|black|hal+owe+n|ejecutivo|mensualidad|matr[ií]cula|nataci[oó]n|gym|aquafitness|estimulaci[oó]n|\bpng\b|\bcps\b/i.test(p);
+}
+// Desde la pestaña Facturación de caja (6/10/2026) los productos se cobran allá: todo lo que
+// llega del informe de WStudio es membresía, sin importar el nombre (igual que el cierre de caja).
+// Lo de antes sigue con la regla por nombre. Las clases/sesiones se separan antes (isClaseSuelta)
+// y el catálogo de la sede manda sobre todo (para sacar algo puntual, p. ej. un alquiler).
+const INICIO_FACTURACION = new Date(2026, 9, 7);
+function esMembresia(product, txDate) {
+    const _t = window.Catalogo && Catalogo.tipo(String(product||'').trim()); if (_t) return _t === 'plan';
+    if (txDate && txDate >= INICIO_FACTURACION) return true;
+    return isMembershipPlan(product);
 }
 function isClaseSuelta(product) {
     const _t = window.Catalogo && Catalogo.tipo(product); if (_t) return _t === 'clase';
@@ -1727,7 +1788,7 @@ function buildRenovStateFromRaw(renovRaw, refUsers) {
             return;
         }
         if (isClaseSuelta(producto)) { clases.push(base); return; }
-        if (!isMembershipPlan(producto)) { sinClasif.push(base); return; }
+        if (!esMembresia(producto, txDate)) { sinClasif.push(base); return; }
         const user = findUserByName(cliente, refUsers);
         const clasif = classifyTransaction(txDate, user, producto);
         renov.push({ ...base, User: user, Tipo: clasif.tipo, Badge: clasif.badge, Icon: clasif.icon, GapDias: clasif.gapDias });
@@ -1901,6 +1962,260 @@ async function processUsuariosFile(data, filename) {
     }
 }
 
+// Promos con regla fija (no usan lista). Devuelven por qué el pago no califica, o ''.
+// La clave es el código normalizado como normName(); plan = producto sin "(Promo: …)".
+const REGLAS_PROMO = {
+    // Black November (noviembre 2026): primer mes de nuevos y de reingresos con más de
+    // 30 días vencidos, solo en planes mensuales o trimestres
+    'black november': (r, plan) =>
+        !r.Tipo || /semest|anual|bimest|cuatrimest|verano|matr[ií]cula/i.test(plan) ? 'el plan no es mensual ni trimestre'
+        : r.Tipo === 'Renovación' ? 'es renovación'
+        : r.Tipo === 'Reingreso' && r.GapDias <= 30 ? `reingreso de ${r.GapDias} días (pide más de 30)`
+        : '',
+};
+
+// Precio que deben pagar los clientes de una lista en un mes dado (clave = la de promo_clientes)
+const PRECIO_PROMO = {
+    // Planes Estándar Halloween: en noviembre 2026 cuestan ₡5.000 para quien los pagó en octubre
+    'plan estandar halloween':      { precio: 5000, mes: '2026-11' },   // Sabanilla
+    'estandar halloween 2026':      { precio: 5000, mes: '2026-11' },   // Pinares
+    'plan estandar halloween 2026': { precio: 5000, mes: '2026-11' },   // Natación
+};
+
+// Tipos de aviso, en orden de gravedad, cada uno con su color
+const AVISO_PROMO = {
+    lista: { color: 'var(--red)',    icono: '🔴', txt: 'Fuera de la lista' },
+    regla: { color: 'var(--purple)', icono: '🟣', txt: 'No cumple la regla' },
+    monto: { color: 'var(--orange)', icono: '🟠', txt: 'Monto distinto' },
+};
+
+// Revisa los pagos del informe que traen código "(Promo: X)" o que son de un plan con lista
+// (ej. "Plan Estandar halloween": en noviembre solo para quien lo pagó en octubre): contra
+// REGLAS_PROMO, o contra la lista de clientes autorizados (tabla promo_clientes, ver
+// promo_clientes.sql; la clave es el código o el nombre del plan normalizado).
+// Lo que no tiene regla ni lista no se revisa.
+async function avisoPromos() {
+    const PROMO_RE = /\(\s*promo\s*:\s*([^)]*?)\s*\)/i;
+    const pagos = [...renovacionesData, ...clasesSueltasData, ...sinClasificarData].map(r => {
+        const m = PROMO_RE.exec(r.Producto || '');
+        const plan = (r.Producto || '').replace(PROMO_RE, '');
+        return { r, plan, promo: m ? normName(m[1]) : null, nombre: m ? `Promo: ${m[1]}` : `Plan: ${plan.trim()}` };
+    });
+    if (!pagos.length) return '';
+    const autorizados = {};
+    try {
+        for (let off = 0; ; off += 1000) {
+            const pag = await supaFetch(`/promo_clientes?sede=eq.${encodeURIComponent(currentSedeName)}&select=promo,cliente_norm&order=id&limit=1000&offset=${off}`) || [];
+            pag.forEach(p => (autorizados[p.promo] = autorizados[p.promo] || new Set()).add(p.cliente_norm));
+            if (pag.length < 1000) break;
+        }
+    } catch(e) { console.warn('No se pudo leer la lista de promos:', e.message); }
+    const mesDe = d => d instanceof Date && !isNaN(d) ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : '';
+    const revisadas = pagos
+        .map(x => {
+            // un pago puede tener regla (por el código) y lista (por el código o por el plan): debe cumplir todas
+            const regla = x.promo && REGLAS_PROMO[x.promo];
+            const claves = [...new Set([x.promo, normName(x.plan)])].filter(k => k && autorizados[k]);
+            if (!regla && !claves.length) return { ...x, motivos: null };
+            const motivos = [];
+            const fallo = regla ? regla(x.r, x.plan) : '';
+            if (fallo) motivos.push({ tipo: 'regla', txt: fallo });
+            claves.forEach(k => {
+                const p = PRECIO_PROMO[k];
+                if (!autorizados[k].has(normName(x.r.Cliente))) motivos.push({ tipo: 'lista', txt: 'no está en la lista' });
+                else if (p && mesDe(x.r.TxDate) === p.mes && Math.abs((x.r.Total || 0) - p.precio) > 1)
+                    motivos.push({ tipo: 'monto', txt: `pagó ₡${(x.r.Total || 0).toLocaleString()} y debía pagar ₡${p.precio.toLocaleString()}` });
+            });
+            const tipos = Object.keys(AVISO_PROMO);
+            motivos.sort((a, b) => tipos.indexOf(a.tipo) - tipos.indexOf(b.tipo));
+            return { ...x, motivos };
+        })
+        .filter(x => x.motivos !== null);
+    if (!revisadas.length) return '';
+    const malos = revisadas.filter(x => x.motivos.length);
+    if (!malos.length) return `<div style="color:var(--green);font-size:13px;margin-top:4px;">✅ Promos revisadas: ${revisadas.length === 1 ? 'el pago califica' : `los ${revisadas.length} pagos califican`}</div>`;
+    // el tipo más grave de cada pago define su color; primero los más graves
+    const tipos = Object.keys(AVISO_PROMO);
+    malos.sort((a, b) => tipos.indexOf(a.motivos[0].tipo) - tipos.indexOf(b.motivos[0].tipo));
+    const cuenta = tipos.map(t => [t, malos.filter(x => x.motivos[0].tipo === t).length]).filter(([, n]) => n);
+    const h = escHtml;
+    return `<div style="margin-top:8px;text-align:left;border:1px solid ${AVISO_PROMO[malos[0].motivos[0].tipo].color};border-radius:10px;padding:10px 12px;font-size:13px;">
+        <div style="font-weight:700;margin-bottom:2px;">⚠️ ${malos.length} ${malos.length === 1 ? 'pago' : 'pagos'} con promo para revisar</div>
+        <div style="color:var(--sec);margin-bottom:6px;">${cuenta.map(([t, n]) => `${AVISO_PROMO[t].icono} ${AVISO_PROMO[t].txt}: ${n}`).join(' · ')}</div>
+        ${malos.map(({ r, nombre, motivos }) => `<div style="border-left:3px solid ${AVISO_PROMO[motivos[0].tipo].color};padding:2px 0 2px 8px;margin:3px 0;">
+            <b>${h(r.Cliente)}</b> · ${h(nombre)} · ${motivos.map(m => `<span style="color:${AVISO_PROMO[m.tipo].color};font-weight:600;">${h(m.txt)}</span>`).join(' · ')}
+            · ${h(String(r.FechaStr).replace(/\s+/g, ' '))} · ₡${(r.Total || 0).toLocaleString()}</div>`).join('')}
+    </div>`;
+}
+
+function escHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+// ── PESTAÑA PROMOS: ver, descargar y editar la lista de promo_clientes ──
+let promoClientes = [];
+const puedeEditarPromos = () => currentRole === 'admin' || currentRole === 'admin_sedes';   // igual que la RLS
+
+async function loadPromos(opts = {}) {
+    const body = document.getElementById('promoBody');
+    body.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--ter);">⏳ Cargando...</td></tr>`;
+    // al abrir la pestaña se vuelven a leer los pagos (pudo haberse subido un informe nuevo)
+    if (!opts.mismosPagos) Object.keys(promoPagosCache).forEach(k => delete promoPagosCache[k]);
+    try {
+        const filas = [];
+        for (let off = 0; ; off += 1000) {
+            const pag = await supaFetch(`/promo_clientes?select=*&order=sede,promo,cliente,id&limit=1000&offset=${off}`) || [];
+            filas.push(...pag);
+            if (pag.length < 1000) break;
+        }
+        promoClientes = filas;
+    } catch(e) {
+        body.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--red);">❌ No se pudo cargar la lista: ${escHtml(e.message)}</td></tr>`;
+        return;
+    }
+    const sel = document.getElementById('promoSel'), antes = sel.value;
+    const promos = [...new Map(promoClientes.map(p => [p.sede + '|' + p.promo, p])).values()];
+    sel.innerHTML = promos.map(p => `<option value="${escHtml(p.sede + '|' + p.promo)}">${escHtml(p.sede)} · ${escHtml(p.promo_nombre || p.promo)}</option>`).join('');
+    if (promos.some(p => p.sede + '|' + p.promo === antes)) sel.value = antes;
+    document.getElementById('promoAgregar').style.display = puedeEditarPromos() && promos.length ? '' : 'none';
+    renderPromos();
+}
+
+function promoActual() {
+    const [sede, promo] = (document.getElementById('promoSel').value || '|').split('|');
+    return promoClientes.filter(p => p.sede === sede && p.promo === promo);
+}
+
+// Pagos de la promo en su mes de precio (PRECIO_PROMO), sacados del informe de ventas guardado
+// de ese mes (gym_snapshots). Así la lista muestra quién ya pagó sin tener que subir nada.
+const promoPagosCache = {};   // 'sede|mes' → { filas, updated_at } | 'cargando' | { error }
+async function cargarPagosPromo(sede, mes) {
+    const k = sede + '|' + mes;
+    if (promoPagosCache[k]) return;
+    promoPagosCache[k] = 'cargando';
+    try {
+        const s = (await supaFetch(`/gym_snapshots?sede=eq.${encodeURIComponent(sede)}&mes_orden=eq.${mes}&select=renov_data,updated_at&order=updated_at.desc&limit=1`) || [])[0];
+        promoPagosCache[k] = { filas: s?.renov_data || [], updated_at: s?.updated_at || null };
+    } catch(e) { promoPagosCache[k] = { error: e.message }; }
+    renderPromos();
+}
+// Pagos de la promo/plan (por código "(Promo: X)" o por nombre del plan) en el mes, por cliente
+function pagosPromoDelMes(filas, promo, mes) {
+    const PROMO_RE = /\(\s*promo\s*:\s*([^)]*?)\s*\)/i, porCliente = new Map();
+    filas.forEach(r => {
+        const m = PROMO_RE.exec(r.Producto || '');
+        if (normName((r.Producto || '').replace(PROMO_RE, '')) !== promo && !(m && normName(m[1]) === promo)) return;
+        const d = parseRenoDateTime(r.FechaStr);
+        if (!d || `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` !== mes) return;
+        const k = normName(r.Cliente);
+        if (!porCliente.has(k)) porCliente.set(k, []);
+        porCliente.get(k).push({ cliente: r.Cliente, total: Number(r.Total) || 0, fecha: d });
+    });
+    return porCliente;
+}
+
+function renderPromos() {
+    const todas = promoActual();
+    const q = normName(document.getElementById('promoSearch').value);
+    const filas = q ? todas.filter(p => normName([p.cliente, p.pin, p.telefono].join(' ')).includes(q)) : todas;
+    const edita = puedeEditarPromos();
+    // Estado del pago en el mes de la promo (solo las que tienen precio por mes)
+    const precio = todas.length && PRECIO_PROMO[todas[0].promo];
+    const mesTxt = precio ? new Date(precio.mes + '-15').toLocaleDateString('es-CR', { month: 'long' }) : '';
+    document.getElementById('promoPagoTh').textContent = precio ? `Pago de ${mesTxt}` : 'Pago';
+    let cache = null, pagos = null;
+    if (precio) {
+        cache = promoPagosCache[todas[0].sede + '|' + precio.mes];
+        if (!cache) cargarPagosPromo(todas[0].sede, precio.mes);
+        else if (cache !== 'cargando' && !cache.error) pagos = pagosPromoDelMes(cache.filas, todas[0].promo, precio.mes);
+    }
+    const dia = d => d.toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit' });
+    const celdaPago = p => {
+        if (!precio) return '<span style="color:var(--ter);">—</span>';
+        if (!pagos) return `<span style="color:var(--ter);">${cache?.error ? 'sin datos' : '…'}</span>`;
+        const ps = pagos.get(p.cliente_norm);
+        if (!ps) return '<span style="color:var(--ter);">Pendiente</span>';
+        return ps.map(x => Math.abs(x.total - precio.precio) <= 1
+            ? `<span style="color:var(--green);font-weight:600;">✓ ₡${x.total.toLocaleString('es-CR')} · ${dia(x.fecha)}</span>`
+            : `<span style="color:var(--orange);font-weight:600;">⚠ ₡${x.total.toLocaleString('es-CR')} · ${dia(x.fecha)} (debía ₡${precio.precio.toLocaleString('es-CR')})</span>`).join('<br>');
+    };
+    document.getElementById('promoBody').innerHTML = filas.length ? filas.map((p, i) => `<tr>
+        <td>${i + 1}</td><td><b>${escHtml(p.cliente)}</b></td><td>${escHtml(p.pin)}</td><td>${escHtml(p.telefono)}</td>
+        <td>${escHtml(p.plan)}</td>
+        <td style="white-space:nowrap;">${celdaPago(p)}</td>
+        <td>${p.nota ? `<span style="color:var(--orange);">⚠ ${escHtml(p.nota)}</span>` : ''}</td>
+        <td style="color:var(--sec);font-size:12px;">${escHtml(p.created_by)}</td>
+        <td>${edita ? `<button class="btn btn-red" style="min-height:28px;padding:0 10px;font-size:12px;" onclick="quitarPromoCliente(${p.id})">Quitar</button>` : ''}</td>
+    </tr>`).join('') : `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--ter);">${todas.length ? 'Ningún cliente coincide con la búsqueda' : 'No hay promos con lista de clientes'}</td></tr>`;
+    let info = todas.length ? (q ? `${filas.length} de ${todas.length} clientes` : `${todas.length} clientes`) : '';
+    let ajenos = '';
+    if (pagos) {
+        const enLista = new Set(todas.map(p => p.cliente_norm));
+        const pagaron = todas.filter(p => pagos.has(p.cliente_norm)).length;
+        info += ` · ${pagaron} ya pagaron en ${mesTxt} · ${todas.length - pagaron} pendientes` +
+            (cache.updated_at ? ` · según el informe de ventas cargado el ${new Date(cache.updated_at).toLocaleString('es-CR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ' · todavía no hay informe de ventas de ese mes');
+        const fuera = [...pagos.entries()].filter(([k]) => !enLista.has(k));
+        if (fuera.length) ajenos = `<div style="padding:10px 12px;border:1px solid var(--red);border-radius:10px;font-size:13px;">
+            <b style="color:var(--red);">🔴 Pagaron en ${mesTxt} sin estar en la lista (${fuera.length})</b>
+            ${fuera.map(([, ps]) => `<div>${escHtml(ps[0].cliente)} · ${ps.map(x => `₡${x.total.toLocaleString('es-CR')} el ${dia(x.fecha)}`).join(', ')}</div>`).join('')}
+            <div style="color:var(--sec);margin-top:4px;">Si es la misma persona con el nombre escrito distinto, agréguela a la lista con el nombre como sale en el sistema.</div></div>`;
+    }
+    document.getElementById('promoInfo').textContent = info;
+    document.getElementById('promoAjenos').innerHTML = ajenos;
+}
+
+async function agregarPromoCliente() {
+    const [sede, promo] = document.getElementById('promoSel').value.split('|');
+    const campo = id => document.getElementById(id).value.trim();
+    const cliente = campo('promoNuevoNombre').replace(/\s+/g, ' ');
+    if (!sede || !cliente) { alert('Escriba el nombre del cliente tal como sale en el sistema.'); return; }
+    const lista = promoActual();
+    if (lista.some(p => p.cliente_norm === normName(cliente))) { alert(`${cliente} ya está en la lista.`); return; }
+    const u = usersData.find(x => normName(x.Nombre) === normName(cliente));   // completa PIN/teléfono si el informe está cargado
+    try {
+        await supaFetch('/promo_clientes', { method: 'POST', body: {
+            sede, promo, promo_nombre: lista[0]?.promo_nombre || null,
+            cliente: u?.Nombre?.trim() || cliente, cliente_norm: normName(cliente),
+            pin: campo('promoNuevoPin') || u?.PIN || null, telefono: campo('promoNuevoTel') || u?.Telefono || null,
+            plan: campo('promoNuevoPlan') || null, nota: campo('promoNuevoNota') || null,
+            created_by: currentUserEmail || null
+        } });
+    } catch(e) { alert('No se pudo agregar: ' + e.message); return; }
+    ['promoNuevoNombre', 'promoNuevoPin', 'promoNuevoTel', 'promoNuevoPlan', 'promoNuevoNota'].forEach(id => document.getElementById(id).value = '');
+    await loadPromos({ mismosPagos: true });
+}
+
+async function quitarPromoCliente(id) {
+    const p = promoClientes.find(x => x.id === id);
+    if (!p || !confirm(`¿Quitar a ${p.cliente} de la lista de ${p.promo_nombre || p.promo}?\n\nSi vuelve a pagar con esa promo, saldrá marcado al subir el informe.`)) return;
+    try { await supaFetch(`/promo_clientes?id=eq.${id}`, { method: 'DELETE' }); }
+    catch(e) { alert('No se pudo quitar: ' + e.message); return; }
+    await loadPromos({ mismosPagos: true });
+}
+
+function descargarPromoExcel() {
+    const filas = promoActual();
+    if (!filas.length) { alert('No hay clientes para descargar.'); return; }
+    const nombre = filas[0].promo_nombre || filas[0].promo, sede = filas[0].sede;
+    // Estado del pago del mes de la promo, igual que en la tabla (si ya se leyó)
+    const precio = PRECIO_PROMO[filas[0].promo], cache = precio && promoPagosCache[sede + '|' + precio.mes];
+    const pagos = cache && cache !== 'cargando' && !cache.error ? pagosPromoDelMes(cache.filas, filas[0].promo, precio.mes) : null;
+    const pagoTxt = p => !pagos ? '' : !pagos.has(p.cliente_norm) ? 'Pendiente'
+        : pagos.get(p.cliente_norm).map(x => `₡${x.total.toLocaleString('es-CR')} el ${x.fecha.toLocaleDateString('es-CR')}${Math.abs(x.total - precio.precio) > 1 ? ' (monto distinto)' : ''}`).join('; ');
+    const ws = XLSX.utils.aoa_to_sheet([
+        [`${nombre} — ${sede} — clientes autorizados`],
+        [`${filas.length} clientes · descargado ${new Date().toLocaleString('es-CR')}`],
+        [],
+        ['#', 'Cliente', 'PIN', 'Teléfono', 'Plan', 'Pago', 'Nota', 'Agregado por', 'Fecha'],
+        ...filas.map((p, i) => [i + 1, p.cliente, p.pin || '', p.telefono || '', p.plan || '', pagoTxt(p), p.nota || '', p.created_by || '',
+            p.created_at ? new Date(p.created_at).toLocaleDateString('es-CR') : ''])
+    ]);
+    ws['!cols'] = [{ wch: 4 }, { wch: 32 }, { wch: 8 }, { wch: 12 }, { wch: 48 }, { wch: 26 }, { wch: 50 }, { wch: 22 }, { wch: 12 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+    XLSX.writeFile(wb, `${nombre} - ${sede}.xlsx`.replace(/[\\/:*?"<>|]/g, ''));
+}
+
 // ── RENOVACIONES (Ventas_por_Producto.xlsx → "Page 1") ──
 async function processRenovacionesFile(data, filename) {
     try {
@@ -1980,7 +2295,7 @@ async function processRenovacionesFile(data, filename) {
                 clasesSueltasData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
                 continue;
             }
-            if (!isMembershipPlan(producto)) {
+            if (!esMembresia(producto, txDate)) {
                 // No es membresía ni clase suelta — no se descarta, queda visible como "sin clasificar"
                 sinClasificarData.push({ FechaStr: fechaStr, TxDate: txDate, Cliente: cliente, RegistradoPor: regPor, Producto: producto, Total: total });
                 continue;
@@ -1996,8 +2311,9 @@ async function processRenovacionesFile(data, filename) {
         }
 
         renoLoaded = true; renoSubido = true;
+        const avisoPromo = await avisoPromos();
         document.getElementById('uploadStatusR').innerHTML =
-            `<span style="color:var(--green);font-weight:600;">✅ ${renovacionesData.length} transacciones de membresía cargadas</span>`;
+            `<span style="color:var(--green);font-weight:600;">✅ ${renovacionesData.length} transacciones de membresía cargadas</span>` + avisoPromo;
 
         rebuildDashboard();
     } catch(e) {

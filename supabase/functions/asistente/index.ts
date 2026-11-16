@@ -7,15 +7,23 @@
 //  asistente_tickets (ver asistente.sql) para que Administración lo atienda.
 //  Si la persona ya tiene una consulta pendiente del mismo asunto, le agrega
 //  los datos nuevos en vez de crear otra.
+//  A Administración (admin, admin_sedes, admin_g) además le acepta "agregá a tu
+//  conocimiento que…": lo guarda en asistente_conocimiento y lo usa desde la
+//  siguiente consulta de cualquier persona.
 //
 //  Además de { mensaje, historial, pagina } acepta:
 //    { accion: 'agregar', ticket, texto }  → botón "Agregar detalle" de Mis consultas
 //    { accion: 'probar_push' }             → notificación de prueba a los teléfonos de quien llama
+//    { accion: 'solicitar_anulacion', factura, motivo } → pide anular una factura de caja y avisa a
+//        Administración y al coordinador de la sede (ver anulaciones.sql)
+//    { accion: 'resolver_anulacion', solicitud, aprobar, nota } → aprueba (anula) o rechaza y avisa a quien la pidió
+//    { accion: 'aviso_apertura', cierre } → el turno abrió con más o menos efectivo que el cierre anterior:
+//        avisa a Administración y al coordinador de la sede (una sola vez; ver caja_apertura.sql)
 //
 //  Secretos: ANTHROPIC_API_KEY (el mismo de analizar-datafono) y, para las
 //  notificaciones push, VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY (la pública es la
 //  misma que VAPID_PUBLIC en movil.html). Sin las VAPID el chat funciona igual.
-//  Se publica con el nombre exacto: asistente  (incluye manual.ts)
+//  Se publica con el nombre exacto: asistente  (incluye manual.ts, terminos.ts y metodologia.ts)
 //    supabase functions deploy asistente
 //  (SUPABASE_URL, SUPABASE_ANON_KEY y SUPABASE_SERVICE_ROLE_KEY ya vienen inyectadas.)
 // ════════════════════════════════════════════════════════════════════════
@@ -23,6 +31,8 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import Anthropic from 'npm:@anthropic-ai/sdk@1.8.0';
 import webpush from 'npm:web-push@3.6.7';
 import { MANUAL } from './manual.ts';
+import { TERMINOS } from './terminos.ts';
+import { METODOLOGIA } from './metodologia.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -40,8 +50,8 @@ const ADMIN_ROLES = ['admin', 'admin_sedes', 'admin_g'];
 const MAPA_APP = `Módulos de jykc.dev (cada uno es una pantalla; se entra desde el menú principal):
 • /caja — Cierre de Caja. Pestañas Cierre y Facturación. Abrir turno (denominaciones + inventario inicial), facturar productos/minita/eventos, cargar Informe de Ventas de WStudio, Reporte SINPE de Ridivi, foto del datáfono, conteo de inventario, opción de minita, recuadro verde «Para WStudio», cierre parcial y cierre final (definitivo; descargar el PDF antes).
 • /gastos — Registrar gastos (necesitan factura y aprobación de Administración) y pagos de clases grupales / instructores de planta.
-• /mediciones — Agenda semanal de mediciones en bloques de 15 minutos. Recepción agenda; el instructor marca la rutina completa o incompleta.
-• /inventario — Consulta de stock, precios y faltantes por sede (recepción solo lectura).
+• /mediciones — Agenda semanal de mediciones en bloques de 15 minutos. Recepción agenda; el instructor o el coordinador marca la rutina (completa, incompleta o solo medición). Administración también puede marcarla.
+• /inventario — Stock, precios y faltantes por sede. Solo Administración, coordinador (solo consulta) y admin_sucursal. Recepción NO tiene acceso a este módulo ni puede ver cantidades de stock en ninguna pantalla: el conteo de inventario de recepción (apertura y cierre en /caja) es a ciegas.
 • /conciliacion — Auditoría SINPE: qué facturas tienen su SINPE y cuáles no.
 • /rrhh — Mi Portal (para quien está en planilla): saldo y solicitud de vacaciones, día libre sin goce, incapacidades, citas médicas y comprobantes. Administración ve ahí Recursos Humanos.
 • /planilla, /sedes, /comparativa, /otros, /nat — módulos de Administración (planilla quincenal, reportes por sede, rentabilidad de productos, academia de natación).
@@ -52,20 +62,33 @@ Sistemas externos: WStudio (membresías y su caja), Ridivi (SINPE Móvil). La se
 const INSTRUCCIONES = `Te llamás Chloe y sos la asistente de ayuda de jykc.dev, el sistema de gestión de Fit and Train Fitness Club (Costa Rica). Te escribe el personal del club (recepcionistas, instructores, coordinadores) desde dentro de la app.
 
 Cómo responder:
-• Respondé solo con lo que dicen el Manual Operativo y el mapa de la app de abajo, más las respuestas de Administración que se te den. No inventes pasos, montos, botones, plazos ni políticas.
+• Respondé solo con lo que dicen el Manual Operativo, los Términos y Condiciones, la Metodología de natación y el mapa de la app de abajo, más las respuestas de Administración que se te den. No inventes pasos, montos, botones, plazos ni políticas.
 • Tratá a la persona de usted, en español sencillo y corto. Para procedimientos, dá los pasos numerados tal como están en el manual y mencioná la sección (p. ej. "Manual 5, Paso 7").
 • Si hay actualizaciones con fecha (sección "Actualización de procedimientos"), lo vigente es lo más reciente.
+• Los Términos y Condiciones de abajo son el contrato y el reglamento que firma el cliente. Usalos para preguntas sobre las reglas del club (indumentaria, edad mínima, niños, casilleros, horario de las instalaciones, reposiciones, congelamientos, cambios de horario, conducta) y citá la cláusula o el número del reglamento. Las cláusulas del contrato hablan de la piscina y las clases de natación; no las apliques a las sedes de gimnasio salvo que el texto lo diga. Para los procedimientos internos del personal manda el Manual; el congelamiento y las clases perdidas por feriado ya los aclaró Administración en el Manual (8.1, 8.2 y el 8.2 de Natación) y eso es lo que vale. Si en otro tema el Manual y los Términos dicen cosas distintas, no elijas: explicá lo que dice cada uno y recomendá confirmarlo con Administración.
+• La Metodología de natación de abajo describe la Academia de Natación: niveles, edades, duración de la clase (depende del nivel: 45 min bebés, 50 min niños Principiante y Transición, 1 hora niños Intermedio y Avanzado, 55 min adultos), cupos, objetivos, ejercicios, evaluaciones, graduaciones y la clase de prueba. Usala para esas preguntas; si preguntan cuánto dura una clase de natación, preguntá el nivel si no lo dicen.
 • Si la persona es de la sede Natación, aplicá también las diferencias para Natación. Las reglas que el manual marca como de Natación no se aplican a las sedes de gimnasio (3 Ríos, Pinares, Sabanilla). Si la persona no tiene sede fija y la respuesta cambia según la sede, preguntá de qué sede es el cliente.
-• Cada mensaje de la persona llega con un bloque "CONTEXTO DE LA APP" que agrega el sistema (quién pregunta, desde qué pantalla y sus consultas pendientes). Usalo como dato; no lo menciones salvo que haga falta.
+• Cada mensaje de la persona llega con un bloque "CONTEXTO DE LA APP" que agrega el sistema (fecha y hora, quién pregunta, desde qué pantalla y sus consultas pendientes). Usalo como dato; no lo menciones salvo que haga falta. Para promociones y reglas con fechas, compará con esa fecha: si ya venció o todavía no empieza, decilo.
 
 Cuándo crear un ticket (herramienta crear_ticket):
 • Si la respuesta NO está en el manual ni en las respuestas de Administración: creá un ticket tipo "duda" con la pregunta, y decile que Administración la va a responder y que la verá en la pestaña "Mis consultas" de este chat. No adivines.
 • Si pide algo que solo Administración puede hacer o autorizar (anular o corregir una venta o un cierre, revisar un SINPE que no aparece o no cuadra, un descuadre de caja, reembolsos, descuentos fuera de tarifa, excepciones al reglamento, un error de la app): creá el ticket con el tipo que corresponda. Nunca digas que la acción ya se hizo: decí que quedó solicitada.
 • Antes de crear un ticket de trámite, pedí los datos que falten si son necesarios para que Administración actúe (fecha, sede, monto, número de factura o los últimos 6 dígitos de la referencia SINPE, nombre del cliente). Si ya los tiene, no los vuelvas a pedir.
 • Un ticket por asunto. Si es una simple duda que sí está en el manual, respondé sin ticket.
+• Anular una factura de la caja de jykc.dev (productos, minita o eventos de la pestaña Facturación): no crees ticket. Explicale que en /caja → Facturación, en "Cobros del día", toque "Solicitar anulación" en esa factura y escriba el motivo; Administración y el coordinador de la sede reciben el aviso y la aprueban con un botón. Que no cierre el turno hasta que la aprueben, porque con el turno cerrado ya no se puede anular. Si el turno ya se cerró, o la venta es de WStudio (membresías), sí va como ticket (anular_venta o descuadre_caja).
 • Si la persona trae más datos o una corrección sobre un asunto que ya tiene una consulta pendiente (lista "CONSULTAS PENDIENTES DE ESTA PERSONA"), usá agregar_a_ticket con ese número en vez de crear otro, y decile a qué número se agregó. Si no está claro que sea el mismo asunto, preguntale. Las consultas ya respondidas no se reabren: un asunto nuevo lleva ticket nuevo.
 • Emergencias médicas o accidentes: indicá de inmediato el procedimiento del manual (sección 11) y que avise a Administración; no esperes a un ticket.
-• No compartas datos personales de colaboradores, clientes ni dueños.`;
+• No compartas datos personales de colaboradores, clientes ni dueños. Excepción: al revisar la caja podés mencionar el nombre del cliente y el monto de un cobro de esa caja para ubicarlo (nunca cédula ni teléfono).
+• Solo si el CONTEXTO DE LA APP dice que el rol es admin, admin_sedes o admin_g y la persona te pide que aprendas, agregues o actualices algo en tu conocimiento (un procedimiento nuevo, un cambio de precio, horario o política, una promoción…), usá guardar_conocimiento. Redactalo completo y claro, como lo tendrías que explicar al personal, con las fechas de vigencia si las dice. Si es ambiguo o le faltan datos, preguntale antes de guardar. Si reemplaza algo anterior, decilo en el contenido. Después confirmale qué quedó guardado y que lo puede ver o quitar en la pestaña "Conocimiento". A nadie más le guardes conocimiento: si otra persona te lo pide, decile que eso lo hace Administración.
+• No tenés acceso al stock. Si alguien de recepción pregunta cuántas unidades hay de un producto, respondé solo que esa cantidad no se puede consultar (el conteo de recepción es a ciegas); no le indiques módulos ni formas de verla.
+
+Diferencias de caja (herramienta revisar_caja; solo la tenés con recepción, admin_sucursal, coordinador y Administración):
+• Cuando alguien diga que la caja no cuadra, que le falta o le sobra dinero, o quiera saber cuánto efectivo debería tener, usá revisar_caja. La sede vacía es la de la persona; Administración tiene que decir la sede si no tiene una fija.
+• Si todavía no dio cuánto efectivo tiene contado, llamala con efectivo_contado null para ver el estado y pedile el conteo (todo el efectivo de la caja, con el fondo incluido). Con el conteo, volvé a llamarla con el monto.
+• Si la herramienta dice que falta el Informe de Ventas de WStudio o que es de otra fecha, eso va primero: pedile que lo descargue y lo cargue en /caja y que después te vuelva a escribir.
+• Explicá el resultado corto: cuánto debería haber, cuánto contó, cuánto falta o sobra. Después dale las pistas en orden, como preguntas para revisar ("¿Puede ser que…?"). Usá solo los montos y datos que devolvió la herramienta; no hagas cuentas propias ni inventes cobros.
+• Nunca acuses a nadie ni sugieras que alguien tomó dinero. Son pistas para revisar, no conclusiones.
+• Si después de revisar las pistas la diferencia sigue, ofrecé crear un ticket tipo "descuadre_caja" con la sede, la fecha, el turno, el efectivo esperado, el contado, la diferencia y lo que ya revisó. Recordale que el cierre lo hace igual en /caja y que la diferencia queda registrada ahí.`;
 
 const TOOLS: Anthropic.Beta.BetaTool[] = [{
   name: 'crear_ticket',
@@ -96,6 +119,39 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [{
   },
 }];
 
+// Solo a quien maneja caja: recepción, admin_sucursal, coordinador y Administración (ver revisarCaja)
+const CAJA_ROLES = ['recepcion', 'admin_sucursal', 'coordinador', ...ADMIN_ROLES];
+const TOOL_CAJA: Anthropic.Beta.BetaTool = {
+  name: 'revisar_caja',
+  description: 'Lee el turno de caja abierto de una sede (o el último si no hay uno abierto): fondo, efectivo del Informe de Ventas de WStudio cobro por cobro, facturas de la app, gastos e ingresos. Calcula cuánto efectivo debería haber y, si se da el conteo, la diferencia y pistas de dónde puede estar.',
+  strict: true,
+  input_schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['sede', 'efectivo_contado'],
+    properties: {
+      sede: { type: 'string', description: 'Sede a revisar. Vacío = la sede de quien pregunta.' },
+      efectivo_contado: { type: ['number', 'null'], description: 'Efectivo que la persona dice tener contado ahora en la caja (₡). null si todavía no lo dio.' },
+    },
+  },
+};
+
+// Solo se le ofrece a Administración (ver más abajo)
+const TOOL_CONOCIMIENTO: Anthropic.Beta.BetaTool = {
+  name: 'guardar_conocimiento',
+  description: 'Guarda información nueva o actualizada que Administración te pide aprender. Desde la siguiente consulta la vas a tener igual que el manual.',
+  strict: true,
+  input_schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['tema', 'contenido'],
+    properties: {
+      tema: { type: 'string', description: 'Título corto, p. ej. "Precio de la mensualidad en Pinares".' },
+      contenido: { type: 'string', description: 'La información completa, clara para el personal, con vigencia si la hay.' },
+    },
+  },
+};
+
 function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 }
@@ -124,7 +180,155 @@ async function avisarAdmins(admin: SupabaseClient, salvo: string, aviso: Aviso) 
     await enviarPush(admin, (data || []).map(a => a.id).filter(id => id !== salvo), aviso);
   } catch (_) { /* sin aviso */ }
 }
+// Quienes aprueban anulaciones de una sede: Administración y los coordinadores de esa sede
+async function avisarAprobadores(admin: SupabaseClient, sede: string, salvo: string, aviso: Aviso) {
+  try {
+    const { data } = await admin.from('user_roles').select('id, role, sede, sedes_extra').in('role', [...ADMIN_ROLES, 'coordinador']);
+    const ids = (data || []).filter(u => ADMIN_ROLES.includes(u.role) || u.sede === sede || (u.sedes_extra || []).includes(sede))
+      .map(u => u.id).filter(id => id !== salvo);
+    return await enviarPush(admin, ids, aviso);
+  } catch (_) { return 0; }
+}
+const METODO_TXT: Record<string, string> = { efectivo: 'efectivo', tarjeta: 'tarjeta', sinpe: 'SINPE', mixto: 'pago mixto' };
 const recorte = (s: string, n = 140) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+
+// ── Revisar la caja (herramienta revisar_caja) ────────────────────────────
+// Misma cuenta que caja.html (cuadre / calc): todo es ACUMULADO DEL DÍA. Tarjeta, SINPE y
+// transferencia se anulan entre lo vendido y lo conciliado, así que el cuadre queda en efectivo:
+//   esperado = fondo del 1er turno del día + efectivo del Informe de Ventas + efectivo facturado en la app
+//              − gastos del día + ingresos del día − sobres ya retirados (sobre_modo 'ya')
+//   diferencia = esperado − contado   (>0 falta dinero, <0 sobra)
+// Las cuentas y las pistas se hacen aquí y no en el modelo, para que los montos salgan exactos.
+type Cobro = { origen: string; cliente: string; monto: number; metodo: string; notas: string; anulada?: boolean };
+const crc = (n: number) => '₡' + Math.round(n).toLocaleString('es-CR');
+const horaCR = (s: string) => new Date(s).toLocaleTimeString('es-CR', { timeZone: 'America/Costa_Rica', hour: '2-digit', minute: '2-digit' });
+// Sin cédulas ni teléfonos: el nombre basta para ubicar el cobro
+const soloNombre = (s: string) => String(s || '').replace(/[-–]?\s*\d{6,}/g, '').trim();
+const suma = (a: { monto?: unknown }[] | null) => (Array.isArray(a) ? a : []).reduce((s, g) => s + (Number(g?.monto) || 0), 0);
+const metodoFactura = (f: { metodo: string; total: number; pagos?: { metodo: string; monto: number }[] | null }, m: string) =>
+  Array.isArray(f.pagos) && f.pagos.length ? f.pagos.filter(p => p.metodo === m).reduce((a, p) => a + (Number(p.monto) || 0), 0)
+    : f.metodo === m ? Number(f.total) || 0 : 0;
+
+async function revisarCaja(admin: SupabaseClient, yo: { role: string; sede: string | null; sedes_extra?: string[] | null },
+                           sedePedida: string, contado: number | null): Promise<string> {
+  const esAdm = ADMIN_ROLES.includes(yo.role);
+  const sede = (sedePedida || '').trim() || yo.sede || '';
+  if (!sede) return 'ERROR: no se sabe qué sede revisar. Preguntale de qué sede es la caja (3 Ríos, Pinares, Sabanilla o Natación).';
+  if (!esAdm && sede !== yo.sede && !(yo.sedes_extra || []).includes(sede))
+    return `ERROR: esta persona solo puede revisar la caja de su sede (${yo.sede || 'sin sede'}).`;
+
+  // Turno abierto; si no hay, el último guardado (sirve para revisar un cierre ya hecho)
+  const { data: ult } = await admin.from('cierres_caja').select('fecha').eq('sede', sede)
+    .order('fecha', { ascending: false }).order('created_at', { ascending: false }).limit(1);
+  if (!ult?.length) return `No hay turnos de caja registrados en ${sede}.`;
+  const { data: abierto } = await admin.from('cierres_caja').select('fecha').eq('sede', sede).eq('estado', 'abierto')
+    .order('fecha', { ascending: false }).limit(1);
+  const fecha = abierto?.[0]?.fecha || ult[0].fecha;
+  const { data: dia } = await admin.from('cierres_caja')
+    .select('id, turno_num, estado, caja_inicial, efectivo, gastos, ingresos, total_gastos, total_ingresos, sobre_modo, minita, informe_ventas, updated_at')
+    .eq('sede', sede).eq('fecha', fecha).order('turno_num', { ascending: true });
+  const turnos = dia || [];
+  const t = turnos.find(x => x.estado === 'abierto') || turnos[turnos.length - 1];
+  if (!t) return `No hay turnos de caja en ${sede} para ${fecha}.`;
+  const previos = turnos.filter(x => x.id !== t.id && (x.estado === 'parcial' || x.estado === 'final') && (x.turno_num || 0) < (t.turno_num || 0));
+
+  const fondo = Number(turnos[0].caja_inicial) || 0;
+  const gastosDia = previos.reduce((s, x) => s + (Number(x.total_gastos) || 0), 0) + suma(t.gastos);
+  const ingresosDia = previos.reduce((s, x) => s + (Number(x.total_ingresos) || 0), 0) + suma(t.ingresos);
+  const sobres = t.sobre_modo === 'ya' ? Number(t.minita) || 0 : 0;
+  const inf = t.informe_ventas as { efectivo?: number; sinpe?: number; tarjeta?: number; transfer?: number; total?: number;
+    detalle?: { fecha?: string; filas?: { Cliente: string; Total: number; Metodo: string; Notas: string }[] } } | null;
+
+  const { data: facts } = await admin.from('facturas_caja')
+    .select('numero, metodo, total, pagos, recibido, estado, tipo, cliente_nombre, items, created_at')
+    .eq('sede', sede).eq('fecha', fecha).order('numero', { ascending: true });
+  const facturas = facts || [];
+  const activas = facturas.filter(f => f.estado !== 'anulada');
+  const efFacturado = activas.reduce((s, f) => s + metodoFactura(f, 'efectivo'), 0);
+
+  const cobros: Cobro[] = [];
+  (inf?.detalle?.filas || []).forEach(r => cobros.push({ origen: 'WStudio', cliente: soloNombre(r.Cliente), monto: Number(r.Total) || 0, metodo: r.Metodo, notas: r.Notas || '' }));
+  facturas.forEach(f => {
+    const desc = f.cliente_nombre || (f.items || []).map((i: { producto?: string; cantidad?: number }) => `${i.cantidad || 1}× ${i.producto || ''}`).join(', ');
+    ['efectivo', 'tarjeta', 'sinpe'].forEach(m => {
+      const monto = metodoFactura(f, m);
+      if (monto) cobros.push({ origen: `Factura #${f.numero} (${horaCR(f.created_at)})`, cliente: soloNombre(desc), monto, metodo: m, notas: '', anulada: f.estado === 'anulada' });
+    });
+  });
+
+  const esperado = fondo + (Number(inf?.efectivo) || 0) + efFacturado - gastosDia + ingresosDia - sobres;
+  const L: string[] = [];
+  L.push(`CAJA DE ${sede.toUpperCase()} — ${fecha}, turno ${t.turno_num ?? '?'} (${t.estado === 'abierto' ? 'ABIERTO' : 'ya cerrado: ' + t.estado}); última actualización ${t.updated_at ? horaCR(t.updated_at) : '—'}`);
+  if (!inf) L.push('⚠ NO SE HA CARGADO EL INFORME DE VENTAS DE WSTUDIO en este turno: el efectivo de membresías no está en la cuenta. Antes de buscar diferencias, que lo descargue de WStudio y lo cargue en /caja con el botón «📤 Informe de Ventas».');
+  else if (inf.detalle?.fecha && inf.detalle.fecha !== fecha) L.push(`⚠ El Informe de Ventas cargado parece ser del ${inf.detalle.fecha}, no del ${fecha}. Que cargue el del día.`);
+  L.push('', 'CÓMO SE CALCULA EL EFECTIVO QUE DEBERÍA HABER (acumulado del día):',
+    `  Fondo inicial del día (turno 1): ${crc(fondo)}`,
+    `  + Efectivo cobrado en WStudio (Informe de Ventas): ${crc(Number(inf?.efectivo) || 0)}`,
+    `  + Efectivo facturado en la app (productos/eventos, sin anuladas): ${crc(efFacturado)}`,
+    `  − Gastos del día: ${crc(gastosDia)}`,
+    `  + Ingresos del día: ${crc(ingresosDia)}`,
+    ...(sobres ? [`  − Sobres de minita ya retirados: ${crc(sobres)}`] : []),
+    `  = EFECTIVO ESPERADO: ${crc(esperado)}`);
+  if (inf) L.push(`Otros medios en WStudio (no afectan el efectivo): tarjeta ${crc(Number(inf.tarjeta) || 0)}, SINPE ${crc(Number(inf.sinpe) || 0)}, transferencia ${crc(Number(inf.transfer) || 0)}.`);
+  const movs = [...previos.flatMap(x => (x.gastos || []).map((g: { desc?: string; monto?: number }) => ({ ...g, turno: x.turno_num }))),
+    ...(t.gastos || []).map((g: { desc?: string; monto?: number }) => ({ ...g, turno: t.turno_num }))].filter(g => Number(g.monto) > 0);
+  if (movs.length) L.push('Gastos anotados: ' + movs.map(g => `${g.desc || 'sin descripción'} ${crc(Number(g.monto))} (turno ${g.turno})`).join('; ') + '.');
+
+  if (contado == null) {
+    const guardado = Number(t.efectivo) || 0;
+    L.push('', `La persona todavía no dijo cuánto tiene contado. Pedíselo (todo el efectivo de la caja, con el fondo incluido${sobres ? '' : ' y la minita si no se ha sacado el sobre'}).` +
+      (t.estado === 'abierto' && guardado ? ` En la pantalla de caja hay un conteo guardado de ${crc(guardado)}; puede no estar al día.` : ''));
+    return L.join('\n');
+  }
+
+  const dif = Math.round(esperado - contado);
+  const abs = Math.abs(dif);
+  L.push('', `EFECTIVO CONTADO: ${crc(contado)}`);
+  if (abs === 0) { L.push('RESULTADO: la caja CUADRA. No hay diferencia.'); return L.join('\n'); }
+  L.push(`RESULTADO: ${dif > 0 ? 'FALTAN' : 'SOBRAN'} ${crc(abs)} en efectivo.`, '', 'PISTAS (posibles causas, de la más probable a la menos; ninguna es segura):');
+  const pistas: string[] = [];
+  const cerca = (m: number) => Math.abs(m - abs) <= 100;
+  const fmtC = (c: Cobro) => `${c.origen}: ${c.cliente || 'sin nombre'} ${crc(c.monto)} en ${c.metodo}${c.notas ? ' (notas: ' + c.notas + ')' : ''}`;
+  const vivos = cobros.filter(c => !c.anulada);
+  if (dif > 0) {
+    vivos.filter(c => c.metodo === 'efectivo' && cerca(c.monto)).forEach(c =>
+      pistas.push(`Un cobro en EFECTIVO por ese mismo monto: ${fmtC(c)}. Revisar si en realidad lo pagaron por SINPE o tarjeta y quedó mal marcado, o si se registró pero no se cobró.`));
+  } else {
+    vivos.filter(c => c.metodo !== 'efectivo' && cerca(c.monto)).forEach(c =>
+      pistas.push(`Un cobro por ese mismo monto marcado como ${c.metodo.toUpperCase()}: ${fmtC(c)}. Revisar si en realidad lo pagaron en efectivo.`));
+    cobros.filter(c => c.anulada && c.metodo === 'efectivo' && cerca(c.monto)).forEach(c =>
+      pistas.push(`Una factura ANULADA en efectivo por ese monto: ${fmtC(c)}. Si no se le devolvió el dinero al cliente, ahí está el sobrante (o se anuló por error).`));
+  }
+  // Dos cobros que juntos dan la diferencia (solo si no apareció uno exacto)
+  if (!pistas.length) {
+    const pool = (dif > 0 ? vivos.filter(c => c.metodo === 'efectivo') : vivos.filter(c => c.metodo !== 'efectivo')).slice(0, 150);
+    const pares: string[] = [];
+    for (let i = 0; i < pool.length && pares.length < 2; i++)
+      for (let j = i + 1; j < pool.length && pares.length < 2; j++)
+        if (Math.abs(pool[i].monto + pool[j].monto - abs) <= 100) pares.push(`${fmtC(pool[i])} + ${fmtC(pool[j])}`);
+    pares.forEach(p => pistas.push(`Dos cobros que juntos suman la diferencia: ${p}. ${dif > 0 ? 'Revisar si se pagaron por otro medio.' : 'Revisar si se pagaron en efectivo.'}`));
+  }
+  // Mismo cliente, mismo monto y medio dos veces en WStudio. Solo un duplicado en efectivo
+  // mueve el efectivo esperado (lo infla → faltante); los demás van como dato aparte.
+  const grupos = new Map<string, Cobro[]>();
+  vivos.filter(c => c.origen === 'WStudio').forEach(c => { const k = `${c.cliente.toLowerCase()}|${c.monto}|${c.metodo}`; grupos.set(k, [...(grupos.get(k) || []), c]); });
+  const dups = [...grupos.values()].filter(g => g.length > 1);
+  if (dif > 0) dups.filter(g => g[0].metodo === 'efectivo').forEach(g =>
+    pistas.push(`Posible cobro DUPLICADO en WStudio: ${g[0].cliente} ${crc(g[0].monto)} en efectivo aparece ${g.length} veces. Si se cobró una sola vez, eso explica faltante.`));
+  if ([500, 1000, 2000, 5000, 10000, 20000].includes(abs) || (abs >= 1000 && abs % 1000 === 0 && abs <= 50000))
+    pistas.push(`La diferencia es un monto redondo (${crc(abs)}): suele ser un billete confundido o un vuelto mal dado. Revisar los vueltos de los cobros en efectivo y que no haya billetes pegados o en otro compartimento.`);
+  facturas.filter(f => f.estado !== 'anulada' && f.metodo === 'efectivo' && f.recibido != null && Number(f.recibido) < Number(f.total)).forEach(f =>
+    pistas.push(`Factura #${f.numero}: se anotó que el cliente entregó ${crc(Number(f.recibido))}, menos que el total ${crc(Number(f.total))}.`));
+  if (dif > 0) pistas.push('Un gasto pagado con dinero de la caja que no se anotó en Gastos (o efectivo que se sacó para cambio y no volvió).');
+  else pistas.push('Un ingreso de efectivo que no se anotó en Ingresos, o un gasto anotado dos veces o por más de lo que se pagó.');
+  pistas.push('Algo cobrado después de la última carga del Informe de Ventas: si hubo cobros en WStudio después, volver a descargar el informe y cargarlo en /caja.');
+  pistas.forEach((p, i) => L.push(`${i + 1}. ${p}`));
+  const sinRef = vivos.filter(c => c.origen === 'WStudio' && c.metodo === 'sinpe' && !c.notas.trim());
+  if (sinRef.length) L.push('', `Dato aparte: ${sinRef.length} cobro(s) SINPE en WStudio sin referencia en las notas (${sinRef.slice(0, 5).map(c => `${c.cliente} ${crc(c.monto)}`).join('; ')}). No cambian el efectivo, pero conviene anotar la referencia.`);
+  const otrosDups = dups.filter(g => !(dif > 0 && g[0].metodo === 'efectivo'));
+  if (otrosDups.length) L.push(`Dato aparte: posibles cobros repetidos en WStudio (mismo cliente, monto y medio): ${otrosDups.slice(0, 5).map(g => `${g[0].cliente} ${crc(g[0].monto)} en ${g[0].metodo} ×${g.length}`).join('; ')}. Si no deberían estar dos veces, avisar a Administración.`);
+  return L.join('\n');
+}
 
 // Agrega un detalle con la sesión de quien llama (la base valida que sea suya y siga pendiente)
 async function agregarDetalle(asCaller: SupabaseClient, admin: SupabaseClient, uid: string, ticket: number, texto: string) {
@@ -156,7 +360,7 @@ Deno.serve(async (req) => {
     const { data: caller } = await asCaller.auth.getUser();
     if (!caller?.user) return json({ error: 'Sesión inválida' }, 401);
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-    const { data: yo } = await admin.from('user_roles').select('role, nombre, sede').eq('id', caller.user.id).single();
+    const { data: yo } = await admin.from('user_roles').select('role, nombre, sede, sedes_extra').eq('id', caller.user.id).single();
     if (!yo?.role) return json({ error: 'Sin permiso' }, 403);
 
     const body = await req.json().catch(() => ({}));
@@ -171,6 +375,61 @@ Deno.serve(async (req) => {
     if (body.accion === 'probar_push') {
       const n = await enviarPush(admin, [caller.user.id], { title: 'Chloe', body: 'Las notificaciones de consultas están activas en este teléfono.', tag: 'prueba', url: '/movil' });
       return json({ enviadas: n });
+    }
+
+    // Anulación de facturas de caja: los permisos y las reglas los valida la base (anulaciones.sql)
+    if (body.accion === 'solicitar_anulacion') {
+      const { data, error } = await asCaller.rpc('solicitar_anulacion_factura', { p_factura: String(body.factura || ''), p_motivo: String(body.motivo || '') });
+      if (error) return json({ error: error.message }, 400);
+      const s = data as { id: number; sede: string; numero: number; total: number; metodo: string; tipo: string; motivo: string; solicitante: string };
+      const avisados = await avisarAprobadores(admin, s.sede, caller.user.id, {
+        title: `Anular factura #${s.numero} · ${s.sede}`,
+        body: recorte(`${s.solicitante}: ₡${Math.round(Number(s.total)).toLocaleString('es-CR')} (${METODO_TXT[s.metodo] || s.metodo}${s.tipo === 'evento' ? ', evento' : ''}). Motivo: ${s.motivo}`, 180),
+        tag: 'anul-' + s.id, url: '/movil?anular=' + s.id,
+      });
+      return json({ ok: true, id: s.id, avisados });
+    }
+    if (body.accion === 'resolver_anulacion') {
+      const { data, error } = await asCaller.rpc('resolver_anulacion_factura', {
+        p_solicitud: Number(body.solicitud), p_aprobar: body.aprobar === true, p_nota: body.nota ? String(body.nota) : null });
+      if (error) return json({ error: error.message }, 400);
+      const r = data as { id: number; estado: string; nota: string | null; sede: string; numero: number; solicitado_por: string | null };
+      const txt = r.estado === 'aprobada' ? 'quedó anulada' : r.estado === 'rechazada' ? 'no se anuló: la solicitud fue rechazada' : 'no se pudo anular: el turno ya se había cerrado';
+      if (r.solicitado_por && r.solicitado_por !== caller.user.id) {
+        await enviarPush(admin, [r.solicitado_por], {
+          title: `Factura #${r.numero} · ${r.sede}`, body: recorte(`La factura ${txt}.${r.nota ? ' ' + r.nota : ''} (${yo.nombre || caller.user.email})`, 180),
+          tag: 'anul-' + r.id, url: '/movil',
+        }).catch(() => 0);
+      }
+      return json({ ok: true, estado: r.estado, nota: r.nota });
+    }
+
+    // Apertura de caja con diferencia: los datos se leen de la base (los calcula caja_apertura.sql), no del navegador
+    if (body.accion === 'aviso_apertura') {
+      const { data: c } = await asCaller.from('cierres_caja')
+        .select('id, sede, fecha, turno_num, estado, caja_inicial, apertura_esperado, apertura_diferencia, apertura_ref, apertura_den_dif, apertura_motivo, apertura_avisado_at, created_at')
+        .eq('id', String(body.cierre || '')).maybeSingle();
+      if (!c) return json({ error: 'Turno no encontrado' }, 404);
+      const dif = Math.round(Number(c.apertura_diferencia) || 0);
+      const reciente = Date.now() - new Date(c.created_at).getTime() < 60 * 60 * 1000;
+      if (c.estado !== 'abierto' || !dif || c.apertura_avisado_at || !reciente) return json({ ok: true, avisados: 0 });
+      // Marca el aviso primero: si llegan dos llamadas, solo una envía
+      const { data: marcado } = await admin.from('cierres_caja').update({ apertura_avisado_at: new Date().toISOString() })
+        .eq('id', c.id).is('apertura_avisado_at', null).select('id');
+      if (!marcado?.length) return json({ ok: true, avisados: 0 });
+      const crc = (n: number) => '₡' + Math.round(Number(n) || 0).toLocaleString('es-CR');
+      const r = (c.apertura_ref || {}) as { fecha?: string; turno_num?: number; estado?: string };
+      const [, mes, dia] = String(r.fecha || '').split('-');
+      const den = Object.entries((c.apertura_den_dif || {}) as Record<string, number>)
+        .map(([k, v]) => [Number(k), Number(v)]).filter(([, v]) => v).sort((a, b) => b[0] - a[0])
+        .map(([d, v]) => `${Math.abs(v)} × ${crc(d)} ${v < 0 ? 'menos' : 'de más'}`).join(', ');
+      const avisados = await avisarAprobadores(admin, c.sede, caller.user.id, {
+        title: `Caja ${c.sede} · Turno ${c.turno_num ?? ''}: abrió con ${crc(Math.abs(dif))} ${dif < 0 ? 'menos' : 'de más'}`,
+        body: recorte(`Esperado ${crc(c.apertura_esperado)} (${r.estado === 'final' ? 'cierre final' : 'cierre'} ${dia || '?'}/${mes || '?'} T${r.turno_num ?? '?'}), contado ${crc(c.caja_inicial)}.`
+          + (den ? ` ${den}.` : '') + (c.apertura_motivo ? ` Motivo: ${c.apertura_motivo}.` : '') + ` Abrió: ${yo.nombre || caller.user.email}.`, 220),
+        tag: 'apertura-' + c.id, url: '/caja',
+      });
+      return json({ ok: true, avisados });
     }
 
     if (!ANTHROPIC_API_KEY) return json({ error: 'Falta configurar ANTHROPIC_API_KEY en los secretos de la función.' }, 500);
@@ -199,6 +458,12 @@ Deno.serve(async (req) => {
       .select('resumen, respuesta').eq('en_asistente', true).not('respuesta', 'is', null)
       .order('resuelto_at', { ascending: false }).limit(200);
     const extra = (aprendidas || []).map(t => `P: ${t.resumen}\nR: ${t.respuesta}`).join('\n\n');
+    // Conocimiento que Administración le enseñó desde el chat (lo más nuevo manda)
+    const { data: notas } = await admin.from('asistente_conocimiento')
+      .select('tema, contenido, created_at').eq('activo', true)
+      .order('created_at', { ascending: true }).limit(200);
+    const conocimiento = (notas || []).map(n => `[${String(n.created_at).slice(0, 10)}] ${n.tema}\n${n.contenido}`).join('\n\n');
+    const esAdmin = ADMIN_ROLES.includes(yo.role);
 
     // Consultas pendientes de quien pregunta: para agregarles datos en vez de duplicarlas
     const { data: abiertas } = await admin.from('asistente_tickets')
@@ -214,10 +479,11 @@ Deno.serve(async (req) => {
     // pendientes) NO va en `system`: el modelo ata su razonamiento a todo lo anterior y un
     // `system` distinto en el turno siguiente da 400. Va como contexto dentro del mensaje nuevo.
     const system: Anthropic.Beta.BetaTextBlockParam[] = [
-      { type: 'text', text: `${INSTRUCCIONES}\n\n═══ MAPA DE LA APP ═══\n${MAPA_APP}\n\n═══ MANUAL OPERATIVO ═══\n${MANUAL}`, cache_control: { type: 'ephemeral' } },
-      { type: 'text', text: `═══ RESPUESTAS DE ADMINISTRACIÓN (valen igual que el manual; si chocan, mandan estas) ═══\n${extra || '(ninguna todavía)'}` },
+      { type: 'text', text: `${INSTRUCCIONES}\n\n═══ MAPA DE LA APP ═══\n${MAPA_APP}\n\n═══ MANUAL OPERATIVO ═══\n${MANUAL}\n\n═══ TÉRMINOS Y CONDICIONES Y REGLAMENTO (los firma el cliente) ═══\n${TERMINOS}\n\n═══ METODOLOGÍA DE NATACIÓN 2026 ═══\n${METODOLOGIA}`, cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: `═══ CONOCIMIENTO AGREGADO POR ADMINISTRACIÓN (vale igual que el manual; si choca, manda esto, y entre dos notas manda la más reciente) ═══\n${conocimiento || '(nada todavía)'}\n\n═══ RESPUESTAS DE ADMINISTRACIÓN (valen igual que el manual; si chocan, mandan estas) ═══\n${extra || '(ninguna todavía)'}` },
     ];
-    const contexto = `═══ CONTEXTO DE LA APP ═══\nNombre: ${yo.nombre || caller.user.email}\nRol: ${yo.role}\nSede: ${yo.sede || 'sin sede fija'}\nPantalla abierta: ${pagina || 'menú principal'}\n\nCONSULTAS PENDIENTES DE ESTA PERSONA:\n${pendientes || '(ninguna)'}`;
+    const ahora = new Date().toLocaleString('es-CR', { timeZone: 'America/Costa_Rica', dateStyle: 'full', timeStyle: 'short' });
+    const contexto = `═══ CONTEXTO DE LA APP ═══\nFecha y hora (Costa Rica): ${ahora}\nNombre: ${yo.nombre || caller.user.email}\nRol: ${yo.role}\nSede: ${yo.sede || 'sin sede fija'}\nPantalla abierta: ${pagina || 'menú principal'}\n\nCONSULTAS PENDIENTES DE ESTA PERSONA:\n${pendientes || '(ninguna)'}`;
 
     const messages: Anthropic.Beta.BetaMessageParam[] = [...historial,
       { role: 'user', content: [{ type: 'text', text: contexto }, { type: 'text', text: mensaje }] }];
@@ -237,7 +503,7 @@ Deno.serve(async (req) => {
           thinking: { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } } as Anthropic.Beta.BetaThinkingConfigParam,
           // Haiku no tiene respaldo automático (fallbacks): un rechazo se maneja abajo (stop_reason 'refusal').
           betas: ['thinking-binding-controls-2026-08-01'],
-          system, tools: TOOLS, messages,
+          system, tools: [...TOOLS, ...(CAJA_ROLES.includes(yo.role) ? [TOOL_CAJA] : []), ...(esAdmin ? [TOOL_CONOCIMIENTO] : [])], messages,
         });
       } catch (e) {
         if (e instanceof Anthropic.APIError) {
@@ -261,6 +527,31 @@ Deno.serve(async (req) => {
           } catch (e) {
             resultados.push({ type: 'tool_result', tool_use_id: b.id, is_error: true, content: (e as Error).message });
           }
+          continue;
+        }
+        if (b.name === 'revisar_caja') {
+          const inp = b.input as { sede?: string; efectivo_contado?: number | null };
+          const contado = inp.efectivo_contado == null || !isFinite(Number(inp.efectivo_contado)) ? null : Number(inp.efectivo_contado);
+          try {
+            const r = CAJA_ROLES.includes(yo.role) ? await revisarCaja(admin, yo, String(inp.sede || ''), contado) : 'ERROR: este rol no maneja caja.';
+            resultados.push({ type: 'tool_result', tool_use_id: b.id, content: r });
+          } catch (e) {
+            resultados.push({ type: 'tool_result', tool_use_id: b.id, is_error: true, content: 'No se pudo leer la caja: ' + (e as Error).message });
+          }
+          continue;
+        }
+        if (b.name === 'guardar_conocimiento') {
+          const inp = b.input as { tema?: string; contenido?: string };
+          const tema = String(inp.tema || '').trim().slice(0, 200), contenido = String(inp.contenido || '').trim().slice(0, 6000);
+          let falla = !esAdmin ? 'Solo Administración puede agregar conocimiento.' : !tema || !contenido ? 'Falta el tema o el contenido.' : '';
+          if (!falla) {
+            const { data: n, error } = await admin.from('asistente_conocimiento').insert({
+              tema, contenido, creado_por: caller.user.id, autor: yo.nombre || caller.user.email,
+            }).select('id').single();
+            if (n) resultados.push({ type: 'tool_result', tool_use_id: b.id, content: `Guardado como nota #${n.id}. Se usa desde la próxima consulta.` });
+            else falla = 'No se guardó: ' + (error?.message || '');
+          }
+          if (falla) resultados.push({ type: 'tool_result', tool_use_id: b.id, is_error: true, content: falla });
           continue;
         }
         const inp = b.input as { tipo?: string; resumen?: string; detalle?: string };

@@ -158,6 +158,10 @@
   .btn.plain svg{stroke:var(--label)}
   .btn.danger{background:var(--red-tint);color:var(--red)}
   .btn.danger svg{stroke:var(--red)}
+  .sheet-body .farea{flex-direction:column;align-items:stretch;gap:2px}
+  .sheet-body .farea label{font-size:13px;color:var(--sec)}
+  .sheet-body .farea textarea{border:0;background:transparent;color:var(--label);outline:none;font:inherit;font-size:17px;min-height:44px;resize:vertical;padding:2px 0}
+  .sheet-body .farea textarea::placeholder{color:var(--ter)}
   .sheet-body select.qty{width:58%;text-align:right;font-weight:400;-webkit-appearance:none;appearance:none}
   .sheet-body .search{margin:0 0 10px}
   .sheet-body .search input{background:var(--fill)}
@@ -196,7 +200,7 @@
 <script src="/asistente.js" defer></script>
 <script>
 const SUPA_URL='__SUPA_URL__', SUPA_KEY='__SUPA_KEY__';
-const APP_VER='2026-10-28b';
+const APP_VER='2026-10-29a';
 const SEDES=['3 Ríos','Natación','Pinares','Sabanilla'];
 const SEDE_COLOR={'3 Ríos':'var(--teal)','Natación':'var(--blue)','Pinares':'var(--pinares)','Sabanilla':'var(--indigo)'};
 const ROLES_PERMITIDOS=['recepcion','admin_sucursal','coordinador','admin_sedes','admin_g','admin'];
@@ -214,12 +218,14 @@ const ICONS={
   proyecciones:'<svg viewBox="0 0 24 24"><path d="M4 18L10 11l4 4 6-8"/><path d="M15 7h5v5"/></svg>',
   arqueo:'<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8 13l3 3 5-6"/></svg>',
   mediciones:'<svg viewBox="0 0 24 24"><path d="M2 9h20v6H2z"/><path d="M6 9v3M10 9v4M14 9v3M18 9v4"/></svg>',
-  minita:'<svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>'
+  minita:'<svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>',
+  pagos:'<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 11l2 2 4-4"/></svg>'
 };
 const MODS=[
   {id:'caja',label:'Caja',color:'var(--brand)'},
   {id:'minita',label:'Minita',color:'var(--green)'},
   {id:'gastos',label:'Gastos',color:'var(--orange)'},
+  {id:'pagos',label:'Pagos',color:'var(--indigo)'},
   {id:'inventario',label:'Inventario',color:'var(--amber)'},
   {id:'arqueo',label:'Arqueo',color:'#FF2D55',arqueo:true},
   {id:'mediciones',label:'Mediciones',color:'var(--purple)',med:true},
@@ -256,7 +262,7 @@ const puedeArquear=()=>esAdmin()||me?.role==='admin_sucursal';
 const verInventarioReal=()=>esAdmin()||me?.role==='coordinador';
 // Mediciones: recepción/coordinación agenda, el instructor solo marca la rutina.
 const puedeAgendarMed=()=>esAdmin()||['recepcion','admin_sucursal','coordinador'].includes(me?.role);
-const puedeRutinaMed=()=>esAdmin()||me?.role==='instructor';
+const puedeRutinaMed=()=>esAdmin()||['instructor','coordinador'].includes(me?.role);
 const puedeVerMed=()=>puedeAgendarMed()||puedeRutinaMed();
 // Asistencia: presente lo marcan recepción o el instructor; ausente solo recepción (lo valida la base)
 const puedePresenteMed=()=>puedeAgendarMed()||me?.role==='instructor';
@@ -279,6 +285,8 @@ async function refreshSession(){
     saveAuth({access_token:d.access_token,refresh_token:d.refresh_token,expires_at:Date.now()+(d.expires_in||3600)*1000,user_id:d.user?.id||auth.user_id,email:d.user?.email||auth.email}); return true;
   }catch(_){return false;}
 }
+// Chloe (asistente.js) usa la sesión de esta app, no la de /sesion.js (que aquí no se inicia)
+window.AsistenteSesion={ token:()=>auth?.access_token||null, url:()=>SUPA_URL, key:()=>SUPA_KEY, renovar:()=>auth?.refresh_token?refreshSession():false };
 async function loadMe(){
   const rows=await supaFetch(`/user_roles?id=eq.${auth.user_id}&select=role,nombre,sede,sedes_extra`);
   me=rows?.[0]||null;
@@ -310,7 +318,10 @@ async function boot(){
   }
   document.getElementById('login').hidden=false;
 }
-function enterApp(){ document.getElementById('login').hidden=true; document.getElementById('app').hidden=false; goSedes(); revisarClave(); }
+function enterApp(){ document.getElementById('login').hidden=true; document.getElementById('app').hidden=false; goSedes().then(()=>{ if(anularEn){ const id=anularEn; anularEn=null; abrirSolicitudAnulacion(id); } }); revisarClave(); }
+// /movil?anular=<id> (notificación de una solicitud de anulación): se abre al entrar
+let anularEn=null;
+try{ const qs=new URLSearchParams(location.search); anularEn=qs.get('anular'); if(anularEn){ qs.delete('anular'); history.replaceState(null,'',location.pathname+(qs.toString()?'?'+qs:'')+location.hash); } }catch(_){}
 // Contraseña: la app maneja su propia sesión; el cambio usa la ventana compartida de /sesion.js
 function clavePara(forzado){ if(!window.Sesion) return;
   Sesion.cambiarClave({ forzado, url:SUPA_URL, key:SUPA_KEY, token:auth?.access_token, email:auth?.email,
@@ -419,13 +430,15 @@ async function renderHub(showLoading){
   document.getElementById('nav').innerHTML=`<div class="row"><button class="back" onclick="back()"><svg viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(backLabel())}</button><span class="tt">${esc(s)}</span><button class="act" onclick="abrirCaja()">Abrir caja</button></div><div class="row"><span class="st">${esc(fechaLarga(selDate))}</span><span id="hubEstado"></span></div>`;
   const v=document.getElementById('view');
   if(showLoading) v.innerHTML='<div class="tiles"><div class="skel" style="margin:0;height:70px"></div><div class="skel" style="margin:0;height:70px"></div></div><div class="mods">'+'<div class="skel" style="margin:0;width:60px;height:60px;border-radius:14px"></div>'.repeat(4)+'</div>';
-  const [r1,r2,r3]=await Promise.allSettled([loadDia(), supaFetch(`/envios_mercaderia?sede=eq.${encodeURIComponent(s)}&estado=eq.pendiente&select=id`), !puedeVerStock()?Promise.resolve([]):invCache[s]?Promise.resolve(invCache[s]):loadInventario(s)]);
+  const [r1,r2,r3,r4]=await Promise.allSettled([loadDia(), supaFetch(`/envios_mercaderia?sede=eq.${encodeURIComponent(s)}&estado=eq.pendiente&select=id`), !puedeVerStock()?Promise.resolve([]):invCache[s]?Promise.resolve(invCache[s]):loadInventario(s),
+    esAdmin()?supaFetch(`/facturas_pendientes?sede=eq.${encodeURIComponent(s)}&estado=eq.pendiente&select=id`):Promise.resolve([])]);
   if(r1.status==='rejected'){ v.innerHTML=`<div class="empty">No se pudo cargar: ${esc(r1.reason?.message||'error')}</div>`; return; }
   const c=ultimoTurno(s); const di=difInfo(c);
   const nEnv=r2.status==='fulfilled'?(r2.value||[]).length:0;
   const inv=r3.status==='fulfilled'?(r3.value||[]):[]; const nBajo=inv.filter(r=>Number(r.cantidad)<Number(r.cantidad_minima||0)).length;
   const pend=pendientesDe(s);
-  const badges={caja:pend.length,inventario:nBajo,envios:nEnv};
+  const nFact=r4.status==='fulfilled'?(r4.value||[]).length:0;
+  const badges={caja:pend.length,inventario:nBajo,envios:nEnv,pagos:nFact};
   const est=document.getElementById('hubEstado'); if(est) est.innerHTML=estadoPill(c);
   const mods=MODS.filter(modVisible).map(m=>`<button class="mod" onclick="goMod('${m.id}',()=>goHub('${esc(s)}'))"><span class="app" style="background:${m.color}">${ICONS[m.id]}${badges[m.id]?`<span class="badge">${badges[m.id]}</span>`:''}</span>${m.label}</button>`).join('');
   v.innerHTML=`
@@ -435,10 +448,11 @@ async function renderHub(showLoading){
       <div class="tile wide"><div><span class="l">Diferencia de caja</span><div class="n num" style="color:${!di?'var(--sec)':di.cls==='ok'?'var(--green)':di.cls==='bad'?'var(--red)':'var(--blue)'}">${c?fmt(Math.abs(Math.round(Number(c.diferencia)||0))):'—'}</div></div>${di?`<span class="pill ${di.cls}">${di.txt}</span>`:'<span class="pill warn">Sin turno</span>'}</div>
     </div>
     <div class="sect"><div class="hdr">Módulos de ${esc(s)}</div><div class="mods">${mods}</div></div>
-    ${pend.length||nBajo||nEnv?`<div class="sect"><div class="hdr">Revisar</div><div class="group">
+    ${pend.length||nBajo||nEnv||nFact?`<div class="sect"><div class="hdr">Revisar</div><div class="group">
       ${pend.map(t=>`<button class="cell" onclick="goMod('caja',()=>goHub('${esc(s)}'))"><div class="main"><span class="t">${esc(t)}</span><span class="s">Caja · turno ${c?c.turno_num:''}</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`).join('')}
       ${nBajo?`<button class="cell" onclick="goMod('inventario',()=>goHub('${esc(s)}'))"><div class="main"><span class="t">${nBajo} producto(s) bajo mínimo</span><span class="s">Inventario</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`:''}
       ${nEnv?`<button class="cell" onclick="goMod('envios',()=>goHub('${esc(s)}'))"><div class="main"><span class="t">${nEnv} envío(s) por aceptar</span><span class="s">Envíos de mercadería</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`:''}
+      ${nFact?`<button class="cell" onclick="goMod('pagos',()=>goHub('${esc(s)}'))"><div class="main"><span class="t">${nFact} factura(s) por aprobar</span><span class="s">Pagos a instructores</span></div><svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`:''}
     </div></div>`:`<div class="sect"><div class="ftr" style="text-align:center">Nada pendiente por revisar en ${esc(s)}.</div></div>`}`;
 }
 
@@ -454,6 +468,7 @@ async function renderMod(showLoading){
   if(curMod==='arqueoVer') return renderArqueoVer();
   if(curMod==='inventario') return renderInventarioMod();
   if(curMod==='gastos') return renderGastosMod();
+  if(curMod==='pagos') return renderPagosMod();
   if(curMod==='cierres') return renderCierresMod();
   if(curMod==='envios') return renderEnviosMod();
   if(curMod==='mediciones') return renderMedicionesMod();
@@ -483,7 +498,7 @@ const medPill=c=>c.rutina==='completa'?'<span class="pill ok">✓ Completa</span
                :c.rutina==='incompleta'?'<span class="pill bad">✗ Incompleta</span>'
                :c.rutina==='sin_rutina'?'<span class="pill solomed">📏 Solo medición</span>'
                :c.asistencia==='ausente'?'<span class="pill warn">Ausente</span>'
-               :c.asistencia==='presente'?'<span class="pill info">Presente</span>'
+               :c.asistencia==='presente'?'<span class="pill info">⏳ En proceso</span>'
                :medPasada(c)?'<span class="pill warn">Sin marcar</span>'
                :'<span class="pill status">Pendiente</span>';
 
@@ -498,11 +513,14 @@ async function renderMedicionesMod(){
   v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
   const seq=++medSeq, sedeQ=encodeURIComponent(detSede), dow=medDow(medFecha);
   try{
-    const [rows,blos]=await Promise.all([
+    const [rows,blos,ins]=await Promise.all([
       supaFetch(`/mediciones?sede=eq.${sedeQ}&fecha=eq.${medFecha}&order=hora.asc&select=*`),
       // Bloqueos que aplican a este día: el permanente de su día de la semana, o el de esta fecha
-      supaFetch(`/mediciones_bloqueos?sede=eq.${sedeQ}&or=(and(tipo.eq.permanente,dia_semana.eq.${dow}),and(tipo.eq.unico,fecha.eq.${medFecha}))&select=*`).catch(()=>[])
+      supaFetch(`/mediciones_bloqueos?sede=eq.${sedeQ}&or=(and(tipo.eq.permanente,dia_semana.eq.${dow}),and(tipo.eq.unico,fecha.eq.${medFecha}))&select=*`).catch(()=>[]),
+      // Instructores de la sede, para asignar quién atiende (si falta el SQL, lista vacía)
+      supaFetch('/rpc/mediciones_instructores',{method:'POST',body:{p_sede:detSede}}).catch(()=>[])
     ]);
+    medInstructores=ins||[];
     medRows=rows||[];
     medBloq={}; (blos||[]).forEach(b=>{ medBloq[String(b.hora||'').slice(0,5)]=b; });
   }
@@ -520,7 +538,7 @@ async function renderMedicionesMod(){
   const fuera=medRows.filter(r=>!validos.includes(String(r.hora||'').slice(0,5)));   // agendadas antes del cambio de horario
   const chevSvg='<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg>';
   const fila=m=>{ const h=medHH(m), c=by[h];
-    if(c) return `<button class="cell" onclick="medAbrir('${h}')"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}</span></div>${medPill(c)}${chevSvg}</button>`;
+    if(c) return `<button class="cell" onclick="medAbrir('${h}')"><span class="v num" style="width:44px;flex:none">${h}</span><div class="main"><span class="t">${esc(c.nombre)}</span><span class="s">${esc(c.telefono||'Sin teléfono')}${c.pin?' · PIN '+esc(c.pin):''}${medMidio(c)?' · Midió '+esc(medMidio(c)):(c.asistencia==='presente'&&c.instructor_nombre?' · Con '+esc(c.instructor_nombre):'')}${c.condicion_medica?' · ⚕️':''}</span></div>${medPill(c)}${chevSvg}</button>`;
     const b=medBloq[h];
     if(b){ const det=(b.tipo==='permanente'?'Todos los '+MED_DIAS[b.dia_semana]:'Solo este día')+(b.motivo?' · '+esc(b.motivo):'');
       return puedeAgendarMed()
@@ -542,8 +560,18 @@ async function renderMedicionesMod(){
     ${fuera.length?`<div class="sect"><div class="hdr">⚠ Fuera del horario</div><div class="group">${fuera.map(r=>fila(medMin(r.hora))).join('')}</div><div class="ftr">Se agendaron antes del cambio de horario. Abrilas para eliminarlas y volver a agendarlas en un espacio válido.</div></div>`:''}
     <div class="sect"><div class="hdr">Mañana · 7:30 a 10:30</div><div class="group">${amHoy.map(fila).join('')}</div></div>
     <div class="sect"><div class="hdr">Tarde · 5:00 a 7:45 p. m.</div><div class="group">${pmHoy.length?pmHoy.map(fila).join(''):'<div class="cell"><span class="s">Viernes en la tarde no hay mediciones.</span></div>'}</div>
-      <div class="ftr">${puedeRutinaMed()&&!puedeAgendarMed()?'Como instructor podés marcar la rutina y si el cliente llegó (presente).':'La rutina la marca el instructor. Ausente solo lo marca recepción.'} Sábado y domingo no hay medición.</div></div>`;
+      <div class="ftr">${puedeRutinaMed()&&!puedeAgendarMed()?'Como instructor podés tomar una medición (Yo la atiendo), marcar la rutina, si el cliente llegó (presente) y llenar la ficha.':puedeRutinaMed()?'Podés marcar la rutina y si el cliente llegó (presente o ausente) desde el día de la cita.':'La rutina la marca el instructor o el coordinador.'} Sábado y domingo no hay medición.</div></div>`;
 }
+
+// Quién hizo la medición (marcó la rutina): nombre, o el correo en las viejas
+const medMidio=c=>c&&c.rutina?(c.rutina_por_nombre||c.rutina_por||''):'';
+// Ficha opcional del cliente: la llenan recepción al agendar o el instructor en la medición
+const MED_FICHA=[['objetivos','medObj','Objetivos','Ej. bajar de peso, ganar masa muscular'],
+                 ['dias_entreno','medDias','Días que puede entrenar','Ej. lunes, miércoles y viernes en la tarde'],
+                 ['condicion_medica','medCond','Condición médica','Ej. hipertensión, lesión de rodilla…']];
+const medHtmlFicha=c=>`<div class="hdr" style="padding:16px 0 6px">Ficha del cliente · opcional</div>
+  <div class="group" style="margin:0">${MED_FICHA.map(([k,id,lbl,ph])=>`<div class="cell farea"><label for="${id}">${lbl}</label><textarea id="${id}" rows="2" maxlength="1000" placeholder="${esc(ph)}">${esc(c?.[k]||'')}</textarea></div>`).join('')}</div>`;
+const medLeerFicha=()=>Object.fromEntries(MED_FICHA.map(([k,id])=>[k,document.getElementById(id)?.value.trim()||null]));
 
 // Hoja de una medición: crear, editar, marcar rutina o eliminar
 let medHora=null, medRutina='', medAsist='', medAsistOrig='', medFutura=false;
@@ -553,6 +581,7 @@ function medAbrir(h){
   const b=!c && medBloq[h];
   if(b){ medHojaBloqueo(h,b); return; }
   medHora=h; medRutina=c?.rutina||''; medAsist=c?.asistencia||''; medAsistOrig=medAsist; medFutura=medFecha>todayStr();
+  medInstr=c?.instructor_id||''; medInstrOrig=medInstr; medInstrNom=c?.instructor_nombre||'';
   const editable=puedeAgendarMed();
   const campo=(lab,id,val,ph,tipo)=>editable
     ? `<div class="cell"><div class="main"><span class="t">${lab}</span></div><input class="qty" id="${id}" type="${tipo||'text'}" value="${esc(val||'')}" placeholder="${ph}" style="width:58%;text-align:right;font-weight:400"></div>`
@@ -579,6 +608,7 @@ function medAbrir(h){
           </div>
           ${c.asistencia_por?`<div class="ftr" style="padding:8px 0 0">Marcado por ${esc(c.asistencia_por)}</div>`:''}
           ${!puedeAusenteMed()?'<div class="ftr" style="padding:6px 0 0">Solo recepción puede marcar ausente.</div>':''}
+          <div id="medInstrBox"></div>
           <div class="hdr" style="padding:16px 0 6px">Rutina</div>
           <div class="seg" id="medSeg" style="grid-auto-flow:row;grid-template-columns:1fr 1fr">
             <button data-v="" onclick="medSetRutina('')" ${puedeRutinaMed()?'':'disabled'}>Pendiente</button>
@@ -586,7 +616,8 @@ function medAbrir(h){
             <button data-v="incompleta" onclick="medSetRutina('incompleta')" ${puedeRutinaMed()?'':'disabled'}>✗ Incompleta</button>
             <button data-v="sin_rutina" onclick="medSetRutina('sin_rutina')" ${puedeRutinaMed()?'':'disabled'}>📏 Solo medición</button>
           </div>
-          ${c.rutina_por?`<div class="ftr" style="padding:8px 0 0">Marcada por ${esc(c.rutina_por)}</div>`:''}`:''}
+          ${medMidio(c)?`<div class="ftr" style="padding:8px 0 0">Medición hecha por <b>${esc(medMidio(c))}</b>${c.rutina_at?' · '+new Date(c.rutina_at).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</div>`:''}`:''}
+        ${medHtmlFicha(c)}
         <div class="err" id="medErr" style="text-align:left"></div>
         ${c&&editable?`<button class="btn plain" style="margin-top:14px;color:var(--red)" onclick="medBorrar('${c.id}')">Eliminar medición</button>`:''}
         ${!c&&editable?`<button class="btn plain" style="margin-top:14px" onclick="medBloquearHoja('${h}')">🔒 Bloquear este espacio</button>`:''}
@@ -676,12 +707,41 @@ function medPintarSeg(){
     b.disabled=!puedeRutinaMed()||(medAsist==='ausente'&&b.dataset.v!==''); });
   document.querySelectorAll('#medSegAsist button').forEach(b=>{ const v=b.dataset.v; b.classList.toggle('on',v===medAsist);
     b.disabled = medFutura || (v==='presente' ? !puedePresenteMed() : (!puedeAusenteMed() && v!==medAsistOrig)); });
+  medPintarInstr();
 }
+// Instructor que atiende: obligatorio al marcar presente. Recepción lo escoge;
+// el instructor solo puede tomarla él mismo (la base lo hace cumplir).
+let medInstructores=[], medInstr='', medInstrOrig='', medInstrNom='';
+function medPintarInstr(){
+  const box=document.getElementById('medInstrBox'); if(!box) return;
+  if(medAsist!=='presente'){ box.innerHTML=''; return; }
+  const yo=auth?.user_id||'';
+  if(me?.role==='instructor'){
+    const nom = medInstr===yo ? 'Vos' : medInstr ? (medInstrNom||'Otro instructor') : 'Vos (al guardar)';
+    box.innerHTML=`<div class="group" style="margin:10px 0 0"><div class="cell"><div class="main"><span class="t">Lo atiende</span></div><span class="v">${esc(nom)}</span>
+      ${medInstr&&medInstr!==yo?`<button class="btn" style="width:auto;min-height:36px;padding:0 12px;font-size:14px;flex:none;background:var(--brand);color:#fff" onclick="medTomar()">Yo la atiendo</button>`:''}</div></div>`;
+    return;
+  }
+  const lista=[...medInstructores];
+  if(medInstr&&!lista.some(i=>i.id===medInstr)) lista.unshift({id:medInstr,nombre:medInstrNom||'(otro)'});
+  box.innerHTML=`<div class="group" style="margin:10px 0 0"><div class="cell"><div class="main"><span class="t">Lo atiende <span style="color:var(--red)">*</span></span></div>
+    <select class="qty" id="medInstr" onchange="medInstr=this.value;medInstrNom=this.options[this.selectedIndex].text">
+      <option value="">Escoger…</option>
+      ${lista.map(i=>`<option value="${esc(i.id)}"${i.id===medInstr?' selected':''}>${esc(i.nombre)}</option>`).join('')}
+    </select></div></div>
+    ${!medInstructores.length?'<div class="ftr" style="padding:6px 0 0">No se pudo cargar la lista de instructores (¿falta correr mediciones_instructor.sql?).</div>':''}`;
+}
+function medTomar(){ medInstr=auth?.user_id||''; medInstrNom=me?.nombre||''; medPintarInstr(); }
 async function medGuardar(id){
   const err=document.getElementById('medErr'), btn=document.getElementById('medSave');
   const inp=i=>document.getElementById(i)?.value.trim()||'';
-  const body = id ? {rutina:medRutina||null} : {};
+  const body = id ? {rutina:medRutina||null, ...medLeerFicha()} : medLeerFicha();
   if(id && medAsist!==medAsistOrig) body.asistencia=medAsist||null;   // solo si cambió (la base valida quién puede)
+  if(id && medAsist==='presente'){
+    if(!medInstr && me?.role!=='instructor' && (medAsist!==medAsistOrig || medInstrOrig)){
+      err.textContent='Escoja el instructor que atiende al cliente.'; return; }
+    if(medInstr!==medInstrOrig) body.instructor_id=medInstr||null;
+  }
   if(puedeAgendarMed()){
     const nombre=inp('medNombre');
     if(!nombre){ err.textContent='El nombre es obligatorio.'; return; }
@@ -696,6 +756,8 @@ async function medGuardar(id){
   }catch(e){ btn.disabled=false; btn.textContent=id?'Guardar':'Agendar';
     err.textContent = /bloqueado/i.test(e.message) ? 'Ese espacio acaba de ser bloqueado. Recargá la agenda.'
                     : /duplicate|unique/i.test(e.message) ? 'Ese espacio ya fue tomado. Recargá.'
+                    : /objetivos|dias_entreno|condicion_medica/.test(e.message) ? 'Falta correr mediciones_ficha.sql en Supabase.'
+                    : /instructor_id/.test(e.message) ? 'Falta correr mediciones_instructor.sql en Supabase.'
                     : (()=>{ try{ return JSON.parse(e.message).message||e.message; }catch(_){ return e.message; } })(); }
 }
 async function medBorrar(id){
@@ -849,6 +911,74 @@ async function renderGastosMod(){
       <div class="ftr">Gastos de ${esc(detSede)} registrados en el módulo de Gastos (incluye los pagos de caja; no incluye depósitos).</div></div>`;
 }
 
+/* ══ Pagos a instructores: facturas por aprobar (admins) y recibos ══
+   La revisión completa (XML, Hacienda, clases, tarifas) es la de /gastos: «Revisar y aprobar» la abre
+   con esa factura cargada. Rechazar sí se hace aquí. */
+let pagPend=[];
+function abrirGastos(params){ handoff(detSede||me.sede); location.href='/gastos?from=movil&'+params; }
+async function renderPagosMod(){
+  navMod('Pagos');
+  const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
+  const sede=encodeURIComponent(detSede);
+  const [rp,rr]=await Promise.allSettled([
+    esAdmin()?supaFetch(`/facturas_pendientes?sede=eq.${sede}&estado=eq.pendiente&order=created_at.asc&select=id,sede,numero_factura,emisor_nombre,emisor_cedula,monto,clases,pago_forma,pago_banco,pago_numero,telefono,nota,created_at`):Promise.resolve([]),
+    supaFetch(`/gastos?sede=eq.${sede}&origen=eq.recibo&order=cargado_at.desc&limit=10&select=id,emisor,monto,cargado_at,dia_pago,pago_tipo,pagado_at`)]);
+  if(rp.status==='rejected'){ v.innerHTML=`<div class="empty">No se pudieron cargar las facturas: ${esc(rp.reason?.message||'error')}</div>`; return; }
+  pagPend=rp.value||[]; const recibos=rr.status==='fulfilled'?(rr.value||[]):[];
+  const chev='<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg>';
+  const pagoTxt=g=>g.pago_tipo==='caja'?'De caja':g.dia_pago?'Pago '+fechaDMY(g.dia_pago):'';
+  v.innerHTML=`
+    <div class="actionbar"><button class="btn primary" onclick="abrirGastos('vista=recibos')">${ICONS.pagos}Crear recibo</button></div>
+    ${esAdmin()?`<div class="sect"><div class="hdr">Facturas por aprobar</div><div class="group">${pagPend.length?pagPend.map(p=>`<button class="cell" onclick="verPendiente('${p.id}')"><div class="main"><span class="t">${esc(p.emisor_nombre||'—')}</span><span class="s">Factura …${esc(String(p.numero_factura||'').slice(-6))} · enviada ${esc(fechaHora(p.created_at))}</span></div><span class="v strong num">${fmt(p.monto)}</span>${chev}</button>`).join('')
+      :'<div class="cell"><span class="s">No hay facturas esperando aprobación en esta sede.</span></div>'}</div>
+      <div class="ftr">Las envían los instructores desde jykc.dev/factura. Tocá una para ver el detalle, aprobarla o rechazarla.</div></div>`:''}
+    <div class="sect"><div class="hdr">Recibos recientes</div><div class="group">${recibos.length?recibos.map(g=>`<div class="cell"><div class="main"><span class="t">${esc(g.emisor||'—')}</span><span class="s">${esc(fechaHora(g.cargado_at))}${pagoTxt(g)?' · '+esc(pagoTxt(g)):''}${g.pagado_at?' · pagado':''}</span></div><span class="v num">${fmt(g.monto)}</span></div>`).join('')
+      :'<div class="cell"><span class="s">Sin recibos registrados en esta sede.</span></div>'}</div>
+      <div class="ftr">Recibos de clase grupal (instructores que cobran por clase sin factura). «Crear recibo» abre Gastos → Recibos: a mano o desde la plantilla semanal.</div></div>`;
+}
+function verPendiente(id){
+  const p=pagPend.find(x=>x.id===id); if(!p) return;
+  const fila=(t,val)=>`<div class="cell"><div class="main"><span class="t">${t}</span></div><span class="v" style="text-align:right;white-space:normal">${val}</span></div>`;
+  const clases=(Array.isArray(p.clases)?p.clases:[]).map(c=>`${esc(c.cantidad)} ${esc(c.tipo)} (${esc(fechaDMY(c.fecha))})`).join('<br>')||'—';
+  const pago=[p.pago_forma==='sinpe'?'SINPE Móvil':p.pago_banco||p.pago_forma||'',p.pago_numero||''].filter(Boolean).join(' · ')||'—';
+  const sh=document.getElementById('sheet');
+  sh.innerHTML=`<div class="sheet-bg" onclick="cerrarSheet()"></div>
+    <div class="sheet-panel" role="dialog" aria-label="Factura por aprobar">
+      <div class="sheet-h"><button class="act" onclick="cerrarSheet()">Cerrar</button><span class="tt">Factura por aprobar</span><span class="act" style="visibility:hidden">Cerrar</span></div>
+      <div class="sheet-body">
+        <div class="group" style="margin:0">
+          ${fila('Emisor',esc(p.emisor_nombre||'—'))}
+          ${fila('Cédula',esc(p.emisor_cedula||'—'))}
+          ${fila('N.º de factura',esc(p.numero_factura||'—'))}
+          ${fila('Monto','<b class="num">'+fmt(p.monto)+'</b>')}
+          ${fila('Clases que indicó',clases)}
+          ${fila('Se le paga a',esc(pago))}
+          ${p.telefono?fila('Teléfono',esc(p.telefono)):''}
+          ${p.nota?fila('Nota',esc(p.nota)):''}
+          ${fila('Enviada',esc(fechaHora(p.created_at)))}
+        </div>
+        <div style="padding-top:18px;display:flex;flex-direction:column;gap:10px">
+          <button class="btn primary" onclick="abrirGastos('aprobar=${encodeURIComponent(p.id)}')">Revisar y aprobar</button>
+          <button class="btn danger" id="btnRechFact" onclick="rechazarPendiente('${p.id}')">Rechazar</button>
+        </div>
+        <div class="ftr" style="padding:10px 0 0">«Revisar y aprobar» abre la factura en Gastos: el sistema revisa el XML y el estado en Hacienda, usted confirma las clases y toca «Aprobar y enviar a Gastos».</div>
+      </div></div>`;
+  sh.hidden=false; document.body.style.overflow='hidden';
+}
+async function rechazarPendiente(id){
+  if(!esAdmin()) return;
+  const p=pagPend.find(x=>x.id===id); if(!p) return;
+  const motivo=prompt(`¿Por qué se rechaza la factura de ${p.emisor_nombre||'este instructor'}?\n(Avísele al instructor: puede corregirla y volver a enviarla.)`);
+  if(motivo===null) return;
+  if(!motivo.trim()){ alert('Escriba el motivo del rechazo.'); return; }
+  const b=document.getElementById('btnRechFact'); if(b){ b.disabled=true; b.textContent='Rechazando…'; }
+  try{
+    await supaFetch(`/facturas_pendientes?id=eq.${encodeURIComponent(id)}&estado=eq.pendiente`,{method:'PATCH',
+      body:{estado:'rechazada',motivo_rechazo:motivo.trim(),revisado_por:auth.email||null,revisado_at:new Date().toISOString()}});
+    cerrarSheet(); toast(`Factura de ${p.emisor_nombre||'el instructor'} rechazada`); renderPagosMod();
+  }catch(e){ alert('No se pudo rechazar: '+e.message); if(b){ b.disabled=false; b.textContent='Rechazar'; } }
+}
+
 // Cierres: historial de la sede
 async function renderCierresMod(){
   navMod('Cierres');
@@ -926,8 +1056,11 @@ async function cancelarEnvio(id){
 
 // Minita: facturas de caja del día (productos y eventos). Ver facturacion.sql.
 // Anula un coordinador o un admin, y solo mientras el turno de la factura siga abierto (lo valida anular_factura_caja).
-let fxRows=[], fxTurnos={};
+// Quien no puede anular la pide (anulaciones.sql); la Edge Function `asistente` avisa por push y
+// la notificación abre /movil?anular=<id> con los botones Aprobar y anular / Rechazar.
+let fxRows=[], fxTurnos={}, fxSol=[];
 const puedeAnular=()=>esAdmin()||me?.role==='coordinador';
+const solPend=fid=>fxSol.find(s=>s.factura_id===fid&&s.estado==='pendiente');
 const FX_MET={efectivo:'Efectivo',tarjeta:'Tarjeta',sinpe:'SINPE'};
 const fxMonto=(f,m)=>Array.isArray(f.pagos)&&f.pagos.length?f.pagos.filter(p=>p.metodo===m).reduce((a,p)=>a+(Number(p.monto)||0),0):(f.metodo===m?Number(f.total)||0:0);
 const fxMetTxt=f=>Array.isArray(f.pagos)&&f.pagos.length>1?f.pagos.map(p=>(FX_MET[p.metodo]||p.metodo)+' '+fmt(p.monto)).join(' + '):(FX_MET[f.metodo]||f.metodo||'—');
@@ -939,12 +1072,14 @@ async function renderMinitaMod(){
   const v=document.getElementById('view'); v.innerHTML='<div class="sect"><div class="skel"></div><div class="skel" style="margin-top:6px"></div></div>';
   const sede=detSede, fecha=selDate;
   let rows, turnos;
-  try{ [rows,turnos]=await Promise.all([
+  let sols;
+  try{ [rows,turnos,sols]=await Promise.all([
       supaFetch(`/facturas_caja?sede=eq.${encodeURIComponent(sede)}&fecha=eq.${fecha}&order=numero.desc&select=*`),
-      supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(sede)}&fecha=eq.${fecha}&select=id,turno_num,estado`)]); }
+      supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(sede)}&fecha=eq.${fecha}&select=id,turno_num,estado`),
+      supaFetch(`/anulaciones_caja?sede=eq.${encodeURIComponent(sede)}&fecha=eq.${fecha}&order=created_at.desc&select=*`).catch(()=>[])]); }
   catch(e){ v.innerHTML=`<div class="empty">No se pudieron cargar las facturas: ${esc(errTxt(e))}</div>`; return; }
   if(view!=='mod'||curMod!=='minita'||detSede!==sede||selDate!==fecha) return;   // cambió de pantalla mientras llegaba
-  fxRows=rows||[]; fxTurnos={}; (turnos||[]).forEach(t=>{ fxTurnos[t.id]=t; });
+  fxRows=rows||[]; fxSol=sols||[]; fxTurnos={}; (turnos||[]).forEach(t=>{ fxTurnos[t.id]=t; });
   const act=fxRows.filter(f=>f.estado!=='anulada'), nAnul=fxRows.length-act.length;
   const suma=L=>L.reduce((s,f)=>s+(Number(f.total)||0),0);
   const prods=act.filter(f=>f.tipo!=='evento'), evs=act.filter(f=>f.tipo==='evento');
@@ -952,23 +1087,34 @@ async function renderMinitaMod(){
   const top=Object.entries(porProd).sort((a,b)=>b[1].total-a[1].total);
   const cell=(t,s,val)=>`<div class="cell"><div class="main"><span class="t">${t}</span>${s?`<span class="s">${s}</span>`:''}</div><span class="v num">${val}</span></div>`;
   const fila=f=>{ const an=f.estado==='anulada'; const t=fxTurnos[f.cierre_id];
-    return `<button class="cell" onclick="verFactura('${f.id}')"><div class="main"><span class="t"${an?' style="text-decoration:line-through;color:var(--sec)"':''}>#${f.numero} · ${esc(fxDet(f))}</span><span class="s">${hora(f.created_at)}${t?' · T'+t.turno_num:''} · ${esc(fxMetTxt(f))}${f.created_by?' · '+esc(quien(f.created_by)):''}</span></div>${an?'<span class="pill bad">Anulada</span>':`<span class="v num">${fmt(f.total)}</span>`}<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`; };
+    return `<button class="cell" onclick="verFactura('${f.id}')"><div class="main"><span class="t"${an?' style="text-decoration:line-through;color:var(--sec)"':''}>#${f.numero} · ${esc(fxDet(f))}</span><span class="s">${hora(f.created_at)}${t?' · T'+t.turno_num:''} · ${esc(fxMetTxt(f))}${f.created_by?' · '+esc(quien(f.created_by)):''}</span></div>${an?'<span class="pill bad">Anulada</span>':solPend(f.id)?'<span class="pill warn">Por anular</span>':`<span class="v num">${fmt(f.total)}</span>`}<svg class="chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6"/></svg></button>`; };
   v.innerHTML=`
     <div class="tiles"><div class="tile"><span class="l">Minita</span><span class="n num">${fmt(suma(prods))}</span></div><div class="tile"><span class="l">Facturas</span><span class="n num">${act.length}${nAnul?` <small style="color:var(--red)">· ${nAnul} anulada${nAnul===1?'':'s'}</small>`:''}</span></div></div>
     ${act.length?`<div class="sect"><div class="hdr">Por método de pago</div><div class="group">${['efectivo','tarjeta','sinpe'].map(m=>cell(FX_MET[m],'',fmt(act.reduce((s,f)=>s+fxMonto(f,m),0)))).join('')}${evs.length?cell('Incluye eventos',`${evs.length} cobro(s) · no van al sobre`,fmt(suma(evs))):''}</div></div>`:''}
     ${top.length?`<div class="sect"><div class="hdr">Productos vendidos</div><div class="group">${top.map(([p,x])=>cell(esc(p),x.qty+' u',fmt(x.total))).join('')}</div></div>`:''}
     <div class="sect"><div class="hdr">Facturas</div><div class="group">${fxRows.length?fxRows.map(fila).join(''):'<div class="cell"><span class="s">No hay facturas de caja este día.</span></div>'}</div>
-      <div class="ftr">Cobros hechos en la pestaña Facturación de caja. ${puedeAnular()?'Tocá una factura para ver el detalle o anularla.':'Tocá una factura para ver el detalle.'}</div></div>`;
+      <div class="ftr">Cobros hechos en la pestaña Facturación de caja. ${puedeAnular()?'Tocá una factura para ver el detalle o anularla.':'Tocá una factura para ver el detalle o pedir que la anulen.'}</div></div>`;
 }
 function verFactura(id){
   const f=fxRows.find(x=>x.id===id); if(!f) return;
   const an=f.estado==='anulada', t=fxTurnos[f.cierre_id], abierto=t?.estado==='abierto';
   const fila=(a,b)=>`<div class="cell"><div class="main"><span class="t">${a}</span></div><span class="v">${b}</span></div>`;
   const items=Array.isArray(f.items)?f.items:[];
+  const sol=solPend(f.id);
   let pie;
   if(an) pie='';
-  else if(!puedeAnular()) pie='<div class="ftr" style="padding:12px 0 0">Solo un coordinador o un administrador puede anular facturas.</div>';
   else if(!abierto) pie='<div class="ftr" style="padding:12px 0 0">El turno de esta factura ya se cerró: no se puede anular, porque el cierre ya quedó guardado con ella.</div>';
+  else if(sol) pie=`<div class="hdr" style="padding:16px 0 6px">Anulación solicitada</div>
+      <div class="group" style="margin:0">${fila('Pidió',esc(sol.solicitante||'—'))}${fila('Hora',esc(fechaHora(sol.created_at)))}
+        <div class="cell"><div class="main"><span class="t">Motivo</span><span class="s">${esc(sol.motivo)}</span></div></div></div>
+      ${puedeAnular()?`<div style="padding-top:14px"><button class="btn danger" id="btnAprobar" onclick="resolverAnulacion(${sol.id},true)">Aprobar y anular factura #${f.numero}</button></div>
+      <div style="padding-top:8px"><button class="btn" id="btnRechazar" onclick="resolverAnulacion(${sol.id},false)">Rechazar</button></div>
+      <div class="ftr" style="padding:8px 0 0;text-align:center">${f.tipo==='evento'?'El cobro sale del cierre del turno.':'El cobro sale del cierre del turno y los productos vuelven al inventario.'} No se puede deshacer.</div>`
+      :'<div class="ftr" style="padding:12px 0 0">Esperando que Administración o el coordinador la aprueben. No cierre el turno mientras tanto.</div>'}`;
+  else if(!puedeAnular()) pie=`<div class="hdr" style="padding:16px 0 6px">Pedir anulación</div>
+      <div class="group" style="margin:0"><div class="cell"><div class="main"><span class="t">Motivo</span></div><input class="qty" id="fxMotivo" type="text" maxlength="200" placeholder="Obligatorio" style="width:62%;text-align:right;font-weight:400"></div></div>
+      <div style="padding-top:14px"><button class="btn danger" id="btnSolicitar" onclick="solicitarAnulacion('${f.id}')">Solicitar anulación de la #${f.numero}</button></div>
+      <div class="ftr" style="padding:8px 0 0;text-align:center">Administración y el coordinador reciben el aviso y la aprueban. No cierre el turno mientras tanto.</div>`;
   else pie=`<div class="hdr" style="padding:16px 0 6px">Anular</div>
       <div class="group" style="margin:0"><div class="cell"><div class="main"><span class="t">Motivo</span></div><input class="qty" id="fxMotivo" type="text" maxlength="200" placeholder="Obligatorio" style="width:62%;text-align:right;font-weight:400"></div></div>
       <div style="padding-top:14px"><button class="btn danger" id="btnAnular" onclick="anularFactura('${f.id}')">Anular factura #${f.numero}</button></div>
@@ -1008,6 +1154,43 @@ async function anularFactura(id){
     invCache[detSede]=null;   // el stock volvió al inventario
     cerrarSheet(); toast(`Factura #${f.numero} anulada.`); renderMinitaMod();
   }catch(e){ if(b){ b.disabled=false; b.textContent=`Anular factura #${f.numero}`; } toast('No se pudo anular: '+errTxt(e)); }
+}
+
+async function fnAsistente(body){
+  const call=()=>fetch(SUPA_URL+'/functions/v1/asistente',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+(auth?.access_token||''),'Content-Type':'application/json'},body:JSON.stringify(body)});
+  let res=await call(); if(res.status===401&&auth?.refresh_token&&await refreshSession()) res=await call();
+  const d=await res.json().catch(()=>({})); if(!res.ok) throw new Error(d.error||('Error '+res.status)); return d;
+}
+async function solicitarAnulacion(id){
+  const f=fxRows.find(x=>x.id===id); if(!f) return;
+  const inp=document.getElementById('fxMotivo'); const motivo=(inp?.value||'').trim();
+  if(!motivo){ toast('Escribí el motivo de la anulación.'); inp?.focus(); return; }
+  const b=document.getElementById('btnSolicitar'); if(b){ b.disabled=true; b.textContent='Enviando…'; }
+  try{ await fnAsistente({accion:'solicitar_anulacion',factura:id,motivo}); cerrarSheet(); toast(`Solicitud enviada para la factura #${f.numero}.`); renderMinitaMod(); }
+  catch(e){ if(b){ b.disabled=false; b.textContent=`Solicitar anulación de la #${f.numero}`; } toast('No se pudo enviar: '+e.message); }
+}
+async function resolverAnulacion(sid,aprobar){
+  if(!puedeAnular()) return;
+  const s=fxSol.find(x=>x.id===sid); if(!s) return;
+  let nota=null;
+  if(!aprobar){ nota=prompt(`¿Por qué se rechaza la anulación de la factura #${s.numero}? (opcional)`); if(nota==null) return; }
+  const b=document.getElementById(aprobar?'btnAprobar':'btnRechazar'); if(b){ b.disabled=true; b.textContent=aprobar?'Anulando…':'Rechazando…'; }
+  try{
+    const r=await fnAsistente({accion:'resolver_anulacion',solicitud:sid,aprobar,nota:nota||null});
+    if(r.estado==='aprobada') invCache[detSede]=null;   // el stock volvió al inventario
+    cerrarSheet(); toast(r.estado==='aprobada'?`Factura #${s.numero} anulada.`:r.estado==='rechazada'?'Solicitud rechazada.':(r.nota||'La solicitud venció.')); renderMinitaMod();
+  }catch(e){ if(b){ b.disabled=false; b.textContent=aprobar?`Aprobar y anular factura #${s.numero}`:'Rechazar'; } toast('No se pudo: '+e.message); }
+}
+// Desde la notificación: /movil?anular=<id> → Minita de esa sede y día con la factura abierta
+async function abrirSolicitudAnulacion(id){
+  try{
+    const s=(await supaFetch(`/anulaciones_caja?id=eq.${encodeURIComponent(id)}&select=*`))?.[0];
+    if(!s){ toast('No se encontró la solicitud de anulación.'); return; }
+    selDate=s.fecha; detSede=s.sede;
+    await goMod('minita',goSedes);
+    if(fxRows.some(f=>f.id===s.factura_id)) verFactura(s.factura_id);
+    if(s.estado!=='pendiente') toast(`Esta solicitud ya fue resuelta (${s.estado}${s.resuelto_por?' por '+s.resuelto_por:''}).`);
+  }catch(e){ toast('No se pudo abrir la solicitud: '+errTxt(e)); }
 }
 
 // Proyecciones (solo admin): último snapshot de la sede
@@ -1425,7 +1608,9 @@ async function suGuardar(){
 }
 
 // ── Service worker (solo la carcasa; nunca datos de Supabase) ──
-if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); }); }
+if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); });
+  // App ya abierta y se toca la notificación de una anulación (sw.js)
+  navigator.serviceWorker.addEventListener('message',e=>{ if(e.data?.tipo==='abrir-anulacion'&&me) abrirSolicitudAnulacion(e.data.id); }); }
 boot();
 </script>
 </body>

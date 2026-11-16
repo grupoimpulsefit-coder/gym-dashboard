@@ -8,14 +8,19 @@
      Administración y "Agregar detalle" mientras sigan pendientes.
    · Pendientes (solo admin, admin_sedes, admin_g): responder y cerrar tickets.
      "Enseñar al asistente" hace que use esa respuesta en las próximas dudas.
+   · Conocimiento (solo Administración): lo que le enseñaron desde el chat
+     ("Chloe, agregá a tu conocimiento que…"); se puede quitar si quedó viejo.
 
    Requiere sesion.js cargado antes (usa Sesion.token/url/key) y la tabla de
    asistente.sql. Se incluye con <script src="/asistente.js"></script>.
+   Una página con sesión propia (movil.html) define antes window.AsistenteSesion =
+   { token, url, key, renovar } y el panel usa esa en vez de Sesion.
    /movil?asistente=pend (desde una notificación push) abre el panel en esa pestaña.
    ════════════════════════════════════════════════════════════════════════ */
 (function () {
-  if (window.__asistente || !window.Sesion) return;
+  if (window.__asistente || !(window.AsistenteSesion || window.Sesion)) return;
   window.__asistente = true;
+  function S() { return window.AsistenteSesion || window.Sesion; }
 
   var ADMIN = ['admin', 'admin_sedes', 'admin_g'];
   var TIPO = { duda: 'Duda', anular_venta: 'Anular venta', revisar_sinpe: 'Revisar SINPE',
@@ -42,14 +47,26 @@
 
   function api(path, opt) {
     opt = opt || {};
-    var h = { apikey: Sesion.key(), Authorization: 'Bearer ' + Sesion.token(), 'Content-Type': 'application/json' };
+    var s = S();
+    var h = { apikey: s.key(), Authorization: 'Bearer ' + s.token(), 'Content-Type': 'application/json' };
     if (opt.method === 'PATCH') h.Prefer = 'return=minimal';
-    return fetch(Sesion.url() + path, { method: opt.method || 'GET', headers: h, body: opt.body ? JSON.stringify(opt.body) : undefined })
-      .then(function (r) { return r.text().then(function (t) {
+    return fetch(s.url() + path, { method: opt.method || 'GET', headers: h, body: opt.body ? JSON.stringify(opt.body) : undefined })
+      .then(function (r) {
+        // Sesión propia vencida (app móvil): se renueva y se reintenta una vez
+        if (r.status === 401 && !opt._re && window.AsistenteSesion && AsistenteSesion.renovar) {
+          return Promise.resolve(AsistenteSesion.renovar()).then(function (ok) {
+            return ok ? api(path, Object.assign({}, opt, { _re: true })) : leerResp(r);
+          });
+        }
+        return leerResp(r);
+      });
+  }
+  function leerResp(r) {
+    return r.text().then(function (t) {
         var j = null; try { j = t ? JSON.parse(t) : null; } catch (_) {}
         if (!r.ok) { var e = new Error((j && (j.error || j.message)) || ('Error ' + r.status)); e.data = j; throw e; }
         return j;
-      }); });
+      });
   }
 
   /* ── Estilos ── */
@@ -90,7 +107,7 @@
   p.id = 'asis-p'; p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'Chloe');
   p.innerHTML =
     '<header><b>Chloe</b><button class="chip" id="asis-nueva" type="button">Nueva</button><button class="chip" id="asis-x" type="button" aria-label="Cerrar">✕</button></header>' +
-    '<div class="asis-tabs"><button data-t="chat" class="on" type="button">Chat</button><button data-t="mis" type="button">Mis consultas</button><button data-t="pend" type="button" style="display:none">Pendientes</button></div>' +
+    '<div class="asis-tabs"><button data-t="chat" class="on" type="button">Chat</button><button data-t="mis" type="button">Mis consultas</button><button data-t="pend" type="button" style="display:none">Pendientes</button><button data-t="con" type="button" style="display:none">Conocimiento</button></div>' +
     '<div id="asis-c"></div>' +
     '<form id="asis-f"><textarea id="asis-i" rows="1" placeholder="Escríbale a Chloe…"></textarea><button type="submit" id="asis-s">Enviar</button></form>';
 
@@ -113,7 +130,7 @@
   }
   function abrirPendiente() {
     if (!abrirEn) return;
-    tab = abrirEn === 'pend' && !esAdmin() ? 'mis' : abrirEn; abrirEn = null;
+    tab = (abrirEn === 'pend' || abrirEn === 'con') && !esAdmin() ? 'mis' : abrirEn; abrirEn = null;
     abrir(); contar();
   }
   function $(id) { return document.getElementById(id); }
@@ -123,7 +140,7 @@
 
   // Mostrar el botón solo con sesión iniciada; detectar cambio de usuario
   function vigilar() {
-    var t = Sesion.token();
+    var t = S().token();
     if (!t) { btn.style.display = 'none'; cerrar(); yo = { token: null, uid: null, rol: null }; return; }
     btn.style.display = 'flex';
     var uid = uidDe(t);
@@ -133,6 +150,7 @@
       api('/rest/v1/user_roles?id=eq.' + uid + '&select=role').then(function (r) {
         yo.rol = r && r[0] && r[0].role;
         p.querySelector('[data-t=pend]').style.display = esAdmin() ? '' : 'none';
+        p.querySelector('[data-t=con]').style.display = esAdmin() ? '' : 'none';
         contar(); abrirPendiente();
       }).catch(function () {});
     }
@@ -158,6 +176,7 @@
     $('asis-nueva').style.display = t === 'chat' ? '' : 'none';
     if (t === 'chat') pintarChat();
     else if (t === 'mis') pintarMis();
+    else if (t === 'con') pintarCon();
     else pintarPend();
   }
 
@@ -166,7 +185,8 @@
     var c = $('asis-c');
     c.innerHTML = chat.burbujas.length ? chat.burbujas.map(function (b) {
       return '<div class="m ' + b.r + '">' + (b.r === 'a' ? fmt(b.t) : esc(b.t)) + '</div>';
-    }).join('') : '<div class="vacio">Hola, soy <b>Chloe</b>. Pregúnteme cómo hacer algo en la app o un procedimiento del manual: abrir o cerrar turno, SINPE, minita, mediciones, vacaciones…<br><br>Si no hay respuesta, o el trámite es de Administración, se crea una consulta y la respuesta aparece en <b>Mis consultas</b>. Si después tiene más datos, dígamelo y los agrego a esa misma consulta.</div>';
+    }).join('') : '<div class="vacio">Hola, soy <b>Chloe</b>. Pregúnteme cómo hacer algo en la app o un procedimiento del manual: abrir o cerrar turno, SINPE, minita, mediciones, vacaciones…<br><br>Si no hay respuesta, o el trámite es de Administración, se crea una consulta y la respuesta aparece en <b>Mis consultas</b>. Si después tiene más datos, dígamelo y los agrego a esa misma consulta.' +
+      (esAdmin() ? '<br><br>Administración: para enseñarme algo nuevo escriba, por ejemplo, <b>«Agregá a tu conocimiento que…»</b>. Lo verá en la pestaña <b>Conocimiento</b>.' : '') + '</div>';
     if (enviando) c.insertAdjacentHTML('beforeend', '<div class="m a">Escribiendo…</div>');
     c.scrollTop = c.scrollHeight;
   }
@@ -251,6 +271,27 @@
       resuelto_por: yo.uid, resuelto_at: new Date().toISOString() } })
       .then(function () { pintarPend(); contar(); })
       .catch(function (e) { b.disabled = false; b.textContent = 'Responder y cerrar'; alert(e.message); });
+  }
+
+  /* ── Conocimiento (Administración) ── */
+  function pintarCon() {
+    var c = $('asis-c'); c.innerHTML = '<div class="vacio">Cargando…</div>';
+    api('/rest/v1/asistente_conocimiento?activo=eq.true&order=created_at.desc&limit=200&select=*').then(function (r) {
+      c.innerHTML = (r && r.length) ? r.map(function (n) {
+        return '<div class="t"><small>#' + n.id + ' · ' + fecha(n.created_at) + (n.autor ? ' · ' + esc(n.autor) : '') + '</small>' +
+          '<div><b>' + esc(n.tema) + '</b></div><div style="margin-top:4px;white-space:pre-wrap">' + esc(n.contenido) + '</div>' +
+          '<button class="chip" type="button" data-q="' + n.id + '" style="margin-top:8px">Quitar</button></div>';
+      }).join('') : '<div class="vacio">Chloe todavía no tiene conocimiento agregado.<br><br>En el Chat escríbale, por ejemplo: «Agregá a tu conocimiento que desde el 1 de noviembre la mensualidad en Pinares cuesta ₡25 000».</div>';
+      c.querySelectorAll('button[data-q]').forEach(function (b) { b.onclick = function () { quitarCon(b); }; });
+    }).catch(function (e) { c.innerHTML = '<div class="e">' + esc(e.message) + '</div>'; });
+  }
+  function quitarCon(b) {
+    if (!confirm('¿Quitar la nota #' + b.dataset.q + '? Chloe deja de usarla desde la próxima consulta.')) return;
+    b.disabled = true; b.textContent = 'Quitando…';
+    api('/rest/v1/asistente_conocimiento?id=eq.' + b.dataset.q, { method: 'PATCH', body: {
+      activo: false, quitado_por: yo.uid, quitado_at: new Date().toISOString() } })
+      .then(pintarCon)
+      .catch(function (e) { b.disabled = false; b.textContent = 'Quitar'; alert(e.message); });
   }
 
   if (document.body) montar(); else document.addEventListener('DOMContentLoaded', montar);

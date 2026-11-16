@@ -48,7 +48,7 @@ function calcularLinea(e, q, novedades){
   const ccss = aseguradoCCSS(e) ? bruto * CCSS_TRABAJADOR : 0;
   const patrono = aseguradoCCSS(e) ? bruto * CCSS_PATRONO : 0;
   const neto = bruto - ccss + t.subsidio - t.deduccion;
-  return { empleado_id: e.id, nombre: e.nombre, cedula: e.cedula || '', cuenta_bac: e.cuenta_bac || '',
+  return { empleado_id: e.id, nombre: e.nombre, cedula: e.cedula || '', puesto: e.puesto || '', cuenta_bac: e.cuenta_bac || '',
     salario_mensual: Number(e.salario_mensual) || 0, diario, asegurado: aseguradoCCSS(e),
     base, notaBase, ...t, bruto, ccss, patrono, neto };
 }

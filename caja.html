@@ -95,6 +95,10 @@ table.denom tfoot td:last-child { border-radius:0 0 10px 0; }
   border:1.5px solid transparent; border-radius:9px; background:var(--fill); color:var(--label);
   padding:0 10px; min-height:36px; font-size:14px; outline:none; font-family:inherit; }
 .line input.desc { flex:1; min-width:0; }
+.pago-caja { margin:-2px 0 10px; font-size:13px; color:var(--sec); }
+.pago-caja.ok { color:var(--success); }
+.pago-caja select { width:100%; min-height:34px; border-radius:9px; border:1.5px dashed var(--brand-text); background:var(--fill); color:var(--label); padding:0 10px; font-size:13px; font-family:inherit; }
+.pago-caja .linkbtn { background:none; border:0; color:var(--brand-text); font-weight:600; cursor:pointer; padding:0 4px; font-size:13px; }
 .line input.monto { width:110px; text-align:right; font-variant-numeric:tabular-nums; }
 .line select.gcat { max-width:170px; font-weight:600; appearance:none; -webkit-appearance:none; padding-right:26px;
   background-image:linear-gradient(45deg,transparent 50%,var(--sec) 50%),linear-gradient(135deg,var(--sec) 50%,transparent 50%);
@@ -667,6 +671,10 @@ table.hist tbody tr:hover td { background:var(--fill); }
         <tfoot><tr class="tot"><td></td><td>Efectivo inicial</td><td id="aEfectivoCell">₡0</td></tr></tfoot>
       </table>
       <div class="hint" id="aEfectivoHint" style="margin:6px 0 16px;"></div>
+      <div id="aMotivoWrap" style="display:none;margin:-6px 0 16px;">
+        <label for="aMotivo" style="display:block;font-size:13px;font-weight:600;color:var(--sec);margin-bottom:4px;">Motivo de la diferencia <span style="font-weight:400;">(opcional)</span></label>
+        <input id="aMotivo" maxlength="300" placeholder="Ej. se usó para el depósito, faltó un billete en el sobre…" style="width:100%;box-sizing:border-box;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;">
+      </div>
       <div style="display:flex;align-items:center;gap:10px;margin:10px 0 8px;">
         <div style="font-size:13px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;">📦 Inventario contado (obligatorio, a ciegas)</div>
         <button type="button" class="btn-ghost" style="margin-left:auto;white-space:nowrap;" onclick="imprimirListaInventario('apertura')">🖨️ Imprimir hoja</button>
@@ -703,7 +711,9 @@ function _sesionExpirada(motivo) {
 // Sedes donde el usuario (no admin) puede operar: su sede principal + sedes_extra, validadas y sin duplicar.
 function computeSedes(sede,extra){ const set=[]; [sede,...(Array.isArray(extra)?extra:[])].forEach(s=>{ if(s&&SEDES.includes(s)&&!set.includes(s))set.push(s); }); return set; }
 async function supaFetch(path,opts={}){
-  const token=currentToken||SUPA_KEY;
+  // Sin sesión (p. ej. se cerró en otra pestaña) no se manda como anónimo: la base respondería con un error de permisos confuso
+  if(!currentToken) throw new Error('Su sesión se cerró (quizá se cerró sesión o se entró con otra cuenta en otra pestaña). Vuelva a entrar e intente de nuevo.');
+  const token=currentToken;
   const res=await fetch(SUPA_URL+'/rest/v1'+path,{method:opts.method||'GET',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':opts.prefer||'return=minimal',...(opts.headers||{})},body:opts.body!=null?JSON.stringify(opts.body):undefined});
   if(res.status===401&&!opts._retry&&await Sesion.renovar())return supaFetch(path,{...opts,_retry:true});
   if(!res.ok){const t=await res.text();throw new Error(t);} const txt=await res.text(); return txt?JSON.parse(txt):null;
@@ -821,6 +831,7 @@ document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key
     document.getElementById('userNombre').textContent=auth.nombre||'—';document.getElementById('loginScreen').style.display='none';setTimeout(init,0);}}catch(_){}})();
 async function doLogout(silent){ Sesion.cerrar();stopLivePoll();try{await fetch(`${SUPA_URL}/auth/v1/logout`,{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentToken}});}catch(_){}
   currentToken=null;currentRole=null;currentSede=null;currentEmail='';document.getElementById('app').style.display='none';
+  document.querySelectorAll('.modal-bg').forEach(m=>m.style.display='none');   // las ventanas quedaban encima del login
   if(!silent){document.getElementById('loginEmail').value='';document.getElementById('loginPassword').value='';}document.getElementById('loginScreen').style.display='flex';}
 
 // ── Init ──
@@ -851,7 +862,10 @@ function updateTurnoUI(){
   const bA=document.getElementById('btnAbrirTurno'), bP=document.getElementById('btnParcial'), bF=document.getElementById('btnFinal');
   if(turnoActual){
     est.innerHTML=`<span class="pill ok" style="font-size:12px;padding:5px 12px;">🟢 Turno ${turnoActual.turno_num} ABIERTO</span>`;
-    info.textContent=`Apertura ${turnoActual.hora_apertura?new Date(turnoActual.hora_apertura).toLocaleString('es-CR'):'—'} · Caja inicial ${fmt(turnoActual.caja_inicial)}`;
+    { const ley=leyendaApertura(turnoActual), dif=Number(turnoActual.apertura_diferencia)||0;
+      info.innerHTML=esc(`Apertura ${turnoActual.hora_apertura?new Date(turnoActual.hora_apertura).toLocaleString('es-CR'):'—'} · Caja inicial ${fmt(turnoActual.caja_inicial)}`)
+        +(ley?`<br><span style="color:${dif?'var(--warn)':'var(--success)'};font-weight:${dif?700:500};">${dif?'⚠ ':''}${esc(ley)}</span>`
+          +(dif?` <button type="button" class="btn-ghost" style="padding:2px 10px;min-height:0;font-size:12px;" onclick="editarMotivoApertura()">✏️ ${turnoActual.apertura_motivo?'Cambiar motivo':'Agregar motivo'}</button>`:''):''); }
     { const li=document.getElementById('liveInfo'); if(li) li.textContent=esAdmin()?'🟢 En vivo (caja de recepción)':'🟢 En vivo'; }
     bA.style.display='none';
     [bP,bF].forEach(b=>{b.disabled=false;b.style.opacity=1;b.style.cursor='pointer';});
@@ -913,7 +927,7 @@ function cargarTurnoEnForm(t){
   document.getElementById('cSobreModo').value=t.sobre_modo||'no';
   window._otrosResumen=t.otros_desglose||null;
   window._informeVentas=t.informe_ventas||null; window._ventasDetalle=(t.informe_ventas&&t.informe_ventas.detalle)||null;
-  gastos=(Array.isArray(t.gastos)&&t.gastos.length?t.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros'}));
+  gastos=(Array.isArray(t.gastos)&&t.gastos.length?t.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros',pago:g.pago||null}));
   ingresos=(Array.isArray(t.ingresos)&&t.ingresos.length?t.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc||'',monto:g.monto??''}));
   // Billetes/monedas: conteo de cierre en curso (del servidor) si existe; si no, arranca con el CONTEO DE APERTURA.
   const baseDen=(t.denominaciones&&Object.keys(t.denominaciones).length)?t.denominaciones:(t.denominaciones_apertura||null);
@@ -955,14 +969,15 @@ async function openAbrirModal(){
   document.getElementById('aDenomBody').innerHTML=DENOMS.map(d=>`
     <tr><td><input type="number" min="0" step="1" id="aden_${d}" value="0" oninput="calcAperturaEfectivo()"></td>
     <td><span class="chip">₡${d.toLocaleString('es-CR')}</span></td><td id="asub_${d}" class="sub">₡0</td></tr>`).join('');
-  window._aExpected=null;
-  if(num>1){ const prev=hoy.filter(c=>c.estado!=='abierto').sort((a,b)=>(b.turno_num||0)-(a.turno_num||0))[0]; if(prev) window._aExpected=Math.round(Number(prev.efectivo_final||prev.efectivo||0)); }
+  window._aExpected=null; window._aRef=null;
+  document.getElementById('aMotivo').value='';
   calcAperturaEfectivo();
+  aperturaReferencia(num).then(ref=>{ window._aRef=ref; window._aExpected=ref?ref.esperado:null; calcAperturaEfectivo(); });
   // Inventario a ciegas (no se muestra el sistema; no se actualiza el stock)
   document.getElementById('aInvList').innerHTML='<div style="padding:12px;color:var(--muted);">Cargando inventario…</div>';
-  try{ window._invAp=await cargarInvCaja(currentSede); }catch(_){ window._invAp=[]; }
+  try{ window._invAp=ordenarInvPorCategoria(await cargarInvCaja(currentSede)); }catch(_){ window._invAp=[]; }
   const inv=window._invAp;
-  document.getElementById('aInvList').innerHTML = inv.length ? inv.map((p,i)=>`
+  document.getElementById('aInvList').innerHTML = inv.length ? inv.map((p,i)=>encabezadoCat(inv,i)+`
     <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--hair);">
       <span style="flex:1;font-size:13px;">${esc(p.producto)}</span>
       <input type="number" step="1" id="ainv_${i}" placeholder="conteo" style="width:82px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:right;font-weight:700;">
@@ -971,17 +986,34 @@ async function openAbrirModal(){
   document.getElementById('abrirModal').style.display='flex';
 }
 // Hoja imprimible para contar el inventario a mano (todas las cantidades en 0).
+// Inventario en el orden de la hoja: por categoría (como el desglose de la minita) y por nombre
+function ordenarInvPorCategoria(inv){
+  return (inv||[]).map(p=>({...p, _cat:resolverOtro(p.producto).cat}))
+    .sort((a,b)=>(CAT_ORDER.indexOf(a._cat)-CAT_ORDER.indexOf(b._cat))||String(a.producto).localeCompare(String(b.producto),'es'));
+}
+// Encabezado de categoría en las listas de conteo, cuando cambia la categoría
+function encabezadoCat(inv,i){
+  const c=inv[i]._cat; if(i>0&&inv[i-1]._cat===c) return '';
+  return `<div style="padding:8px 10px 4px;font-size:12px;font-weight:700;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;background:var(--fill);">${esc(CAT_LABEL[c]||c)}</div>`;
+}
 function imprimirListaInventario(origen){
   const inv=origen==='cierre'?(window._ccInv||[]):(window._invAp||[]);
   if(!inv.length){ alert('Esta sede no tiene productos en inventario para imprimir.'); return; }
   const fecha=todayStr(), turno=window._turnoNum||'';
-  const rows=inv.map((p,i)=>`<tr><td class="n">${i+1}</td><td>${esc(p.producto)}</td><td class="c">0</td></tr>`).join('');
+  // Agrupada por categoría (mismas categorías que el desglose de la minita), cada una ordenada por nombre
+  const grupos={}; inv.forEach(p=>{ const c=resolverOtro(p.producto).cat; (grupos[c]=grupos[c]||[]).push(p); });
+  let n=0;
+  const rows=CAT_ORDER.filter(c=>grupos[c]&&grupos[c].length).map(c=>
+    `<tr class="cat"><td colspan="3">${esc(CAT_LABEL[c]||c)} <span>(${grupos[c].length})</span></td></tr>`
+    +grupos[c].sort((a,b)=>String(a.producto).localeCompare(String(b.producto),'es'))
+      .map(p=>`<tr><td class="n">${++n}</td><td>${esc(p.producto)}</td><td class="c">0</td></tr>`).join('')).join('');
   const html=`<!doctype html><html><head><meta charset="utf-8"><title>Conteo inventario ${esc(currentSede)} ${fecha}</title>
   <style>*{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;} body{margin:22px;color:#111;}
   h1{font-size:18px;margin:0 0 2px;} .sub{font-size:12px;color:#555;margin:0 0 14px;}
   table{width:100%;border-collapse:collapse;font-size:13px;} th,td{border:1px solid #999;padding:9px 8px;text-align:left;}
   th{background:#eee;} td.n{width:34px;text-align:center;color:#777;} td.c{width:150px;text-align:center;color:#bbb;font-weight:700;}
   tr{page-break-inside:avoid;} .foot{margin-top:16px;font-size:11px;color:#555;}
+  tr.cat td{background:#ddd;font-weight:700;font-size:13.5px;padding:7px 8px;page-break-after:avoid;} tr.cat td span{font-weight:400;color:#555;}
   @media print{.noprint{display:none;}}</style></head><body>
   <h1>Hoja de conteo de inventario</h1>
   <div class="sub">Sede: <b>${esc(currentSede)}</b> · Fecha: ${fecha}${turno?` · Turno ${turno}`:''} · ${inv.length} productos</div>
@@ -993,13 +1025,64 @@ function imprimirListaInventario(origen){
   if(!w){ alert('Permití las ventanas emergentes para imprimir la hoja.'); return; }
   w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch(_){} },350);
 }
+// ── Diferencia al abrir: contra el último turno cerrado de la sede (el cierre final del día
+//    anterior, o el turno anterior del mismo día). Misma regla que caja_apertura.sql, que es
+//    la que guarda la diferencia: aquí solo se muestra mientras se cuenta. No bloquea la apertura.
+const denTotal=d=>Object.entries(d||{}).reduce((s,[k,v])=>s+(Number(k)||0)*(Number(v)||0),0);
+async function aperturaReferencia(num){
+  const hoy=todayStr(), sede=currentSede;
+  try{
+    const r=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(sede)}`
+      +`&and=(or(estado.in.(parcial,final),estado.is.null),or(fecha.lt.${hoy},and(fecha.eq.${hoy},turno_num.lt.${num})))`
+      +`&order=fecha.desc,turno_num.desc.nullslast,created_at.desc&limit=1&select=id,fecha,turno_num,estado,efectivo,efectivo_final,denominaciones,created_by`))||[];
+    const c=r[0]; if(!c||sede!==currentSede) return null;
+    const esperado=Math.round(Number(c.efectivo_final)||Number(c.efectivo)||0);
+    const comparable=c.denominaciones&&typeof c.denominaciones==='object'&&esperado>0&&denTotal(c.denominaciones)===esperado;
+    return { id:c.id, fecha:c.fecha, turno_num:c.turno_num, estado:c.estado||'final', por:c.created_by, esperado, den:comparable?c.denominaciones:null };
+  }catch(_){ return null; }
+}
+// "1 × ₡5 000 menos · 2 × ₡1 000 de más"
+function textoDenDif(dd){
+  return Object.entries(dd||{}).map(([k,v])=>[Number(k),Number(v)]).filter(([,v])=>v).sort((a,b)=>b[0]-a[0])
+    .map(([d,v])=>`${Math.abs(v)} × ${fmt(d)} ${v<0?'menos':'de más'}`).join(' · ');
+}
 function calcAperturaEfectivo(){
   let ef=0; DENOMS.forEach(d=>{ const c=Number(document.getElementById('aden_'+d).value)||0; const s=c*d; ef+=s; const el=document.getElementById('asub_'+d); if(el)el.textContent=fmt(s); });
   document.getElementById('aEfectivoCell').textContent=fmt(ef);
-  const h=document.getElementById('aEfectivoHint');
-  if(window._aExpected!=null){ const dif=ef-window._aExpected; h.innerHTML=`Esperado (efectivo final del turno anterior): <b>${fmt(window._aExpected)}</b> — ${dif===0?'<span style="color:var(--success);font-weight:700;">✓ cuadra</span>':`<span style="color:var(--warn);font-weight:700;">diferencia ${fmt(Math.abs(dif))}</span>`}`; }
-  else h.textContent='Primer turno del día: cuente el efectivo con que abre la caja.';
+  const h=document.getElementById('aEfectivoHint'), r=window._aRef, mw=document.getElementById('aMotivoWrap');
+  if(r){
+    const dif=ef-r.esperado;
+    let html=`Esperado: <b>${fmt(r.esperado)}</b> — lo que dejó el ${r.estado==='final'?'cierre final':'cierre parcial'} del ${esc(fechaCorta(r.fecha))} · Turno ${esc(r.turno_num||'—')}${r.por?' ('+esc(r.por)+')':''}.<br>`;
+    if(dif===0) html+='<span style="color:var(--success);font-weight:700;">✓ Cuadra</span>';
+    else{
+      html+=`<span style="color:var(--warn);font-weight:700;">Abre con ${fmt(Math.abs(dif))} ${dif<0?'menos':'de más'}</span> <span style="color:var(--sec);">· no impide abrir: queda anotado en el turno y se avisa a Administración.</span>`;
+      if(r.den){ const dd={}; DENOMS.forEach(d=>{ const v=(Number(document.getElementById('aden_'+d).value)||0)-(Number(r.den[d])||0); if(v) dd[d]=v; });
+        const t=textoDenDif(dd); if(t) html+=`<br>Por billete: ${esc(t)}`; }
+      else html+='<br><span style="color:var(--sec);">No se puede comparar por billete: ese cierre contó el sobre junto con el efectivo.</span>';
+    }
+    h.innerHTML=html; mw.style.display=dif===0?'none':'';
+  }else{
+    h.textContent=window._turnoNum>1?'Cuente el efectivo con que abre la caja.':'No hay un cierre anterior para comparar: cuente el efectivo con que abre la caja.';
+    mw.style.display='none';
+  }
   return ef;
+}
+// Leyenda del turno: con cuánto abrió frente al cierre anterior
+function leyendaApertura(t){
+  if(!t||t.apertura_diferencia==null) return '';
+  const dif=Math.round(Number(t.apertura_diferencia)||0), r=t.apertura_ref||{};
+  const base=`${r.estado==='final'?'cierre final':'cierre'} del ${fechaCorta(r.fecha)} · T${r.turno_num||'—'}`;
+  if(!dif) return `✓ Abrió cuadrado con el ${base}`;
+  const den=textoDenDif(t.apertura_den_dif);
+  return `Abrió con ${fmt(Math.abs(dif))} ${dif<0?'menos':'de más'} que el ${base} (esperado ${fmt(t.apertura_esperado)}, contado ${fmt(t.caja_inicial)})`
+    +(den?` · ${den}`:'')+(t.apertura_motivo?` · Motivo: ${t.apertura_motivo}`:'');
+}
+async function editarMotivoApertura(){
+  const t=turnoActual; if(!t) return;
+  const m=prompt('Motivo de la diferencia al abrir (opcional):', t.apertura_motivo||'');
+  if(m==null) return;
+  try{ await supaFetch(`/cierres_caja?id=eq.${t.id}`,{method:'PATCH',body:{apertura_motivo:m.trim()||null}}); await loadCierres(); }
+  catch(e){ alert('No se pudo guardar el motivo: '+mensajeError(e)); }
 }
 
 async function abrirTurno(){
@@ -1012,8 +1095,13 @@ async function abrirTurno(){
   try{
     inv.forEach((p,i)=>{ const raw=document.getElementById('ainv_'+i).value; contados[p.producto]=raw===''?null:(Number(raw)||0); });
     const rec={ sede:currentSede, fecha:todayStr(), turno:'Turno '+window._turnoNum, turno_num:window._turnoNum, estado:'abierto', hora_apertura:new Date().toISOString(), caja_inicial:efectivo, denominaciones_apertura:denom, created_by:currentEmail||null };
-    const creado=await supaFetch('/cierres_caja',{method:'POST',prefer:'return=representation',body:rec});
+    const motivo=document.getElementById('aMotivo').value.trim();
+    let creado;
+    try{ creado=await supaFetch('/cierres_caja',{method:'POST',prefer:'return=representation',body:motivo?{...rec,apertura_motivo:motivo}:rec}); }
+    catch(e1){ if(motivo&&/apertura_motivo/.test(e1.message)) creado=await supaFetch('/cierres_caja',{method:'POST',prefer:'return=representation',body:rec}); else throw e1; }   // si aún no se corrió caja_apertura.sql
     const nuevo=Array.isArray(creado)?creado[0]:creado;
+    // Abrió con más o menos que el cierre anterior: aviso al teléfono de Administración (no frena nada si falla)
+    if(nuevo&&nuevo.id&&Number(nuevo.apertura_diferencia)) fxAsistente({accion:'aviso_apertura',cierre:nuevo.id}).catch(()=>{});
     // El conteo se compara en la base (recepción no recibe las cantidades del sistema)
     if(inv.length&&nuevo&&nuevo.id){
       try{
@@ -1027,7 +1115,8 @@ async function abrirTurno(){
     document.getElementById('abrirModal').style.display='none';
     await loadCierres();
     const sm=document.getElementById('saveMsg'); sm.className='msg ok';
-    sm.innerHTML=`✅ Turno ${window._turnoNum} abierto (efectivo ${fmt(efectivo)}). Arriba, en <b>🟢 Para WStudio</b>, están los montos para abrir allá.`+esc(avisoConteo)+(inv.length&&!avisoConteo?(discrep.length?` <span style="color:var(--warn);">⚠ Inventario con ${discrep.length} diferencia(s): ${discrep.slice(0,5).map(esc).join('; ')}${discrep.length>5?'…':''}</span>`:' <span style="color:var(--success);">Inventario cuadra ✓</span>'):'');
+    const leyAp=nuevo&&Number(nuevo.apertura_diferencia)?` <span style="color:var(--warn);">⚠ ${esc(leyendaApertura(nuevo))}. Se avisó a Administración.</span>`:'';
+    sm.innerHTML=`✅ Turno ${window._turnoNum} abierto (efectivo ${fmt(efectivo)}). Arriba, en <b>🟢 Para WStudio</b>, están los montos para abrir allá.`+leyAp+esc(avisoConteo)+(inv.length&&!avisoConteo?(discrep.length?` <span style="color:var(--warn);">⚠ Inventario con ${discrep.length} diferencia(s): ${discrep.slice(0,5).map(esc).join('; ')}${discrep.length>5?'…':''}</span>`:' <span style="color:var(--success);">Inventario cuadra ✓</span>'):'');
   }catch(e){ err.textContent='No se pudo abrir: '+e.message; }
   finally{ btn.disabled=false; btn.textContent='🔓 Abrir turno'; }
 }
@@ -1110,7 +1199,7 @@ function applyRowToForm(row){
     document.getElementById('cTransfer').value=row.total_transferencia==null?'':row.total_transferencia;
     document.getElementById('cTotalVentas').value=sinFacturado(row,'total_ventas','total')||0;
     document.getElementById('cSobreModo').value=row.sobre_modo||'no';
-    gastos=(Array.isArray(row.gastos)&&row.gastos.length?row.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros'}));
+    gastos=(Array.isArray(row.gastos)&&row.gastos.length?row.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc||'',monto:g.monto??'',cat:g.cat||'otros',pago:g.pago||null}));
     ingresos=(Array.isArray(row.ingresos)&&row.ingresos.length?row.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc||'',monto:g.monto??''}));
     window._otrosResumen=row.otros_desglose||null; renderOtrosResumen(window._otrosResumen);
     const invCambio=JSON.stringify(row.inventario_cierre||null)!==JSON.stringify(inventarioCierre||null);
@@ -1133,6 +1222,13 @@ function cuadre({efectivo,tarjeta,sinpe,transfer,sobreOut,gastos,ingresos,cajaIn
   console.assert(cuadre({...base,efectivo:50000}).diferencia===10000,'cuadre: faltan 10 000 en efectivo');
   console.assert(cuadre({...base,ingresos:0}).diferencia===-2000,'cuadre: un ingreso sin anotar es sobrante');
 })();
+// Faltante de SINPE: se facturó más SINPE del que entró (reporte de Ridivi + saldo arrastrado).
+// Hace que la caja NO cuadre. El excedente (entró SINPE sin facturar) no se marca. 0 sin reporte cargado.
+function sinpeFaltante(facturado){
+  const s=window._sinpeReporte; if(!s) return 0;
+  const pendAfter=Math.round((s.pendPrev||0)+s.nuevosMonto-facturado);
+  return pendAfter<0?-pendAfter:0;
+}
 function calc(){
   let efectivo=0;
   DENOMS.forEach(d=>{const c=Number(document.getElementById('den_'+d).value)||0; const sub=c*d; efectivo+=sub; document.getElementById('sub_'+d).textContent=fmt(sub);});
@@ -1170,13 +1266,17 @@ function calc(){
   document.getElementById('totGastos').textContent=fmt(totGastos)+(pg.gastos?` (+${fmt(pg.gastos)} turnos previos)`:'');
   document.getElementById('totIngresos').textContent=fmt(totIngresos)+(pg.ingresos?` (+${fmt(pg.ingresos)} turnos previos)`:'');
   const difR=Math.round(diferencia);
-  const ok=difR===0;
+  const sinpeFalta=sinpeFaltante(Math.round(sinpe));
+  const ok=difR===0&&!sinpeFalta;
   // diferencia = totalVentas − conciliado. >0 = falta dinero (de menos vs facturado); <0 = sobra (de más).
+  const badgeSinpe=sinpeFalta?`<span class="badge-dif">⚠ No cuadra: faltan ${fmt(sinpeFalta)} de SINPE (se facturó más de lo recibido)</span>`:'';
   document.getElementById('rEstado').innerHTML=ok
     ? '<span class="badge-ok">✓ Caja cuadra</span>'
+    : difR===0 ? badgeSinpe
     : (difR>0
         ? `<span class="badge-dif">⚠ Faltante ${fmt(Math.abs(difR))} (de menos vs facturado)</span>`
-        : `<span class="badge-dif" style="background:var(--blue);">⚠ Sobrante ${fmt(Math.abs(difR))} (de más vs facturado)</span>`);
+        : `<span class="badge-dif" style="background:var(--blue);">⚠ Sobrante ${fmt(Math.abs(difR))} (de más vs facturado)</span>`)
+      + (badgeSinpe?'<br>'+badgeSinpe:'');
   // Efectivo final: solo se descuenta la minita cuando el sobre se retira hoy ('retira').
   const efectivoFinal=(sobreModo==='retira')?(efectivo-minita):efectivo;
   document.getElementById('rEfectivoFinal').textContent=fmt(efectivoFinal);
@@ -1190,17 +1290,48 @@ function calc(){
     sobreModo==='ya' ? 'Sobre ya retirado del efectivo contado (solo cierre final). Efectivo final = efectivo contado.'
     : sobreModo==='no' ? 'No se sacaron sobres: la minita queda en caja. Úselo en parciales (el sobre sale solo en el final).'
     : 'El conteo incluye la minita; en el cierre final se retira ese monto en sobres (efectivo final lo descuenta).';
-  return {efectivo,tarjeta,sinpe,transfer,totalVentas,cajaIni,membresias,totGastos,totIngresos,totGastosDia,totIngresosDia,conciliado,diferencia,minita,ok,efectivoFinal,otros:minita,sobreOut,sobreRetirado,sobreModo};
+  return {efectivo,tarjeta,sinpe,transfer,totalVentas,cajaIni,membresias,totGastos,totIngresos,totGastosDia,totIngresosDia,conciliado,diferencia,minita,ok,sinpeFalta,efectivoFinal,otros:minita,sobreOut,sobreRetirado,sobreModo};
 }
 
 // ── Gastos / Ingresos dinámicos ──
+// Pagos a instructores que se pagan de caja (facturas, recibos o planilla por horas ya cargados en Gastos).
+// Al anotar la salida se elige el pago: no se crea otro gasto y el pago queda marcado como pagado al guardar el cierre.
+const CATS_PAGO=['clases_grupales','instructores_planta'];
+let pagosCaja={sede:null,rows:[],cargando:false};
+async function cargarPagosCaja(){
+  const sede=currentSede; if(!sede||pagosCaja.cargando) return;
+  pagosCaja={sede,rows:pagosCaja.sede===sede?pagosCaja.rows:[],cargando:true};
+  let rows=[]; try{ rows=(await supaFetch(`/gastos?sede=eq.${encodeURIComponent(sede)}&origen=in.(xml,recibo,horas)&pago_tipo=eq.caja&pagado_at=is.null&order=fecha_clase.asc&select=id,origen,emisor,monto,fecha_clase,numero_factura`))||[]; }catch(_){ rows=[]; }
+  if(sede!==currentSede){ pagosCaja.cargando=false; return; }
+  pagosCaja={sede,rows,cargando:false}; renderGastos();
+}
+const pagoCajaTxt=p=>`${p.emisor||'—'} · ${fmt(p.monto)} · ${p.origen==='xml'?'factura …'+String(p.numero_factura||'').slice(-6):p.origen==='recibo'?'recibo':'horas'} · ${fechaCorta(p.fecha_clase)}`;
+function elegirPagoCaja(i,id){
+  const g=gastos[i]; if(!g) return;
+  const p=pagosCaja.rows.find(x=>x.id===id);
+  if(p){ g.pago=p.id; g.desc=`${p.emisor||'Instructor'} · ${p.origen==='xml'?'factura …'+String(p.numero_factura||'').slice(-6):p.origen==='recibo'?'recibo clase grupal':'planilla por horas'}`; g.monto=Math.round(Number(p.monto)||0); }
+  else g.pago=null;
+  renderGastos(); calc(); saveDraft();
+}
 function renderGastos(){
+  const editable=!!turnoActual&&turnoActual.estado==='abierto'&&window._formCierreId===turnoActual.id;
+  if(editable&&pagosCaja.sede!==currentSede&&!pagosCaja.cargando) cargarPagosCaja();
+  const usados=new Set(gastos.map(g=>g.pago).filter(Boolean));
+  const filaPago=(g,i)=>{
+    if(!CATS_PAGO.includes(g.cat)) return '';
+    if(g.pago){ const p=pagosCaja.rows.find(x=>x.id===g.pago);
+      return `<div class="pago-caja ok">✓ Pago de caja${p?': '+esc(pagoCajaTxt(p)):''}. Ya está en Gastos: al guardar el cierre queda marcado como pagado y no se registra otra vez.${editable?` <button type="button" class="linkbtn" onclick="elegirPagoCaja(${i},'')">Quitar</button>`:''}</div>`; }
+    if(!editable) return '';
+    const libres=pagosCaja.rows.filter(p=>!usados.has(p.id));
+    if(!libres.length) return '';
+    return `<div class="pago-caja"><select onchange="elegirPagoCaja(${i},this.value)"><option value="">¿Es un pago de caja pendiente? Elíjalo aquí (${libres.length})</option>${libres.map(p=>`<option value="${p.id}">${esc(pagoCajaTxt(p))}</option>`).join('')}</select></div>`;
+  };
   document.getElementById('gastosLines').innerHTML=gastos.map((g,i)=>`
     <div class="line">
-    <select class="gcat" onchange="gastos[${i}].cat=this.value;saveDraft()">${CATS_GASTO.map(c=>`<option value="${c.id}"${(g.cat||'otros')===c.id?' selected':''}>${c.label}</option>`).join('')}</select>
+    <select class="gcat" onchange="gastos[${i}].cat=this.value;if(!CATS_PAGO.includes(this.value))gastos[${i}].pago=null;renderGastos();saveDraft()">${CATS_GASTO.map(c=>`<option value="${c.id}"${(g.cat||'otros')===c.id?' selected':''}>${c.label}</option>`).join('')}</select>
     <input class="desc" placeholder="Descripción" value="${esc(g.desc)}" oninput="gastos[${i}].desc=this.value;saveDraft()">
     <input class="monto" type="number" step="1" placeholder="0" value="${g.monto}" oninput="gastos[${i}].monto=this.value;calc()">
-    <button class="btn-del" onclick="gastos.splice(${i},1);renderGastos();calc()">🗑</button></div>`).join('');
+    <button class="btn-del" onclick="gastos.splice(${i},1);renderGastos();calc()">🗑</button></div>${filaPago(g,i)}`).join('');
 }
 function addGasto(){gastos.push({desc:'',monto:'',cat:'otros'});renderGastos();}
 function renderIngresos(){
@@ -1290,6 +1421,7 @@ async function cargarSinpeHistorico(file){
       const seen=new Set(); const all=[];
       for(let i=hdr+1;i<rows.length;i++){ const r=rows[i]; if(!r)continue;
         const ref=String(r[cRef]==null?'':r[cRef]).trim(); if(!ref||seen.has(ref))continue; seen.add(ref);
+        if((Number(r[cMonto])||0)<0) continue;   // SINPE salientes: no son cobros
         all.push({ referencia:ref, monto:Math.round(Number(r[cMonto])||0), fecha_tx:cFecha>=0?String(r[cFecha]||'').trim():'', detalle:cDet>=0?String(r[cDet]||'').trim():'' }); }
       if(!all.length)throw new Error('El archivo no tiene filas de SINPE.');
       // Referencias ya registradas de la sede
@@ -1405,7 +1537,7 @@ async function cargarAclaraciones(){
   try{
     const h=(await supaFetch('/sinpe_aclaraciones?order=created_at.desc&limit=30&select=*'))||[];
     document.getElementById('aclHist').innerHTML=h.length?h.map(a=>`<div style="padding:7px 2px;border-bottom:1px solid var(--hair);font-size:13px;">
-        <b>${esc(a.sede)}</b> · ${a.tipo==='faltante'?'faltante (SINPE sin contar)':a.tipo==='factura'?'faltante (factura anulada '+esc((a.referencias&&a.referencias[0]&&a.referencias[0].factura)||'')+')':'excedente'} de ${fmt(a.monto)} · saldo ${fmt(a.pendiente_antes)} → ${fmt(a.pendiente_despues)}
+        <b>${esc(a.sede)}</b> · ${a.tipo==='faltante'?'faltante (SINPE sin contar)':a.tipo==='asumido'?'faltante que asume la empresa':a.tipo==='factura'?'faltante (factura anulada '+esc((a.referencias&&a.referencias[0]&&a.referencias[0].factura)||'')+')':'excedente'} de ${fmt(a.monto)} · saldo ${fmt(a.pendiente_antes)} → ${fmt(a.pendiente_despues)}
         <div style="color:var(--muted);font-size:12px;">${esc(a.nota)}${a.tipo==='faltante'&&(a.referencias||[]).length?` · ${a.referencias.length} SINPE registrados${a.archivo?' ('+esc(a.archivo)+')':''}`:a.tipo==='factura'&&a.archivo?' · informe corregido: '+esc(a.archivo):''}<br>${esc(a.hecho_por||'—')} · ${new Date(a.created_at).toLocaleString('es-CR')} · cierre del ${esc(a.cierre_fecha||'—')}</div></div>`).join('')
       :'<div class="hint">Todavía no hay aclaraciones.</div>';
   }catch(e){ document.getElementById('aclHist').innerHTML=/sinpe_aclaraciones/.test(e.message)?'<div class="hint">Falta correr <b>sinpe_aclaraciones.sql</b> en Supabase.</div>':''; }
@@ -1431,6 +1563,12 @@ function aclElegir(sede){
       <div class="seg" style="margin-top:8px;" role="tablist">
         <button type="button" id="aclModoS" aria-selected="true" onclick="aclModo('sinpe')">📥 Faltaban SINPE por contar</button>
         <button type="button" id="aclModoF" aria-selected="false" onclick="aclModo('factura')">🧾 Factura anulada o duplicada</button>
+        <button type="button" id="aclModoA" aria-selected="false" onclick="aclModo('asumido')">🏢 Lo asume la empresa</button>
+      </div>
+      <div id="aclPaneA" hidden>
+        <div class="hint" style="margin-top:8px;">Para diferencias que no se van a recuperar, p. ej. el cliente transfirió unos colones de menos. No pide reporte: queda registrado con el monto, la nota y su usuario.</div>
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 6px;">Monto que asume la empresa</label>
+        <input type="number" id="aclMontoA" min="1" max="${-x.saldo}" step="1" value="${-x.saldo}" oninput="aclSumarA()" style="width:180px;padding:6px 10px;border:1.5px solid var(--border);border-radius:10px;font-weight:700;">
       </div>
       <div id="aclPaneS">
         <div class="hint" style="margin-top:8px;">Cargue el <b>Reporte SINPE</b> donde salen los SINPE que faltaban (p. ej. descargado desde un día antes) y marque los que explican el faltante. Quedan registrados y no se pueden volver a contar.</div>
@@ -1447,7 +1585,7 @@ function aclElegir(sede){
         <input type="text" id="aclFactNum" maxlength="40" placeholder="Ej. 00200002010000001787" style="width:100%;padding:6px 10px;border:1.5px solid var(--border);border-radius:10px;" oninput="aclRevisarFactura()">
       </div>
       ${notaHtml}
-      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;justify-content:flex-end;flex-wrap:wrap;"><span id="aclSuma" class="hint"></span><button class="btn-primary" id="aclBtn" type="button" onclick="aclConfirmar(ACL.modo==='factura'?'factura':'faltante')" disabled>Registrar y aclarar</button></div></div>`;
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;justify-content:flex-end;flex-wrap:wrap;"><span id="aclSuma" class="hint"></span><button class="btn-primary" id="aclBtn" type="button" onclick="aclConfirmar(ACL.modo==='factura'?'factura':ACL.modo==='asumido'?'asumido':'faltante')" disabled>Registrar y aclarar</button></div></div>`;
     ACL.modo='sinpe';
   }
 }
@@ -1503,10 +1641,19 @@ function aclModo(m){
   ACL.modo=m;
   document.getElementById('aclModoS').setAttribute('aria-selected',m==='sinpe');
   document.getElementById('aclModoF').setAttribute('aria-selected',m==='factura');
+  document.getElementById('aclModoA').setAttribute('aria-selected',m==='asumido');
   document.getElementById('aclPaneS').hidden=m!=='sinpe';
   document.getElementById('aclPaneF').hidden=m!=='factura';
+  document.getElementById('aclPaneA').hidden=m!=='asumido';
   document.getElementById('aclMsg').textContent='';
-  if(m==='factura'){ aclLlenarDias(); aclRevisarFactura(); } else aclSumar();
+  if(m==='factura'){ aclLlenarDias(); aclRevisarFactura(); } else if(m==='asumido') aclSumarA(); else aclSumar();
+}
+// Faltante que asume la empresa: solo monto (≤ faltante) y nota
+function aclSumarA(){
+  const x=ACL.saldos.find(y=>y.sede===ACL.sede); const m=Math.round(Number(document.getElementById('aclMontoA').value)||0);
+  const ok=x&&m>0&&m<=-x.saldo;
+  document.getElementById('aclSuma').innerHTML=ok?`La empresa asume ${fmt(m)} → el saldo queda en <b>${fmt(x.saldo+m)}</b>`:x?`El monto debe estar entre 1 y ${fmt(-x.saldo)}`:'';
+  document.getElementById('aclBtn').disabled=!ok;
 }
 function aclLlenarDias(){
   const sel=document.getElementById('aclDia'); if(!sel) return;
@@ -1617,6 +1764,10 @@ async function aclConfirmar(tipo){
     refs=[{ factura:num, fecha:r.dia.fecha, dia_id:r.dia.id, informe_antes:r.viejo, informe_corregido:r.nuevo, cobros:r.quitados }];
     ACL.archivo=r.archivo;
     if(!confirm(`¿Aclarar ${fmt(monto)} del faltante SINPE de ${x.sede} por la factura ${num} del ${r.dia.fecha}?\n\nEl saldo queda en ${fmt(x.saldo+monto)}. Queda registrado con su usuario, la nota y el informe corregido.`)) return;
+  } else if(tipo==='asumido'){
+    monto=Math.round(Number(document.getElementById('aclMontoA').value)||0);
+    if(monto<=0||monto>-x.saldo){ msg.style.color='var(--red)'; msg.textContent=`El monto debe estar entre 1 y ${fmt(-x.saldo)}.`; return; }
+    if(!confirm(`¿La empresa asume ${fmt(monto)} del faltante SINPE de ${x.sede}?\n\nEl saldo queda en ${fmt(x.saldo+monto)}. Queda registrado con su usuario y la nota.`)) return;
   } else {
     refs=aclElegidos(); monto=refs.reduce((a,t)=>a+t.monto,0);
     if(!refs.length) return;
@@ -1651,17 +1802,20 @@ async function cargarReporteSinpe(file){
         if(ri>=0&&mi>=0){ hdr=i; cRef=ri; cMonto=mi; cFecha=nm.findIndex(c=>c.includes('fecha')&&c.includes('transacc')); if(cFecha<0)cFecha=nm.findIndex(c=>c.includes('fecha')); cDet=nm.findIndex(c=>c==='detalle'); cOrig=nm.findIndex(c=>c.includes('cliente origen')); break; } }
       let desde=''; for(let i=0;i<Math.min(rows.length,10);i++){ const r=rows[i]||[]; if(normHdr(r[0])==='desde'){ desde=String(r[1]||'').trim().slice(0,10); break; } }
       if(hdr<0)throw new Error('No se encontró el encabezado con "ReferenciaSinpe" y "Monto". ¿Es el reporte SINPE?');
-      const seen=new Set(); const all=[];
+      const seen=new Set(); const all=[]; const salidas=[];
       for(let i=hdr+1;i<rows.length;i++){ const r=rows[i]; if(!r)continue;
         const ref=String(r[cRef]==null?'':r[cRef]).trim(); if(!ref)continue;
         if(seen.has(ref))continue; seen.add(ref);                     // dedup dentro del mismo archivo
+        // Montos negativos son SINPE que SALIERON de la cuenta (devoluciones, pagos): no son cobros recibidos.
+        // Antes se sumaban y restaban de lo recibido, dando un "faltante" de SINPE falso.
+        if((Number(r[cMonto])||0)<0){ salidas.push({ referencia:ref, monto:Math.round(Number(r[cMonto])||0), detalle:cDet>=0?String(r[cDet]||'').trim():'' }); continue; }
         all.push({ referencia:ref, monto:Math.round(Number(r[cMonto])||0),
           fecha_tx:cFecha>=0?String(r[cFecha]||'').trim():'', detalle:cDet>=0?String(r[cDet]||'').trim():'', origen:cOrig>=0?String(r[cOrig]||'').trim():'' });
       }
       if(!all.length)throw new Error('El reporte no tiene filas de SINPE.');
       let yaSet=new Set();
       try{ yaSet=await refsRegistradas(currentSede, all.map(x=>x.referencia)); }
-      catch(err){ hintEl.innerHTML='⚠ No se pudieron leer las referencias registradas: '+esc(err.message)+' (¿corrió el SQL de <code>sinpe_registrados</code>?).'; window._sinpeReporte=null; renderSinpeResumen(); return; }
+      catch(err){ hintEl.innerHTML='⚠ No se pudieron leer las referencias registradas: '+esc(err.message)+' (¿corrió el SQL de <code>sinpe_registrados</code>?).'; window._sinpeReporte=null; renderSinpeResumen(); calc(); return; }
       all.forEach(x=>{ x.ya=yaSet.has(x.referencia); });
       const nuevos=all.filter(x=>!yaSet.has(x.referencia));
       const yaReg=all.filter(x=>yaSet.has(x.referencia));
@@ -1669,16 +1823,22 @@ async function cargarReporteSinpe(file){
       const cierreDate=document.getElementById('cFecha').value;
       let nuevosPrev=0, nuevosPrevMonto=0;
       nuevos.forEach(x=>{ const d=parseDateCR(String(x.fecha_tx||'').split(/\s+/)[0]); if(d && cierreDate){ const iso=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; if(iso<cierreDate){ nuevosPrev++; nuevosPrevMonto+=x.monto; } } });
-      // Saldo pendiente arrastrado: SOLO de un DÍA ANTERIOR (no de turnos del mismo día, que reutilizan
-      // el mismo Informe acumulado). El SINPE se concilia una sola vez, en el cierre final del día.
+      // Saldo pendiente arrastrado del último cierre final (no de turnos parciales del mismo día, que
+      // reutilizan el mismo Informe acumulado). El SINPE se concilia en el cierre final del día.
       let pendPrev=0;
-      try{ const fPrevDia=cierreDate?`&fecha=lt.${encodeURIComponent(cierreDate)}`:''; const prev=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(currentSede)}&sinpe_pendiente=not.is.null${fPrevDia}&order=fecha.desc,created_at.desc&limit=1&select=sinpe_pendiente`))||[]; if(prev.length)pendPrev=Number(prev[0].sinpe_pendiente)||0; }catch(_){}
-      window._sinpeReporte={ fileName:file.name, all, nuevos,
+      // Si HOY ya hubo otro cierre final (dos turnos marcados como final), sus SINPE ya quedaron registrados
+      // y aquí no salen como nuevos, pero el Informe acumulado SÍ trae lo que él facturó. Se arranca desde
+      // su saldo + lo que él facturó; si no, aparece un faltante falso igual a lo que él recibió.
+      try{ const fDia=cierreDate?`&fecha=lte.${encodeURIComponent(cierreDate)}`:''; const fId=window._formCierreId?`&id=neq.${encodeURIComponent(window._formCierreId)}`:'';
+        const prev=(await supaFetch(`/cierres_caja?sede=eq.${encodeURIComponent(currentSede)}&sinpe_pendiente=not.is.null${fDia}${fId}&order=fecha.desc,turno_num.desc,created_at.desc&limit=1&select=fecha,sinpe_pendiente,sinpe_reporte`))||[];
+        if(prev.length){ const p=prev[0]; pendPrev=Number(p.sinpe_pendiente)||0;
+          if(cierreDate&&p.fecha===cierreDate) pendPrev+=Number(p.sinpe_reporte&&p.sinpe_reporte.facturado)||0; } }catch(_){}
+      window._sinpeReporte={ fileName:file.name, all, nuevos, salidas, salidasMonto:salidas.reduce((t,x)=>t+x.monto,0),
         nuevosMonto:nuevos.reduce((s,x)=>s+x.monto,0),
         yaRegN:yaReg.length, yaRegMonto:yaReg.reduce((s,x)=>s+x.monto,0),
         totalN:all.length, totalMonto:all.reduce((s,x)=>s+x.monto,0), pendPrev, nuevosPrev, nuevosPrevMonto, desde };
-      renderSinpeResumen();
-    }catch(err){ hintEl.innerHTML='⚠ '+esc(err.message); window._sinpeReporte=null; renderSinpeResumen(); }
+      calc();   // repinta el resumen SINPE y el estado de la caja (un faltante de SINPE hace que no cuadre)
+    }catch(err){ hintEl.innerHTML='⚠ '+esc(err.message); window._sinpeReporte=null; renderSinpeResumen(); calc(); }
   };
   reader.readAsArrayBuffer(file);
 }
@@ -1794,7 +1954,7 @@ function renderSinpeResumen(){
   const pendAfter=pendPrev+s.nuevosMonto-facturado;
   // pendiente positivo = SINPE recibido aún sin facturar (normal); negativo = se facturó más de lo recibido (revisar).
   let bg,cl,ic,txt;
-  if(pendAfter<0){ bg='var(--red-tint)'; cl='var(--red)'; ic='⚠'; txt='Se facturó más SINPE del recibido — revisar'; }
+  if(pendAfter<0){ bg='var(--red-tint)'; cl='var(--red)'; ic='⚠'; txt='Se facturó más SINPE del recibido — la caja no cuadra hasta aclararlo'; }
   else if(pendAfter===0){ bg='var(--green-tint)'; cl='var(--green)'; ic='✓'; txt='Todo el SINPE recibido está facturado'; }
   else { bg='var(--blue-tint)'; cl='var(--blue)'; ic='🕒'; txt='SINPE recibido pendiente de facturar (se factura después)'; }
   const esParcial = !!(turnoActual && turnoActual.estado!=='final');
@@ -1803,6 +1963,7 @@ function renderSinpeResumen(){
     <div style="margin-top:2px;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;">
       <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--fill);font-weight:700;"><span>📄 ${esc(s.fileName)}</span><span>${s.totalN} mov · ${fmt(s.totalMonto)}</span></div>
       <div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--muted);"><span>Ya registrados (no se recuentan)</span><span>${s.yaRegN} · ${fmt(s.yaRegMonto)}</span></div>
+      ${(s.salidas||[]).length?`<div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--orange);" title="${esc(s.salidas.map(x=>x.referencia+(x.detalle?' · '+x.detalle:'')).join('\n'))}"><span>↩ Salidas (montos negativos, no cuentan)</span><span>${s.salidas.length} · ${fmt(s.salidasMonto)}</span></div>`:''}
       <div style="display:flex;justify-content:space-between;padding:6px 12px;font-weight:700;color:var(--primary);border-top:1px dashed var(--border);"><span>🆕 SINPE recibidos nuevos</span><span>${s.nuevos.length} · ${fmt(s.nuevosMonto)}</span></div>
       ${s.nuevosPrev?`<div style="display:flex;justify-content:space-between;padding:4px 12px 6px;font-size:11px;color:var(--orange);"><span>🔁 incluye ${s.nuevosPrev} de días anteriores (confirmados ahora)</span><span>${fmt(s.nuevosPrevMonto)}</span></div>`:''}
       <div style="display:flex;justify-content:space-between;padding:6px 12px;"><span>Facturado hoy (cierre)</span><span>${fmt(facturado)}</span></div>
@@ -1838,8 +1999,8 @@ function renderSinpeResumenHist(sr){
       <div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--muted);"><span>Pendiente arrastrado</span><span>${fmt(sr.pendPrev||0)}</span></div>
       <div style="padding:9px 12px;background:${bg};color:${cl};font-weight:800;border-top:1px solid var(--border);"><div style="display:flex;justify-content:space-between;"><span>${ic} Pendiente por facturar</span><span>${fmt(pendAfter)}</span></div><div style="font-weight:600;font-size:11px;margin-top:2px;opacity:.9;">${txt}</div></div>
       ${sr.ajuste_manual?`<div style="padding:6px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);">✎ Pendiente puesto en 0 a mano (antes ${fmt(sr.ajuste_manual.pendiente_antes||0)})</div>`:''}
-      ${(sr.aclarado_detalle||[]).map(a=>`<div style="padding:6px 12px;font-size:11px;color:var(--green);border-top:1px solid var(--border);">✓ ${fmt(a.monto)} de la diferencia de este día aclarados (${a.tipo==='factura'?'factura anulada':a.tipo==='faltante'?'SINPE sin contar':'excedente'}) · ${esc(a.nota||'')} · ${esc(a.por||'')} · ${a.at?new Date(a.at).toLocaleDateString('es-CR'):''}</div>`).join('')}
-      ${(sr.aclaraciones||[]).map(a=>`<div style="padding:6px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);">✎ ${a.tipo==='faltante'?'Faltante':a.tipo==='factura'?'Faltante por factura anulada':'Excedente'} aclarado: ${fmt(a.monto)} (saldo ${fmt(a.antes)} → ${fmt(a.despues)}) · ${esc(a.nota||'')} · ${esc(a.por||'')} · ${new Date(a.at).toLocaleDateString('es-CR')}</div>`).join('')}
+      ${(sr.aclarado_detalle||[]).map(a=>`<div style="padding:6px 12px;font-size:11px;color:var(--green);border-top:1px solid var(--border);">✓ ${fmt(a.monto)} de la diferencia de este día aclarados (${a.tipo==='factura'?'factura anulada':a.tipo==='faltante'?'SINPE sin contar':a.tipo==='asumido'?'lo asume la empresa':'excedente'}) · ${esc(a.nota||'')} · ${esc(a.por||'')} · ${a.at?new Date(a.at).toLocaleDateString('es-CR'):''}</div>`).join('')}
+      ${(sr.aclaraciones||[]).map(a=>`<div style="padding:6px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);">✎ ${a.tipo==='faltante'?'Faltante':a.tipo==='factura'?'Faltante por factura anulada':a.tipo==='asumido'?'Faltante que asume la empresa':'Excedente'} aclarado: ${fmt(a.monto)} (saldo ${fmt(a.antes)} → ${fmt(a.despues)}) · ${esc(a.nota||'')} · ${esc(a.por||'')} · ${new Date(a.at).toLocaleDateString('es-CR')}</div>`).join('')}
     </div>
     ${sr.cruce?htmlCruce(sr.cruce,true):'<div class="hint" style="margin-top:8px;">Este cierre no guardó el cruce por transacción (se guarda desde el 13/10/2026).</div>'}`;
 }
@@ -1931,10 +2092,11 @@ async function openConteoCierre(){
   let inv=[];
   try{ inv=await cargarInvCaja(currentSede); }
   catch(e){ err.textContent='No se pudo cargar el inventario: '+e.message; }
+  inv=ordenarInvPorCategoria(inv);
   window._ccInv=inv;
   list.innerHTML = inv.length ? inv.map((p,i)=>{
     const prev=inventarioCierre&&inventarioCierre[p.producto]; const val=(prev&&prev.contado!=null)?prev.contado:'';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--hair);">
+    return encabezadoCat(inv,i)+`<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--hair);">
       <span style="flex:1;font-size:13px;">${esc(p.producto)}</span>
       <input type="number" step="1" id="cc_${i}" value="${val}" placeholder="conteo" style="width:82px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:right;font-weight:700;"></div>`;
   }).join('') : '<div style="padding:12px;color:var(--muted);">Esta sede no tiene productos en inventario.</div>';
@@ -2045,6 +2207,8 @@ async function cerrarTurno(estado){
   const fecha=document.getElementById('cFecha').value;
   if(document.getElementById('cTarjeta').value===''||document.getElementById('cSinpe').value===''){ msg.className='msg err'; msg.textContent='Cargue el 📤 Informe de Ventas (llena Tarjeta y SINPE automáticamente).'; return; }
   if(estado==='final'&&!window._sinpeReporte){ msg.className='msg err'; msg.textContent='Para el cierre final debe cargar el 🔷 Reporte SINPE del día.'; return; }
+  const solPend=(fxState.solicitudes||[]).filter(s=>s.estado==='pendiente'&&(fxState.facturas||[]).some(f=>f.id===s.factura_id&&f.cierre_id===turnoActual.id));
+  if(solPend.length&&!confirm(`Hay ${solPend.length} solicitud(es) de anulación sin aprobar (factura ${solPend.map(s=>'#'+s.numero).join(', ')}).\n\nSi cierra el turno, esas facturas ya no se podrán anular y quedarán como descuadre.\n\n¿Cerrar igual?`)) return;
   if(!fotoDatafono){ msg.className='msg err'; msg.textContent=`Suba la foto del datáfono (${estado==='final'?'cierre de lote':'auditoría'}) — es obligatoria para el cierre.`; return; }
   // Conteo de inventario obligatorio en cada cierre (parcial y final) para detectar diferencias entre turnos. No modifica el stock.
   const _invE = inventarioCierre ? Object.values(inventarioCierre) : null;
@@ -2057,7 +2221,7 @@ async function cerrarTurno(estado){
   const conciliado=c.efectivo+c.tarjeta+c.sinpe+c.transfer+sobreOut+c.totGastosDia-c.totIngresosDia-c.cajaIni;
   const diferencia=Math.round(c.totalVentas-conciliado);
   const denominaciones={}; DENOMS.forEach(d=>denominaciones[d]=Number(document.getElementById('den_'+d).value)||0);
-  const gastosLimpios=gastos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Gasto de caja',monto:Number(g.monto)||0,cat:g.cat||'otros'}));
+  const gastosLimpios=gastos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Gasto de caja',monto:Number(g.monto)||0,cat:g.cat||'otros',...(g.pago&&CATS_PAGO.includes(g.cat)?{pago:g.pago}:{})}));
   const ingresosLimpios=ingresos.filter(g=>(Number(g.monto)||0)>0).map(g=>({desc:g.desc||'Ingreso',monto:Number(g.monto)||0}));
   const payload={
     membresias:c.membresias, total_ventas:c.totalVentas,
@@ -2082,14 +2246,23 @@ async function cerrarTurno(estado){
     const pendAfter=Math.round((sr.pendPrev||0)+sr.nuevosMonto-c.sinpe);
     payload.sinpe_pendiente=pendAfter;
     let cruce=null; try{ cruce=cruceGuardable(conciliarSinpe()); }catch(_){}   // el cruce no debe frenar el cierre
-    payload.sinpe_reporte={ fileName:sr.fileName, totalN:sr.totalN, totalMonto:sr.totalMonto, yaRegN:sr.yaRegN, yaRegMonto:sr.yaRegMonto, nuevosN:sr.nuevos.length, nuevosMonto:sr.nuevosMonto, facturado:Math.round(c.sinpe), pendPrev:Math.round(sr.pendPrev||0), pendAfter, cruce };
+    payload.sinpe_reporte={ fileName:sr.fileName, totalN:sr.totalN, totalMonto:sr.totalMonto, yaRegN:sr.yaRegN, yaRegMonto:sr.yaRegMonto, nuevosN:sr.nuevos.length, nuevosMonto:sr.nuevosMonto, salidasMonto:sr.salidasMonto||0, facturado:Math.round(c.sinpe), pendPrev:Math.round(sr.pendPrev||0), pendAfter, cruce };
   }
   const btn=estado==='final'?document.getElementById('btnFinal'):document.getElementById('btnParcial');
   const bt0=btn.textContent; btn.disabled=true; btn.textContent='Guardando...';
   try{
     await supaFetch(`/cierres_caja?id=eq.${turnoActual.id}`,{method:'PATCH',body:payload});
     // Los depósitos al banco salen de caja (cuentan para el cuadre) pero NO son gastos → no van al módulo de Gastos.
-    const gastosParaModulo=gastosLimpios.filter(g=>g.cat!=='deposito');
+    // Los pagos de caja a instructores ya están en Gastos (factura, recibo u horas): se marcan pagados, no se repiten.
+    const gastosParaModulo=gastosLimpios.filter(g=>g.cat!=='deposito'&&!g.pago);
+    const idsPago=gastosLimpios.map(g=>g.pago).filter(Boolean);
+    let pagoMsg='';
+    if(idsPago.length){
+      try{ const n=await supaFetch('/rpc/marcar_pago_caja',{method:'POST',body:{p_ids:idsPago},prefer:'return=representation'});
+        pagoMsg=` 💸 ${Number(n)||0} pago(s) de caja a instructores marcados como pagados.`; }
+      catch(pe){ pagoMsg=' ⚠ No se pudieron marcar los pagos de caja como pagados: '+pe.message; }
+      pagosCaja.sede=null;
+    }
     if(gastosParaModulo.length){
       const d=parseFecha(fecha);
       const filas=gastosParaModulo.map(g=>({ sede:currentSede, categoria:g.cat||'otros', fecha_clase:fecha, mes:mesEt(d), mes_orden:mesOrd(d),
@@ -2105,8 +2278,8 @@ async function cerrarTurno(estado){
     }
     else if(!esFinal&&sr) sinpeMsg=' 🔷 El SINPE se conciliará en el cierre final del día.';
     stopLivePoll();   // turno cerrado → detener refresco en vivo
-    const nDep=gastosLimpios.length-gastosParaModulo.length;
-    msg.className='msg ok'; msg.textContent=(estado==='final'?'⏹️ Turno cerrado (final).':'⏸️ Cierre parcial guardado. Puede abrir el siguiente turno.')+(gastosParaModulo.length?` ${gastosParaModulo.length} gasto(s) enviados a Gastos.`:'')+(nDep?` 🏦 ${nDep} depósito(s) (no van a Gastos).`:'')+sinpeMsg;
+    const nDep=gastosLimpios.filter(g=>g.cat==='deposito').length;
+    msg.className='msg ok'; msg.textContent=(estado==='final'?'⏹️ Turno cerrado (final).':'⏸️ Cierre parcial guardado. Puede abrir el siguiente turno.')+(gastosParaModulo.length?` ${gastosParaModulo.length} gasto(s) enviados a Gastos.`:'')+(nDep?` 🏦 ${nDep} depósito(s) (no van a Gastos).`:'')+pagoMsg+sinpeMsg;
     await loadCierres();
   }catch(e){ msg.className='msg err'; msg.textContent='⚠️ '+e.message; }
   finally{ btn.disabled=false; btn.textContent=bt0; }
@@ -2176,7 +2349,7 @@ function renderHist(){
   const estBadge=e=> e==='abierto'?'<span class="pill" style="background:var(--green-tint);color:var(--green);">abierto</span>':e==='parcial'?'<span class="pill" style="background:var(--orange-tint);color:var(--orange);">parcial</span>':e==='final'?'<span class="pill" style="background:rgba(88,86,214,.14);color:var(--indigo);">final</span>':'';
   tb.innerHTML=cierres.map(c=>`<tr>
     <td>${esc(c.fecha)}</td><td>${c.turno_num?('Turno '+c.turno_num):esc(c.turno)||'—'} ${estBadge(c.estado)}</td>
-    <td class="num">${fmt(c.caja_inicial)}</td><td class="num">${fmt(c.efectivo)}</td>
+    <td class="num">${fmt(c.caja_inicial)}${Number(c.apertura_diferencia)?`<div><span class="pill" style="background:var(--orange-tint);color:var(--orange);font-size:11px;" title="${esc(leyendaApertura(c))}">Abrió ${Number(c.apertura_diferencia)<0?'−':'+'}${fmt(Math.abs(c.apertura_diferencia))}</span></div>`:''}</td><td class="num">${fmt(c.efectivo)}</td>
     <td class="num">${fmt(c.total_ventas)}</td><td class="num">${fmt(c.minita)}</td>
     <td class="num" style="color:${Math.round(c.diferencia||0)===0?'var(--green)':'var(--red)'};">${fmt(c.diferencia)}</td>
     <td>${Math.round(c.diferencia||0)===0?'<span class="pill ok">OK</span>':(Math.round(c.diferencia||0)>0?'<span class="pill dif">Faltante</span>':'<span class="pill dif" style="background:var(--blue-tint);color:var(--blue);">Sobrante</span>')}${faltantesCruce(c.sinpe_reporte&&c.sinpe_reporte.cruce)&&!(sinpeDia(c.sinpe_reporte)||{}).aclarado?` <span class="pill dif" title="Cobros SINPE sin transferencia: abra el cierre para ver quiénes">⚠ SINPE ${faltantesCruce(c.sinpe_reporte.cruce)}</span>`:''}</td>
@@ -2197,7 +2370,7 @@ function cargarCierre(id){
   document.getElementById('cTotalVentas').value=sinFacturado(c,'total_ventas','total')||0;
   document.getElementById('cSobreModo').value=c.sobre_modo||(c.sobre_retirado?'ya':'retira');
   DENOMS.forEach(d=>{const el=document.getElementById('den_'+d); if(el)el.value=(c.denominaciones&&c.denominaciones[d])||0;});
-  gastos=(c.gastos&&c.gastos.length?c.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc,monto:g.monto,cat:g.cat||'otros'}));
+  gastos=(c.gastos&&c.gastos.length?c.gastos:[{desc:'',monto:'',cat:'otros'}]).map(g=>({desc:g.desc,monto:g.monto,cat:g.cat||'otros',pago:g.pago||null}));
   ingresos=(c.ingresos&&c.ingresos.length?c.ingresos:[{desc:'',monto:''}]).map(g=>({desc:g.desc,monto:g.monto}));
   renderGastos(); renderIngresos();
   fotoDatafono=null; document.getElementById('fileFoto').value='';
@@ -2222,7 +2395,7 @@ const FX_VACIO={efectivo:0,tarjeta:0,sinpe:0,total:0,productos:0,eventos:0,n:0,d
 // Parte que va al sobre (productos). Los cierres guardados antes de los eventos solo traen `total`.
 const fxProductos=f=>f.productos!=null?(Number(f.productos)||0):(Number(f.total)||0);
 let tabActual='cierre';
-const fxState={prods:[],cart:{},pago:'efectivo',cat:'todos',facturas:[],errFacturas:null,busy:false,
+const fxState={prods:[],cart:{},pago:'efectivo',cat:'todos',facturas:[],solicitudes:[],errFacturas:null,busy:false,
   eventos:[], evento:null,
   split:false, sel:['efectivo'], montos:{}};   // pago dividido: métodos elegidos y monto de cada uno   // evento: { id, tipo:'miembro'|'no_miembro', pin, nombre, tel, cliente } — uno por cobro
 const puedeAnular=()=>esAdmin()||currentRole==='coordinador';
@@ -2231,9 +2404,14 @@ const puedeAnular=()=>esAdmin()||currentRole==='coordinador';
 function factCierre(){ return window._factCierre||FX_VACIO; }
 // Las columnas del cierre guardan Informe + facturado; el formulario muestra solo lo del Informe.
 function sinFacturado(row,col,key){ const v=row[col]; if(v==null) return ''; const f=row.facturado||{};
-  return Math.round((Number(v)||0)-(key==='productos'?fxProductos(f):(Number(f[key])||0))); }
+  // "Otros vendidos" nunca es negativo: si da negativo es porque `facturado` quedó desfasado de la columna
+  // (un guardado sin facturas cargadas). Antes ese negativo restaba del sobre y daba un faltante falso.
+  if(key==='productos') return Math.max(0,Math.round((Number(v)||0)-fxProductos(f)));
+  return Math.round((Number(v)||0)-(Number(f[key])||0)); }
 // Solo se guarda la columna `facturado` si la tabla de facturas respondió (facturacion.sql ya corrió).
-function facturadoPayload(){ return window._factCierre?{facturado:window._factCierre}:{}; }
+// Siempre se guarda junto con los totales: si no, `facturado` queda con lo de otro guardado y al recargar
+// los totales (que se guardan informe + facturado) se descuentan mal.
+function facturadoPayload(){ return {facturado:window._factCierre||FX_VACIO}; }
 function resumirFacturas(list){
   const r={efectivo:0,tarjeta:0,sinpe:0,total:0,productos:0,eventos:0,n:0,desglose:{}};
   list.filter(f=>f.estado!=='anulada').forEach(f=>{ const t=Math.round(Number(f.total)||0);
@@ -2303,6 +2481,10 @@ async function loadFacturasDia(){
   catch(e){ if(turnoActual&&turnoActual.id===t.id){ fxState.errFacturas=mensajeError(e); renderFxHist(); } return; }
   if(!turnoActual||turnoActual.id!==t.id) return;   // cambió de sede o de turno mientras llegaba
   fxState.facturas=lista; fxState.errFacturas=null;
+  // Solicitudes de anulación (anulaciones.sql). Sin la tabla, la caja funciona igual.
+  try{ fxState.solicitudes=(await supaFetch(`/anulaciones_caja?sede=eq.${encodeURIComponent(t.sede)}&fecha=eq.${t.fecha}&order=created_at.desc&select=*`))||[]; }
+  catch(_){ fxState.solicitudes=[]; }
+  if(!turnoActual||turnoActual.id!==t.id) return;
   renderFxHist();
   // El cierre en pantalla es el del turno abierto → actualizar sus totales si cambió lo facturado
   if(window._formCierreId===t.id){
@@ -2496,14 +2678,57 @@ function renderFxHist(){
       ? `🎟️ ${esc((f.items&&f.items[0]&&f.items[0].producto)||'Evento')}<div class="hint" style="font-size:12px;">${esc(f.cliente_nombre||'')} ${f.tipo_precio==='miembro'?'<span class="fx-tag m">Miembro</span>':'<span class="fx-tag nm">No miembro</span>'}</div>`
       : (f.items||[]).map(it=>esc(it.producto)+(Number(it.cantidad)>1?' ×'+it.cantidad:'')).join(', ');
     const ref=fxMontoMetodo(f,'sinpe')>0&&f.referencia?`<div class="hint" style="font-size:11px;">ref …${esc(String(f.referencia).slice(-6))}</div>`:'';
-    const acc=anulada?`<span class="pill dif" title="${esc(f.motivo_anulacion||'')}">Anulada</span>`
-      :(puedeAnular()&&turnoActual&&f.cierre_id===turnoActual.id?`<button class="btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="fxAnular('${f.id}')">Anular</button>`:'');
+    const acc=anulada?`<span class="pill dif" title="${esc(f.motivo_anulacion||'')}">Anulada</span>`:fxAccionesAnular(f);
     return `<tr class="${anulada?'anulada':''}"><td class="num">${f.numero}</td><td>${new Date(f.created_at).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'})}</td>
       <td>${det}</td><td>${fxMetodoTxt(f)}${ref}</td><td class="num">${fmt(f.total)}</td><td>${acc}</td></tr>`;
   }).join(''):'<tr><td colspan="6" class="hint" style="text-align:center;padding:14px;">Aún no hay facturas hoy.</td></tr>';
   const r=resumirFacturas(L);
   document.getElementById('fxN').textContent=r.n?`${r.n} · ${fmt(r.total)}`:'';
   document.getElementById('fxPorMetodo').innerHTML=['efectivo','tarjeta','sinpe'].map(m=>`<div class="tile"><div class="tl">${FX_METODOS[m]}</div><div class="tv">${fmt(r[m])}</div></div>`).join('');
+}
+// ── Anulación: coordinador y Administración anulan directo; los demás la piden (anulaciones.sql).
+// La solicitud pasa por la Edge Function `asistente`, que avisa por push a quienes aprueban.
+const fxSolPend=fid=>fxState.solicitudes.find(s=>s.factura_id===fid&&s.estado==='pendiente');
+function fxAccionesAnular(f){
+  if(!turnoActual||f.cierre_id!==turnoActual.id) return '';   // turno cerrado: ya no se anula
+  const b=(txt,fn,extra='')=>`<button class="btn-ghost" style="font-size:12px;padding:4px 10px;${extra}" onclick="${fn}">${txt}</button>`;
+  const sol=fxSolPend(f.id);
+  if(sol){
+    const info=`<span class="pill" style="background:var(--orange-tint);color:var(--orange);" title="${esc((sol.solicitante||'')+': '+sol.motivo)}">⏳ Anulación solicitada</span>`;
+    return puedeAnular()?`${info}<div style="display:flex;gap:4px;margin-top:4px;">${b('Aprobar',`fxResolverAnulacion(${sol.id},true)`)}${b('Rechazar',`fxResolverAnulacion(${sol.id},false)`)}</div>`:info;
+  }
+  if(puedeAnular()) return b('Anular',`fxAnular('${f.id}')`);
+  const rech=fxState.solicitudes.find(s=>s.factura_id===f.id&&s.estado==='rechazada');
+  return (rech?`<div class="hint" style="font-size:11px;color:var(--red);" title="${esc(rech.nota||'')}">Anulación rechazada${rech.nota?': '+esc(rech.nota):''}</div>`:'')
+    +b('Solicitar anulación',`fxSolicitarAnulacion('${f.id}')`);
+}
+async function fxAsistente(body){
+  const res=await fetch(`${SUPA_URL}/functions/v1/asistente`,{ method:'POST',
+    headers:{'Authorization':'Bearer '+currentToken,'apikey':SUPA_KEY,'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  const d=await res.json().catch(()=>({})); if(!res.ok) throw new Error(d.error||('Error '+res.status)); return d;
+}
+async function fxSolicitarAnulacion(id){
+  const f=fxState.facturas.find(x=>x.id===id); if(!f) return;
+  const motivo=prompt(`Motivo para anular la factura #${f.numero} (${fmt(f.total)}).\nAdministración y el coordinador reciben el aviso y la aprueban.`);
+  if(motivo==null) return;
+  const msg=document.getElementById('fxMsg');
+  if(!motivo.trim()){ msg.className='msg err'; msg.textContent='Indique el motivo de la anulación.'; return; }
+  try{ await fxAsistente({accion:'solicitar_anulacion',factura:id,motivo:motivo.trim()});
+    msg.className='msg ok'; msg.textContent=`Solicitud enviada para la factura #${f.numero}. No cierre el turno hasta que la aprueben: con el turno cerrado ya no se puede anular.`; }
+  catch(e){ msg.className='msg err'; msg.textContent='⚠ '+mensajeError(e); }
+  await loadFacturasDia();
+}
+async function fxResolverAnulacion(sid,aprobar){
+  const s=fxState.solicitudes.find(x=>x.id===sid); if(!s) return;
+  let nota=null;
+  if(aprobar){ if(!confirm(`¿Aprobar y anular la factura #${s.numero} por ${fmt(s.total)}?\n\nPidió: ${s.solicitante||'—'}\nMotivo: ${s.motivo}\n\nEl stock vuelve al inventario. No se puede deshacer.`)) return; }
+  else { nota=prompt(`¿Por qué se rechaza la anulación de la factura #${s.numero}? (opcional)`); if(nota==null) return; }
+  const msg=document.getElementById('fxMsg');
+  try{ const r=await fxAsistente({accion:'resolver_anulacion',solicitud:sid,aprobar,nota:nota||null});
+    msg.className=r.estado==='vencida'?'msg err':'msg ok';
+    msg.textContent=r.estado==='aprobada'?`Factura #${s.numero} anulada. El stock se devolvió al inventario.`:r.estado==='rechazada'?`Solicitud de la factura #${s.numero} rechazada.`:(r.nota||'La solicitud venció.'); }
+  catch(e){ msg.className='msg err'; msg.textContent='⚠ '+mensajeError(e); }
+  await Promise.all([loadFxProds(), loadFacturasDia()]);
 }
 async function fxAnular(id){
   const f=fxState.facturas.find(x=>x.id===id); if(!f) return;
@@ -2822,6 +3047,12 @@ function generarPDF(){
   doc.text(document.getElementById('cFecha').value+(document.getElementById('cTurno').value?'   ·   '+document.getElementById('cTurno').value:''),X+W-11,y-4,{align:'right'}); y+=RH;
   y+=6;
   row('CAJA INICIAL',c.cajaIni,'ECECEC');
+  { const fc=_formCierre(), dif=fc?Math.round(Number(fc.apertura_diferencia)||0):0;
+    if(dif){ const r=fc.apertura_ref||{}, sinTilde=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(156,0,24);
+      const txt=sinTilde(`Abrio con ${money(Math.abs(dif))} ${dif<0?'menos':'de mas'} que el cierre ${r.estado==='final'?'final ':''}del ${r.fecha||''} T${r.turno_num||''} (esperado ${money(fc.apertura_esperado)})`
+        +(textoDenDif(fc.apertura_den_dif)?' · '+textoDenDif(fc.apertura_den_dif).replace(/₡/g,''):'')+(fc.apertura_motivo?' · Motivo: '+fc.apertura_motivo:''));
+      doc.splitTextToSize(txt,W-22).forEach(l=>{ doc.text(l,X+11,y+4); y+=11; }); y+=6; } }
   row('MEMBRESIAS',c.membresias,'FFFF99');
   y+=6;
   head('BILLETES Y MONEDAS','EBFFBF');
@@ -2841,7 +3072,11 @@ function generarPDF(){
   y+=3; const bw=210, bx=X+(W-bw)/2; const[br,bg,bb]=hex(c.ok?'C6EFCE':'FFC7CE');
   doc.setFillColor(br,bg,bb); doc.roundedRect(bx,y-RH+6,bw,RH,6,6,'F');
   doc.setFont('helvetica','bold');doc.setFontSize(11.5); doc.setTextColor(c.ok?6:156, c.ok?100:0, c.ok?50:24);
-  doc.text(c.ok?'CAJA CUADRA':((Math.round(c.diferencia||0)>0?'FALTANTE (de menos)  ':'SOBRANTE (de más)  ')+money(Math.abs(c.diferencia))), X+W/2, y-4, {align:'center'}); y+=RH+7;
+  const difPdf=Math.round(c.diferencia||0), txtSinpe='NO CUADRA: FALTA SINPE  '+money(c.sinpeFalta);
+  doc.text(c.ok?'CAJA CUADRA':difPdf===0?txtSinpe:((difPdf>0?'FALTANTE (de menos)  ':'SOBRANTE (de más)  ')+money(Math.abs(difPdf))), X+W/2, y-4, {align:'center'}); y+=RH+7;
+  if(difPdf!==0&&c.sinpeFalta){   // faltante de SINPE además de la diferencia de efectivo
+    y-=4; doc.setFillColor(255,199,206); doc.roundedRect(bx,y-RH+6,bw,RH,6,6,'F');
+    doc.setTextColor(156,0,24); doc.text(txtSinpe, X+W/2, y-4, {align:'center'}); y+=RH+7; }
   head('GASTOS (día)','FFC000');
   const gs=gastosDelDia(); const totGD=gs.reduce((s,g)=>s+g.monto,0);
   (gs.length?gs:[{desc:'Sin gastos',monto:0}]).forEach(g=>{ border(); doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(40); doc.text((g.turno?`T${g.turno} · `:'')+esc(g.desc||'Gasto'),X+11,y-4); doc.setFont('helvetica','bold'); doc.text(money(g.monto),X+W-11,y-4,{align:'right'}); y+=RH; });
