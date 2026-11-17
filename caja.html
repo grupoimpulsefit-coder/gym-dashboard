@@ -1878,9 +1878,11 @@ function conciliarSinpe(){
   const s=window._sinpeReporte; if(!s||!s.all)return null;
   const fxSinpe=(turnoActual&&window._formCierreId===turnoActual.id?fxState.facturas:[]).filter(f=>f.estado!=='anulada'&&fxMontoMetodo(f,'sinpe')>0);
   const v=window._ventasDetalle||(fxSinpe.length?{filas:[],agrupado:false,fecha:document.getElementById('cFecha').value}:null); if(!v)return null;
-  // Un cobro puede traer varias líneas (plan + matrícula ₡0): se agrupan por hora + cliente
+  // Un cobro puede traer varias líneas (plan + matrícula ₡0): se agrupan por hora + cliente + método.
+  // El método va en la clave: un pago dividido (₡10 000 SINPE + ₡25 000 efectivo) no debe sumarse
+  // como un cobro SINPE de ₡35 000, que nunca calza con la transferencia de ₡10 000.
   const mapa=new Map();
-  v.filas.forEach(f=>{ const k=f.FechaStr+'|'+f.Cliente; let c=mapa.get(k);
+  v.filas.forEach(f=>{ const k=f.FechaStr+'|'+f.Cliente+'|'+(f.Metodo||''); let c=mapa.get(k);
     if(!c){ c={fecha:f.FechaStr, d:fechaHora(f.FechaStr), cliente:f.Cliente, total:0, metodo:f.Metodo, refs:[], productos:[]}; mapa.set(k,c); }
     c.total+=Number(f.Total)||0; (String(f.Notas||'').match(/\d{6,}/g)||[]).forEach(d=>c.refs.push(d));
     if(f.Producto&&Number(f.Total))c.productos.push(f.Producto); if(f.Metodo)c.metodo=f.Metodo; });
@@ -1893,7 +1895,8 @@ function conciliarSinpe(){
   // 1) Por referencia. Varios cobros pueden traer la MISMA referencia (p. ej. un plan en pareja pagado
   //    con un solo SINPE): se agrupan por transferencia y se aceptan si juntos suman lo transferido o menos.
   const porTrans=new Map();
-  cobros.filter(c=>c.refs.length).forEach(c=>{
+  // Solo los cobros SINPE: la parte en efectivo de un pago dividido puede traer la referencia en Notas.
+  cobros.filter(c=>c.refs.length&&(!v.agrupado||c.metodo==='sinpe')).forEach(c=>{
     const t=trans.find(t=>c.refs.some(d=>t.referencia===d||t.referencia.endsWith(d)));
     if(!t){ refSinTrans.push(c); return; }
     if(!porTrans.has(t)) porTrans.set(t,[]);
