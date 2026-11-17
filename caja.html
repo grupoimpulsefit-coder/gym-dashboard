@@ -1434,15 +1434,16 @@ async function cargarSinpeHistorico(file){
     try{
       const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
       const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
-      let hdr=-1,cRef=-1,cMonto=-1,cFecha=-1,cDet=-1;
+      let hdr=-1,cRef=-1,cMonto=-1,cFecha=-1,cDet=-1,cConf=-1;
       for(let i=0;i<Math.min(rows.length,15);i++){ const nm=(rows[i]||[]).map(normHdr);
         const ri=nm.findIndex(c=>c.includes('referencia')); const mi=nm.findIndex(c=>c==='monto');
-        if(ri>=0&&mi>=0){ hdr=i; cRef=ri; cMonto=mi; cFecha=nm.findIndex(c=>c.includes('fecha')&&c.includes('transacc')); if(cFecha<0)cFecha=nm.findIndex(c=>c.includes('fecha')); cDet=nm.findIndex(c=>c==='detalle'); break; } }
+        if(ri>=0&&mi>=0){ hdr=i; cRef=ri; cMonto=mi; cFecha=nm.findIndex(c=>c.includes('fecha')&&c.includes('transacc')); if(cFecha<0)cFecha=nm.findIndex(c=>c.includes('fecha')); cDet=nm.findIndex(c=>c==='detalle'); cConf=colConfirmacion(nm); break; } }
       if(hdr<0)throw new Error('No se encontró el encabezado con "ReferenciaSinpe" y "Monto". ¿Es un reporte SINPE?');
       const seen=new Set(); const all=[];
       for(let i=hdr+1;i<rows.length;i++){ const r=rows[i]; if(!r)continue;
         const ref=String(r[cRef]==null?'':r[cRef]).trim(); if(!ref||seen.has(ref))continue; seen.add(ref);
         if((Number(r[cMonto])||0)<0) continue;   // SINPE salientes: no son cobros
+        if(sinConfirmar(r,cConf)) continue;       // sin confirmar: se registra cuando se confirme
         all.push({ referencia:ref, monto:Math.round(Number(r[cMonto])||0), fecha_tx:cFecha>=0?String(r[cFecha]||'').trim():'', detalle:cDet>=0?String(r[cDet]||'').trim():'' }); }
       if(!all.length)throw new Error('El archivo no tiene filas de SINPE.');
       // Referencias ya registradas de la sede
@@ -1741,13 +1742,14 @@ async function aclLeerReporte(file){
     const buf=await file.arrayBuffer();
     const wb=XLSX.read(new Uint8Array(buf),{type:'array'});
     const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
-    let hdr=-1,cRef=-1,cMonto=-1,cFecha=-1,cDet=-1,cOrig=-1;
+    let hdr=-1,cRef=-1,cMonto=-1,cFecha=-1,cDet=-1,cOrig=-1,cConf=-1;
     for(let i=0;i<Math.min(rows.length,15);i++){ const nm=(rows[i]||[]).map(normHdr);
       const ri=nm.findIndex(c=>c.includes('referencia')); const mi=nm.findIndex(c=>c==='monto');
-      if(ri>=0&&mi>=0){ hdr=i; cRef=ri; cMonto=mi; cFecha=nm.findIndex(c=>c.includes('fecha')&&c.includes('transacc')); if(cFecha<0)cFecha=nm.findIndex(c=>c.includes('fecha')); cDet=nm.findIndex(c=>c==='detalle'); cOrig=nm.findIndex(c=>c.includes('cliente origen')); break; } }
+      if(ri>=0&&mi>=0){ hdr=i; cRef=ri; cMonto=mi; cFecha=nm.findIndex(c=>c.includes('fecha')&&c.includes('transacc')); if(cFecha<0)cFecha=nm.findIndex(c=>c.includes('fecha')); cDet=nm.findIndex(c=>c==='detalle'); cOrig=nm.findIndex(c=>c.includes('cliente origen')); cConf=colConfirmacion(nm); break; } }
     if(hdr<0) throw new Error('No se encontró el encabezado con "ReferenciaSinpe" y "Monto". ¿Es el reporte SINPE?');
     const vistos=new Set(), all=[];
     for(let i=hdr+1;i<rows.length;i++){ const r=rows[i]; if(!r) continue; const ref=String(r[cRef]==null?'':r[cRef]).trim(); if(!ref||vistos.has(ref)) continue; vistos.add(ref);
+      if(sinConfirmar(r,cConf)) continue;   // sin confirmar: no explica un faltante todavía
       all.push({ referencia:ref, monto:Math.round(Number(r[cMonto])||0), fecha_tx:cFecha>=0?String(r[cFecha]||'').trim():'', detalle:cDet>=0?String(r[cDet]||'').trim():'', origen:cOrig>=0?String(r[cOrig]||'').trim():'' }); }
     const ya=await refsRegistradas(ACL.sede, all.map(x=>x.referencia));
     ACL.trans=all.filter(x=>!ya.has(x.referencia)&&x.monto>0); ACL.archivo=file.name;
@@ -1809,6 +1811,9 @@ async function aclConfirmar(tipo){
 }
 
 // ── Reporte SINPE (obligatorio en cierre final): dedup por ReferenciaSinpe + comparación ──
+// Columna "Fecha Confirmación" del reporte SINPE (si el reporte no la trae, todo cuenta como confirmado)
+const colConfirmacion=nm=>nm.findIndex(c=>c.includes('fecha')&&c.includes('confirmacion'));
+const sinConfirmar=(r,cConf)=>cConf>=0&&!String(r[cConf]==null?'':r[cConf]).trim();
 function normHdr(s){ return String(s||'').toLowerCase().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n').replace(/\s+/g,' ').trim(); }
 async function cargarReporteSinpe(file){
   const hintEl=document.getElementById('sinpeHint');
@@ -1817,23 +1822,27 @@ async function cargarReporteSinpe(file){
     try{
       const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
       const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
-      let hdr=-1,cRef=-1,cMonto=-1,cFecha=-1,cDet=-1,cOrig=-1;
+      let hdr=-1,cRef=-1,cMonto=-1,cFecha=-1,cDet=-1,cOrig=-1,cConf=-1;
       for(let i=0;i<Math.min(rows.length,15);i++){ const nm=(rows[i]||[]).map(normHdr);
         const ri=nm.findIndex(c=>c.includes('referencia')); const mi=nm.findIndex(c=>c==='monto');
-        if(ri>=0&&mi>=0){ hdr=i; cRef=ri; cMonto=mi; cFecha=nm.findIndex(c=>c.includes('fecha')&&c.includes('transacc')); if(cFecha<0)cFecha=nm.findIndex(c=>c.includes('fecha')); cDet=nm.findIndex(c=>c==='detalle'); cOrig=nm.findIndex(c=>c.includes('cliente origen')); break; } }
+        if(ri>=0&&mi>=0){ hdr=i; cRef=ri; cMonto=mi; cFecha=nm.findIndex(c=>c.includes('fecha')&&c.includes('transacc')); if(cFecha<0)cFecha=nm.findIndex(c=>c.includes('fecha')); cDet=nm.findIndex(c=>c==='detalle'); cOrig=nm.findIndex(c=>c.includes('cliente origen')); cConf=colConfirmacion(nm); break; } }
       let desde=''; for(let i=0;i<Math.min(rows.length,10);i++){ const r=rows[i]||[]; if(normHdr(r[0])==='desde'){ desde=String(r[1]||'').trim().slice(0,10); break; } }
       if(hdr<0)throw new Error('No se encontró el encabezado con "ReferenciaSinpe" y "Monto". ¿Es el reporte SINPE?');
-      const seen=new Set(); const all=[]; const salidas=[];
+      const seen=new Set(); const all=[]; const salidas=[]; const sinConf=[];
       for(let i=hdr+1;i<rows.length;i++){ const r=rows[i]; if(!r)continue;
         const ref=String(r[cRef]==null?'':r[cRef]).trim(); if(!ref)continue;
         if(seen.has(ref))continue; seen.add(ref);                     // dedup dentro del mismo archivo
         // Montos negativos son SINPE que SALIERON de la cuenta (devoluciones, pagos): no son cobros recibidos.
         // Antes se sumaban y restaban de lo recibido, dando un "faltante" de SINPE falso.
+        // Sin "Fecha Confirmación": todavía no se confirmó, no cuenta como recibido ni se registra.
+        // Cuando se confirme saldrá en un reporte posterior como nuevo.
+        if((Number(r[cMonto])||0)>0&&sinConfirmar(r,cConf)){ sinConf.push({ referencia:ref, monto:Math.round(Number(r[cMonto])||0),
+          fecha_tx:cFecha>=0?String(r[cFecha]||'').trim():'', detalle:cDet>=0?String(r[cDet]||'').trim():'', origen:cOrig>=0?String(r[cOrig]||'').trim():'' }); continue; }
         if((Number(r[cMonto])||0)<0){ salidas.push({ referencia:ref, monto:Math.round(Number(r[cMonto])||0), detalle:cDet>=0?String(r[cDet]||'').trim():'' }); continue; }
         all.push({ referencia:ref, monto:Math.round(Number(r[cMonto])||0),
           fecha_tx:cFecha>=0?String(r[cFecha]||'').trim():'', detalle:cDet>=0?String(r[cDet]||'').trim():'', origen:cOrig>=0?String(r[cOrig]||'').trim():'' });
       }
-      if(!all.length)throw new Error('El reporte no tiene filas de SINPE.');
+      if(!all.length)throw new Error(sinConf.length?'Todos los SINPE del reporte están sin confirmar.':'El reporte no tiene filas de SINPE.');
       let yaSet=new Set();
       try{ yaSet=await refsRegistradas(currentSede, all.map(x=>x.referencia)); }
       catch(err){ hintEl.innerHTML='⚠ No se pudieron leer las referencias registradas: '+esc(err.message)+' (¿corrió el SQL de <code>sinpe_registrados</code>?).'; window._sinpeReporte=null; renderSinpeResumen(); calc(); return; }
@@ -1855,6 +1864,7 @@ async function cargarReporteSinpe(file){
         if(prev.length){ const p=prev[0]; pendPrev=Number(p.sinpe_pendiente)||0;
           if(cierreDate&&p.fecha===cierreDate) pendPrev+=Number(p.sinpe_reporte&&p.sinpe_reporte.facturado)||0; } }catch(_){}
       window._sinpeReporte={ fileName:file.name, all, nuevos, salidas, salidasMonto:salidas.reduce((t,x)=>t+x.monto,0),
+        sinConf, sinConfMonto:sinConf.reduce((t,x)=>t+x.monto,0),
         nuevosMonto:nuevos.reduce((s,x)=>s+x.monto,0),
         yaRegN:yaReg.length, yaRegMonto:yaReg.reduce((s,x)=>s+x.monto,0),
         totalN:all.length, totalMonto:all.reduce((s,x)=>s+x.monto,0), pendPrev, nuevosPrev, nuevosPrevMonto, desde };
@@ -1988,6 +1998,7 @@ function renderSinpeResumen(){
       <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--fill);font-weight:700;"><span>📄 ${esc(s.fileName)}</span><span>${s.totalN} mov · ${fmt(s.totalMonto)}</span></div>
       <div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--muted);"><span>Ya registrados (no se recuentan)</span><span>${s.yaRegN} · ${fmt(s.yaRegMonto)}</span></div>
       ${(s.salidas||[]).length?`<div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--orange);" title="${esc(s.salidas.map(x=>x.referencia+(x.detalle?' · '+x.detalle:'')).join('\n'))}"><span>↩ Salidas (montos negativos, no cuentan)</span><span>${s.salidas.length} · ${fmt(s.salidasMonto)}</span></div>`:''}
+      ${(s.sinConf||[]).length?`<div style="display:flex;justify-content:space-between;padding:6px 12px;color:var(--orange);" title="${esc(s.sinConf.map(x=>(x.origen||'Sin nombre')+' · '+x.fecha_tx+' · '+fmt(x.monto)+' · ref …'+x.referencia.slice(-6)).join('\n'))}"><span>⏳ Sin confirmar (no cuentan todavía)${s.sinConf.length<=3?'<div style="font-size:11px;font-weight:400;">'+s.sinConf.map(x=>esc(x.origen||'Sin nombre')+' · '+esc(x.fecha_tx)).join('<br>')+'</div>':''}</span><span>${s.sinConf.length} · ${fmt(s.sinConfMonto)}</span></div>`:''}
       <div style="display:flex;justify-content:space-between;padding:6px 12px;font-weight:700;color:var(--primary);border-top:1px dashed var(--border);"><span>🆕 SINPE recibidos nuevos</span><span>${s.nuevos.length} · ${fmt(s.nuevosMonto)}</span></div>
       ${s.nuevosPrev?`<div style="display:flex;justify-content:space-between;padding:4px 12px 6px;font-size:11px;color:var(--orange);"><span>🔁 incluye ${s.nuevosPrev} de días anteriores (confirmados ahora)</span><span>${fmt(s.nuevosPrevMonto)}</span></div>`:''}
       <div style="display:flex;justify-content:space-between;padding:6px 12px;"><span>Facturado hoy (cierre)</span><span>${fmt(facturado)}</span></div>
