@@ -199,6 +199,10 @@
         </select>
       </div>
       <div class="f-field full">
+        <label>Detalle de la factura</label>
+        <textarea id="fDetalle" rows="2" placeholder="Ej. 4 clases de Spinning · 2 de Zumba"></textarea>
+      </div>
+      <div class="f-field full">
         <label>Cuenta / número para el pago</label>
         <div class="pay-box" id="payBox">Seleccione un instructor para autocompletar los datos de pago, o escríbalos manualmente.</div>
       </div>
@@ -231,6 +235,7 @@
     <div class="modal-body">
       <div class="f-field"><label>Nombre <span class="req">*</span></label><input type="text" id="iNombre" placeholder="Nombre completo"></div>
       <div class="f-field"><label>Cédula</label><input type="text" id="iCedula" placeholder="Para reconocerlo en el XML de la factura" inputmode="numeric"></div>
+      <div class="f-field"><label>A nombre de quién está la cuenta</label><input type="text" id="iTitular" placeholder="Vacío = a nombre del instructor"></div>
       <div class="f-field"><label>Número de cuenta BAC</label><input type="text" id="iCuentaBac" placeholder="Cuenta / IBAN BAC"></div>
       <div class="f-field"><label>Otro banco (si no usa BAC)</label><input type="text" id="iOtroBanco" placeholder="Nombre del banco"></div>
       <div class="f-field"><label>Número de cuenta del otro banco</label><input type="text" id="iCuentaOtro" placeholder="Cuenta / IBAN"></div>
@@ -518,7 +523,7 @@ function renderGastos() {
     const body = rows.length ? rows.map(g => `
       <tr>
         <td>${esc(new Date(g.fecha_clase+'T00:00:00').toLocaleDateString('es-CR'))}</td>
-        <td>${esc(g.emisor)}</td>
+        <td>${esc(g.emisor)}${piDetalle(g) !== '—' ? '<br><span style="font-size:11px;color:var(--muted);">' + esc(piDetalle(g)) + '</span>' : ''}</td>
         <td>${g.documento_cobro ? esc(g.documento_cobro) : '<span class="pill">—</span>'}</td>
         <td>${g.numero_factura ? esc(g.numero_factura) : '—'}${infoPagoXml(g)}${g.clave_hacienda ? '<br>' + piBotonClave(g.clave_hacienda) : ''}</td>
         <td>${g.banco_pago ? esc(g.banco_pago) : '—'}${g.cuenta_pago ? '<br><span style="font-size:11px;color:var(--muted);">'+esc(g.cuenta_pago)+'</span>' : ''}</td>
@@ -595,7 +600,7 @@ function onMetodoChange() {
   if (val === 'caja') { box.innerHTML = '<b>💵 Pago de caja</b> · efectivo (no requiere cuenta)'; return; }
   if (!inst || !val) { box.textContent = '—'; return; }
   const m = metodosDe(inst).find(x => x.value === val);
-  if (m) box.innerHTML = `<b>${esc(m.banco)}</b> · ${esc(m.cuenta)}`;
+  if (m) box.innerHTML = `<b>${esc(m.banco)}</b> · ${esc(m.cuenta)} · a nombre de <b>${esc(inst.titular_cuenta || inst.nombre)}</b>`;
 }
 
 // ── Guardar gasto (crear / editar) ───────────────────────────────────────
@@ -630,6 +635,7 @@ async function guardarGasto() {
     instructor_id: instId,
     documento_cobro: document.getElementById('fDocumento').value.trim() || null,
     numero_factura: document.getElementById('fNumFactura').value.trim() || null,
+    detalle: document.getElementById('fDetalle').value.trim() || null,
     monto,
     metodo_pago: metVal || null,
     banco_pago: esCaja ? 'Pago de caja' : (m ? m.banco : null),
@@ -670,7 +676,9 @@ function editarGasto(id) {
   document.getElementById('fEmisor').value = g.emisor || '';
   document.getElementById('fDocumento').value = g.documento_cobro || '';
   document.getElementById('fNumFactura').value = g.numero_factura || '';
-  document.getElementById('fMonto').value = g.monto;
+  document.getElementById('fDetalle').value = g.detalle || '';
+  const auto = piResumenClases([g]);   // si no tiene detalle propio, sugiere el de las clases
+  document.getElementById('fDetalle').placeholder = auto !== '—' ? auto : 'Ej. 4 clases de Spinning · 2 de Zumba';
   document.getElementById('fInstructor').value = g.instructor_id || '';
   onInstructorChange();   // reconstruye opciones de método (incluye "Pago de caja")
   const metSel = document.getElementById('fMetodo');
@@ -703,6 +711,8 @@ function resetForm() {
   document.getElementById('fEmisor').value = '';
   document.getElementById('fDocumento').value = '';
   document.getElementById('fNumFactura').value = '';
+  document.getElementById('fDetalle').value = '';
+  document.getElementById('fDetalle').placeholder = 'Ej. 4 clases de Spinning · 2 de Zumba';
   document.getElementById('fMonto').value = '';
   document.getElementById('fMetodo').innerHTML = '<option value="">— Seleccione —</option>' + OPT_CAJA;
   document.getElementById('payBox').textContent = 'Seleccione un instructor para autocompletar los datos de pago, o escríbalos manualmente.';
@@ -736,7 +746,7 @@ function exportExcel() {
   aoa.push([`Gastos — ${currentSede} — ${etiqueta}`]);
   aoa.push([`Generado: ${new Date().toLocaleString('es-CR')} · Semanas de domingo a sábado`]);
   aoa.push([]);
-  const headers = ['Fecha clase','Categoría','Emisor','Doc. cobro','N° factura','Método de pago','Cuenta / número','Monto'];
+  const headers = ['Fecha clase','Categoría','Emisor','Doc. cobro','N° factura','Detalle','Método de pago','Cuenta / número','Monto'];
   const montoCol = headers.length - 1;          // índice de la columna Monto (0-based)
   const montoCells = [];                          // filas (0-based) con montos, para formato numérico
   let granTotal = 0;
@@ -756,22 +766,23 @@ function exportExcel() {
         g.emisor || '',
         g.documento_cobro || '',
         g.numero_factura || '',
+        piDetalle(g) === '—' ? '' : piDetalle(g),
         g.banco_pago || '',
         g.cuenta_pago || '',
         monto
       ]);
       montoCells.push(aoa.length - 1);
     });
-    aoa.push(['', '', '', '', '', '', 'Subtotal semana', subtot]);
+    aoa.push(['', '', '', '', '', '', '', 'Subtotal semana', subtot]);
     montoCells.push(aoa.length - 1);
     aoa.push([]);
     granTotal += subtot;
   });
-  aoa.push(['', '', '', '', '', '', 'TOTAL DEL MES', granTotal]);
+  aoa.push(['', '', '', '', '', '', '', 'TOTAL DEL MES', granTotal]);
   montoCells.push(aoa.length - 1);
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [ {wch:12}, {wch:22}, {wch:26}, {wch:16}, {wch:14}, {wch:16}, {wch:22}, {wch:14} ];
+  ws['!cols'] = [ {wch:12}, {wch:22}, {wch:26}, {wch:16}, {wch:14}, {wch:30}, {wch:16}, {wch:22}, {wch:14} ];
   // Formato de moneda en la columna Monto
   montoCells.forEach(r => {
     const ref = XLSX.utils.encode_cell({ r, c: montoCol });
@@ -789,6 +800,7 @@ let editandoInstructorId = null;   // null = crear; id = editar (solo admin)
 function setInstructorModalFields(inst) {
   document.getElementById('iNombre').value     = inst?.nombre || '';
   document.getElementById('iCedula').value     = inst?.cedula || '';
+  document.getElementById('iTitular').value    = inst?.titular_cuenta || '';
   document.getElementById('iCuentaBac').value  = inst?.cuenta_bac || '';
   document.getElementById('iOtroBanco').value  = inst?.otro_banco || '';
   document.getElementById('iCuentaOtro').value = inst?.cuenta_otro || '';
@@ -847,6 +859,7 @@ async function guardarInstructor() {
   const payload = {
     nombre,
     cedula:      document.getElementById('iCedula').value.replace(/\D/g, '') || null,
+    titular_cuenta: document.getElementById('iTitular').value.trim() || null,
     cuenta_bac:  document.getElementById('iCuentaBac').value.trim() || null,
     otro_banco:  document.getElementById('iOtroBanco').value.trim() || null,
     cuenta_otro: document.getElementById('iCuentaOtro').value.trim() || null,
