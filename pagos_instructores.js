@@ -672,7 +672,7 @@ async function piRechazar() {
 }
 
 // ══ 3) Pago de la semana ══════════════════════════════════════════════════
-const PI_COLS = 'id,origen,sede,fecha_clase,emisor,emisor_cedula,instructor_id,numero_factura,clave_hacienda,monto,monto_esperado,nota_diferencia,banco_pago,cuenta_pago,metodo_pago,pago_tipo,dia_pago,cargado_at,pagado_at,pagado_por,detalle_clases';
+const PI_COLS = 'id,origen,sede,fecha_clase,emisor,emisor_cedula,instructor_id,numero_factura,clave_hacienda,monto,monto_esperado,nota_diferencia,detalle,banco_pago,cuenta_pago,metodo_pago,pago_tipo,dia_pago,cargado_at,pagado_at,pagado_por,detalle_clases';
 
 function piSemanaInicial() {
   const hoy = piAhoraCR();
@@ -721,7 +721,7 @@ function piAgrupar(rows) {
     const key = (g.instructor_id || g.emisor_cedula || g.emisor) + '|' + (g.cuenta_pago || '');
     if (!map.has(key)) {
       const inst = instructores.find(i => i.id === g.instructor_id);
-      map.set(key, { nombre: inst?.nombre || g.emisor, cedula: inst?.cedula || g.emisor_cedula || '', banco: g.banco_pago || '', cuenta: g.cuenta_pago || '', rows: [], total: 0 });
+      map.set(key, { nombre: inst?.nombre || g.emisor, titular: inst?.titular_cuenta || '', cedula: inst?.cedula || g.emisor_cedula || '', banco: g.banco_pago || '', cuenta: g.cuenta_pago || '', rows: [], total: 0 });
     }
     const gr = map.get(key); gr.rows.push(g); gr.total += Number(g.monto) || 0;
   });
@@ -734,6 +734,12 @@ function piResumenClases(rows) {
     t[k] = (t[k] || 0) + (Number(c.cantidad) || 0);
   }));
   return Object.entries(t).map(([k, n]) => `${n} ${k}`).join(' · ') || '—';
+}
+// Detalle de la factura: el que se escribió a mano (editable) o, si no hay, el resumen de clases
+function piDetalle(g) { return (g.detalle || '').trim() || piResumenClases([g]); }
+function piDetalleGrupo(rows) {
+  const d = [...new Set(rows.map(piDetalle).filter(x => x !== '—'))];
+  return d.join(' · ') || '—';
 }
 function piEstado(gr, caja) {
   if (caja) {
@@ -789,7 +795,7 @@ function piRenderPagos() {
         </div>` : r.origen === 'recibo' ? `<div style="display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:4px 0;">
           <span class="pill info" title="Pago con recibo (sin factura)">Clase grupal</span>
           <span>Clases ${esc([...new Set((r.detalle_clases || []).map(c => piFechaCorta(c.fecha)))].join(', ') || piFechaCorta(r.fecha_clase))}</span>
-          <span>${esc(piResumenClases([r]))}</span>
+          <span>${esc(piDetalle(r))}</span>
           <b>${fmtCRC(r.monto)}</b>
           ${r.nota_diferencia ? `<span style="color:var(--orange);">Nota: ${esc(r.nota_diferencia)}</span>` : ''}
           <span class="hint">Registrado ${esc(piHora(r.cargado_at))}${r.pagado_at ? ` · pagado ${esc(piHora(r.pagado_at))}${r.pagado_por ? ' por ' + esc(r.pagado_por) : ''}` : ''}</span>
@@ -797,7 +803,7 @@ function piRenderPagos() {
         </div>` : `<div style="display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:4px 0;">
           <span>Factura …${esc(String(r.numero_factura || '').slice(-6))}</span>
           <span>Clase ${esc(piFechaCorta(r.fecha_clase))}</span>
-          <span>${esc(piResumenClases([r]))}</span>
+          <span>${esc(piDetalle(r))}</span>
           <b>${fmtCRC(r.monto)}</b>
           ${r.nota_diferencia ? `<span style="color:var(--orange);">Nota: ${esc(r.nota_diferencia)}</span>` : ''}
           <span class="hint">Cargada ${esc(piHora(r.cargado_at))}${r.pagado_at ? ` · pagada ${esc(piHora(r.pagado_at))}${r.pagado_por ? ' por ' + esc(r.pagado_por) : ''}` : ''}</span>
@@ -807,9 +813,9 @@ function piRenderPagos() {
       </td></tr>` : '';
     return `<tr>
       <td><button class="btn-edit" aria-label="${abierto ? 'Ocultar' : 'Ver'} facturas" onclick="piToggle(${i})">${abierto ? '▾' : '▸'}</button> <b>${esc(gr.nombre)}</b>${gr.cedula ? `<br><span class="hint">${esc(gr.cedula)}</span>` : ''}</td>
-      <td>${esc(gr.banco || '—')}${gr.cuenta ? `<br><span style="font-size:12px;color:var(--muted);">${esc(gr.cuenta)}</span>` : ''}</td>
+      <td>${esc(gr.banco || '—')}${gr.cuenta ? `<br><span style="font-size:12px;color:var(--muted);">${esc(gr.cuenta)}</span>` : ''}${gr.titular ? `<br><span style="font-size:12px;color:var(--muted);">A nombre de ${esc(gr.titular)}</span>` : ''}</td>
       <td class="num">${gr.rows.length}</td>
-      <td>${esc(piResumenClases(gr.rows))}</td>
+      <td>${esc(piDetalleGrupo(gr.rows))}</td>
       <td class="num"><b>${fmtCRC(gr.total)}</b></td>
       <td><span class="pill ${est.pill}">${esc(est.txt)}</span>${nota}</td>
       ${acciones ? `<td class="num" style="white-space:nowrap;">${est.pagado
@@ -844,14 +850,14 @@ function piRenderPagos() {
     </div>
     <div class="section"><div class="g-wrap" style="margin:0;">
       <table class="g-table">
-        <thead><tr><th>Instructor</th><th>Se le paga a</th><th class="num">Facturas</th><th>Clases</th><th class="num">Total</th><th>Estado</th>${acciones ? '<th></th>' : ''}</tr></thead>
+        <thead><tr><th>Instructor</th><th>Se le paga a</th><th class="num">Facturas</th><th>Detalle</th><th class="num">Total</th><th>Estado</th>${acciones ? '<th></th>' : ''}</tr></thead>
         <tbody>${cuerpo}
           ${piGrupos.length ? `<tr class="cat-total"><td colspan="4">Total</td><td class="num">${fmtCRC(total)}</td><td colspan="${acciones ? 2 : 1}"></td></tr>` : ''}
         </tbody>
       </table>
     </div></div>
     <div class="form-actions" style="padding:0 var(--gut) 24px;">
-      <div class="hint" style="margin-right:auto;">Se descarga un Excel por sede, con lo que pide el protocolo de pagos: emisor, n.º de factura, nombre a quien se transfiere, cuenta o SINPE y monto.</div>
+      <div class="hint" style="margin-right:auto;">Se descarga un Excel por sede, con lo que pide el protocolo de pagos: emisor, n.º de factura, nombre a quien se transfiere, cuenta o SINPE, detalle y monto.</div>
       <button class="btn-primary" onclick="piExcel()">⬇️ Excel de pagos (uno por sede)</button>
     </div>`;
 }
@@ -930,14 +936,14 @@ async function piExcel() {
       [fis?.razon_social ? `${fis.razon_social}${fis.cedula_juridica ? ' · ' + fis.cedula_juridica : ''}` : ''],
       [`Generado: ${new Date().toLocaleString('es-CR')}`],
       [],
-      ['Emisor', 'N.º de factura electrónica', 'Nombre a quien se transfiere', 'Forma de pago', 'Cuenta / SINPE', 'Monto'],
+      ['Emisor', 'N.º de factura electrónica', 'Nombre a quien se transfiere', 'Forma de pago', 'Cuenta / SINPE', 'Detalle', 'Monto'],
     ];
-    const ENC = aoa.length - 1, COLS = 6, MONTO = 5;
-    grupos.forEach(gr => aoa.push([piEmisorExcel(gr), piFacturasExcel(gr), gr.nombre, gr.banco, gr.cuenta, Math.round(gr.total)]));
-    aoa.push(['TOTAL', '', '', '', '', Math.round(grupos.reduce((s, g) => s + g.total, 0))]);
+    const ENC = aoa.length - 1, COLS = 7, MONTO = 6;
+    grupos.forEach(gr => { const d = piDetalleGrupo(gr.rows); aoa.push([piEmisorExcel(gr), piFacturasExcel(gr), gr.titular || gr.nombre, gr.banco, gr.cuenta, d === '—' ? '' : d, Math.round(gr.total)]); });
+    aoa.push(['TOTAL', '', '', '', '', '', Math.round(grupos.reduce((s, g) => s + g.total, 0))]);
     const TOT = aoa.length - 1;
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 32 }, { wch: 26 }, { wch: 32 }, { wch: 16 }, { wch: 28 }, { wch: 14 }];
+    ws['!cols'] = [{ wch: 32 }, { wch: 26 }, { wch: 32 }, { wch: 16 }, { wch: 28 }, { wch: 34 }, { wch: 14 }];
     ws['!merges'] = [0, 1, 2].map(r => ({ s: { r, c: 0 }, e: { r, c: COLS - 1 } }));
     // Formato: título en negrita, encabezado con color, cuadrícula en toda la tabla y montos con miles
     const borde = { style: 'thin', color: { rgb: '9AA5B1' } };
