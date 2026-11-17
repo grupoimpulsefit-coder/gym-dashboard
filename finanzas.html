@@ -52,8 +52,17 @@
 .inv-det-foto { width: 100%; max-height: 300px; object-fit: contain; border-radius: 12px; background: var(--fill); }
 #invScan { position: fixed; inset: 0; z-index: 10001; background: #000; display: none; flex-direction: column; }
 #invScan.open { display: flex; }
-#invScanReg { flex: 1; min-height: 0; }
-#invScanReg video { object-fit: cover; }
+.scan-vista { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.scan-vista video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* Marco: lo que está adentro es exactamente lo que se lee */
+.scan-marco { position: absolute; left: 50%; top: 50%; width: min(86%, 420px); aspect-ratio: 2 / 1; transform: translate(-50%, -50%);
+  border-radius: 14px; box-shadow: 0 0 0 100vmax rgba(0,0,0,.45); outline: 3px solid rgba(255,255,255,.9); }
+.scan-marco.ok { outline-color: #34C759; }
+.scan-marco::after { content: ''; position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; background: #FF3B30; box-shadow: 0 0 8px #FF3B30; animation: scanLinea 1.6s ease-in-out infinite; }
+@keyframes scanLinea { 0%, 100% { transform: translateY(-34px); } 50% { transform: translateY(34px); } }
+.scan-arriba { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; padding: calc(12px + env(safe-area-inset-top)) 14px 0; }
+.scan-arriba button { border: 0; border-radius: 22px; min-height: 44px; padding: 0 16px; background: rgba(0,0,0,.55); color: #fff; font-size: 15px; font-weight: 600; }
+.scan-arriba button.on { background: #FFCC00; color: #000; }
 .inv-scan-pie { background: var(--card); padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; }
 .inv-scan-pie .f-inline input { flex: 1; min-height: 40px; background: var(--fill); border: 0; border-radius: 10px; padding: 0 12px; font-size: 16px; color: var(--label); }
 </style>
@@ -108,11 +117,14 @@
 
 <!-- Escáner de código de barras -->
 <div id="invScan">
-  <div id="invScanReg"></div>
+  <div class="scan-vista">
+    <video id="invVideo" playsinline muted autoplay></video>
+    <div class="scan-marco" id="invMarco"></div>
+    <div class="scan-arriba"><button onclick="cerrarScan()">✕ Cerrar</button><button id="invLinterna" onclick="linterna()" style="display:none">🔦 Luz</button></div>
+  </div>
   <div class="inv-scan-pie">
     <div class="hint" id="invScanMsg">Apunte la cámara al código de barras</div>
     <div class="f-inline"><input id="invScanManual" inputmode="numeric" placeholder="…o escriba el código" onkeydown="if(event.key==='Enter')scanManual()"><button class="btn-ghost" onclick="scanManual()">Buscar</button></div>
-    <button class="btn-ghost" onclick="cerrarScan()">Cerrar</button>
   </div>
 </div>
 <!-- Detalle de un producto -->
@@ -785,9 +797,13 @@ async function foBorrar(id, gastoId) {
 }
 
 /* ── inventario de la casa ── */
-const INV_BUCKET = 'fin-inventario', QR_LIB = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+const INV_BUCKET = 'fin-inventario';
+// Lector para celulares sin lector propio (iPhone): zxing-wasm, se descarga solo la primera vez que se escanea
+const BD_LIB = 'https://cdn.jsdelivr.net/npm/barcode-detector@3.2.3/dist/iife/ponyfill.js';
+const BD_WASM = 'https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.6/dist/reader/zxing_reader.wasm';
+const SCAN_FORMATOS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code'];
 let invCons = {};
-let inv = [], invFotos = {}, invEdita = false, invGrupo = null, invPersonas = {}, invEditId = null, scanModo = null, scanner = null;
+let inv = [], invFotos = {}, invEdita = false, invGrupo = null, invPersonas = {}, invEditId = null, scanModo = null, scan = null;
 const encPath = p => p.split('/').map(encodeURIComponent).join('/');
 async function sto(path, opt = {}) {   // Storage de Supabase con la misma sesión
   if (ses && ses.exp - Date.now() < 120000) await renovar();
@@ -985,28 +1001,93 @@ async function invBorrar(id) {
   });
 }
 
-// Escáner: cámara del celular (html5-qrcode, se carga solo cuando se usa) o código escrito a mano
-function cargarQr() {
-  if (window.Html5Qrcode) return Promise.resolve();
-  return new Promise((ok, mal) => { const s = document.createElement('script'); s.src = QR_LIB; s.onload = ok; s.onerror = () => mal(new Error('No se pudo cargar el lector')); document.head.appendChild(s); });
+// Escáner propio: video a pantalla completa, cámara en HD con enfoque continuo y se lee
+// solo lo que está dentro del marco, a resolución completa. Usa el lector del celular
+// (Android) o, si no tiene (iPhone), zxing-wasm. También se puede escribir el código.
+let detector = null;
+function cargarScript(src) {
+  return new Promise((ok, mal) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => mal(new Error('No se pudo cargar el lector')); document.head.appendChild(s); });
+}
+async function obtenerDetector() {
+  if (detector) return detector;
+  if ('BarcodeDetector' in window) {
+    try {
+      const sop = await BarcodeDetector.getSupportedFormats();
+      const f = SCAN_FORMATOS.filter(x => sop.includes(x));
+      if (f.includes('ean_13')) return (detector = new BarcodeDetector({ formats: f }));
+    } catch (_) {}
+  }
+  if (!window.BarcodeDetectionAPI) await cargarScript(BD_LIB);
+  BarcodeDetectionAPI.setZXingModuleOverrides({ locateFile: (path, prefix) => path.endsWith('.wasm') ? BD_WASM : prefix + path });
+  return (detector = new BarcodeDetectionAPI.BarcodeDetector({ formats: SCAN_FORMATOS }));
 }
 async function abrirScan(modo) {
-  scanModo = modo; $('invScanManual').value = ''; $('invScanMsg').textContent = 'Apunte la cámara al código de barras';
+  scanModo = modo; $('invScanManual').value = ''; $('invMarco').classList.remove('ok');
+  $('invScanMsg').textContent = 'Abriendo la cámara…'; $('invLinterna').style.display = 'none';
   $('invScan').classList.add('open');
+  const yo = scan = { activo: true, stream: null, luz: false };
   try {
-    await cargarQr();
-    const F = Html5QrcodeSupportedFormats;
-    scanner = new Html5Qrcode('invScanReg', { verbose: false, formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF, F.QR_CODE] });
-    await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: (w, h) => ({ width: Math.min(300, w * 0.85), height: Math.min(170, h * 0.4) }) },
-      codigo => { if (navigator.vibrate) navigator.vibrate(60); encontrado(codigo); }, () => {});
+    const [stream, det] = await Promise.all([
+      navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } }),
+      obtenerDetector(),
+    ]);
+    yo.stream = stream;
+    if (!yo.activo) { stream.getTracks().forEach(t => t.stop()); return; }
+    const track = stream.getVideoTracks()[0];
+    try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (_) {}
+    try { if (track.getCapabilities?.().torch) $('invLinterna').style.display = ''; } catch (_) {}
+    const v = $('invVideo'); v.srcObject = stream; await v.play();
+    $('invScanMsg').textContent = 'Ponga el código de barras dentro del marco';
+    leerCuadros(yo, v, det);
   } catch (e) {
-    scanner = null;
-    $('invScanMsg').textContent = 'No se pudo usar la cámara (' + (e.message || e) + '). Escriba el código abajo.';
+    if (!yo.activo) return;
+    const n = e && e.name;
+    $('invScanMsg').textContent = n === 'NotAllowedError' ? 'No hay permiso para usar la cámara. Actívelo en la configuración del navegador o escriba el código abajo.'
+      : n === 'NotFoundError' ? 'No se encontró una cámara. Escriba el código abajo.'
+      : 'No se pudo usar la cámara (' + ((e && e.message) || e) + '). Escriba el código abajo.';
   }
+}
+// Recorta del video (a su resolución real) lo que se ve dentro del marco
+function recorteDelMarco(v, canvas) {
+  const vw = v.videoWidth, vh = v.videoHeight, cw = v.clientWidth, ch = v.clientHeight;
+  const k = Math.max(cw / vw, ch / vh);                    // object-fit: cover
+  const ox = (cw - vw * k) / 2, oy = (ch - vh * k) / 2;
+  const m = $('invMarco').getBoundingClientRect(), r = v.getBoundingClientRect();
+  let sx = (m.left - r.left - ox) / k, sy = (m.top - r.top - oy) / k, sw = m.width / k, sh = m.height / k;
+  const mx = sw * 0.08, my = sh * 0.15;                     // un poco de margen alrededor del marco
+  sx = Math.max(0, sx - mx); sy = Math.max(0, sy - my); sw = Math.min(vw - sx, sw + 2 * mx); sh = Math.min(vh - sy, sh + 2 * my);
+  const esc = Math.min(1, 1280 / sw);                       // no más de 1280 px de ancho para que sea rápido
+  canvas.width = Math.round(sw * esc); canvas.height = Math.round(sh * esc);
+  canvas.getContext('2d', { willReadFrequently: true }).drawImage(v, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+async function leerCuadros(yo, v, det) {
+  const canvas = document.createElement('canvas');
+  while (yo.activo) {
+    if (v.readyState >= 2 && v.videoWidth) {
+      try {
+        const r = await det.detect(recorteDelMarco(v, canvas));
+        const c = r && r.find(x => x.rawValue);
+        if (c && yo.activo) {
+          $('invMarco').classList.add('ok');
+          if (navigator.vibrate) navigator.vibrate(60);
+          await new Promise(ok => setTimeout(ok, 150));
+          return encontrado(c.rawValue);
+        }
+      } catch (_) {}
+    }
+    await new Promise(ok => requestAnimationFrame(ok));
+  }
+}
+async function linterna() {
+  if (!scan?.stream) return;
+  const t = scan.stream.getVideoTracks()[0];
+  try { scan.luz = !scan.luz; await t.applyConstraints({ advanced: [{ torch: scan.luz }] }); $('invLinterna').classList.toggle('on', scan.luz); } catch (_) {}
 }
 async function cerrarScan() {
   $('invScan').classList.remove('open');
-  if (scanner) { try { await scanner.stop(); scanner.clear(); } catch (_) {} scanner = null; }
+  if (scan) { scan.activo = false; if (scan.stream) scan.stream.getTracks().forEach(t => t.stop()); scan = null; }
+  $('invVideo').srcObject = null; $('invLinterna').classList.remove('on');
 }
 function scanManual() { const c = $('invScanManual').value.trim(); if (c) encontrado(c); }
 async function encontrado(codigo) {
