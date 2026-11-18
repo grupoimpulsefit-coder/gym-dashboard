@@ -2239,6 +2239,13 @@ function parseProdQty(name){ const s=String(name||'').trim(); const m=s.match(/\
 async function cerrarTurno(estado){
   const msg=document.getElementById('saveMsg');
   if(!turnoActual){ msg.className='msg err'; msg.textContent='Primero abra el turno.'; return; }
+  // Si en pantalla hay un cierre del historial ("Ver"), el formulario tiene SUS montos, gastos y conteo:
+  // cerrar así guardaría ese cierre viejo encima del turno abierto. Se vuelve al turno abierto y se pide revisar.
+  if(window._formCierreId!==turnoActual.id){
+    cargarTurnoEnForm(turnoActual);
+    msg.className='msg err'; msg.textContent='Estaba viendo un cierre anterior. Se volvió a cargar el turno abierto: revise los montos y vuelva a cerrar.';
+    return;
+  }
   const fecha=document.getElementById('cFecha').value;
   if(document.getElementById('cTarjeta').value===''||document.getElementById('cSinpe').value===''){ msg.className='msg err'; msg.textContent='Cargue el 📤 Informe de Ventas (llena Tarjeta y SINPE automáticamente).'; return; }
   if(estado==='final'&&!window._sinpeReporte){ msg.className='msg err'; msg.textContent='Para el cierre final debe cargar el 🔷 Reporte SINPE del día.'; return; }
