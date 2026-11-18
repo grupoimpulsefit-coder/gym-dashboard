@@ -17,12 +17,12 @@ function piAhoraCR(instante) {
     .formatToParts(instante ? new Date(instante) : new Date()).forEach(x => { p[x.type] = x.value; });
   return new Date(+p.year, +p.month - 1, +p.day, (+p.hour) % 24, +p.minute);
 }
-// Misma regla que dia_pago_instructor() en la base: corte miércoles y viernes 10:00 a. m.
+// Misma regla que dia_pago_instructor() en la base: corte miércoles y viernes 12 mediodía
 function piDiaPagoPara(instante) {
   const ahora = piAhoraCR(instante);
   for (let i = 0; i <= 7; i++) {
     const d = piSumarDias(ahora, i);
-    if ((d.getDay() === 3 || d.getDay() === 5) && ahora < new Date(d.getFullYear(), d.getMonth(), d.getDate(), 10, 0)) return d;
+    if ((d.getDay() === 3 || d.getDay() === 5) && ahora < new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0)) return d;
   }
   return null;
 }

@@ -6,7 +6,7 @@
    · Recepción registra las clases de cada instructor (a mano o desde la
      plantilla semanal) y se guardan como gasto de Clases grupales, origen
      'recibo'. El día de pago lo pone la base con la HORA DE REGISTRO
-     (corte miércoles y viernes 10:00 a. m.); fines de semana, caja.
+     (corte miércoles y viernes 12 mediodía); fines de semana, caja.
    · Plantilla: las clases fijas de cada instructor por día de la semana.
      «Registrar desde la plantilla» arma las clases de un rango de fechas y
      salta las que ya se registraron, para no pagarlas dos veces.
@@ -71,7 +71,7 @@ function rcRender() {
   v.innerHTML = `
     <div class="section"><div class="section-title">🧾 Pagos con recibo <span class="section-note">— ${esc(currentSede)} · instructores que cobran por clase y no dan factura</span></div></div>
     ${aviso ? `<div class="section" style="padding-top:0;"><div class="form-msg ${aviso.tipo}" style="font-size:15px;">${aviso.html}</div></div>` : ''}
-    <div class="section" style="padding-top:0;"><div class="hint">Se paga igual que las facturas, según la hora en que se registra: antes del miércoles 10:00 a. m. → miércoles; antes del viernes 10:00 a. m. → viernes. Clases de sábado y domingo → caja.</div></div>
+    <div class="section" style="padding-top:0;"><div class="hint">Se paga igual que las facturas, según la hora en que se registra: antes del miércoles 12 mediodía → miércoles; antes del viernes 12 mediodía → viernes. Clases de sábado y domingo → caja.</div></div>
     <div class="form-card" id="rcManual"></div>
     <div class="form-card" id="rcDesdePlantilla"></div>
     <div class="form-card" id="rcPlantillaCard"></div>`;

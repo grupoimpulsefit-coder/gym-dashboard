@@ -7,9 +7,9 @@
 --      «Cargar factura XML». Se valida y se guarda como un gasto más
 --      (categoría clases_grupales), así el resumen mensual no cambia.
 --    · El DÍA DE PAGO lo pone la base con la hora del servidor (Costa Rica):
---        cargada antes del miércoles 10:00 a. m.            → miércoles
---        del miércoles 10:00 a. m. al viernes 10:00 a. m.   → viernes
---        después del viernes 10:00 a. m.                    → miércoles siguiente
+--        cargada antes del miércoles 12 mediodía            → miércoles
+--        del miércoles 12 mediodía al viernes 12 mediodía   → viernes
+--        después del viernes 12 mediodía                    → miércoles siguiente
 --      Las clases de fin de semana se marcan «caja»: no tienen día de pago.
 --    · Una factura no se puede cargar dos veces (clave de Hacienda única).
 --    · El instructor también puede enviarla él mismo desde la página pública
@@ -113,8 +113,8 @@ declare
   i int;
 begin
   for i in 0..7 loop
-    -- isodow: 3 = miércoles, 5 = viernes; corte a las 10:00 a. m. de ese día
-    if extract(isodow from d + i) in (3, 5) and l < (d + i) + time '10:00' then
+    -- isodow: 3 = miércoles, 5 = viernes; corte a las 12 mediodía de ese día
+    if extract(isodow from d + i) in (3, 5) and l < (d + i) + time '12:00' then
       return d + i;
     end if;
   end loop;
