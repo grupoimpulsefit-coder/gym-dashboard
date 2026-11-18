@@ -9,7 +9,7 @@
    Base de datos: pagos_instructores.sql.
 
    El día de pago NO lo decide el navegador: lo pone la base con la hora del
-   servidor (corte miércoles y viernes 10:00 a. m., hora de Costa Rica).
+   servidor (corte miércoles y viernes 12 mediodía, hora de Costa Rica).
    ══════════════════════════════════════════════════════════════════════════ */
 
 let piTab = 'gastos';
@@ -266,7 +266,7 @@ function piRenderCarga(aviso) {
         <span class="btn-primary" style="margin-top:6px;">Elegir XML</span>
       </label>
       <div class="section"><div class="hint">Al guardarla, la factura entra a «Gastos del mes» (Clases grupales) y al «Pago de la semana» que le corresponda.
-        Corte: miércoles y viernes a las 10:00 a. m. Las clases de fin de semana se pagan de caja.</div></div>`;
+        Corte: miércoles y viernes a las 12 mediodía. Las clases de fin de semana se pagan de caja.</div></div>`;
     const drop = document.getElementById('piDrop');
     drop.ondragover = e => { e.preventDefault(); drop.style.background = 'var(--brand-tint)'; };
     drop.ondragleave = () => { drop.style.background = ''; };
@@ -494,7 +494,7 @@ function piActualizar() {
       : `<div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;"><span style="font-size:20px;font-weight:700;">${d ? piFechaLarga(d) : '—'}</span><span class="pill info">Transferencia</span></div>
          <div class="hint" style="margin-top:4px;">${piF.pend
            ? `Según la hora en que el instructor la envió (${esc(piHora(piF.pend.created_at))}).${d && d < piSumarDias(piAhoraCR(), 0) ? ' <b style="color:var(--orange);">Ese día ya pasó: quedará como atrasada.</b>' : ''}`
-           : 'Si se guarda ahora. El día exacto lo fija el sistema con la hora del servidor (corte: miércoles y viernes a las 10:00 a. m.).'}</div>`;
+           : 'Si se guarda ahora. El día exacto lo fija el sistema con la hora del servidor (corte: miércoles y viernes a las 12 mediodía).'}</div>`;
   }
   const pend = piPendientes();
   const btn = document.getElementById('piGuardar');
@@ -841,7 +841,7 @@ function piRenderPagos() {
     ${atr}
     <div class="section" style="padding-bottom:0;"><div class="hint">${caja
       ? 'Clases de sábado y domingo: se pagan de caja. Aquí solo quedan registradas.'
-      : `Corte: ${piDia === 'mie' ? 'miércoles' : 'viernes'} a las 10:00 a. m. Lo que se carga después pasa al siguiente día de pago.`}</div></div>
+      : `Corte: ${piDia === 'mie' ? 'miércoles' : 'viernes'} a las 12 mediodía. Lo que se carga después pasa al siguiente día de pago.`}</div></div>
     <div class="kpi-row">
       <div class="kpi"><div class="kpi-label">Total ${esc(piEtiquetaDia(piDia))}</div><div class="kpi-value">${fmtCRC(total)}</div></div>
       <div class="kpi green"><div class="kpi-label">${caja ? 'Pagado de caja' : 'Pagado'}</div><div class="kpi-value">${fmtCRC(pagado)}</div></div>
@@ -1030,7 +1030,7 @@ function piRenderConfig(aviso) {
           || '<tr><td colspan="5" class="g-empty">No hay instructores en el directorio.</td></tr>'}
         </tbody></table></div>
     </div>
-    <div class="section"><div class="hint">Cortes de pago (fijos): miércoles y viernes a las 10:00 a. m., hora de Costa Rica. Sábado y domingo se pagan de caja.</div></div>`;
+    <div class="section"><div class="hint">Cortes de pago (fijos): miércoles y viernes a las 12 mediodía, hora de Costa Rica. Sábado y domingo se pagan de caja.</div></div>`;
 }
 
 async function piProbarHacienda(i) {

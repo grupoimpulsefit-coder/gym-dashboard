@@ -7,7 +7,7 @@
 --    factura. Recepción registra las clases en Gastos → «🧾 Recibos» y se
 --    guardan como gasto de Clases grupales con origen 'recibo'. El día de pago
 --    sale igual que las facturas: por la HORA EN QUE SE REGISTRA (corte
---    miércoles y viernes 10:00 a. m.); fines de semana, caja.
+--    miércoles y viernes 12 mediodía); fines de semana, caja.
 --  · Plantillas: las clases (recibos) o las horas (planilla por horas) fijas
 --    de cada persona por día de la semana, para no volver a anotarlas.
 -- ══════════════════════════════════════════════════════════════════════════
