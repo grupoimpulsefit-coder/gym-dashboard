@@ -534,11 +534,13 @@ table.hist tbody tr:hover td { background:var(--fill); }
     </div>
   </div>
 
+  <div id="histWrap" hidden>
   <h3 style="margin:22px 0 10px;font-size:13px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;">📋 Cierres recientes</h3>
   <div class="tbl-wrap"><table class="hist">
     <thead><tr><th>Fecha</th><th>Turno</th><th class="num">Caja inicial</th><th class="num">Efectivo</th><th class="num">Total ventas</th><th class="num">Minita</th><th class="num">Diferencia</th><th>Estado</th><th></th></tr></thead>
     <tbody id="histBody"></tbody>
   </table></div>
+  </div>
   </div><!-- /paneCierre -->
 
   <!-- Eventos (solo administradores). Ver eventos.sql -->
@@ -2239,6 +2241,13 @@ function parseProdQty(name){ const s=String(name||'').trim(); const m=s.match(/\
 async function cerrarTurno(estado){
   const msg=document.getElementById('saveMsg');
   if(!turnoActual){ msg.className='msg err'; msg.textContent='Primero abra el turno.'; return; }
+  // Si en pantalla hay un cierre del historial ("Ver"), el formulario tiene SUS montos, gastos y conteo:
+  // cerrar así guardaría ese cierre viejo encima del turno abierto. Se vuelve al turno abierto y se pide revisar.
+  if(window._formCierreId!==turnoActual.id){
+    cargarTurnoEnForm(turnoActual);
+    msg.className='msg err'; msg.textContent='Estaba viendo un cierre anterior. Se volvió a cargar el turno abierto: revise los montos y vuelva a cerrar.';
+    return;
+  }
   const fecha=document.getElementById('cFecha').value;
   if(document.getElementById('cTarjeta').value===''||document.getElementById('cSinpe').value===''){ msg.className='msg err'; msg.textContent='Cargue el 📤 Informe de Ventas (llena Tarjeta y SINPE automáticamente).'; return; }
   if(estado==='final'&&!window._sinpeReporte){ msg.className='msg err'; msg.textContent='Para el cierre final debe cargar el 🔷 Reporte SINPE del día.'; return; }
@@ -2378,8 +2387,12 @@ async function aceptarEnvio(){
 }
 // Los errores de Supabase llegan como JSON en el texto: mostrar solo el mensaje
 function mensajeError(e){ try{ const j=JSON.parse(e.message); return j.message||e.message; }catch(_){ return e.message; } }
+// Recepción solo trabaja el turno abierto: no ve ni abre los cierres anteriores.
+const verHistorial=()=>currentRole!=='recepcion';
 function renderHist(){
   const tb=document.getElementById('histBody');
+  document.getElementById('histWrap').hidden=!verHistorial();
+  if(!verHistorial()){ tb.innerHTML=''; return; }
   if(!cierres.length){tb.innerHTML='<tr><td colspan="9" style="padding:16px;color:var(--muted);">Sin cierres registrados.</td></tr>';return;}
   const estBadge=e=> e==='abierto'?'<span class="pill" style="background:var(--green-tint);color:var(--green);">abierto</span>':e==='parcial'?'<span class="pill" style="background:var(--orange-tint);color:var(--orange);">parcial</span>':e==='final'?'<span class="pill" style="background:rgba(88,86,214,.14);color:var(--indigo);">final</span>':'';
   tb.innerHTML=cierres.map(c=>`<tr>
@@ -2392,6 +2405,7 @@ function renderHist(){
   </tr>`).join('');
 }
 function cargarCierre(id){
+  if(!verHistorial()) return;
   const c=cierres.find(x=>x.id===id); if(!c)return;
   stopLivePoll();              // viendo historial → no refrescar/pisar con el turno abierto
   window._formCierreId=c.id;   // viendo historial → no dispara autoguardado del turno abierto
