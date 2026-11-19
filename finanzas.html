@@ -255,11 +255,21 @@
         <div class="form-grid">
           <div class="f-field"><label>Nombre</label><input id="ivNombre" placeholder="Ej. Arroz 2 kg"></div>
           <div class="f-field"><label>Código de barras</label><div class="f-inline"><div class="f-field"><input id="ivCodigo" inputmode="numeric" placeholder="Escanee o escriba"></div><button class="btn-ghost" onclick="abrirScan('form')">📷</button></div></div>
-          <div class="f-field" id="ivCantWrap"><label>Cuántas unidades hay</label><input id="ivCant" type="number" inputmode="decimal" min="0" step="any" value="1"></div>
-          <div class="f-field"><label>Avisar cuando queden (opcional)</label><input id="ivMin" type="number" inputmode="decimal" min="0" step="any" placeholder="Ej. 1"></div>
-          <div class="f-field"><label>Unidad (opcional)</label><input id="ivUnidad" placeholder="rollos, latas, kg…"></div>
+          <div class="f-field"><label>Unidad (opcional)</label><input id="ivUnidad" placeholder="huevos, rollos, latas…" oninput="ivCostoU()"></div>
           <div class="f-field"><label>Precio del paquete ₡ (opcional)</label><input id="ivPrecio" type="number" inputmode="decimal" min="0" step="any" placeholder="Ej. 4600" oninput="ivCostoU()"></div>
           <div class="f-field"><label>Unidades por paquete</label><input id="ivPorPaq" type="number" inputmode="decimal" min="1" step="any" value="1" oninput="ivCostoU()"><span class="hint" id="ivCostoU"></span></div>
+          <!-- Cuánto hay: si el paquete trae varias unidades (cartón de 15 huevos) se cuenta en paquetes -->
+          <div class="f-field" id="ivCantWrap">
+            <div id="ivModoUno"><label>Cuántas hay</label><input id="ivCant1" type="number" inputmode="decimal" min="0" step="any" value="1" oninput="ivCostoU()"></div>
+            <div id="ivModoPaq" style="display:none">
+              <div class="f-inline">
+                <div class="f-field"><label>Paquetes que hay</label><input id="ivPaqN" type="number" inputmode="decimal" min="0" step="any" value="1" oninput="ivCostoU()"></div>
+                <div class="f-field"><label>Sueltas aparte</label><input id="ivSueltas" type="number" inputmode="decimal" min="0" step="any" value="0" oninput="ivCostoU()"></div>
+              </div>
+            </div>
+            <span class="hint" id="ivTotal"></span>
+          </div>
+          <div class="f-field"><label id="ivMinLbl">Avisar cuando queden (opcional)</label><input id="ivMin" type="number" inputmode="decimal" min="0" step="any" placeholder="Ej. 4"></div>
           <div class="f-field"><label>Foto</label><input id="ivFoto" type="file" accept="image/*" capture="environment"></div>
           <div class="f-field full"><label>Nota (opcional)</label><input id="ivNota" placeholder="Ej. en la alacena de arriba"></div>
         </div>
@@ -936,7 +946,8 @@ function invNuevo(codigo) {
   invEditId = ''; $('invFormTit').textContent = 'Nuevo producto'; $('ivCantWrap').style.display = '';
   ['ivNombre', 'ivMin', 'ivUnidad', 'ivNota', 'ivFoto', 'ivPrecio'].forEach(k => { $(k).value = ''; });
   $('ivPorPaq').value = 1; ivCostoU();
-  $('ivCodigo').value = codigo || ''; $('ivCant').value = 1; $('ivMsg').textContent = '';
+  $('ivCodigo').value = codigo || ''; $('ivCant1').value = 1; $('ivPaqN').value = 1; $('ivSueltas').value = 0; $('ivMsg').textContent = '';
+  ivCostoU();
   $('invForm').style.display = ''; $('ivNombre').focus();
 }
 function invEditar(id) {
@@ -947,9 +958,17 @@ function invEditar(id) {
   $('ivPrecio').value = i.precio ?? ''; $('ivPorPaq').value = +i.por_paquete || 1; ivCostoU();
   $('invForm').style.display = ''; $('invForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+// Unidades con que se crea el producto: paquetes × unidades por paquete + sueltas
+function ivCantidadInicial() {
+  const pq = +$('ivPorPaq').value || 1;
+  return pq > 1 ? Math.max(0, (+$('ivPaqN').value || 0) * pq + (+$('ivSueltas').value || 0)) : Math.max(0, +$('ivCant1').value || 0);
+}
 function ivCostoU() {
-  const pr = +$('ivPrecio').value, pq = +$('ivPorPaq').value || 1;
+  const pr = +$('ivPrecio').value, pq = +$('ivPorPaq').value || 1, u = $('ivUnidad').value.trim() || 'unidades';
   $('ivCostoU').textContent = pr > 0 && pq > 1 ? `= ${crc(pr / pq)} por unidad` : '';
+  $('ivModoUno').style.display = pq > 1 ? 'none' : ''; $('ivModoPaq').style.display = pq > 1 ? '' : 'none';
+  $('ivTotal').textContent = pq > 1 ? `= ${invCant({ cantidad: ivCantidadInicial() })} ${u} en total` : '';
+  $('ivMinLbl').textContent = `Avisar cuando queden (${u}, opcional)`;
 }
 function invCerrarForm() { invEditId = null; $('invForm').style.display = 'none'; }
 // Achica la foto antes de subirla (≈900 px, JPEG) para que cargue rápido
@@ -984,7 +1003,7 @@ async function invGuardar() {
     }
     const vieja = invEditId ? inv.find(x => x.id === invEditId)?.foto : null;
     if (invEditId) await api('fin_inventario?id=eq.' + invEditId, { method: 'PATCH', body: datos });
-    else await api('fin_inventario', { method: 'POST', body: { ...datos, cantidad: Math.max(0, +$('ivCant').value || 0) } });
+    else await api('fin_inventario', { method: 'POST', body: { ...datos, cantidad: ivCantidadInicial() } });
     if (foto && vieja) sto('object/' + INV_BUCKET, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: [vieja] }) }).catch(() => {});
     invEditId = null; $('invForm').style.display = 'none';
     await cargarInv();
