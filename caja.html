@@ -425,6 +425,7 @@ table.hist tbody tr:hover td { background:var(--fill); }
         <div class="f-row"><label>Total Transferencia (₡)</label><input type="number" id="cTransfer" step="1" readonly title="Se carga desde el Informe de Ventas" ></div>
         <div class="hint">🔒 Tarjeta, SINPE y Transferencia se cargan solo desde el <b>Informe de Ventas</b> (no se editan a mano).</div>
         <div id="factCierreBox" style="margin:10px 0;"></div>
+        <div id="histFactBox" style="margin:10px 0;"></div>
         <div class="f-row"><label>TOTAL ventas (₡)</label><input type="number" id="cTotalVentas" step="1" oninput="calc()"></div>
         <div class="hint" id="ventasHint"></div>
         <div class="f-row"><label>Sobre (minita)</label>
@@ -924,7 +925,7 @@ function limpiarEstadoSede(){
   window._sinpeReporte=null; window._ventasDetalle=null; window._informeVentas=null; window._otrosResumen=null;
   window._factCierre=null; fotoDatafono=null; inventarioCierre=null; window._invSis={}; window._enviosPend=[]; window._envioActual=null;
   fxState.prods=[]; fxState.cart={}; fxState.facturas=[]; fxState.errFacturas=null; fxState.eventos=[]; fxState.evento=null; fxState.reservas=[]; fxState.abono=null;
-  ['sinpeResumen','fotoResumen','ventasHint','saveMsg','conteoCierreResumen','liveInfo','aperturaInvBody','factCierreBox'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=''; });
+  ['sinpeResumen','fotoResumen','ventasHint','saveMsg','conteoCierreResumen','liveInfo','aperturaInvBody','factCierreBox','histFactBox'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=''; });
   ['fileVentas','fileSinpe','fileFoto'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   DENOMS.forEach(d=>{ const el=document.getElementById('den_'+d); if(el) el.value=0; });
   document.getElementById('histBody').innerHTML='<tr><td colspan="9" style="padding:16px;color:var(--muted);">Cargando…</td></tr>';
@@ -961,6 +962,7 @@ function cargarTurnoEnForm(t){
   renderOtrosResumen(window._otrosResumen);
   renderConteoCierreResumen();
   renderAperturaInv(t);
+  document.getElementById('histFactBox').innerHTML='';
   renderGastos(); renderIngresos();
   calc();
   _noSave=false;
@@ -1368,6 +1370,7 @@ function addIngreso(){ingresos.push({desc:'',monto:''});renderIngresos();}
 // ── Nuevo cierre (con acumulado: caja inicial = efectivo del cierre anterior) ──
 function nuevoCierre(){
   window._formCierreId=null;
+  document.getElementById('histFactBox').innerHTML='';
   document.getElementById('cFecha').value=todayStr();
   document.getElementById('cTurno').value='';
   ['cMembresias','cOtros','cTarjeta','cSinpe','cTransfer','cTotalVentas'].forEach(id=>document.getElementById(id).value='');
@@ -2431,7 +2434,44 @@ function cargarCierre(id){
   window._sinpeReporte=null;              // historial: no hay reporte en vivo
   calc();
   renderSinpeResumenHist(c.sinpe_reporte||null);   // muestra cómo quedó el SINPE de ese cierre (sobró/faltó)
+  renderHistFacturas(c);
   window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── Ventas de caja de un turno ya cerrado: solo Administración las puede anular (anulacion_turno_cerrado.sql).
+// La base anula, devuelve el stock y corrige los cierres guardados que contaban la venta.
+async function renderHistFacturas(c){
+  const box=document.getElementById('histFactBox'); box.innerHTML='';
+  if(!esAdmin()||!['parcial','final'].includes(c.estado)) return;
+  let L=[]; try{ L=(await supaFetch(`/facturas_caja?cierre_id=eq.${c.id}&order=numero.asc&select=*`))||[]; }
+  catch(e){ box.innerHTML=`<div class="hint" style="color:var(--red);">No se pudieron cargar las ventas de este turno: ${esc(mensajeError(e))}</div>`; return; }
+  if(window._formCierreId!==c.id) return;   // se abrió otro cierre mientras cargaba
+  const post=(c.facturado&&c.facturado.anuladas_post)||[];
+  if(!L.length&&!post.length) return;
+  const filas=L.map(f=>{
+    const det=f.tipo==='evento'?'🎟️ '+esc((f.items&&f.items[0]&&f.items[0].producto)||'Evento'):(f.items||[]).map(it=>esc(it.producto)+(Number(it.cantidad)>1?' ×'+it.cantidad:'')).join(', ');
+    const acc=f.estado==='anulada'?`<span class="pill dif" title="${esc(f.motivo_anulacion||'')}">Anulada</span>`
+      :`<button class="btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="histAnularFactura('${f.id}','${c.id}')">Anular</button>`;
+    return `<tr class="${f.estado==='anulada'?'anulada':''}"><td class="num">${f.numero}</td><td>${det}</td><td>${fxMetodoTxt(f)}</td><td class="num">${fmt(f.total)}</td><td>${acc}</td></tr>`;
+  }).join('');
+  box.innerHTML=`<div style="border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;">
+    <div style="font-size:13px;font-weight:600;margin-bottom:4px;">🛒 Ventas de caja de este turno <span class="hint">(solo Administración puede anularlas)</span></div>
+    ${L.length?`<div style="overflow-x:auto;"><table class="fx-tbl" style="min-width:0;"><thead><tr><th class="num">#</th><th>Detalle</th><th>Pago</th><th class="num">Total</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>`:''}
+    ${post.map(a=>`<div class="hint" style="font-size:12px;margin-top:4px;">✎ Factura #${a.numero} (${fmt(a.total)}) anulada después del cierre · ${esc(a.motivo||'')} · ${esc(a.por||'')} · ${a.at?new Date(a.at).toLocaleDateString('es-CR'):''}</div>`).join('')}
+  </div>`;
+}
+async function histAnularFactura(fid,cid){
+  const msg=document.getElementById('saveMsg');
+  const motivo=prompt('Motivo para anular esta venta del turno ya cerrado.\n\nEl producto vuelve al inventario y se corrigen los totales de este cierre y de los turnos siguientes del mismo día. Si se pagó por SINPE y el día ya tuvo cierre final, el saldo SINPE de la sede se ajusta.');
+  if(motivo==null) return;
+  if(!motivo.trim()){ msg.className='msg err'; msg.textContent='Indique el motivo de la anulación.'; return; }
+  try{
+    const r=await supaFetch('/rpc/anular_factura_caja',{method:'POST',prefer:'return=representation',body:{p_factura:fid,p_motivo:motivo.trim()}});
+    await loadCierres(); cargarCierre(cid);
+    msg.className='msg ok';
+    msg.textContent=`Factura #${r&&r.numero} anulada. El stock volvió al inventario y se corrigieron ${(r&&r.cierres_ajustados)||0} cierre(s) de ese día.`
+      +' Si el cierre final ya había sacado el sobre de la minita, el sobre quedó con ese monto de más y aparece como faltante en ese cierre.';
+  }catch(e){ msg.className='msg err'; msg.textContent='⚠ '+mensajeError(e); }
 }
 
 // ══ Facturación de productos (minita y otros) — ver facturacion.sql ══════════
