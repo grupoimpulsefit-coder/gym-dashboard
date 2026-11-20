@@ -145,6 +145,11 @@ begin
   if not exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('admin','admin_sedes','admin_g')) then
     raise exception 'Solo un admin puede aprobar las horas.';
   end if;
+  -- Solo semanas terminadas: la semana actual sale llena con la plantilla y aprobarla pagaría horas no trabajadas
+  if (now() at time zone 'America/Costa_Rica')::date <= p_semana + 6 then
+    raise exception 'La semana del % al % todavía no termina: se puede aprobar a partir del lunes %.',
+      to_char(p_semana, 'DD/MM'), to_char(p_semana + 6, 'DD/MM'), to_char(p_semana + 7, 'DD/MM');
+  end if;
   perform set_config('horas.rpc', '1', true);
   delete from horas_semana where sede = p_sede and semana = p_semana and estado <> 'aprobada' and horas = 0;
   for r in select * from horas_semana where sede = p_sede and semana = p_semana and estado <> 'aprobada' loop
