@@ -109,9 +109,9 @@ async function piLeerArchivo(file) {
   try { texto = await file.text(); } catch (_) { piRenderCarga({ tipo: 'err', texto: 'No se pudo leer el archivo.' }); return; }
   try { x = piParseXML(texto); } catch (e) { piF = null; piRenderCarga({ tipo: 'err', texto: e.message }); return; }
   if (!piTarifas.length) await piCargarCatalogos();
-  piF = { x, texto, archivo: file.name, checks: {}, inst: null, porNombre: false, clases: [], caja: false, cajaTocado: false, metodo: '', nota: '' };
+  piF = { x, texto, archivo: file.name, checks: {}, inst: null, porNombre: false, clases: [], caja: false, cajaTocado: false, dia: '', metodo: '', nota: '' };
   piF.clases = piClasesIniciales(x);
-  piF.caja = piTodasFinde();
+  piF.caja = piCajaInicial();
   piBuscarInstructor();
   piRenderCarga();
   piValidar();
@@ -133,6 +133,15 @@ function piClasesIniciales(x) {
   return filas;
 }
 const piTodasFinde = () => piF.clases.length > 0 && piF.clases.every(c => c.fecha && [0, 6].includes(parseFecha(c.fecha).getDay()));
+// Fin de semana: no se supone caja ni transferencia, quien acepta la factura lo elige (null = sin elegir)
+const piCajaInicial = () => piTodasFinde() ? null : false;
+
+// Días de pago que se pueden elegir: miércoles y viernes desde hoy, 3 semanas
+function piDiasElegibles() {
+  const hoy = piSumarDias(piAhoraCR(), 0), dias = [];
+  for (let i = 0; i < 21; i++) { const d = piSumarDias(hoy, i); if (d.getDay() === 3 || d.getDay() === 5) dias.push(d); }
+  return dias;
+}
 
 function piBuscarInstructor() {
   const ced = piF.x.emisorCedula;
@@ -246,7 +255,8 @@ function piPendientes() {
   const { filas, dif } = piCalc();
   if (!filas.length || filas.some(f => !f.tarifa || f.cantidad <= 0 || !f.fecha)) p.push('Complete las clases: fecha, tipo y cantidad.');
   if (dif !== 0 && !piF.nota.trim()) p.push('Explique por qué el monto no coincide con las tarifas.');
-  if (!piF.caja && !piF.metodo) p.push('Elija a dónde se le paga, o marque pago de caja.');
+  if (piF.caja === null) p.push('Clase de fin de semana: elija si se paga por transferencia o de caja.');
+  if (piF.caja === false && !piF.metodo) p.push('Elija a dónde se le paga, o marque pago de caja.');
   return p;
 }
 
@@ -329,12 +339,8 @@ function piRenderCarga(aviso) {
           </div>
         </div>
         <div class="form-card" style="margin:0;">
-          <div class="section-title" style="margin-bottom:8px;">Día de pago</div>
+          <div class="section-title" style="margin-bottom:8px;">Forma y día de pago</div>
           <div id="piPagoInfo"></div>
-          <label style="display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:12px 14px;border-radius:10px;background:var(--fill);cursor:pointer;font-size:14px;">
-            <input type="checkbox" id="piCaja" ${piF.caja ? 'checked' : ''} onchange="piF.caja=this.checked; piF.cajaTocado=true; piActualizar();" style="width:20px;height:20px;margin:0;flex:none;">
-            <span><b>Clase de fin de semana: se paga de caja</b><br><span class="hint">Igual entra a Gastos, pero no aparece en el pago del miércoles ni del viernes.</span></span>
-          </label>
         </div>
         <div class="form-actions" style="padding:0;">
           <div class="form-msg" id="piMsg"></div>
@@ -345,6 +351,7 @@ function piRenderCarga(aviso) {
     </div>`;
   piRenderInstructor();
   piRenderClases();
+  piRenderPago();
   piRenderChecks();
 }
 
@@ -458,8 +465,9 @@ function piRenderClases() {
 function piCambiarClase(i, campo, valor) {
   piF.clases[i][campo] = valor;
   if (campo === 'fecha' && !piF.cajaTocado) {
-    piF.caja = piTodasFinde();
-    const cb = document.getElementById('piCaja'); if (cb) cb.checked = piF.caja;
+    const antes = piF.caja;
+    piF.caja = piCajaInicial();
+    if (piF.caja !== antes) piRenderPago();
   }
   piActualizar();
 }
@@ -469,6 +477,46 @@ function piAgregarClase() {
   piRenderClases();
 }
 function piQuitarClase(i) { piF.clases.splice(i, 1); piRenderClases(); }
+
+function piElegirCaja(caja) { piF.caja = caja; piF.cajaTocado = true; piRenderPago(); piActualizar(); }
+
+function piRenderPago() {
+  const el = document.getElementById('piPagoInfo');
+  if (!el || !piF) return;
+  const auto = piF.pend ? piDiaPagoPara(piF.pend.created_at) : piDiaPagoEstimado();
+  const hoy = piSumarDias(piAhoraCR(), 0);
+  const opcion = (val, txt, sub) => `
+    <label style="flex:1 1 200px;display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;cursor:pointer;font-size:14px;
+                  background:${piF.caja === val ? 'var(--brand-tint)' : 'var(--fill)'};border:1.5px solid ${piF.caja === val ? 'var(--brand)' : 'transparent'};">
+      <input type="radio" name="piFormaPago" ${piF.caja === val ? 'checked' : ''} onchange="piElegirCaja(${val})" style="width:20px;height:20px;margin:0;flex:none;">
+      <span><b>${txt}</b><br><span class="hint">${sub}</span></span>
+    </label>`;
+  let html = `<div style="display:flex;flex-wrap:wrap;gap:8px;">
+      ${opcion(false, 'Transferencia', 'Entra al pago del miércoles o del viernes.')}
+      ${opcion(true, 'Pago de caja', 'Igual entra a Gastos, pero no aparece en el pago del miércoles ni del viernes.')}
+    </div>`;
+  if (piF.caja === null) {
+    html += '<div class="hint" style="margin-top:8px;color:var(--orange);"><b>Clase de fin de semana:</b> elija cómo se le paga a este instructor.</div>';
+  } else if (piF.caja === false) {
+    const dias = piDiasElegibles();
+    if (piF.dia && !dias.some(d => piYMD(d) === piF.dia)) piF.dia = '';
+    const autoTxt = auto ? piFechaLarga(auto) : '—';
+    html += `
+      <div class="f-field" style="margin-top:12px;">
+        <label for="piDiaSel">Día de pago</label>
+        <select id="piDiaSel" onchange="piF.dia=this.value; piRenderPago();">
+          <option value="">Automático · ${esc(autoTxt)}</option>
+          ${dias.map(d => `<option value="${piYMD(d)}"${piF.dia === piYMD(d) ? ' selected' : ''}>${esc(piFechaLarga(d))}</option>`).join('')}
+        </select>
+      </div>
+      <div class="hint" style="margin-top:4px;">${piF.dia
+        ? 'Elegido a mano: se paga ese día aunque la factura haya llegado antes o después del corte.'
+        : piF.pend
+          ? `Según la hora en que el instructor la envió (${esc(piHora(piF.pend.created_at))}).${auto && auto < hoy ? ' <b style="color:var(--orange);">Ese día ya pasó: quedará como atrasada. Puede elegir otro día.</b>' : ''}`
+          : 'Según la hora del servidor al guardar (corte: miércoles y viernes a las 12 mediodía). Si la factura llegó antes, elija el día.'}</div>`;
+  }
+  el.innerHTML = html;
+}
 
 // Refresca lo calculado sin redibujar los campos (no se pierde el foco)
 function piActualizar() {
@@ -485,16 +533,6 @@ function piActualizar() {
         ${ok ? '<span class="pill ok">Coincide</span>' : `<span class="pill pend">Diferencia ${dif > 0 ? '+' : '−'}${fmtCRC(Math.abs(dif))}</span>`}
       </div>`;
     document.getElementById('piNotaWrap').style.display = ok ? 'none' : '';
-  }
-  const info = document.getElementById('piPagoInfo');
-  if (info) {
-    const d = piF.pend ? piDiaPagoPara(piF.pend.created_at) : piDiaPagoEstimado();
-    info.innerHTML = piF.caja
-      ? '<div style="font-size:20px;font-weight:700;">Pago de caja</div><div class="hint">Clase de fin de semana: no entra al pago del miércoles ni del viernes.</div>'
-      : `<div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;"><span style="font-size:20px;font-weight:700;">${d ? piFechaLarga(d) : '—'}</span><span class="pill info">Transferencia</span></div>
-         <div class="hint" style="margin-top:4px;">${piF.pend
-           ? `Según la hora en que el instructor la envió (${esc(piHora(piF.pend.created_at))}).${d && d < piSumarDias(piAhoraCR(), 0) ? ' <b style="color:var(--orange);">Ese día ya pasó: quedará como atrasada.</b>' : ''}`
-           : 'Si se guarda ahora. El día exacto lo fija el sistema con la hora del servidor (corte: miércoles y viernes a las 12 mediodía).'}</div>`;
   }
   const pend = piPendientes();
   const btn = document.getElementById('piGuardar');
@@ -540,6 +578,7 @@ async function piGuardar() {
     monto_esperado: esperado,
     nota_diferencia: dif !== 0 ? f.nota.trim() : null,
     pago_tipo: f.caja ? 'caja' : 'transferencia',
+    dia_pago: f.caja ? null : (f.dia || null),   // vacío = automático (lo calcula la base)
     factura_pendiente_id: f.pend ? f.pend.id : null,
   };
   const btn = document.getElementById('piGuardar');
@@ -642,11 +681,11 @@ async function piRevisarPendientePorId(id) {
   }
   if (!piTarifas.length) await piCargarCatalogos();
   piF = { x, texto: p.xml, archivo: p.nombre_archivo || `factura_${p.numero_factura || ''}.xml`, pend: p,
-          checks: {}, inst: null, porNombre: false, clases: [], caja: false, cajaTocado: false, metodo: '', nota: '' };
+          checks: {}, inst: null, porNombre: false, clases: [], caja: false, cajaTocado: false, dia: '', metodo: '', nota: '' };
   const clases = (Array.isArray(p.clases) ? p.clases : []).map(c => ({
     fecha: c.fecha, cantidad: c.cantidad, tarifaId: piTarifas.find(t => piNorm(t.tipo) === piNorm(c.tipo))?.id || '' }));
   piF.clases = clases.length ? clases : piClasesIniciales(x);
-  piF.caja = piTodasFinde();
+  piF.caja = piCajaInicial();
   piBuscarInstructor();
   piTab = 'xml';
   document.querySelectorAll('#piTabs .tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'xml'));
