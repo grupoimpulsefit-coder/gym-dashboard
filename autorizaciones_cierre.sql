@@ -7,7 +7,7 @@
 --  puede, quien cierra pide autorización con un motivo:
 --    'informe_viejo' → cerrar con un Informe de más de 10 minutos
 --    'sin_informe'   → cerrar sin Informe de Ventas (también permite uno viejo)
---  La Edge Function `asistente` (accion 'solicitar_autorizacion_cierre') llama a
+--  La Edge Function `autorizar-cierre` (accion 'solicitar') llama a
 --  solicitar_autorizacion_cierre() y avisa por push a Administración. Un admin
 --  aprueba o rechaza (caja.html) con resolver_autorizacion_cierre() y la función
 --  avisa a quien la pidió. La autorización vale solo para ese turno y mientras

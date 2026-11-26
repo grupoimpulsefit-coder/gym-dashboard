@@ -1519,6 +1519,11 @@ function informeParaCerrar(inf, cargado, ahora){
 
 // ── Autorización de Administración para cerrar sin Informe al día (autorizaciones_cierre.sql) ──
 let _autCierre=null, _autPoll=null;
+async function autCierreFn(body){   // Edge Function autorizar-cierre (avisa por push)
+  const res=await fetch(`${SUPA_URL}/functions/v1/autorizar-cierre`,{ method:'POST',
+    headers:{'Authorization':'Bearer '+currentToken,'apikey':SUPA_KEY,'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  const d=await res.json().catch(()=>({})); if(!res.ok) throw new Error(d.error||('Error '+res.status)); return d;
+}
 async function autorizacionDelTurno(cierreId){
   try{ const r=await supaFetch(`/autorizaciones_cierre?cierre_id=eq.${encodeURIComponent(cierreId)}&order=created_at.desc&limit=1&select=*`); return (r&&r[0])||null; }
   catch(_){ return null; }
@@ -1544,7 +1549,7 @@ async function pedirAutorizacionCierre(){
   const msg=document.getElementById('saveMsg');
   if(motivo.trim().length<5){ msg.className='msg err'; msg.textContent='Escriba el motivo para pedir la autorización.'; return; }
   try{
-    await fxAsistente({accion:'solicitar_autorizacion_cierre', cierre:turnoActual.id, tipo:x.req.tipo, motivo:motivo.trim(), generado:x.req.generado||null});
+    await autCierreFn({accion:'solicitar', cierre:turnoActual.id, tipo:x.req.tipo, motivo:motivo.trim(), generado:x.req.generado||null});
     const a=await autorizacionDelTurno(turnoActual.id);
     mostrarPedirAutorizacion(x.estado, x.req, a||{estado:'pendiente',created_at:new Date().toISOString(),tipo:x.req.tipo,cierre_id:turnoActual.id});
   }catch(e){ msg.className='msg err'; msg.textContent='⚠ '+mensajeError(e); }
@@ -1581,7 +1586,7 @@ async function resolverAutorizacionCierre(id, aprobar){
   let nota=null;
   if(aprobar){ if(!confirm('¿Autorizar el cierre de este turno sin Informe de Ventas al día?\n\nLo que se facturó y no está en el Informe no se cuenta en ningún cierre: queda como diferencia por aclarar.')) return; }
   else { nota=prompt('¿Por qué se rechaza? (opcional)'); if(nota==null) return; }
-  try{ const r=await fxAsistente({accion:'resolver_autorizacion_cierre', solicitud:id, aprobar, nota:nota||null});
+  try{ const r=await autCierreFn({accion:'resolver', solicitud:id, aprobar, nota:nota||null});
     alert(r.estado==='aprobada'?'Autorizado: el turno ya se puede cerrar.':r.estado==='rechazada'?'Solicitud rechazada.':(r.nota||'La solicitud venció.')); }
   catch(e){ alert('⚠ '+mensajeError(e)); }
   loadAutorizacionesPend();
