@@ -393,6 +393,7 @@
     <div class="tab" onclick="switchTab('tabValidacion',this)">✅ Validación Descuentos</div>
     <div class="tab" onclick="switchTab('tabSeguimiento',this)">📋 Seguimiento Vencidos</div>
     <div class="tab" id="tabCalendarioBtn" style="display:none" onclick="switchTab('tabCalendario',this)">📅 Calendario</div>
+    <div class="tab" onclick="switchTab('tabReposiciones',this)">🏊 Reposiciones cierre</div>
   </div>
 
   <!-- Selector de mes (visible dentro del dashboard) -->
@@ -853,12 +854,17 @@
       <div id="calSinResultados" class="cal-none" style="display:none">Sin resultados para esa búsqueda.</div>
     </div>
   </div>
+
+  <!-- TAB: Reposiciones por cierre de fin de año (pantalla en reposiciones_nat_ui.js) -->
+  <div id="tabReposiciones" class="tab-panel"><div id="repoRoot"></div></div>
 </div>
 
 <script src="/util.js"></script>
 <script src="/sesion.js"></script>
 <script src="/asistente.js" defer></script>
 <script src="/catalogo.js"></script>
+<script src="/reposiciones_nat.js"></script>
+<script src="/reposiciones_nat_ui.js"></script>
 <script>
 // ─────────────────────────────────────────
 // SUPABASE
@@ -4139,6 +4145,7 @@ function switchTab(id, el) {
   if (id === 'tabJunio') renderRenovaciones();
   if (id === 'tabSeguimiento') renderSeguimiento();
   if (id === 'tabCalendario') calInicializar();
+  if (id === 'tabReposiciones') repoCargar();
 }
 
 // ─────────────────────────────────────────
@@ -4653,6 +4660,14 @@ document.getElementById('calFileInput').addEventListener('change', e => {
     if (e.dataTransfer.files[0]) calProcesarArchivo(e.dataTransfer.files[0]);
   });
 })();
+</script>
+<script>
+// Pestaña Reposiciones: se monta la primera vez que se abre (reposiciones_nat_ui.js)
+let repoUI = null, repoUIRol = null;
+function repoCargar() {
+  if (!repoUI || repoUIRol !== currentRole) repoUIRol = currentRole, repoUI = RepoNatUI.montar(document.getElementById('repoRoot'), { supaFetch, rol: currentRole });
+  else repoUI.recargar();
+}
 </script>
 </body>
 </html>
