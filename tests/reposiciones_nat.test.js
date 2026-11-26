@@ -31,7 +31,7 @@ test('cuenta por cliente según día de la semana y vencimiento del plan', () =>
   assert.deepStrictEqual(por('luis').sort(), ['2026-12-24', '2026-12-28']);
   assert.ok(excluidos.some(e => e.cliente === 'Luis Soto' && e.fecha_clase === '2026-12-31' && /vence/.test(e.motivo)));
   assert.ok(excluidos.some(e => e.cliente === 'Marta Ruiz' && e.motivo === 'Inactivo'));
-  assert.ok(excluidos.some(e => e.cliente === 'Desconocido X' && /informe/.test(e.motivo)));
+  assert.ok(excluidos.some(e => e.cliente === 'Desconocido X' && /pagos/.test(e.motivo)));
   assert.strictEqual(filas.find(f => f.cliente_norm.startsWith('ana')).plan, 'Natación 2x');
 });
 
@@ -54,4 +54,35 @@ test('reconfirmar en enero: activo si el plan cubre la fecha de la reposición',
   assert.strictEqual(R.requiereReconfirmar({ estado: 'tomada', fecha_reposicion: '2027-01-12' }), true);
   assert.strictEqual(R.requiereReconfirmar({ estado: 'tomada', fecha_reposicion: '2026-12-12' }), false);
   assert.strictEqual(R.requiereReconfirmar({ estado: 'pendiente' }), false);
+});
+
+test('ventas por producto: cada mensualidad extiende un mes', () => {
+  assert.strictEqual(R.sumarMes('2026-11-15'), '2026-12-15');
+  assert.strictEqual(R.sumarMes('2027-01-31'), '2027-02-28');
+  assert.ok(R.esPagoPlanNatacion('Clases de Natación adultos - 1 vez por semana + Gym  (Promo: Marzo )'));
+  assert.ok(!R.esPagoPlanNatacion('Gym mensualidad'));
+  assert.ok(!R.esPagoPlanNatacion('Reposición natación'));
+  const base = [
+    { Nombre: 'Luis Soto', Activo: 'Sí', Expira: '29/12/2026', ÚltimoProducto: 'Natación 1x' },
+    { Nombre: 'Ana Pérez Mora', Activo: 'Sí', Expira: '15/12/2026' },
+    { Nombre: 'Marta Ruiz', Activo: 'No', Expira: '10/11/2026' }
+  ];
+  const pagos = [
+    { Cliente: 'Luis Soto', FechaStr: '27/12/2026  10:00:00 AM', Producto: 'Clases de Natación adultos - 1 vez por semana' },
+    { Cliente: 'Ana Pérez Mora', FechaStr: '20/11/2026  10:00:00 AM', Producto: 'Aquafitness - 2 veces por semana' }, // ya incluido
+    { Cliente: 'Marta Ruiz', FechaStr: '20/11/2026  10:00:00 AM', Producto: 'Clases de Natación adultos - 2 veces por semana' },
+    { Cliente: 'Nuevo Cliente', FechaStr: '01/12/2026  10:00:00 AM', Producto: 'Clases de Natación niños - 1 vez por semana' },
+    { Cliente: 'Nuevo Cliente', FechaStr: '30/12/2026  10:00:00 AM', Producto: 'Clases de Natación niños - 1 vez por semana' }
+  ];
+  const u = R.aplicarVentas(base, pagos);
+  const de = n => u.find(x => x.Nombre === n);
+  assert.strictEqual(de('Luis Soto').Expira, '2027-01-29');       // desde el vencimiento
+  assert.strictEqual(de('Ana Pérez Mora').Expira, '2026-12-15');  // pago viejo, no suma
+  assert.strictEqual(de('Marta Ruiz').Expira, '2026-12-20');      // vencida: desde el pago
+  assert.strictEqual(de('Marta Ruiz').Activo, 'Sí');
+  assert.strictEqual(de('Nuevo Cliente').Expira, '2027-02-01');   // dos pagos seguidos, sin informe
+  // y el cálculo de reposiciones la usa: Marta (lunes) ahora no repone porque vence el 20/12
+  const ses = [{ act: 'N', dia: 'Lunes', hora: '6', personas: ['Luis Soto', 'Nuevo Cliente'] }];
+  const { filas } = R.calcular(ses, u);
+  assert.deepStrictEqual(filas.map(f => f.cliente).sort(), ['Luis Soto', 'Nuevo Cliente']);
 });

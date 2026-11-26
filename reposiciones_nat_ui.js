@@ -9,7 +9,7 @@
      reposición de los clientes que ya están en el cálculo guardado.
    - Las agendadas en enero se reconfirman (cliente activo ese día); si no lo
      está, la reposición se cancela. Admin puede reconfirmarlas todas juntas
-     contra el informe de usuarios.
+     contra los pagos (Ventas por Producto) y el informe de usuarios.
    La base de datos aplica los mismos permisos (nat_reposiciones.sql). */
 (function () {
   const R = window.RepoNat;
@@ -91,6 +91,8 @@
           <option value="canc">Con canceladas</option><option value="comp">Completaron todas</option>
         </select>
         <button class="rp-btn" data-a="csv">⬇️ Exportar CSV</button>
+        ${puedeCalcular ? `<label class="rp-btn" style="cursor:pointer">📤 Subir Ventas por Producto
+          <input type="file" data-r="ventas" accept=".xlsx,.xls" style="display:none"></label>` : ''}
       </div>
       <div class="rp-wrap"><table>
         <thead><tr><th>Cliente</th><th>Plan</th><th>Vence</th><th>Clases a reponer</th><th>Total</th><th>Tomadas</th><th>Pendientes</th><th></th></tr></thead>
@@ -101,6 +103,7 @@
     const $ = k => el.querySelector(`[data-r="${k}"]`);
     $('q').addEventListener('input', render);
     $('f').addEventListener('change', render);
+    if ($('ventas')) $('ventas').addEventListener('change', e => { if (e.target.files[0]) subirVentas(e.target.files[0]); e.target.value = ''; });
     el.addEventListener('click', e => {
       const b = e.target.closest('[data-a]');
       if (!b || !el.contains(b)) return;
@@ -121,21 +124,32 @@
         S.calc = null; S.usuarios = new Map(); S.buscar = null;
         let estado = `${S.guardadas.length} reposiciones guardadas`;
         if (puedeCalcular) {
-          const [cal, snaps] = await Promise.all([
+          const [cal, snaps, pagosSubidos] = await Promise.all([
             supaFetch(CAL_Q + '&limit=1&select=users_data,updated_at'),
-            supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&limit=1&select=mes,users_data,updated_at')
+            // users_data del más reciente + ventas guardadas de los últimos meses
+            supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&limit=3&select=mes,users_data,renov_data,updated_at'),
+            supaFetch('/nat_repo_pagos?select=cliente,fecha,producto&limit=50000').catch(() => [])
           ]);
           const sesiones = cal?.[0]?.users_data?.sesiones || [];
           const usuarios = Array.isArray(snaps?.[0]?.users_data) ? snaps[0].users_data : [];
-          if (usuarios.length) S.buscar = R.crearBuscador(usuarios);
-          if (sesiones.length && usuarios.length) {
-            S.calc = R.calcular(sesiones, usuarios);
+          // Pagos: los subidos aquí (Ventas por Producto) + las ventas ya guardadas en Natación
+          const pagos = [...(pagosSubidos || [])];
+          (snaps || []).forEach(sn => (sn.renov_data || []).forEach(r => {
+            if (!r.EsClaseSuelta && !r.EsSinClasificar) pagos.push({ cliente: r.Cliente, fecha: r.FechaStr, producto: r.Producto });
+          }));
+          const efectivos = R.aplicarVentas(usuarios, pagos);
+          const conVentas = efectivos.filter(u => u.FuenteVence === 'ventas');
+          const ultimoPago = conVentas.reduce((m, u) => u.UltimoPago > m ? u.UltimoPago : m, '');
+          if (efectivos.length) S.buscar = R.crearBuscador(efectivos);
+          if (sesiones.length && efectivos.length) {
+            S.calc = R.calcular(sesiones, efectivos);
             [...S.calc.filas, ...S.calc.excluidos].forEach(f => {
               if (f.plan || f.expira) S.usuarios.set(f.cliente_norm, { plan: f.plan, expira: f.expira });
             });
           }
           estado += ` · Calendario: ${sesiones.length ? 'actualizado ' + fmtTs(cal[0].updated_at) : 'no hay'}` +
-            ` · Informe de usuarios: ${usuarios.length ? snaps[0].mes + ', actualizado ' + fmtTs(snaps[0].updated_at) : 'no hay'}`;
+            ` · Informe de usuarios: ${usuarios.length ? snaps[0].mes + ', actualizado ' + fmtTs(snaps[0].updated_at) : 'no hay'}` +
+            ` · Ventas: ${conVentas.length} clientes con el vencimiento actualizado por pagos${ultimoPago ? ' (último pago ' + dmy(ultimoPago) + ')' : ''}`;
         }
         $('status').textContent = estado;
         render();
@@ -162,10 +176,10 @@
       const { nuevas, sobran } = diff();
       let calcHtml = '';
       if (puedeCalcular) {
-        if (!S.calc) calcHtml = `<div class="rp-info">Para calcular hace falta el calendario de reservaciones y el informe de usuarios cargados en Natación.</div>`;
+        if (!S.calc) calcHtml = `<div class="rp-info">Para calcular hace falta el calendario de reservaciones (pestaña 📅 Calendario de Natación) y los pagos: suba el reporte <b>Ventas por Producto</b> con el botón 📤 (o el informe de usuarios).</div>`;
         else if (!hay) calcHtml = `<div class="rp-info">Vista previa del cálculo — <b>todavía no está guardado</b>; recepción no lo ve hasta guardarlo.
           <button class="rp-btn pri" data-a="guardar" style="margin-left:8px">💾 Guardar cálculo</button></div>`;
-        else if (nuevas.length || sobran.length) calcHtml = `<div class="rp-info">Con el calendario y el informe de usuarios actuales el cálculo cambió:
+        else if (nuevas.length || sobran.length) calcHtml = `<div class="rp-info">Con el calendario y los pagos actuales el cálculo cambió:
           <b>${nuevas.length}</b> reposiciones nuevas y <b>${sobran.length}</b> pendientes que ya no aplican. Las tomadas o agendadas no se tocan.
           <button class="rp-btn pri" data-a="guardar" style="margin-left:8px">🔄 Recalcular</button></div>`;
       } else if (!hay) {
@@ -175,7 +189,7 @@
       if (porReconf.length) calcHtml += `<div class="rp-info" style="background:var(--purple-tint)">
         <b>${porReconf.length}</b> reposiciones agendadas en enero sin reconfirmar. Toque cada una para confirmar que el cliente
         sigue activo; si no lo está, se cancela.
-        ${puedeCalcular && S.buscar ? '<button class="rp-btn pri" data-a="recAll" style="margin-left:8px">✔ Reconfirmar todas con el informe de usuarios</button>' : ''}</div>`;
+        ${puedeCalcular && S.buscar ? '<button class="rp-btn pri" data-a="recAll" style="margin-left:8px">✔ Reconfirmar todas con los pagos</button>' : ''}</div>`;
       $('calc').innerHTML = calcHtml;
 
       const tomadas = filas.filter(f => f.estado === 'tomada');
@@ -315,7 +329,7 @@
       const f = S.guardadas.find(r => r.id === id);
       if (!f || !puedeRegistrar) return;
       const enero = R.requiereReconfirmar(f) || (f.estado === 'cancelada');
-      // Sugerencia automática (solo admin tiene el informe de usuarios cargado)
+      // Sugerencia automática (solo admin tiene los pagos cargados)
       const sug = S.buscar && enero ? R.estadoClienteEn(S.buscar, f.cliente, f.fecha_reposicion) : null;
       const m = document.createElement('div');
       m.className = 'rp-modal rp';
@@ -325,7 +339,7 @@
         <div>Reposición: <b>${dmy(f.fecha_reposicion)}${f.hora_reposicion ? ' · ' + esc(f.hora_reposicion) : ''}</b>
           ${f.estado === 'cancelada' ? `<br><span style="color:var(--red)">Cancelada: ${esc(f.motivo_cancelacion || 'cliente inactivo')}</span>` : ''}
           ${f.confirmada_en ? `<br><span style="color:var(--green)">Reconfirmada activo — ${esc(f.confirmada_por || '')}, ${fmtTs(f.confirmada_en)}</span>` : ''}</div>
-        ${sug ? `<div class="rp-info" style="margin:0">Según el informe de usuarios: ${sug.activo ? '<b>activo</b>' : '<b>no activo</b> — ' + esc(sug.motivo)}${sug.expira ? ` (vence ${dmy(sug.expira)})` : ''}</div>` : ''}
+        ${sug ? `<div class="rp-info" style="margin:0">Según los pagos registrados: ${sug.activo ? '<b>activo</b>' : '<b>no activo</b> — ' + esc(sug.motivo)}${sug.expira ? ` (vence ${dmy(sug.expira)})` : ''}</div>` : ''}
         ${R.requiereReconfirmar(f) ? `<div class="rp-dim">Reposición de enero: confirme que el cliente sigue activo con su plan al día para esa fecha. Si no lo está, se cancela.</div>` : ''}
         <div class="rp-err" data-m="err"></div>
         <div style="display:flex;flex-direction:column;gap:8px">
@@ -356,13 +370,13 @@
       };
     }
 
-    // Admin: reconfirma todas las de enero contra el último informe de usuarios
+    // Admin: reconfirma todas las de enero contra los pagos (ventas + informe de usuarios)
     async function reconfirmarEnero() {
       if (!puedeCalcular || !S.buscar) return;
       const lista = S.guardadas.filter(f => R.requiereReconfirmar(f) && !f.confirmada_en)
         .map(f => ({ f, e: R.estadoClienteEn(S.buscar, f.cliente, f.fecha_reposicion) }));
       const act = lista.filter(x => x.e.activo), ina = lista.filter(x => !x.e.activo);
-      if (!confirm(`Según el informe de usuarios: ${act.length} siguen activos (se confirman) y ${ina.length} no lo están (se cancelan).\n\n` +
+      if (!confirm(`Según los pagos registrados: ${act.length} siguen activos (se confirman) y ${ina.length} no lo están (se cancelan).\n\n` +
         ina.slice(0, 15).map(x => `✖ ${x.f.cliente} — ${dm(x.f.fecha_reposicion)}: ${x.e.motivo}`).join('\n') +
         (ina.length > 15 ? `\n… y ${ina.length - 15} más` : '') + '\n\n¿Continuar?')) return;
       $('status').textContent = '⏳ Reconfirmando…';
@@ -374,6 +388,51 @@
         for (const x of ina) await patch(x.f.id, { estado: 'cancelada', motivo_cancelacion: x.e.motivo });
         await cargar();
       } catch (e) { $('status').textContent = '⚠️ No se pudo reconfirmar: ' + e.message; }
+    }
+
+    // Admin: sube "Ventas por Producto"; se guardan las mensualidades de natación
+    // (nat_repo_pagos) y cada pago extiende el plan del cliente un mes.
+    async function subirVentas(file) {
+      if (!puedeCalcular) return;
+      $('status').textContent = '⏳ Leyendo Ventas por Producto…';
+      try {
+        if (!window.XLSX) throw new Error('No se cargó el lector de Excel; recargue la página.');
+        const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array', cellDates: false });
+        const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+        let h = -1, col = {};
+        for (let i = 0; i < Math.min(raw.length, 10); i++) {
+          const r = (raw[i] || []).map(c => String(c || '').trim().toLowerCase());
+          if (r.includes('fecha') && r.includes('producto')) {
+            h = i; col = { fecha: r.indexOf('fecha'), producto: r.indexOf('producto'), cliente: r.indexOf('cliente'),
+              total: r.findIndex(c => c.includes('total crc')) };
+            if (col.total < 0) col.total = r.findIndex(c => c.includes('total') && !c.includes('usd'));
+            break;
+          }
+        }
+        if (h < 0 || col.cliente < 0) throw new Error('No se encontró el encabezado (Fecha / Cliente / Producto). Verifique que sea el reporte "Ventas por Producto".');
+        const fechaIso = v => {
+          if (typeof v === 'number' && XLSX.SSF) { const d = XLSX.SSF.parse_date_code(v); return d ? `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}` : null; }
+          return R.expiraIso(v);
+        };
+        const vistos = new Set(), filas = [];
+        raw.slice(h + 1).forEach(r => {
+          const cliente = String(r[col.cliente] || '').trim().replace(/\s+/g, ' ');
+          const producto = String(r[col.producto] || '').trim();
+          const fecha = fechaIso(r[col.fecha]);
+          const total = col.total >= 0 ? Number(r[col.total]) || 0 : null;
+          if (!cliente || !fecha || !R.esPagoPlanNatacion(producto) || (total !== null && total <= 0)) return;
+          const fila = { cliente, cliente_norm: R.fold(cliente), fecha, producto, total };
+          const k = [fila.cliente_norm, fecha, producto].join('|');
+          if (!vistos.has(k)) { vistos.add(k); filas.push(fila); }
+        });
+        if (!filas.length) throw new Error('El archivo no tiene pagos de planes de natación.');
+        for (let i = 0; i < filas.length; i += 500)
+          await supaFetch('/nat_repo_pagos?on_conflict=cliente_norm,fecha,producto',
+            { method: 'POST', prefer: 'resolution=ignore-duplicates,return=minimal', body: filas.slice(i, i + 500) });
+        const fs = filas.map(f => f.fecha).sort();
+        alert(`✅ ${filas.length} pagos de natación guardados (${dmy(fs[0])} al ${dmy(fs[fs.length - 1])}).\n\nSi el cálculo cambió, revise y pulse "Recalcular".`);
+        await cargar();
+      } catch (e) { $('status').textContent = '⚠️ No se pudieron subir las ventas: ' + e.message; }
     }
 
     function csv() {
