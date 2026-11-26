@@ -27,6 +27,53 @@
     return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
   }
 
+  // 'yyyy-mm-dd' + 1 mes (31/01 → 28/02)
+  function sumarMes(f) {
+    const [y, m, d] = f.split('-').map(Number);
+    const ult = new Date(y, m + 1, 0).getDate();      // último día del mes siguiente
+    return iso(new Date(y, m, Math.min(d, ult)));
+  }
+
+  // ¿La venta es una mensualidad de natación? (Ventas por Producto)
+  function esPagoPlanNatacion(producto) {
+    const p = fold(producto);
+    return /nataci|aquafit|aquaterap|estimulaci/.test(p) && !/reposici|matricul|suelta|sesion/.test(p);
+  }
+
+  /* Vencimientos a partir de Ventas por Producto, sin depender del informe de usuarios.
+     usuarios (opcional): informe de usuarios, da el vencimiento de partida.
+     pagos: [{ cliente, fecha:'yyyy-mm-dd' o 'dd/mm/yyyy …', producto }]
+     Cada mensualidad de natación extiende el plan un mes desde el vencimiento
+     (o desde el día del pago si ya estaba vencido). Un pago hecho más de 10 días
+     antes del vencimiento conocido se toma como ya incluido en ese vencimiento.
+     → usuarios con Expira actualizado (yyyy-mm-dd) + los que solo aparecen en ventas */
+  function aplicarVentas(usuarios, pagos) {
+    const lista = (usuarios || []).map(u => ({ ...u, Expira: expiraIso(u.Expira) || u.Expira }));
+    const buscar = crearBuscador(lista);
+    const nuevos = new Map();
+    (pagos || [])
+      .map(p => ({ ...p, fecha: expiraIso(p.fecha || p.FechaStr), cliente: p.cliente || p.Cliente, producto: p.producto || p.Producto }))
+      .filter(p => p.fecha && p.cliente && esPagoPlanNatacion(p.producto))
+      .sort((a, b) => a.fecha.localeCompare(b.fecha))
+      .forEach(p => {
+        let u = buscar(p.cliente);
+        if (!u) {
+          const k = fold(p.cliente);
+          if (!nuevos.has(k)) nuevos.set(k, { Nombre: p.cliente.trim().replace(/\s+/g, ' '), PIN: '', Activo: 'Sí', Expira: null });
+          u = nuevos.get(k);
+        }
+        const exp = expiraIso(u.Expira);
+        const limite = exp ? iso(new Date(deIso(exp).getTime() - 10 * 86400000)) : null;
+        if (exp && p.fecha < limite) return;                // ya incluido en el vencimiento del informe
+        u.Expira = sumarMes(exp && exp > p.fecha ? exp : p.fecha);
+        u.Activo = 'Sí';
+        u.ÚltimoProducto = p.producto.replace(/\(Promo:[^)]*\)/i, '').replace(/\s+/g, ' ').trim();
+        u.UltimoPago = p.fecha;
+        u.FuenteVence = 'ventas';
+      });
+    return lista.concat([...nuevos.values()]);
+  }
+
   // Días cerrados que sí se reponen: [{ fecha:'2026-12-24', dia:'Jueves' }, …]
   function diasAReponer(cfg = CONFIG) {
     const out = [];
@@ -83,7 +130,7 @@
           const base = { cliente: nombre.trim(), cliente_norm: fold(nombre), fecha_clase: fecha,
                          dia: s.dia, hora: s.hora, actividad: s.act };
           let motivo = null;
-          if (!u) motivo = 'No aparece en el informe de usuarios';
+          if (!u) motivo = 'Sin pagos ni registro en el informe de usuarios';
           else if (/^no/i.test(String(u.Activo || '').trim())) motivo = 'Inactivo';
           else if (!exp) motivo = 'Sin fecha de vencimiento';
           else if (exp < fecha) motivo = 'Plan vence antes de la clase';
@@ -101,7 +148,7 @@
   // plan vigente el día de la reposición?  → { activo, motivo, expira }
   function estadoClienteEn(buscar, nombre, fecha) {
     const u = buscar(nombre);
-    if (!u) return { activo: false, motivo: 'No aparece en el informe de usuarios' };
+    if (!u) return { activo: false, motivo: 'Sin pagos ni registro en el informe de usuarios' };
     const exp = expiraIso(u.Expira);
     if (/^no/i.test(String(u.Activo || '').trim()) && !(exp && exp >= fecha)) return { activo: false, motivo: 'Inactivo', expira: exp };
     if (!exp) return { activo: false, motivo: 'Sin fecha de vencimiento' };
@@ -120,7 +167,7 @@
     return null;
   }
 
-  const api = { CONFIG, DIAS, fold, expiraIso, diasAReponer, crearBuscador, calcular, validarFechaReposicion,
+  const api = { CONFIG, DIAS, fold, expiraIso, sumarMes, esPagoPlanNatacion, aplicarVentas, diasAReponer, crearBuscador, calcular, validarFechaReposicion,
                 estadoClienteEn, requiereReconfirmar };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.RepoNat = api;

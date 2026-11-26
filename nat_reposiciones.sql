@@ -126,5 +126,47 @@ create trigger nat_reposiciones_guard_trg
   before insert or update on nat_reposiciones
   for each row execute function nat_reposiciones_guard();
 
--- Comprobación: deberían aparecer las 4 políticas
-select policyname, cmd from pg_policies where tablename = 'nat_reposiciones' order by policyname;
+-- ══════════════════════════════════════════════════════════════════════════
+--  PAGOS DE NATACIÓN (Ventas por Producto) para el cálculo de reposiciones
+--  Así el vencimiento no depende del informe de usuarios: admin sube el
+--  reporte "Ventas por Producto" en la pantalla de reposiciones, se guardan
+--  aquí las mensualidades de natación y cada una extiende el plan un mes.
+-- ══════════════════════════════════════════════════════════════════════════
+create table if not exists nat_repo_pagos (
+  id           bigserial primary key,
+  cliente      text not null,
+  cliente_norm text not null,
+  fecha        date not null,
+  producto     text not null,
+  total        numeric,
+  subido_por   text,
+  created_at   timestamptz not null default now(),
+  unique (cliente_norm, fecha, producto)
+);
+alter table nat_repo_pagos enable row level security;
+
+drop policy if exists nat_repo_pagos_select on nat_repo_pagos;
+create policy nat_repo_pagos_select on nat_repo_pagos
+  for select to authenticated using (true);
+
+drop policy if exists nat_repo_pagos_insert on nat_repo_pagos;
+create policy nat_repo_pagos_insert on nat_repo_pagos
+  for insert to authenticated
+  with check (exists (select 1 from user_roles ur where ur.id = auth.uid()
+                      and ur.role in ('admin','admin_sedes')));
+
+create or replace function nat_repo_pagos_guard()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.subido_por := coalesce(auth.jwt() ->> 'email', new.subido_por);
+  new.created_at := now();
+  return new;
+end;
+$$;
+drop trigger if exists nat_repo_pagos_guard_trg on nat_repo_pagos;
+create trigger nat_repo_pagos_guard_trg
+  before insert on nat_repo_pagos
+  for each row execute function nat_repo_pagos_guard();
+
+-- Comprobación: deberían aparecer 4 políticas de nat_reposiciones y 2 de nat_repo_pagos
+select tablename, policyname, cmd from pg_policies where tablename in ('nat_reposiciones','nat_repo_pagos') order by 1, 2;
