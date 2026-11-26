@@ -97,6 +97,19 @@
     return { filas: filas.sort(orden), excluidos: excluidos.sort(orden) };
   }
 
+  // Reconfirmación de una reposición agendada: ¿el cliente sigue activo con el
+  // plan vigente el día de la reposición?  → { activo, motivo, expira }
+  function estadoClienteEn(buscar, nombre, fecha) {
+    const u = buscar(nombre);
+    if (!u) return { activo: false, motivo: 'No aparece en el informe de usuarios' };
+    const exp = expiraIso(u.Expira);
+    if (/^no/i.test(String(u.Activo || '').trim()) && !(exp && exp >= fecha)) return { activo: false, motivo: 'Inactivo', expira: exp };
+    if (!exp) return { activo: false, motivo: 'Sin fecha de vencimiento' };
+    if (exp < fecha) return { activo: false, motivo: `Plan venció el ${exp.slice(8, 10)}/${exp.slice(5, 7)}`, expira: exp };
+    return { activo: true, expira: exp };
+  }
+  const requiereReconfirmar = r => r.estado === 'tomada' && (r.fecha_reposicion || '') > CONFIG.cierreHasta;
+
   // ¿Se puede registrar una reposición en esta fecha?  null = sí; si no, el motivo
   function validarFechaReposicion(fecha, cfg = CONFIG) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha || '')) return 'Indique la fecha en que tomó la clase.';
@@ -107,7 +120,8 @@
     return null;
   }
 
-  const api = { CONFIG, DIAS, fold, expiraIso, diasAReponer, crearBuscador, calcular, validarFechaReposicion };
+  const api = { CONFIG, DIAS, fold, expiraIso, diasAReponer, crearBuscador, calcular, validarFechaReposicion,
+                estadoClienteEn, requiereReconfirmar };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.RepoNat = api;
 })(typeof window !== 'undefined' ? window : globalThis);

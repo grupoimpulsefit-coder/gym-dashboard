@@ -10,7 +10,10 @@
 --
 --  Cada fila se marca como tomada con la fecha en que el cliente la repuso:
 --  se puede adelantar en diciembre (desde el 01/12) o tomar hasta el 31/01,
---  nunca durante el cierre.
+--  nunca durante el cierre. Las agendadas en enero se reconfirman: si el
+--  cliente sigue activo queda confirmada (confirmada_en); si no, cancelada.
+--  Una vez agendada NO se reprograma: si el cliente no llega, la pierde
+--  (solo admin puede devolverla a pendiente por un error de digitación).
 -- ══════════════════════════════════════════════════════════════════════════
 
 create table if not exists nat_reposiciones (
@@ -24,7 +27,7 @@ create table if not exists nat_reposiciones (
   dia              text not null,
   hora             text not null,
   actividad        text not null,
-  estado           text not null default 'pendiente' check (estado in ('pendiente','tomada')),
+  estado           text not null default 'pendiente',
   fecha_reposicion date,
   hora_reposicion  text,
   nota             text,
@@ -35,12 +38,22 @@ create table if not exists nat_reposiciones (
   unique (cliente_norm, fecha_clase, hora, actividad),
   constraint nat_repo_fecha_clase check (
     fecha_clase between date '2026-12-24' and date '2027-01-03'
-    and fecha_clase not in (date '2026-12-25', date '2027-01-01')),
-  constraint nat_repo_tomada check (
-    (estado = 'pendiente' and fecha_reposicion is null) or
-    (estado = 'tomada' and fecha_reposicion between date '2026-12-01' and date '2027-01-31'
-                       and fecha_reposicion not between date '2026-12-24' and date '2027-01-03'))
+    and fecha_clase not in (date '2026-12-25', date '2027-01-01'))
 );
+
+-- Reconfirmación de las agendadas en enero (también si la tabla ya existía)
+alter table nat_reposiciones add column if not exists confirmada_en      timestamptz;
+alter table nat_reposiciones add column if not exists confirmada_por     text;
+alter table nat_reposiciones add column if not exists motivo_cancelacion text;
+
+alter table nat_reposiciones drop constraint if exists nat_reposiciones_estado_check;
+alter table nat_reposiciones add constraint nat_reposiciones_estado_check
+  check (estado in ('pendiente','tomada','cancelada'));
+alter table nat_reposiciones drop constraint if exists nat_repo_tomada;
+alter table nat_reposiciones add constraint nat_repo_tomada check (
+  (estado = 'pendiente' and fecha_reposicion is null) or
+  (estado in ('tomada','cancelada') and fecha_reposicion between date '2026-12-01' and date '2027-01-31'
+                                    and fecha_reposicion not between date '2026-12-24' and date '2027-01-03'));
 
 create index if not exists nat_reposiciones_cliente_idx on nat_reposiciones (cliente_norm);
 
@@ -64,7 +77,7 @@ create policy nat_repo_delete on nat_reposiciones
   using (estado = 'pendiente' and exists (select 1 from user_roles ur where ur.id = auth.uid()
                       and ur.role in ('admin','admin_sedes')));
 
--- Registrar que se tomó (o deshacerlo): admin, admin_sedes y recepción/coordinación
+-- Agendar / registrar, reconfirmar, cancelar o deshacer: admin, admin_sedes y recepción/coordinación
 drop policy if exists nat_repo_update on nat_reposiciones;
 create policy nat_repo_update on nat_reposiciones
   for update to authenticated
@@ -82,10 +95,25 @@ begin
     new.fecha_clase := old.fecha_clase;  new.dia := old.dia;
     new.hora := old.hora;  new.actividad := old.actividad;
     new.created_at := old.created_at;
+    -- Una reposición agendada no se reprograma: si el cliente no llega, la pierde.
+    -- Solo admin / admin_sedes pueden devolverla a pendiente o cambiarle la fecha
+    -- (para corregir errores de digitación).
+    if old.estado <> 'pendiente'
+       and (new.estado = 'pendiente' or new.fecha_reposicion is distinct from old.fecha_reposicion
+            or (old.estado = 'cancelada' and new.estado <> 'cancelada'))
+       and not exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('admin','admin_sedes')) then
+      raise exception 'Una reposición agendada no se cambia de fecha; si el cliente no llega, la pierde.';
+    end if;
     if new.estado = 'tomada' and old.estado = 'pendiente' then
       new.registrado_por := coalesce(auth.jwt() ->> 'email', new.registrado_por);
     elsif new.estado = 'pendiente' then
       new.fecha_reposicion := null;  new.hora_reposicion := null;  new.registrado_por := null;
+      new.confirmada_en := null;  new.confirmada_por := null;  new.motivo_cancelacion := null;
+    end if;
+    if new.estado = 'cancelada' then new.confirmada_en := null; end if;
+    if new.confirmada_en is distinct from old.confirmada_en or new.estado is distinct from old.estado then
+      new.confirmada_por := case when new.confirmada_en is null and new.estado <> 'cancelada' then null
+                                 else coalesce(auth.jwt() ->> 'email', new.confirmada_por) end;
     end if;
   end if;
   new.updated_by := coalesce(auth.jwt() ->> 'email', new.updated_by);

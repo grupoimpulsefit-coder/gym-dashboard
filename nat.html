@@ -855,39 +855,8 @@
     </div>
   </div>
 
-  <!-- TAB: Reposiciones por cierre de fin de año -->
-  <div id="tabReposiciones" class="tab-panel">
-    <div class="alert alert-info">
-      La piscina cierra del <strong>24/12 al 03/01</strong>. Se reponen todas las clases de esos días
-      <strong>menos las del 25/12 y el 01/01</strong>. Le tocan al cliente que tiene la clase en el calendario de
-      reservaciones y está activo con el plan vigente el día de la clase. Se pueden <strong>adelantar desde el 01/12</strong>
-      o tomar <strong>como máximo el 31/01</strong>.
-    </div>
-    <div id="repoStatus" class="dim" style="font-size:13px;margin-bottom:10px;"></div>
-    <div class="cards" id="repoCards" style="padding:0 0 12px;"></div>
-    <div id="repoCalculo" style="margin-bottom:14px;"></div>
-    <div class="filters">
-      <input class="search-box" id="repoBuscar" placeholder="Buscar cliente…" oninput="repoRender()">
-      <select class="filter-select" id="repoFiltro" onchange="repoRender()">
-        <option value="">Todos</option>
-        <option value="pend">Con reposiciones pendientes</option>
-        <option value="comp">Completaron todas</option>
-      </select>
-      <button class="btn btn-accent" onclick="repoCSV()">⬇️ Exportar CSV</button>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Cliente</th><th>Plan</th><th>Vence</th><th>Clases a reponer</th><th>Total</th><th>Tomadas</th><th>Pendientes</th><th></th></tr></thead>
-        <tbody id="repoBody"></tbody>
-      </table>
-    </div>
-    <details style="margin-top:16px;" id="repoExclDet">
-      <summary style="cursor:pointer;font-weight:600;">Clases del cierre que no se reponen (<span id="repoExclN">0</span>)</summary>
-      <div class="table-wrap" style="margin-top:10px;">
-        <table><thead><tr><th>Cliente</th><th>Clase</th><th>Motivo</th><th>Vence</th></tr></thead><tbody id="repoExclBody"></tbody></table>
-      </div>
-    </details>
-  </div>
+  <!-- TAB: Reposiciones por cierre de fin de año (pantalla en reposiciones_nat_ui.js) -->
+  <div id="tabReposiciones" class="tab-panel"><div id="repoRoot"></div></div>
 </div>
 
 <script src="/util.js"></script>
@@ -895,6 +864,7 @@
 <script src="/asistente.js" defer></script>
 <script src="/catalogo.js"></script>
 <script src="/reposiciones_nat.js"></script>
+<script src="/reposiciones_nat_ui.js"></script>
 <script>
 // ─────────────────────────────────────────
 // SUPABASE
@@ -4692,227 +4662,11 @@ document.getElementById('calFileInput').addEventListener('change', e => {
 })();
 </script>
 <script>
-// ─────────────────────────────────────────
-// TAB REPOSICIONES — cierre de la piscina 24/12 al 03/01 (reposiciones_nat.js
-// hace el cálculo; la tabla nat_reposiciones guarda una fila por clase a reponer
-// y quién/cuándo la tomó). Ver nat_reposiciones.sql.
-// ─────────────────────────────────────────
-const REPO = { guardadas: [], calc: null, usuarios: new Map(), cargando: false };
-const repoPuedeGenerar  = () => ['admin','admin_sedes'].includes(currentRole);
-const repoPuedeRegistrar = () => ['admin','admin_sedes','recepcion','coordinador','admin_sucursal'].includes(currentRole);
-const repoClave = r => [r.cliente_norm, r.fecha_clase, r.hora, r.actividad].join('|');
-const repoDM = f => f ? f.slice(8,10) + '/' + f.slice(5,7) : '';
-
-async function repoCargar() {
-  if (REPO.cargando) return;
-  REPO.cargando = true;
-  const st = document.getElementById('repoStatus');
-  st.textContent = '⏳ Cargando reposiciones…';
-  try {
-    const [guardadas, cal, snaps] = await Promise.all([
-      supaFetch('/nat_reposiciones?select=*&order=cliente.asc,fecha_clase.asc&limit=20000'),
-      supaFetch(CAL_Q + '&limit=1&select=users_data,updated_at'),
-      supaFetch('/gym_snapshots?sede=eq.Nataci%C3%B3n&order=updated_at.desc&limit=1&select=mes,users_data,updated_at')
-    ]);
-    REPO.guardadas = guardadas || [];
-    const sesiones = cal?.[0]?.users_data?.sesiones || [];
-    const usuarios = Array.isArray(snaps?.[0]?.users_data) ? snaps[0].users_data : [];
-    REPO.calc = (sesiones.length && usuarios.length) ? RepoNat.calcular(sesiones, usuarios) : null;
-    REPO.usuarios = new Map();
-    if (REPO.calc) [...REPO.calc.filas, ...REPO.calc.excluidos].forEach(f => {
-      if (f.plan || f.expira) REPO.usuarios.set(f.cliente_norm, { plan: f.plan, expira: f.expira });
-    });
-    const fmt = d => d ? new Date(d).toLocaleString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
-    st.textContent = `Calendario: ${sesiones.length ? 'actualizado ' + fmt(cal[0].updated_at) : 'no hay'} · ` +
-      `Informe de usuarios: ${usuarios.length ? (snaps[0].mes + ', actualizado ' + fmt(snaps[0].updated_at)) : 'no hay'}`;
-    repoRender();
-  } catch (e) {
-    st.textContent = '⚠️ No se pudieron cargar las reposiciones: ' + e.message +
-      (/nat_reposiciones/.test(e.message) ? ' (¿se corrió nat_reposiciones.sql?)' : '');
-  } finally { REPO.cargando = false; }
-}
-
-// Diferencia entre lo calculado ahora y lo guardado
-function repoDiff() {
-  if (!REPO.calc) return { nuevas: [], sobran: [] };
-  const calc = new Set(REPO.calc.filas.map(repoClave));
-  const guard = new Set(REPO.guardadas.map(repoClave));
-  return {
-    nuevas: REPO.calc.filas.filter(f => !guard.has(repoClave(f))),
-    sobran: REPO.guardadas.filter(g => g.estado === 'pendiente' && !calc.has(repoClave(g)))
-  };
-}
-
-function repoRender() {
-  const hayGuardadas = REPO.guardadas.length > 0;
-  const filas = hayGuardadas ? REPO.guardadas : (REPO.calc?.filas || []).map(f => ({ ...f, estado: 'pendiente' }));
-  const hoyIso = new Date().toLocaleDateString('en-CA');
-
-  // Bloque del cálculo: guardar por primera vez o actualizar
-  const { nuevas, sobran } = repoDiff();
-  const cBox = document.getElementById('repoCalculo');
-  if (!REPO.calc) {
-    cBox.innerHTML = `<div class="alert alert-info">Para calcular hace falta el calendario de reservaciones (pestaña 📅 Calendario) y el informe de usuarios cargados.</div>`;
-  } else if (!hayGuardadas) {
-    cBox.innerHTML = `<div class="alert alert-info">Vista previa del cálculo — <strong>todavía no está guardado</strong>.
-      ${repoPuedeGenerar() ? '<button class="btn btn-primary" style="margin-left:8px" onclick="repoGuardarCalculo()">💾 Guardar cálculo</button>' : 'Un administrador debe guardarlo.'}</div>`;
-  } else if (nuevas.length || sobran.length) {
-    cBox.innerHTML = `<div class="alert alert-info">Con el calendario y el informe de usuarios actuales el cálculo cambió:
-      <strong>${nuevas.length}</strong> reposiciones nuevas y <strong>${sobran.length}</strong> pendientes que ya no aplican
-      (por ejemplo, renovó o se dio de baja). Las ya tomadas no se tocan.
-      ${repoPuedeGenerar() ? '<button class="btn btn-primary" style="margin-left:8px" onclick="repoGuardarCalculo()">🔄 Actualizar cálculo</button>' : ''}</div>`;
-  } else cBox.innerHTML = '';
-
-  // Tarjetas
-  const tomadas = filas.filter(f => f.estado === 'tomada');
-  const clientes = new Set(filas.map(f => f.cliente_norm));
-  const diasRest = Math.max(0, Math.ceil((new Date(2027,0,31) - new Date(hoyIso + 'T00:00')) / 86400000) + 1);
-  const porDia = RepoNat.diasAReponer().map(d => {
-    const n = filas.filter(f => f.fecha_clase === d.fecha).length;
-    return `${d.dia.slice(0,3)} ${repoDM(d.fecha)}: <b>${n}</b>`;
-  }).join(' · ');
-  document.getElementById('repoCards').innerHTML = `
-    <div class="card"><div class="card-label">Clientes con reposición</div><div class="card-value">${clientes.size}</div></div>
-    <div class="card purple"><div class="card-label">Reposiciones totales</div><div class="card-value">${filas.length}</div></div>
-    <div class="card green"><div class="card-label">Tomadas / agendadas</div><div class="card-value">${tomadas.length}</div>
-      <div class="card-sub">${tomadas.filter(t => t.fecha_reposicion > hoyIso).length} agendadas a futuro</div></div>
-    <div class="card orange"><div class="card-label">Pendientes</div><div class="card-value">${filas.length - tomadas.length}</div>
-      <div class="card-sub">${diasRest} días para tomarlas (hasta 31/01)</div></div>
-    <div class="card" style="grid-column:1/-1"><div class="card-label">Clases a reponer por día de cierre</div>
-      <div class="card-sub" style="font-size:13px;margin-top:6px;line-height:1.7">${porDia}</div></div>`;
-
-  // Agrupar por cliente
-  const grupos = new Map();
-  filas.forEach(f => {
-    if (!grupos.has(f.cliente_norm)) grupos.set(f.cliente_norm, { cliente: f.cliente, norm: f.cliente_norm, filas: [] });
-    grupos.get(f.cliente_norm).filas.push(f);
-  });
-  const q = RepoNat.fold(document.getElementById('repoBuscar').value);
-  const filtro = document.getElementById('repoFiltro').value;
-  const lista = [...grupos.values()].filter(g => {
-    const pend = g.filas.filter(f => f.estado !== 'tomada').length;
-    if (q && !g.norm.includes(q)) return false;
-    if (filtro === 'pend' && !pend) return false;
-    if (filtro === 'comp' && pend) return false;
-    return true;
-  }).sort((a,b) => a.cliente.localeCompare(b.cliente, 'es'));
-
-  const puede = hayGuardadas && repoPuedeRegistrar();
-  document.getElementById('repoBody').innerHTML = lista.map(g => {
-    const info = REPO.usuarios.get(g.norm) || {};
-    const plan = info.plan || g.filas[0].plan || '—';
-    const expira = info.expira || g.filas[0].expira;
-    const tom = g.filas.filter(f => f.estado === 'tomada').length;
-    const chips = g.filas.map(f => {
-      const base = `${f.dia.slice(0,3)} ${repoDM(f.fecha_clase)} ${esc(f.hora)}`;
-      const title = esc(f.actividad + (f.nota ? ' — ' + f.nota : '') + (f.registrado_por ? ' — registró ' + f.registrado_por : ''));
-      if (f.estado === 'tomada') {
-        const fut = f.fecha_reposicion > hoyIso;
-        return `<span class="tag ${fut ? 'tag-g20' : 'tag-corr'}" title="${title}" style="margin:2px;${puede ? 'cursor:pointer' : ''}"
-          ${puede ? `onclick="repoDeshacer(${f.id})"` : ''}>${base} → ${fut ? '📅' : '✔'} ${repoDM(f.fecha_reposicion)}${f.hora_reposicion ? ' ' + esc(f.hora_reposicion) : ''}</span>`;
-      }
-      return `<span class="tag tag-orig" title="${title}" style="margin:2px;${puede ? 'cursor:pointer' : ''}"
-        ${puede ? `onclick="repoRegistrar(${f.id})"` : ''}>${base}</span>`;
-    }).join('');
-    return `<tr><td><strong>${esc(g.cliente)}</strong></td><td>${esc(plan)}</td><td>${expira ? repoDM(expira) + '/' + expira.slice(0,4) : '—'}</td>
-      <td style="white-space:normal">${chips}</td><td>${g.filas.length}</td><td>${tom}</td>
-      <td><strong>${g.filas.length - tom}</strong></td>
-      <td>${puede && tom < g.filas.length ? `<button class="btn-mini" onclick="repoRegistrar(${g.filas.find(f => f.estado !== 'tomada').id})">Registrar</button>` : ''}</td></tr>`;
-  }).join('') || `<tr><td colspan="8" class="dim" style="text-align:center;padding:20px">Sin reposiciones para mostrar.</td></tr>`;
-
-  // Excluidos (solo informativo, del cálculo actual)
-  const excl = REPO.calc?.excluidos || [];
-  document.getElementById('repoExclN').textContent = excl.length;
-  document.getElementById('repoExclBody').innerHTML = excl.map(e => `<tr><td>${esc(e.cliente)}</td>
-    <td>${e.dia.slice(0,3)} ${repoDM(e.fecha_clase)} ${esc(e.hora)} · ${esc(e.actividad)}</td>
-    <td>${esc(e.motivo)}</td><td>${e.expira ? repoDM(e.expira) + '/' + e.expira.slice(0,4) : '—'}</td></tr>`).join('');
-}
-
-async function repoGuardarCalculo() {
-  if (!repoPuedeGenerar() || !REPO.calc) return;
-  const { nuevas, sobran } = repoDiff();
-  if (REPO.guardadas.length && !confirm(`Se agregan ${nuevas.length} reposiciones y se quitan ${sobran.length} pendientes que ya no aplican. ¿Continuar?`)) return;
-  const st = document.getElementById('repoStatus');
-  st.textContent = '⏳ Guardando cálculo…';
-  try {
-    const campos = f => ({ cliente: f.cliente, cliente_norm: f.cliente_norm, pin: f.pin || null, plan: f.plan || null,
-      expira: f.expira || null, fecha_clase: f.fecha_clase, dia: f.dia, hora: f.hora, actividad: f.actividad });
-    for (let i = 0; i < nuevas.length; i += 500) {
-      await supaFetch('/nat_reposiciones?on_conflict=cliente_norm,fecha_clase,hora,actividad',
-        { method: 'POST', prefer: 'resolution=ignore-duplicates,return=minimal', body: nuevas.slice(i, i + 500).map(campos) });
-    }
-    for (let i = 0; i < sobran.length; i += 150) {
-      const ids = sobran.slice(i, i + 150).map(r => r.id).join(',');
-      await supaFetch(`/nat_reposiciones?id=in.(${ids})&estado=eq.pendiente`, { method: 'DELETE' });
-    }
-    await repoCargar();
-  } catch (e) { st.textContent = '⚠️ No se pudo guardar: ' + e.message; }
-}
-
-function repoRegistrar(id) {
-  const f = REPO.guardadas.find(r => r.id === id);
-  if (!f || !repoPuedeRegistrar()) return;
-  // Clases pendientes del mismo cliente, para poder elegir cuál repone
-  const pend = REPO.guardadas.filter(r => r.cliente_norm === f.cliente_norm && r.estado !== 'tomada');
-  let modal = document.getElementById('repoModal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'repoModal'; modal.className = 'nat-modal';
-    document.body.appendChild(modal);
-    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
-  }
-  const C = RepoNat.CONFIG;
-  modal.innerHTML = `<div class="nat-modal-card" style="max-width:480px;">
-    <div class="nat-modal-head"><h3>Registrar reposición — ${esc(f.cliente)}</h3>
-      <button class="btn btn-accent" onclick="document.getElementById('repoModal').style.display='none'">✕</button></div>
-    <div class="nat-modal-body" style="display:flex;flex-direction:column;gap:12px;">
-      <label>Clase que repone<br><select id="repoSelClase" class="filter-select" style="width:100%">
-        ${pend.map(r => `<option value="${r.id}" ${r.id === id ? 'selected' : ''}>${r.dia} ${repoDM(r.fecha_clase)} · ${esc(r.hora)} · ${esc(r.actividad)}</option>`).join('')}
-      </select></label>
-      <label>Fecha en que la toma<br><input type="date" id="repoFecha" class="search-box" style="width:100%"
-        min="${C.tomarDesde}" max="${C.tomarHasta}" value="${new Date().toLocaleDateString('en-CA')}"></label>
-      <label>Hora / clase (opcional)<br><input id="repoHora" class="search-box" style="width:100%" placeholder="Ej: 6:00 p.m. adultos"></label>
-      <label>Nota (opcional)<br><input id="repoNota" class="search-box" style="width:100%"></label>
-      <div class="dim" style="font-size:12px">Se puede adelantar desde el 01/12 o tomar hasta el 31/01. No en el cierre (24/12 al 03/01). Si la fecha es futura queda como agendada.</div>
-      <div id="repoErr" style="color:var(--red);font-size:13px"></div>
-      <button class="btn btn-primary" onclick="repoGuardarToma()">Guardar</button>
-    </div></div>`;
-  modal.style.display = 'block';
-}
-
-async function repoGuardarToma() {
-  const id = +document.getElementById('repoSelClase').value;
-  const fecha = document.getElementById('repoFecha').value;
-  const err = RepoNat.validarFechaReposicion(fecha);
-  const errEl = document.getElementById('repoErr');
-  if (err) { errEl.textContent = err; return; }
-  try {
-    await supaFetch(`/nat_reposiciones?id=eq.${id}&estado=eq.pendiente`, { method: 'PATCH', body: {
-      estado: 'tomada', fecha_reposicion: fecha,
-      hora_reposicion: document.getElementById('repoHora').value.trim() || null,
-      nota: document.getElementById('repoNota').value.trim() || null } });
-    document.getElementById('repoModal').style.display = 'none';
-    await repoCargar();
-  } catch (e) { errEl.textContent = 'No se pudo guardar: ' + e.message; }
-}
-
-async function repoDeshacer(id) {
-  const f = REPO.guardadas.find(r => r.id === id);
-  if (!f || !repoPuedeRegistrar()) return;
-  if (!confirm(`¿Deshacer la reposición de ${f.cliente} (${f.dia} ${repoDM(f.fecha_clase)}) registrada para el ${repoDM(f.fecha_reposicion)}? Vuelve a quedar pendiente.`)) return;
-  try {
-    await supaFetch(`/nat_reposiciones?id=eq.${id}`, { method: 'PATCH', body: { estado: 'pendiente', fecha_reposicion: null, hora_reposicion: null } });
-    await repoCargar();
-  } catch (e) { alert('No se pudo deshacer: ' + e.message); }
-}
-
-function repoCSV() {
-  const filas = REPO.guardadas.length ? REPO.guardadas : (REPO.calc?.filas || []);
-  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-  const csv = ['Cliente,PIN,Plan,Clase cerrada,Día,Hora,Actividad,Estado,Fecha reposición,Hora reposición,Nota,Registró']
-    .concat(filas.map(f => [f.cliente, f.pin, f.plan, f.fecha_clase, f.dia, f.hora, f.actividad, f.estado || 'pendiente',
-      f.fecha_reposicion, f.hora_reposicion, f.nota, f.registrado_por].map(q).join(','))).join('\n');
-  dlBlob(csv, 'reposiciones-natacion-' + hoy() + '.csv', 'text/csv;charset=utf-8');
+// Pestaña Reposiciones: se monta la primera vez que se abre (reposiciones_nat_ui.js)
+let repoUI = null, repoUIRol = null;
+function repoCargar() {
+  if (!repoUI || repoUIRol !== currentRole) repoUIRol = currentRole, repoUI = RepoNatUI.montar(document.getElementById('repoRoot'), { supaFetch, rol: currentRole });
+  else repoUI.recargar();
 }
 </script>
 </body>

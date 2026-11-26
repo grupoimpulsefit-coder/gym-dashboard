@@ -43,3 +43,15 @@ test('validar fecha de reposición', () => {
   assert.match(R.validarFechaReposicion('2026-12-28'), /cerrada/);
   assert.match(R.validarFechaReposicion(''), /fecha/);
 });
+
+test('reconfirmar en enero: activo si el plan cubre la fecha de la reposición', () => {
+  const buscar = R.crearBuscador(usuarios);
+  assert.strictEqual(R.estadoClienteEn(buscar, 'Ana Pérez Mora', '2027-01-10').activo, true);
+  const ana = R.estadoClienteEn(buscar, 'Ana Pérez Mora', '2027-01-20');
+  assert.strictEqual(ana.activo, false);
+  assert.match(ana.motivo, /venció el 15\/01/);
+  assert.strictEqual(R.estadoClienteEn(buscar, 'Nadie', '2027-01-10').activo, false);
+  assert.strictEqual(R.requiereReconfirmar({ estado: 'tomada', fecha_reposicion: '2027-01-12' }), true);
+  assert.strictEqual(R.requiereReconfirmar({ estado: 'tomada', fecha_reposicion: '2026-12-12' }), false);
+  assert.strictEqual(R.requiereReconfirmar({ estado: 'pendiente' }), false);
+});
