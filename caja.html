@@ -538,7 +538,7 @@ table.hist tbody tr:hover td { background:var(--fill); }
   <div id="histWrap" hidden>
   <h3 style="margin:22px 0 10px;font-size:13px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;">📋 Cierres recientes</h3>
   <div class="tbl-wrap"><table class="hist">
-    <thead><tr><th>Fecha</th><th>Turno</th><th class="num">Caja inicial</th><th class="num">Efectivo</th><th class="num">Total ventas</th><th class="num">Minita</th><th class="num">Diferencia</th><th>Estado</th><th></th></tr></thead>
+    <thead><tr><th>Fecha</th><th>Turno</th><th>Abrió</th><th>Cerró</th><th class="num">Caja inicial</th><th class="num">Efectivo</th><th class="num">Total ventas</th><th class="num">Minita</th><th class="num">Diferencia</th><th>Estado</th><th></th></tr></thead>
     <tbody id="histBody"></tbody>
   </table></div>
   </div>
@@ -928,7 +928,7 @@ function limpiarEstadoSede(){
   ['sinpeResumen','fotoResumen','ventasHint','saveMsg','conteoCierreResumen','liveInfo','aperturaInvBody','factCierreBox','histFactBox'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=''; });
   ['fileVentas','fileSinpe','fileFoto'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   DENOMS.forEach(d=>{ const el=document.getElementById('den_'+d); if(el) el.value=0; });
-  document.getElementById('histBody').innerHTML='<tr><td colspan="9" style="padding:16px;color:var(--muted);">Cargando…</td></tr>';
+  document.getElementById('histBody').innerHTML='<tr><td colspan="11" style="padding:16px;color:var(--muted);">Cargando…</td></tr>';
   renderEnviosBanner();
   try{ renderFxProds(); renderFxTicket(); renderFxHist(); }catch(_){}
 }
@@ -2392,14 +2392,21 @@ async function aceptarEnvio(){
 function mensajeError(e){ try{ const j=JSON.parse(e.message); return j.message||e.message; }catch(_){ return e.message; } }
 // Recepción solo trabaja el turno abierto: no ve ni abre los cierres anteriores.
 const verHistorial=()=>currentRole!=='recepcion';
+// Hora local de apertura/cierre; si cae en otro día que el del cierre (p. ej. cerró pasada la medianoche) se antepone la fecha
+function horaTurno(iso,fecha){
+  if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—';
+  const h=d.toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'});
+  return ymd(d)===fecha?h:`${d.toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit'})} ${h}`;
+}
 function renderHist(){
   const tb=document.getElementById('histBody');
   document.getElementById('histWrap').hidden=!verHistorial();
   if(!verHistorial()){ tb.innerHTML=''; return; }
-  if(!cierres.length){tb.innerHTML='<tr><td colspan="9" style="padding:16px;color:var(--muted);">Sin cierres registrados.</td></tr>';return;}
+  if(!cierres.length){tb.innerHTML='<tr><td colspan="11" style="padding:16px;color:var(--muted);">Sin cierres registrados.</td></tr>';return;}
   const estBadge=e=> e==='abierto'?'<span class="pill" style="background:var(--green-tint);color:var(--green);">abierto</span>':e==='parcial'?'<span class="pill" style="background:var(--orange-tint);color:var(--orange);">parcial</span>':e==='final'?'<span class="pill" style="background:rgba(88,86,214,.14);color:var(--indigo);">final</span>':'';
   tb.innerHTML=cierres.map(c=>`<tr>
     <td>${esc(c.fecha)}</td><td>${c.turno_num?('Turno '+c.turno_num):esc(c.turno)||'—'} ${estBadge(c.estado)}</td>
+    <td style="white-space:nowrap;">${horaTurno(c.hora_apertura,c.fecha)}</td><td style="white-space:nowrap;" title="Última vez que se guardó el cierre">${c.estado==='abierto'?'—':horaTurno(c.hora_cierre,c.fecha)}</td>
     <td class="num">${fmt(c.caja_inicial)}${Number(c.apertura_diferencia)?`<div><span class="pill" style="background:var(--orange-tint);color:var(--orange);font-size:11px;" title="${esc(leyendaApertura(c))}">Abrió ${Number(c.apertura_diferencia)<0?'−':'+'}${fmt(Math.abs(c.apertura_diferencia))}</span></div>`:''}</td><td class="num">${fmt(c.efectivo)}</td>
     <td class="num">${fmt(c.total_ventas)}</td><td class="num">${fmt(c.minita)}</td>
     <td class="num" style="color:${Math.round(c.diferencia||0)===0?'var(--green)':'var(--red)'};">${fmt(c.diferencia)}</td>
