@@ -85,7 +85,7 @@
       <div data-r="calc"></div>
       <div class="rp-cards" data-r="cards"></div>
       <div class="rp-bar">
-        <input class="rp-in" data-r="q" placeholder="Buscar cliente…" style="width:240px;max-width:100%">
+        <input class="rp-in" data-r="q" placeholder="Buscar por nombre o PIN…" style="width:240px;max-width:100%">
         <select class="rp-in" data-r="f">
           <option value="">Todos</option><option value="pend">Con pendientes</option><option value="rec">Enero por reconfirmar</option>
           <option value="canc">Con canceladas</option><option value="comp">Completaron todas</option>
@@ -198,13 +198,13 @@
 
       const grupos = new Map();
       filas.forEach(f => {
-        if (!grupos.has(f.cliente_norm)) grupos.set(f.cliente_norm, { cliente: f.cliente, norm: f.cliente_norm, filas: [] });
+        if (!grupos.has(f.cliente_norm)) grupos.set(f.cliente_norm, { cliente: f.cliente, norm: f.cliente_norm, pin: String(f.pin || '').trim(), filas: [] });
         grupos.get(f.cliente_norm).filas.push(f);
       });
       const q = R.fold($('q').value), filtro = $('f').value;
       const lista = [...grupos.values()].filter(g => {
         const pend = g.filas.some(f => f.estado === 'pendiente');
-        if (q && !g.norm.includes(q)) return false;
+        if (q && !g.norm.includes(q) && !(g.pin && g.pin.toLowerCase().includes(q))) return false;
         if (filtro === 'pend') return pend;
         if (filtro === 'comp') return !pend;
         if (filtro === 'rec') return g.filas.some(f => R.requiereReconfirmar(f) && !f.confirmada_en);
@@ -237,7 +237,7 @@
           return `<${tag} class="rp-chip" title="${title}" ${puede ? `data-a="reg" data-id="${f.id}"` : ''}>${base}</${tag}>`;
         }).join('');
         const primera = g.filas.find(f => f.estado === 'pendiente');
-        return `<tr><td><b>${esc(g.cliente)}</b></td><td>${esc(plan)}</td><td>${dmy(expira)}</td>
+        return `<tr><td><b>${esc(g.cliente)}</b>${g.pin ? `<div class="rp-dim" style="font-size:12px">PIN ${esc(g.pin)}</div>` : ''}</td><td>${esc(plan)}</td><td>${dmy(expira)}</td>
           <td style="min-width:260px">${chips}</td><td>${g.filas.length}</td><td>${tom}</td><td><b>${pen}</b></td>
           <td>${puede && primera ? `<button class="rp-btn sm" data-a="reg" data-id="${primera.id}">Agendar</button>` : ''}</td></tr>`;
       }).join('') || `<tr><td colspan="8" class="rp-dim" style="text-align:center;padding:20px">Sin reposiciones para mostrar.</td></tr>`;
