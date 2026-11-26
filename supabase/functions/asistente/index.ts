@@ -17,6 +17,9 @@
 //    { accion: 'solicitar_anulacion', factura, motivo } → pide anular una factura de caja y avisa a
 //        Administración y al coordinador de la sede (ver anulaciones.sql)
 //    { accion: 'resolver_anulacion', solicitud, aprobar, nota } → aprueba (anula) o rechaza y avisa a quien la pidió
+//    { accion: 'solicitar_autorizacion_cierre', cierre, tipo, motivo, generado } → pide cerrar caja sin Informe de Ventas
+//        al día y avisa a Administración; { accion: 'resolver_autorizacion_cierre', solicitud, aprobar, nota } → la
+//        aprueba o rechaza y avisa a quien la pidió (ver autorizaciones_cierre.sql)
 //    { accion: 'aviso_apertura', cierre } → el turno abrió con más o menos efectivo que el cierre anterior:
 //        avisa a Administración y al coordinador de la sede (una sola vez; ver caja_apertura.sql)
 //
@@ -399,6 +402,41 @@ Deno.serve(async (req) => {
         await enviarPush(admin, [r.solicitado_por], {
           title: `Factura #${r.numero} · ${r.sede}`, body: recorte(`La factura ${txt}.${r.nota ? ' ' + r.nota : ''} (${yo.nombre || caller.user.email})`, 180),
           tag: 'anul-' + r.id, url: '/movil',
+        }).catch(() => 0);
+      }
+      return json({ ok: true, estado: r.estado, nota: r.nota });
+    }
+
+    // Cerrar caja sin Informe de Ventas al día: los permisos y las reglas los valida la base (autorizaciones_cierre.sql)
+    if (body.accion === 'solicitar_autorizacion_cierre') {
+      const { data, error } = await asCaller.rpc('solicitar_autorizacion_cierre', {
+        p_cierre: String(body.cierre || ''), p_tipo: String(body.tipo || ''), p_motivo: String(body.motivo || ''),
+        p_generado: body.generado ? String(body.generado) : null });
+      if (error) return json({ error: error.message }, 400);
+      const a = data as { id: number; sede: string; turno_num: number | null; tipo: string; motivo: string; informe_generado: string | null; solicitante: string };
+      const hora = a.informe_generado ? new Date(a.informe_generado).toLocaleTimeString('es-CR', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Costa_Rica' }) : '';
+      const que = a.tipo === 'sin_informe' ? 'sin Informe de Ventas' : `con un Informe de Ventas de las ${hora || '¿?'}`;
+      let avisados = 0;
+      try {
+        const { data: ads } = await admin.from('user_roles').select('id').in('role', ADMIN_ROLES);
+        avisados = await enviarPush(admin, (ads || []).map(x => x.id).filter(id => id !== caller.user.id), {
+          title: `Autorizar cierre · ${a.sede}${a.turno_num ? ' turno ' + a.turno_num : ''}`,
+          body: recorte(`${a.solicitante} pide cerrar ${que}. Motivo: ${a.motivo}`, 180),
+          tag: 'autcierre-' + a.id, url: '/caja?autorizar=' + a.id,
+        });
+      } catch (_) { /* sin aviso */ }
+      return json({ ok: true, id: a.id, avisados });
+    }
+    if (body.accion === 'resolver_autorizacion_cierre') {
+      const { data, error } = await asCaller.rpc('resolver_autorizacion_cierre', {
+        p_id: Number(body.solicitud), p_aprobar: body.aprobar === true, p_nota: body.nota ? String(body.nota) : null });
+      if (error) return json({ error: error.message }, 400);
+      const r = data as { id: number; estado: string; nota: string | null; sede: string; turno_num: number | null; solicitado_por: string | null };
+      const txt = r.estado === 'aprobada' ? 'aprobada: ya puede cerrar el turno' : r.estado === 'rechazada' ? 'rechazada: descargue el Informe de Ventas y cárguelo' : 'vencida: el turno ya se había cerrado';
+      if (r.solicitado_por && r.solicitado_por !== caller.user.id) {
+        await enviarPush(admin, [r.solicitado_por], {
+          title: `Cierre de caja · ${r.sede}`, body: recorte(`Autorización ${txt}.${r.nota ? ' ' + r.nota : ''} (${yo.nombre || caller.user.email})`, 180),
+          tag: 'autcierre-' + r.id, url: '/caja',
         }).catch(() => 0);
       }
       return json({ ok: true, estado: r.estado, nota: r.nota });

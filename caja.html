@@ -349,6 +349,7 @@ table.hist tbody tr:hover td { background:var(--fill); }
 </div>
 
 <div id="enviosBanner" style="display:none;padding:12px var(--gut);background:var(--orange-tint);border-bottom:.5px solid var(--hair);"></div>
+<div id="autBanner" style="display:none;padding:12px var(--gut);background:var(--orange-tint);border-bottom:.5px solid var(--hair);"></div>
 
 <!-- Modal recibir mercadería -->
 <!-- Modal: aclarar saldo SINPE (solo admins) -->
@@ -1502,17 +1503,88 @@ function informeGenerado(rows){
   return null;
 }
 const horaHM=d=>d.toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'});
-// Aviso antes del cierre final: el Informe de Ventas se descargó hace rato (lo facturado después no se cuenta)
-// o hay SINPE recibidos después de que se generó. '' si no hay nada que avisar.
-const INFORME_VIEJO_MIN=30;
-function avisoInformeViejo(inf, sinpe, ahora){
-  const g=inf&&inf.generado?new Date(inf.generado):null; if(!g||isNaN(g)) return '';
-  const min=Math.round((ahora-g)/6e4);
-  const despues=((sinpe&&sinpe.all)||[]).filter(t=>{ const d=fechaHora(t.fecha_tx); return d&&d>g; });
-  if(min<INFORME_VIEJO_MIN&&!despues.length) return '';
-  return `El Informe de Ventas se generó a las ${horaHM(g)}${min>=INFORME_VIEJO_MIN?` (hace ${min>=120?Math.floor(min/60)+' h '+(min%60)+' min':min+' min'})`:''}.`
-    +(despues.length?` El reporte SINPE trae ${despues.length} SINPE recibidos después de esa hora (${fmt(despues.reduce((a,t)=>a+t.monto,0))}).`:'')
-    +`\n\nLo que se facturó después no entra en este cierre ni en el de mañana. Descargue de nuevo el Informe de Ventas y cárguelo antes de cerrar.`;
+// Para cerrar un turno (parcial o final) el Informe de Ventas tiene que ser de hace INFORME_MAX_MIN minutos o
+// menos: lo que se facturó después de descargarlo no entra en ningún cierre (el del día siguiente solo trae ese día).
+// Devuelve null si se puede cerrar, o {tipo:'sin_informe'|'informe_viejo', texto} si hace falta autorización.
+const INFORME_MAX_MIN=10;
+function informeParaCerrar(inf, cargado, ahora){
+  if(!cargado) return { tipo:'sin_informe', texto:'No hay Informe de Ventas cargado.' };
+  const g=inf&&inf.generado?new Date(inf.generado):null;
+  if(!g||isNaN(g)) return { tipo:'informe_viejo', texto:'No se pudo leer a qué hora se generó el Informe de Ventas (vuelva a descargarlo y cárguelo).' };
+  const min=Math.floor((ahora-g)/6e4);
+  if(min<=INFORME_MAX_MIN) return null;
+  return { tipo:'informe_viejo', generado:g.toISOString(),
+    texto:`El Informe de Ventas se generó a las ${horaHM(g)} (hace ${min>=120?Math.floor(min/60)+' h '+(min%60)+' min':min+' min'}). Para cerrar tiene que ser de hace ${INFORME_MAX_MIN} minutos o menos: lo que se facturó después no entraría en ningún cierre.` };
+}
+
+// ── Autorización de Administración para cerrar sin Informe al día (autorizaciones_cierre.sql) ──
+let _autCierre=null, _autPoll=null;
+async function autorizacionDelTurno(cierreId){
+  try{ const r=await supaFetch(`/autorizaciones_cierre?cierre_id=eq.${encodeURIComponent(cierreId)}&order=created_at.desc&limit=1&select=*`); return (r&&r[0])||null; }
+  catch(_){ return null; }
+}
+// ¿La autorización cubre lo que falta? 'sin_informe' permite también un Informe viejo; 'informe_viejo' no permite cerrar sin Informe.
+const autorizaCubre=(a,tipo)=>!!a&&a.estado==='aprobada'&&(a.tipo==='sin_informe'||a.tipo===tipo);
+function mostrarPedirAutorizacion(estado, req, a){
+  const msg=document.getElementById('saveMsg'); msg.className='msg err';
+  const pend=a&&a.estado==='pendiente';
+  const rech=a&&a.estado==='rechazada';
+  _autCierre={estado, req};
+  msg.innerHTML=`⚠ ${esc(req.texto)} ${req.tipo==='sin_informe'?'Cargue el 📤 Informe de Ventas.':'Descárguelo de nuevo y cárguelo.'}`
+    +(pend?`<div style="margin-top:6px;">⏳ Se pidió autorización a Administración a las ${horaHM(new Date(a.created_at))} (${a.tipo==='sin_informe'?'cerrar sin Informe':'cerrar con Informe viejo'}). Cuando la aprueben puede cerrar.</div>`
+      :`<div style="margin-top:6px;">${rech?`Administración rechazó la autorización${a.nota?': '+esc(a.nota):''}. `:''}Si no se puede descargar: <button class="btn-ghost" type="button" style="font-size:12px;padding:4px 10px;" onclick="pedirAutorizacionCierre()">Pedir autorización a Administración</button></div>`);
+  if(pend) vigilarAutorizacion(a.cierre_id);
+}
+async function pedirAutorizacionCierre(){
+  const x=_autCierre; if(!x||!turnoActual) return;
+  const motivo=prompt(x.req.tipo==='sin_informe'
+    ?'¿Por qué hay que cerrar sin Informe de Ventas? Administración recibe el aviso y lo autoriza.'
+    :'¿Por qué no se puede descargar de nuevo el Informe de Ventas? Administración recibe el aviso y lo autoriza.');
+  if(motivo==null) return;
+  const msg=document.getElementById('saveMsg');
+  if(motivo.trim().length<5){ msg.className='msg err'; msg.textContent='Escriba el motivo para pedir la autorización.'; return; }
+  try{
+    await fxAsistente({accion:'solicitar_autorizacion_cierre', cierre:turnoActual.id, tipo:x.req.tipo, motivo:motivo.trim(), generado:x.req.generado||null});
+    const a=await autorizacionDelTurno(turnoActual.id);
+    mostrarPedirAutorizacion(x.estado, x.req, a||{estado:'pendiente',created_at:new Date().toISOString(),tipo:x.req.tipo,cierre_id:turnoActual.id});
+  }catch(e){ msg.className='msg err'; msg.textContent='⚠ '+mensajeError(e); }
+}
+// Mientras la solicitud está pendiente se revisa cada 20 s; al aprobarse se avisa en pantalla.
+function vigilarAutorizacion(cierreId){
+  if(_autPoll) clearInterval(_autPoll);
+  const hasta=Date.now()+60*6e4;
+  _autPoll=setInterval(async()=>{
+    if(Date.now()>hasta||!turnoActual||turnoActual.id!==cierreId){ clearInterval(_autPoll); _autPoll=null; return; }
+    const a=await autorizacionDelTurno(cierreId); if(!a||a.estado==='pendiente') return;
+    clearInterval(_autPoll); _autPoll=null;
+    const msg=document.getElementById('saveMsg');
+    if(a.estado==='aprobada'){ msg.className='msg ok'; msg.textContent=`✅ ${a.resuelto_por||'Administración'} autorizó cerrar ${a.tipo==='sin_informe'?'sin Informe de Ventas':'con el Informe de Ventas que tiene'}. Toque de nuevo el botón de cierre.`; }
+    else if(_autCierre) mostrarPedirAutorizacion(_autCierre.estado, _autCierre.req, a);
+  },20000);
+}
+// Administración: solicitudes pendientes de todas las sedes, arriba de la caja
+async function loadAutorizacionesPend(){
+  const b=document.getElementById('autBanner'); if(!b) return;
+  if(!esAdmin()){ b.style.display='none'; return; }
+  let list=[]; try{ list=(await supaFetch('/autorizaciones_cierre?estado=eq.pendiente&order=created_at.asc&select=*'))||[]; }catch(_){ list=[]; }
+  if(!list.length){ b.style.display='none'; b.innerHTML=''; return; }
+  b.style.display='block';
+  b.innerHTML=`<div style="font-weight:800;color:var(--orange);margin-bottom:6px;">🔐 ${list.length} turno(s) piden autorización para cerrar</div>`
+    +list.map(a=>`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:.5px solid var(--hair);font-size:13px;">
+      <span style="flex:1;min-width:220px;"><b>${esc(a.sede)}</b> · turno ${esc(a.turno_num||'')} · ${esc(a.solicitante||'—')} · ${horaHM(new Date(a.created_at))}
+        <div style="color:var(--muted);font-size:12px;">${a.tipo==='sin_informe'?'Cerrar <b>sin Informe de Ventas</b>':`Cerrar con un Informe de Ventas de las ${a.informe_generado?horaHM(new Date(a.informe_generado)):'¿?'}`} · Motivo: ${esc(a.motivo)}</div></span>
+      <button class="btn-primary" type="button" style="font-size:12px;padding:6px 12px;" onclick="resolverAutorizacionCierre(${Number(a.id)},true)">Autorizar</button>
+      <button class="btn-ghost" type="button" style="font-size:12px;padding:6px 12px;" onclick="resolverAutorizacionCierre(${Number(a.id)},false)">Rechazar</button></div>`).join('');
+}
+setInterval(()=>{ if(currentToken&&esAdmin()) loadAutorizacionesPend(); },60000);   // Administración ve las solicitudes nuevas sin recargar
+async function resolverAutorizacionCierre(id, aprobar){
+  let nota=null;
+  if(aprobar){ if(!confirm('¿Autorizar el cierre de este turno sin Informe de Ventas al día?\n\nLo que se facturó y no está en el Informe no se cuenta en ningún cierre: queda como diferencia por aclarar.')) return; }
+  else { nota=prompt('¿Por qué se rechaza? (opcional)'); if(nota==null) return; }
+  try{ const r=await fxAsistente({accion:'resolver_autorizacion_cierre', solicitud:id, aprobar, nota:nota||null});
+    alert(r.estado==='aprobada'?'Autorizado: el turno ya se puede cerrar.':r.estado==='rechazada'?'Solicitud rechazada.':(r.nota||'La solicitud venció.')); }
+  catch(e){ alert('⚠ '+mensajeError(e)); }
+  loadAutorizacionesPend();
 }
 
 // ── Cargar Informe de Ventas (validación/autollenado) ──
@@ -2282,10 +2354,21 @@ async function cerrarTurno(estado){
     return;
   }
   const fecha=document.getElementById('cFecha').value;
-  if(document.getElementById('cTarjeta').value===''||document.getElementById('cSinpe').value===''){ msg.className='msg err'; msg.textContent='Cargue el 📤 Informe de Ventas (llena Tarjeta y SINPE automáticamente).'; return; }
+  // Informe de Ventas cargado y de hace INFORME_MAX_MIN minutos o menos; si no, autorización de Administración.
+  const informeCargado=!(document.getElementById('cTarjeta').value===''||document.getElementById('cSinpe').value==='');
+  const reqInf=informeParaCerrar(window._informeVentas, informeCargado, new Date());
+  let autorizacion=null;
+  if(reqInf){
+    if(esAdmin()){
+      if(!confirm('⚠ '+reqInf.texto+'\n\nComo administrador puede cerrar igual; queda registrado que usted lo autorizó.\n\n¿Cerrar igual?')){ msg.className='msg err'; msg.textContent=reqInf.texto; return; }
+      autorizacion={tipo:reqInf.tipo, por:currentEmail||'administrador', at:new Date().toISOString(), propia:true, informe_generado:reqInf.generado||null};
+    } else {
+      const a=await autorizacionDelTurno(turnoActual.id);
+      if(!autorizaCubre(a,reqInf.tipo)){ mostrarPedirAutorizacion(estado, reqInf, a); return; }
+      autorizacion={id:a.id, tipo:a.tipo, por:a.resuelto_por, at:a.resuelto_at, motivo:a.motivo, solicitante:a.solicitante, informe_generado:reqInf.generado||null};
+    }
+  }
   if(estado==='final'&&!window._sinpeReporte){ msg.className='msg err'; msg.textContent='Para el cierre final debe cargar el 🔷 Reporte SINPE del día.'; return; }
-  if(estado==='final'){ const av=avisoInformeViejo(window._informeVentas, window._sinpeReporte, new Date());
-    if(av&&!confirm('⚠ '+av+'\n\n¿Cerrar igual?')){ msg.className='msg err'; msg.textContent='Descargue de nuevo el Informe de Ventas y cárguelo antes del cierre final.'; return; } }
   const solPend=(fxState.solicitudes||[]).filter(s=>s.estado==='pendiente'&&(fxState.facturas||[]).some(f=>f.id===s.factura_id&&f.cierre_id===turnoActual.id));
   if(solPend.length&&!confirm(`Hay ${solPend.length} solicitud(es) de anulación sin aprobar (factura ${solPend.map(s=>'#'+s.numero).join(', ')}).\n\nSi cierra el turno, esas facturas ya no se podrán anular y quedarán como descuadre.\n\n¿Cerrar igual?`)) return;
   if(!fotoDatafono){ msg.className='msg err'; msg.textContent=`Suba la foto del datáfono (${estado==='final'?'cierre de lote':'auditoría'}) — es obligatoria para el cierre.`; return; }
@@ -2309,7 +2392,8 @@ async function cerrarTurno(estado){
     total_gastos:c.totGastos, total_ingresos:c.totIngresos, minita:c.minita,
     efectivo_final:efectivoFinal, otros_vendidos:c.otros, otros_desglose:window._otrosResumen||null, ...(invLegacy?{inventario_cierre:inventarioCierre||null}:{}), sobre_retirado:esFinal&&c.sobreRetirado, sobre_modo:esFinal?c.sobreModo:'no',
     diferencia, estado_dif:diferencia===0?'OK':(diferencia>0?'Faltante':'Sobrante'),
-    informe_ventas:window._informeVentas||null, estado, hora_cierre:new Date().toISOString(), ...facturadoPayload()
+    informe_ventas:autorizacion?{...(window._informeVentas||{sin_informe:true}), autorizacion}:(window._informeVentas||null),
+    estado, hora_cierre:new Date().toISOString(), ...facturadoPayload()
   };
   const ws=wsCierre({...c, sobreOut});
   if(ws && Object.prototype.hasOwnProperty.call(turnoActual,'wstudio')) payload.wstudio={cierre:ws};   // columna de wstudio.sql
@@ -2371,7 +2455,7 @@ async function loadCierres(){
   catch(_){ rows=[]; }
   if(seq!==_cierresSeq||sede!==currentSede) return;   // ya se pidió otra sede (o una recarga más nueva)
   cierres=rows;
-  renderHist(); checkTurno(); loadEnviosCaja();
+  renderHist(); checkTurno(); loadEnviosCaja(); loadAutorizacionesPend();
 }
 
 // ── Envíos de mercadería por recibir ──
