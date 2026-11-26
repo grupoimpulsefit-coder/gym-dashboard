@@ -235,7 +235,7 @@
         const pen = g.filas.filter(f => f.estado === 'pendiente').length;
         const chips = g.filas.map(f => {
           const base = `${f.dia.slice(0, 3)} ${dm(f.fecha_clase)} ${esc(f.hora)}`;
-          const title = esc(f.actividad + (f.nota ? ' — ' + f.nota : '') + (f.registrado_por ? ' — registró ' + f.registrado_por : ''));
+          const title = esc(f.actividad + (f.nota ? ' — ' + f.nota : '') + (f.registrado_por ? ' — agendó ' + f.registrado_por : ''));
           const tag = puede ? 'button' : 'span';
           const acc = puede ? `data-a="acc" data-id="${f.id}"` : '';
           const cuando = `${dm(f.fecha_reposicion)}${f.hora_reposicion ? ' ' + esc(f.hora_reposicion) : ''}`;
@@ -251,8 +251,11 @@
           return `<${tag} class="rp-chip" title="${title}" ${puede ? `data-a="reg" data-id="${f.id}"` : ''}>${base}</${tag}>`;
         }).join('');
         const primera = g.filas.find(f => f.estado === 'pendiente');
+        // Quién agendó cada reposición, visible en la fila
+        const quien = g.filas.filter(f => f.estado !== 'pendiente' && f.registrado_por).map(f =>
+          `${f.dia.slice(0, 3)} ${dm(f.fecha_clase)}: agendó <b>${esc(f.registrado_por)}</b>${f.registrado_en ? ' el ' + fmtTs(f.registrado_en) : ''}`).join('<br>');
         return `<tr><td><b>${esc(g.cliente)}</b>${g.pin ? `<div class="rp-dim" style="font-size:12px">PIN ${esc(g.pin)}</div>` : ''}</td><td>${esc(plan)}</td><td>${dmy(expira)}</td>
-          <td style="min-width:260px">${chips}</td><td>${g.filas.length}</td><td>${tom}</td><td><b>${pen}</b></td>
+          <td style="min-width:260px">${chips}${quien ? `<div class="rp-dim" style="font-size:12px;margin-top:4px">${quien}</div>` : ''}</td><td>${g.filas.length}</td><td>${tom}</td><td><b>${pen}</b></td>
           <td>${puede && primera ? `<button class="rp-btn sm" data-a="reg" data-id="${primera.id}">Agendar</button>` : ''}</td></tr>`;
       }).join('') || `<tr><td colspan="8" class="rp-dim" style="text-align:center;padding:20px">Sin reposiciones para mostrar.</td></tr>`;
 
@@ -337,6 +340,8 @@
         <h3>${esc(f.cliente)}</h3>
         <div>Clase del cierre: <b>${f.dia} ${dm(f.fecha_clase)} · ${esc(f.hora)}</b> · ${esc(f.actividad)}</div>
         <div>Reposición: <b>${dmy(f.fecha_reposicion)}${f.hora_reposicion ? ' · ' + esc(f.hora_reposicion) : ''}</b>
+          ${f.registrado_por ? `<br>Agendada por <b>${esc(f.registrado_por)}</b>${f.registrado_en ? ' el ' + fmtTs(f.registrado_en) : ''}` : ''}
+          ${f.nota ? `<br>Nota: ${esc(f.nota)}` : ''}
           ${f.estado === 'cancelada' ? `<br><span style="color:var(--red)">Cancelada: ${esc(f.motivo_cancelacion || 'cliente inactivo')}</span>` : ''}
           ${f.confirmada_en ? `<br><span style="color:var(--green)">Reconfirmada activo — ${esc(f.confirmada_por || '')}, ${fmtTs(f.confirmada_en)}</span>` : ''}</div>
         ${sug ? `<div class="rp-info" style="margin:0">Según los pagos registrados: ${sug.activo ? '<b>activo</b>' : '<b>no activo</b> — ' + esc(sug.motivo)}${sug.expira ? ` (vence ${dmy(sug.expira)})` : ''}</div>` : ''}
@@ -438,9 +443,10 @@
     function csv() {
       const filas = S.guardadas.length ? S.guardadas : (S.calc?.filas || []);
       const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-      const txt = ['Cliente,PIN,Plan,Clase cerrada,Día,Hora,Actividad,Estado,Fecha reposición,Hora reposición,Nota,Registró,Reconfirmada,Motivo cancelación']
+      const txt = ['Cliente,PIN,Plan,Clase cerrada,Día,Hora,Actividad,Estado,Fecha reposición,Hora reposición,Nota,Agendó,Fecha en que se agendó,Reconfirmada,Motivo cancelación']
         .concat(filas.map(f => [f.cliente, f.pin, f.plan, f.fecha_clase, f.dia, f.hora, f.actividad, f.estado || 'pendiente',
           f.fecha_reposicion, f.hora_reposicion, f.nota, f.registrado_por,
+          f.registrado_en ? new Date(f.registrado_en).toLocaleString('es-CR') : '',
           f.confirmada_en ? (f.confirmada_por || 'sí') : '', f.motivo_cancelacion].map(q).join(','))).join('\n');
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob(['﻿' + txt], { type: 'text/csv;charset=utf-8' }));

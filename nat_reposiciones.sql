@@ -45,6 +45,8 @@ create table if not exists nat_reposiciones (
 alter table nat_reposiciones add column if not exists confirmada_en      timestamptz;
 alter table nat_reposiciones add column if not exists confirmada_por     text;
 alter table nat_reposiciones add column if not exists motivo_cancelacion text;
+-- Quién agendó y cuándo (nombre del usuario en user_roles; si no tiene, su correo)
+alter table nat_reposiciones add column if not exists registrado_en      timestamptz;
 
 alter table nat_reposiciones drop constraint if exists nat_reposiciones_estado_check;
 alter table nat_reposiciones add constraint nat_reposiciones_estado_check
@@ -89,6 +91,9 @@ create policy nat_repo_update on nat_reposiciones
 -- Sella quién y cuándo; al actualizar solo se puede cambiar el registro de la toma
 create or replace function nat_reposiciones_guard()
 returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  quien text := coalesce((select nullif(btrim(ur.nombre), '') from user_roles ur where ur.id = auth.uid()),
+                         auth.jwt() ->> 'email');
 begin
   if tg_op = 'UPDATE' then
     new.cliente := old.cliente;  new.cliente_norm := old.cliente_norm;
@@ -104,16 +109,20 @@ begin
        and not exists (select 1 from user_roles ur where ur.id = auth.uid() and ur.role in ('admin','admin_sedes')) then
       raise exception 'Una reposición agendada no se cambia de fecha; si el cliente no llega, la pierde.';
     end if;
-    if new.estado = 'tomada' and old.estado = 'pendiente' then
-      new.registrado_por := coalesce(auth.jwt() ->> 'email', new.registrado_por);
-    elsif new.estado = 'pendiente' then
-      new.fecha_reposicion := null;  new.hora_reposicion := null;  new.registrado_por := null;
+    if new.estado = 'pendiente' then
+      new.fecha_reposicion := null;  new.hora_reposicion := null;  new.registrado_por := null;  new.registrado_en := null;
       new.confirmada_en := null;  new.confirmada_por := null;  new.motivo_cancelacion := null;
+    elsif old.estado = 'pendiente' then          -- se acaba de agendar: queda quién y cuándo
+      new.registrado_por := coalesce(quien, new.registrado_por);
+      new.registrado_en  := now();
+    else                                          -- no se puede cambiar quién agendó
+      new.registrado_por := old.registrado_por;
+      new.registrado_en  := old.registrado_en;
     end if;
     if new.estado = 'cancelada' then new.confirmada_en := null; end if;
     if new.confirmada_en is distinct from old.confirmada_en or new.estado is distinct from old.estado then
       new.confirmada_por := case when new.confirmada_en is null and new.estado <> 'cancelada' then null
-                                 else coalesce(auth.jwt() ->> 'email', new.confirmada_por) end;
+                                 else coalesce(quien, new.confirmada_por) end;
     end if;
   end if;
   new.updated_by := coalesce(auth.jwt() ->> 'email', new.updated_by);
