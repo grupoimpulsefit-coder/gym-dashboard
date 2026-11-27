@@ -9,7 +9,7 @@
 --      puede anotarlas, por una emergencia.
 --    · Un admin la aprueba: cada persona queda como un gasto de
 --      «Instructores de planta» y aparece en «Pago de la semana» el VIERNES
---      siguiente a la semana trabajada (lunes + 11 días).
+--      de la misma semana trabajada (lunes + 4 días).
 --    · Tarifas fijas por hora (Configuración): Profesor de natación ₡3 500,
 --      Instructor de planta ₡2 500. Sin deducciones por ahora; la columna
 --      `deduccion` queda lista por si se necesitan (solo la edita un admin).
@@ -132,7 +132,7 @@ create policy horas_semana_delete on horas_semana for delete to authenticated
          and (ur.role in ('admin','admin_sedes','admin_g')
               or (ur.role in ('recepcion','coordinador','admin_sucursal') and (ur.sede = horas_semana.sede or horas_semana.sede = any(ur.sedes_extra))))));
 
--- 4) Aprobar una semana: un gasto por persona, para el viernes siguiente -----
+-- 4) Aprobar una semana: un gasto por persona, para el viernes de esa semana -
 create or replace function aprobar_horas(p_sede text, p_semana date)
 returns integer language plpgsql security definer set search_path = public as $$
 declare
@@ -159,7 +159,7 @@ begin
                         cargado_at, detalle_clases)
     values (r.sede, 'instructores_planta', fin, meses[extract(month from fin)::int] || ' ' || extract(year from fin),
             to_char(fin, 'YYYY-MM'), i.nombre, i.id, 'Planilla por horas', r.horas * r.tarifa - r.deduccion,
-            metodo, banco, cuenta, quien, 'horas', i.cedula, 'transferencia', p_semana + 11, now(),
+            metodo, banco, cuenta, quien, 'horas', i.cedula, 'transferencia', p_semana + 4, now(),
             jsonb_build_array(jsonb_build_object('tipo', r.tipo, 'cantidad', r.horas, 'unidad', 'h', 'tarifa', r.tarifa,
               'subtotal', r.horas * r.tarifa, 'deduccion', r.deduccion, 'semana', r.semana, 'dias', r.dias, 'nota', r.nota)))
     returning id into g_id;

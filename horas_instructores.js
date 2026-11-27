@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════════════════════════════════════
    horas_instructores.js — Planilla por horas: instructores que no facturan y
-   se les paga cada viernes por las horas de la semana anterior (lun–dom).
+   se les paga cada viernes por las horas de esa misma semana (lun–dom).
    Pestaña «🕐 Horas» de gastos.html. Base: horas_instructores.sql.
 
    · Coordinador / recepción anotan las horas por día y envían a aprobación.
@@ -19,7 +19,7 @@ let phAviso = null;
 let phPlantilla = [];     // plantilla de horas de la sede (plantillas_pago, tipo 'horas')
 let phDesdePlantilla = false;
 const PH_DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-const phPago = lunes => piSumarDias(lunes, 11);   // viernes siguiente a la semana trabajada
+const phPago = lunes => piSumarDias(lunes, 4);    // viernes de la misma semana trabajada
 const phNum = v => { const n = Number(String(v ?? '').replace(',', '.')); return isFinite(n) && n > 0 ? n : 0; };
 const phHoras = f => f.dias.reduce((s, h) => s + phNum(h), 0);
 const phTarifaDe = f => f.estado === 'aprobada' ? Number(f.tarifa) || 0 : Number(piHoraTarifas.find(t => t.id === f.tarifa_id)?.monto) || 0;
@@ -27,11 +27,8 @@ const phTotal = f => Math.max(0, phHoras(f) * phTarifaDe(f) - (Number(f.deduccio
 const phInst = id => instructores.find(i => i.id === id) || null;
 const phRango = l => { const d = piSumarDias(l, 6); return `${l.getDate()}${l.getMonth() !== d.getMonth() ? ' de ' + l.toLocaleDateString('es-CR', { month: 'long' }) : ''} al ${d.getDate()} de ${d.toLocaleDateString('es-CR', { month: 'long' })}`; };
 
-// Lunes a viernes se trabaja la semana anterior (se paga este viernes); sábado y domingo, la actual
-function phSemanaInicial() {
-  const hoy = piAhoraCR(), lun = piLunes(hoy);
-  phSemana = [6, 0].includes(hoy.getDay()) ? lun : piSumarDias(lun, -7);
-}
+// Siempre abre en la semana actual (se paga este viernes)
+function phSemanaInicial() { phSemana = piLunes(piAhoraCR()); }
 
 async function phCargar() {
   if (!phSemana) phSemanaInicial();
